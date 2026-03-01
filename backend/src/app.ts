@@ -1,70 +1,75 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import * as dotenv from 'dotenv';
 
-/**
- * Creates and configures the Express application.
- *
- * This function encapsulates middleware configuration and attaches
- * stubbed routes for authentication and project CRUD.  When implementing
- * functionality, replace the stubs with proper handlers.
- */
-export function createApp() {
-  const app = express();
+import authRoutes from './routes/auth';
+import projectRoutes from './routes/projects';
 
-  // Enable JSON body parsing
-  app.use(express.json());
-  // Enable CORS for development. In production, restrict allowed origins.
-  app.use(cors({ origin: true, credentials: true }));
+dotenv.config();
 
-  /**
-   * Authentication routes. These are placeholders and should be
-   * replaced with real logic that interacts with PostgreSQL and sends
-   * password reset emails.
-   */
-  app.post('/auth/register', (req, res) => {
-    // TODO: implement registration
-    res.status(501).json({ message: 'Registration not implemented yet.' });
-  });
+const app = express();
 
-  app.post('/auth/login', (req, res) => {
-    // TODO: implement login
-    res.status(501).json({ message: 'Login not implemented yet.' });
-  });
+// Security middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      "font-src": ["'self'", "https://fonts.gstatic.com"],
+      "connect-src": ["'self'", "ws:", "wss:"]
+    }
+  }
+}));
 
-  app.post('/auth/logout', (_req, res) => {
-    // TODO: implement logout
-    res.status(200).json({ message: 'Logged out.' });
-  });
+// CORS configuration
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://studio.metamechsolutions.com'] 
+    : ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
 
-  /**
-   * Project CRUD routes. These endpoints return a 501 status to
-   * indicate they are not implemented.  Once a database layer is added,
-   * these handlers should create, read, update and delete projects.
-   */
-  app.get('/projects', (_req, res) => {
-    // TODO: fetch projects from DB
-    res.status(501).json({ projects: [] });
-  });
+// Request parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
 
-  app.post('/projects', (req, res) => {
-    // TODO: create a new project
-    res.status(501).json({ message: 'Create project not implemented.' });
-  });
-
-  app.get('/projects/:id', (req, res) => {
-    // TODO: read a single project
-    res.status(501).json({ message: `Read project ${req.params.id} not implemented.` });
-  });
-
-  app.put('/projects/:id', (req, res) => {
-    // TODO: update a project
-    res.status(501).json({ message: `Update project ${req.params.id} not implemented.` });
-  });
-
-  app.delete('/projects/:id', (req, res) => {
-    // TODO: delete a project
-    res.status(501).json({ message: `Delete project ${req.params.id} not implemented.` });
-  });
-
-  return app;
+// Logging middleware
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan('combined'));
 }
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV
+  });
+});
+
+// API routes
+app.use('/auth', authRoutes);
+app.use('/projects', projectRoutes);
+
+// Global error handler
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { details: err.message })
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+export default app;

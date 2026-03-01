@@ -1,14 +1,35 @@
-import { createApp } from './app.js';
+import app from './app';
+import { pool } from './database';
 
-// Load environment variables from .env file if present
-import dotenv from 'dotenv';
-dotenv.config();
+const PORT = process.env.PORT || 3000;
 
-const app = createApp();
+async function startServer() {
+  try {
+    // Test database connection
+    await pool.query('SELECT NOW()');
+    console.log('Database connection established');
 
-// Use PORT from environment or default to 3000
-const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+    app.listen(PORT, () => {
+      console.log(`MetaMech Simulation Studio API server running on port ${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
 
-app.listen(port, () => {
-  console.log(`MetaMech backend listening on http://localhost:${port}`);
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  await pool.end();
+  process.exit(0);
 });
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received. Shutting down gracefully...');
+  await pool.end();
+  process.exit(0);
+});
+
+startServer();
