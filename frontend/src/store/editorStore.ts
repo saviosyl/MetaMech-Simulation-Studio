@@ -139,12 +139,23 @@ export function getConnectionPorts(type: string, params?: Record<string, any>, a
         { id: 'output', type: 'output', localPosition: [length / 2, 0.1, 0] },
       ];
     case 'belt-conveyor':
-    case 'roller-conveyor': {
+    case 'roller-conveyor':
+    case 'modular-conveyor-straight': {
       const pL = ((params?.length || 3000) / 1000);
       const pH = ((params?.height || 800) / 1000);
       return [
         { id: 'input', type: 'input', localPosition: [-pL / 2, pH, 0] },
         { id: 'output', type: 'output', localPosition: [pL / 2, pH, 0] },
+      ];
+    }
+    case 'modular-conveyor-90-curve':
+    case 'modular-conveyor-45-curve': {
+      const pH = ((params?.height || 800) / 1000);
+      const cAngle = (params?.curveAngle || 90) * Math.PI / 180;
+      const cRadius = (params?.curveRadius || 1000) / 1000;
+      return [
+        { id: 'input', type: 'input', localPosition: [cRadius, pH, 0] },
+        { id: 'output', type: 'output', localPosition: [cRadius * Math.cos(cAngle), pH, cRadius * Math.sin(cAngle)] },
       ];
     }
     case 'buffer':
