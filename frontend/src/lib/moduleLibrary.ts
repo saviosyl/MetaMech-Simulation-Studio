@@ -20,6 +20,7 @@ export interface ModuleDefinition {
   category: 'process' | 'environment' | 'actors';
   icon: any;
   description: string;
+  assetId?: string; // references AssetDef.id in manifest
   parameters: {
     [key: string]: {
       type: 'number' | 'string' | 'select' | 'boolean' | 'color';
@@ -124,6 +125,40 @@ export const moduleLibrary: ModuleDefinition[] = [
         label: 'Belt Color',
         default: '#2d2d2d',
       },
+    },
+  },
+  {
+    id: 'belt-conveyor',
+    name: 'Belt Conveyor',
+    category: 'process',
+    icon: ArrowRight,
+    description: 'Parametric belt conveyor with adjustable dimensions',
+    assetId: 'belt-conveyor',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 600, min: 300, max: 1200, step: 50 },
+      length: { type: 'number', label: 'Length (mm)', default: 3000, min: 500, max: 12000, step: 100 },
+      height: { type: 'number', label: 'Height (mm)', default: 800, min: 300, max: 3000, step: 50 },
+      angle: { type: 'number', label: 'Angle (°)', default: 0, min: 0, max: 35, step: 1 },
+      beltSpeed: { type: 'number', label: 'Belt Speed (m/min)', default: 20, min: 1, max: 100, step: 1 },
+      sideGuides: { type: 'boolean', label: 'Side Guides', default: true },
+      driveEnd: { type: 'select', label: 'Drive End', default: 'right', options: ['left', 'right'] },
+      supportSpacing: { type: 'number', label: 'Support Spacing (mm)', default: 1500, min: 500, max: 3000, step: 100 },
+    },
+  },
+  {
+    id: 'roller-conveyor',
+    name: 'Roller Conveyor',
+    category: 'process',
+    icon: ArrowRight,
+    description: 'Parametric roller conveyor with adjustable pitch',
+    assetId: 'roller-conveyor',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 600, min: 300, max: 1200, step: 50 },
+      length: { type: 'number', label: 'Length (mm)', default: 3000, min: 500, max: 12000, step: 100 },
+      height: { type: 'number', label: 'Height (mm)', default: 800, min: 300, max: 3000, step: 50 },
+      rollerPitch: { type: 'number', label: 'Roller Pitch (mm)', default: 100, min: 50, max: 200, step: 10 },
+      driven: { type: 'boolean', label: 'Powered Rollers', default: true },
+      sideRails: { type: 'boolean', label: 'Side Rails', default: true },
     },
   },
   {
@@ -468,44 +503,98 @@ export const moduleLibrary: ModuleDefinition[] = [
     },
   },
 
-  // Environment Modules - will be added in the same pattern
-  // For brevity, I'll add just a few key ones here
+  // Environment Modules
   {
     id: 'wall',
     name: 'Wall',
     category: 'environment',
-    icon: Package, // Replace with appropriate icon
+    icon: Package,
     description: 'Structural wall element',
+    assetId: 'wall',
     parameters: {
-      width: {
-        type: 'number',
-        label: 'Width (m)',
-        default: 5,
-        min: 1,
-        max: 20,
-        step: 0.5,
-      },
-      height: {
-        type: 'number',
-        label: 'Height (m)',
-        default: 3,
-        min: 1,
-        max: 8,
-        step: 0.5,
-      },
-      thickness: {
-        type: 'number',
-        label: 'Thickness (m)',
-        default: 0.2,
-        min: 0.1,
-        max: 0.5,
-        step: 0.05,
-      },
-      color: {
-        type: 'color',
-        label: 'Color',
-        default: '#f5f5f5',
-      },
+      width: { type: 'number', label: 'Width (mm)', default: 5000, min: 500, max: 20000, step: 100 },
+      height: { type: 'number', label: 'Height (mm)', default: 3000, min: 1000, max: 8000, step: 100 },
+      thickness: { type: 'number', label: 'Thickness (mm)', default: 200, min: 100, max: 500, step: 10 },
+    },
+  },
+  {
+    id: 'door',
+    name: 'Door',
+    category: 'environment',
+    icon: Package,
+    description: 'Door with frame',
+    assetId: 'door',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 1200, min: 600, max: 3000, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 2400, min: 1800, max: 3000, step: 50 },
+      thickness: { type: 'number', label: 'Thickness (mm)', default: 100, min: 50, max: 200, step: 10 },
+    },
+  },
+  {
+    id: 'window',
+    name: 'Window',
+    category: 'environment',
+    icon: Package,
+    description: 'Window with frame and glass',
+    assetId: 'window',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 1500, min: 400, max: 4000, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 1200, min: 400, max: 3000, step: 50 },
+      thickness: { type: 'number', label: 'Thickness (mm)', default: 100, min: 50, max: 200, step: 10 },
+    },
+  },
+  {
+    id: 'stairs',
+    name: 'Stairs',
+    category: 'environment',
+    icon: Package,
+    description: 'Staircase with configurable steps',
+    assetId: 'stairs',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 1200, min: 600, max: 3000, step: 50 },
+      stepCount: { type: 'number', label: 'Steps', default: 12, min: 3, max: 30, step: 1 },
+      stepHeight: { type: 'number', label: 'Step Height (mm)', default: 180, min: 150, max: 220, step: 10 },
+      stepDepth: { type: 'number', label: 'Step Depth (mm)', default: 280, min: 200, max: 350, step: 10 },
+    },
+  },
+  {
+    id: 'pallet-rack',
+    name: 'Pallet Rack',
+    category: 'environment',
+    icon: Package,
+    description: 'Industrial pallet racking',
+    assetId: 'pallet-rack',
+    parameters: {
+      bayWidth: { type: 'number', label: 'Bay Width (mm)', default: 2700, min: 1500, max: 4000, step: 100 },
+      depth: { type: 'number', label: 'Depth (mm)', default: 1100, min: 800, max: 1500, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 5000, min: 2000, max: 12000, step: 100 },
+      levels: { type: 'number', label: 'Levels', default: 4, min: 2, max: 8, step: 1 },
+    },
+  },
+  {
+    id: 'safety-rail',
+    name: 'Safety Rail',
+    category: 'environment',
+    icon: Package,
+    description: 'Safety guardrail',
+    assetId: 'safety-rail',
+    parameters: {
+      width: { type: 'number', label: 'Length (mm)', default: 3000, min: 500, max: 10000, step: 100 },
+      height: { type: 'number', label: 'Height (mm)', default: 1100, min: 900, max: 1200, step: 50 },
+      thickness: { type: 'number', label: 'Thickness (mm)', default: 60, min: 40, max: 80, step: 10 },
+    },
+  },
+  {
+    id: 'warehouse-shell',
+    name: 'Warehouse Shell',
+    category: 'environment',
+    icon: Package,
+    description: 'Large warehouse enclosure',
+    assetId: 'warehouse-shell',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 20000, min: 5000, max: 50000, step: 500 },
+      height: { type: 'number', label: 'Height (mm)', default: 8000, min: 4000, max: 15000, step: 500 },
+      thickness: { type: 'number', label: 'Thickness (mm)', default: 300, min: 200, max: 500, step: 50 },
     },
   },
 

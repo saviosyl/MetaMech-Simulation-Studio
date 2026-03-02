@@ -2,6 +2,9 @@ import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { ProcessNode } from '../../store/editorStore';
+import { getAssetById, ParametricAssetDef, StaticAssetDef } from '../../lib/assetManifest';
+import ParametricModel from './ParametricModel';
+import StaticModel from './StaticModel';
 import ConveyorModel from './models/ConveyorModel';
 import RobotArmModel from './models/RobotArmModel';
 import MachineModel from './models/MachineModel';
@@ -26,6 +29,45 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
       groupRef.current.position.y = node.position[1];
     }
   });
+
+  // Check if this node uses the new asset system
+  const assetDef = node.assetId ? getAssetById(node.assetId) : undefined;
+
+  if (assetDef) {
+    if (assetDef.assetType === 'parametric') {
+      return (
+        <group
+          ref={groupRef}
+          position={node.position}
+          rotation={node.rotation}
+          scale={node.scale}
+        >
+          <ParametricModel
+            assetDef={assetDef as ParametricAssetDef}
+            parameters={node.parameters}
+            isSelected={isSelected}
+            onClick={onClick}
+          />
+        </group>
+      );
+    }
+    if (assetDef.assetType === 'static') {
+      return (
+        <group
+          ref={groupRef}
+          position={node.position}
+          rotation={node.rotation}
+          scale={node.scale}
+        >
+          <StaticModel
+            assetDef={assetDef as StaticAssetDef}
+            isSelected={isSelected}
+            onClick={onClick}
+          />
+        </group>
+      );
+    }
+  }
 
   const renderModel = () => {
     switch (node.type) {

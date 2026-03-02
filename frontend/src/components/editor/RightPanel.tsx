@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModuleDefinition } from '../../lib/moduleLibrary';
+import { getAssetById, ParametricAssetDef } from '../../lib/assetManifest';
 
 const RightPanel: React.FC = () => {
   const {
@@ -48,6 +49,13 @@ const RightPanel: React.FC = () => {
   }, [selectedObjectId, selectedObjectType, processNodes, environmentAssets, actors]);
 
   const moduleDefinition = selectedObject ? getModuleDefinition(selectedObject.type) : null;
+  
+  // Check for parametric asset def (for enhanced parameter UI)
+  const parametricAssetDef = React.useMemo(() => {
+    if (!selectedObject || !(selectedObject as any).assetId) return null;
+    const def = getAssetById((selectedObject as any).assetId);
+    return def?.assetType === 'parametric' ? def as ParametricAssetDef : null;
+  }, [selectedObject]);
 
   const handleParameterChange = (paramKey: string, value: any) => {
     if (!selectedObject || !selectedObjectType) return;
@@ -329,8 +337,61 @@ const RightPanel: React.FC = () => {
                 </div>
               </div>
 
-              {/* Module Parameters */}
-              {moduleDefinition && (
+              {/* Parametric Asset Parameters (with units) */}
+              {parametricAssetDef && (
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-2">Parameters</h3>
+                  <div className="space-y-3">
+                    {Object.entries(parametricAssetDef.parameterDefs).map(([paramKey, paramDef]) => {
+                      const value = selectedObject?.parameters[paramKey] ?? parametricAssetDef.defaults[paramKey];
+                      const limits = parametricAssetDef.limits[paramKey];
+                      return (
+                        <div key={paramKey}>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {paramDef.label}{paramDef.unit ? ` (${paramDef.unit})` : ''}
+                          </label>
+                          {paramDef.type === 'number' && (
+                            <input
+                              type="number"
+                              value={value}
+                              onChange={(e) => handleParameterChange(paramKey, Number(e.target.value))}
+                              min={limits?.[0]}
+                              max={limits?.[1]}
+                              step={paramDef.step || 1}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                            />
+                          )}
+                          {paramDef.type === 'boolean' && (
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={value ?? false}
+                                onChange={(e) => handleParameterChange(paramKey, e.target.checked)}
+                                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                              />
+                              <span className="text-sm text-gray-700">Enabled</span>
+                            </label>
+                          )}
+                          {paramDef.type === 'select' && paramDef.options && (
+                            <select
+                              value={value}
+                              onChange={(e) => handleParameterChange(paramKey, e.target.value)}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                            >
+                              {paramDef.options.map(opt => (
+                                <option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Module Parameters (legacy/non-parametric) */}
+              {!parametricAssetDef && moduleDefinition && (
                 <div>
                   <h3 className="font-medium text-gray-900 mb-2">Parameters</h3>
                   <div className="space-y-3">

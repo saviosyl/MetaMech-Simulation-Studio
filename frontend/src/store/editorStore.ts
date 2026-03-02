@@ -1,16 +1,35 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
+import { AssetDef, getAssetManifest, getAssetById, ParametricAssetDef } from '../lib/assetManifest';
+import { runBuilder } from '../lib/parametricBuilders';
+
 // Types
 export interface ProcessNode {
   id: string;
   type: 'source' | 'sink' | 'conveyor' | 'buffer' | 'machine' | 'router' | 
         'transfer-bridge' | 'popup-transfer' | 'pusher-transfer' | 
-        'spiral-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer';
+        'spiral-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
+        'belt-conveyor' | 'roller-conveyor' | 'fanuc-robot' | 'machine-static';
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
   parameters: Record<string, any>;
   name: string;
+  assetId?: string;       // references AssetDef.id if using new asset system
+  assetDefType?: 'static' | 'parametric'; // asset type from manifest
+}
+
+// New unified scene object type (used alongside existing types)
+export interface SceneObject {
+  id: string;
+  assetId: string;
+  assetType: 'static' | 'parametric';
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+  parameters: Record<string, any>;
+  name: string;
+  category: 'process' | 'environment' | 'actors';
 }
 
 export interface EnvironmentAsset {
@@ -22,6 +41,8 @@ export interface EnvironmentAsset {
   scale: [number, number, number];
   parameters: Record<string, any>;
   name: string;
+  assetId?: string;
+  assetDefType?: 'static' | 'parametric';
 }
 
 export interface Actor {
@@ -32,6 +53,8 @@ export interface Actor {
   scale: [number, number, number];
   parameters: Record<string, any>;
   name: string;
+  assetId?: string;
+  assetDefType?: 'static' | 'parametric';
 }
 
 export interface ProcessEdge {
@@ -86,7 +109,24 @@ export interface CustomProduct {
 }
 
 // Connection port definitions per object type
-export function getConnectionPorts(type: string, params?: Record<string, any>): ConnectionPort[] {
+export function getConnectionPorts(type: string, params?: Record<string, any>, assetId?: string): ConnectionPort[] {
+  // Check asset manifest first
+  if (assetId) {
+    const assetDef = getAssetById(assetId);
+    if (assetDef) {
+      if (assetDef.assetType === 'static' && assetDef.connectionPorts) {
+        return assetDef.connectionPorts;
+      }
+      if (assetDef.assetType === 'parametric') {
+        const mergedParams = { ...assetDef.defaults, ...params };
+        const result = runBuilder(assetDef.builder, mergedParams);
+        if (result && result.ports.length > 0) {
+          return result.ports;
+        }
+      }
+    }
+  }
+
   const length = params?.length || 5;
   switch (type) {
     case 'source':
@@ -98,6 +138,15 @@ export function getConnectionPorts(type: string, params?: Record<string, any>): 
         { id: 'input', type: 'input', localPosition: [-length / 2, 0.1, 0] },
         { id: 'output', type: 'output', localPosition: [length / 2, 0.1, 0] },
       ];
+    case 'belt-conveyor':
+    case 'roller-conveyor': {
+      const pL = ((params?.length || 3000) / 1000);
+      const pH = ((params?.height || 800) / 1000);
+      return [
+        { id: 'input', type: 'input', localPosition: [-pL / 2, pH, 0] },
+        { id: 'output', type: 'output', localPosition: [pL / 2, pH, 0] },
+      ];
+    }
     case 'buffer':
       return [
         { id: 'input', type: 'input', localPosition: [-1, 0.4, 0] },
@@ -133,6 +182,9 @@ export function getConnectionPorts(type: string, params?: Record<string, any>): 
 }
 
 interface EditorState {
+  // Asset manifest
+  assetManifest: AssetDef[];
+
   // Scene objects
   processNodes: ProcessNode[];
   environmentAssets: EnvironmentAsset[];
@@ -228,6 +280,7 @@ const defaultSceneSettings: SceneSettings = {
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   // Initial state
+  assetManifest: getAssetManifest(),
   processNodes: [],
   environmentAssets: [],
   actors: [],
@@ -260,14 +313,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   // Actions
   addProcessNode: (type, position) => {
+    // Check if there's a matching asset in the manifest
+    const manifest = get().assetManifest;
+    const matchingAsset = manifest.find(a => a.id === type && a.category === 'process');
+    const isParametric = matchingAsset?.assetType === 'parametric';
+    const defaultParams = isParametric
+      ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
+      : getDefaultParameters(type);
+
     const newNode: ProcessNode = {
       id: uuidv4(),
       type,
       position,
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
-      parameters: getDefaultParameters(type),
+      parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
+      assetId: matchingAsset?.id,
+      assetDefType: matchingAsset?.assetType,
     };
     
     set(state => ({
@@ -278,14 +341,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   addEnvironmentAsset: (type, position) => {
+    const manifest = get().assetManifest;
+    const matchingAsset = manifest.find(a => a.id === type && a.category === 'environment');
+    const isParametric = matchingAsset?.assetType === 'parametric';
+    const defaultParams = isParametric
+      ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
+      : getDefaultParameters(type);
+
     const newAsset: EnvironmentAsset = {
       id: uuidv4(),
       type,
       position,
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
-      parameters: getDefaultParameters(type),
+      parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
+      assetId: matchingAsset?.id,
+      assetDefType: matchingAsset?.assetType,
     };
     
     set(state => ({
@@ -296,14 +368,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   addActor: (type, position) => {
+    const manifest = get().assetManifest;
+    const matchingAsset = manifest.find(a => a.id === type && a.category === 'actors');
+    const isParametric = matchingAsset?.assetType === 'parametric';
+    const defaultParams = isParametric
+      ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
+      : getDefaultParameters(type);
+
     const newActor: Actor = {
       id: uuidv4(),
       type,
       position,
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
-      parameters: getDefaultParameters(type),
+      parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
+      assetId: matchingAsset?.id,
+      assetDefType: matchingAsset?.assetType,
     };
     
     set(state => ({
@@ -469,6 +550,10 @@ function getDefaultParameters(type: string): Record<string, any> {
     source: { spawnRate: 1.0, productType: 'default' },
     sink: { capacity: 100 },
     conveyor: { length: 5, width: 1, speed: 1.0 },
+    'belt-conveyor': { width: 600, length: 3000, height: 800, angle: 0, beltSpeed: 20, sideGuides: true, driveEnd: 'right', supportSpacing: 1500 },
+    'roller-conveyor': { width: 600, length: 3000, height: 800, rollerPitch: 100, driven: true, sideRails: true },
+    'fanuc-robot': {},
+    'machine-static': {},
     buffer: { capacity: 10 },
     machine: { processingTime: 2.0, capacity: 1 },
     router: { mode: 'round-robin' },

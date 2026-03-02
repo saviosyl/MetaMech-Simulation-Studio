@@ -1,0 +1,169 @@
+[
+  {
+    "id": "belt-conveyor",
+    "assetType": "parametric",
+    "category": "process",
+    "name": "Belt Conveyor",
+    "description": "Belt conveyor with adjustable width, length, height, and angle",
+    "builder": "beltConveyorBuilder",
+    "parts": {},
+    "thumbnailUrl": "",
+    "defaults": { "width": 600, "length": 3000, "height": 800, "angle": 0, "beltSpeed": 20, "sideGuides": true, "driveEnd": "right", "supportSpacing": 1500 },
+    "limits": { "width": [300, 1200], "length": [500, 12000], "height": [300, 3000], "angle": [0, 35], "beltSpeed": [1, 100], "supportSpacing": [500, 3000] },
+    "parameterDefs": {
+      "width": { "type": "number", "label": "Width", "unit": "mm", "step": 50 },
+      "length": { "type": "number", "label": "Length", "unit": "mm", "step": 100 },
+      "height": { "type": "number", "label": "Height", "unit": "mm", "step": 50 },
+      "angle": { "type": "number", "label": "Incline Angle", "unit": "°", "step": 1 },
+      "beltSpeed": { "type": "number", "label": "Belt Speed", "unit": "m/min", "step": 1 },
+      "sideGuides": { "type": "boolean", "label": "Side Guides" },
+      "driveEnd": { "type": "select", "label": "Drive End", "options": ["left", "right"] },
+      "supportSpacing": { "type": "number", "label": "Support Spacing", "unit": "mm", "step": 100 }
+    }
+  },
+  {
+    "id": "roller-conveyor",
+    "assetType": "parametric",
+    "category": "process",
+    "name": "Roller Conveyor",
+    "description": "Roller conveyor with adjustable pitch and drive type",
+    "builder": "rollerConveyorBuilder",
+    "parts": {},
+    "thumbnailUrl": "",
+    "defaults": { "width": 600, "length": 3000, "height": 800, "rollerPitch": 100, "driven": true, "sideRails": true },
+    "limits": { "width": [300, 1200], "length": [500, 12000], "height": [300, 3000], "rollerPitch": [50, 200] },
+    "parameterDefs": {
+      "width": { "type": "number", "label": "Width", "unit": "mm", "step": 50 },
+      "length": { "type": "number", "label": "Length", "unit": "mm", "step": 100 },
+      "height": { "type": "number", "label": "Height", "unit": "mm", "step": 50 },
+      "rollerPitch": { "type": "number", "label": "Roller Pitch", "unit": "mm", "step": 10 },
+      "driven": { "type": "boolean", "label": "Powered Rollers" },
+      "sideRails": { "type": "boolean", "label": "Side Rails" }
+    }
+  },
+  {
+    "id": "fanuc-robot",
+    "assetType": "static",
+    "category": "process",
+    "name": "Fanuc Robot",
+    "description": "Industrial robot arm",
+    "glbUrl": "/models/fanuc-robot.glb",
+    "thumbnailUrl": "",
+    "defaultScale": [1, 1, 1],
+    "connectionPorts": [
+      { "id": "input", "type": "input", "localPosition": [-1.5, 0, 0] },
+      { "id": "output", "type": "output", "localPosition": [1.5, 0, 0] }
+    ]
+  },
+  {
+    "id": "forklift-static",
+    "assetType": "static",
+    "category": "actors",
+    "name": "Forklift",
+    "description": "Industrial forklift vehicle",
+    "glbUrl": "/models/forklift.glb",
+    "thumbnailUrl": "",
+    "defaultScale": [1, 1, 1]
+  },
+  {
+    "id": "machine-static",
+    "assetType": "static",
+    "category": "process",
+    "name": "Machine (GLB)",
+    "description": "Industrial machine from GLB model",
+    "glbUrl": "/models/machine.glb",
+    "thumbnailUrl": "",
+    "defaultScale": [1, 1, 1],
+    "connectionPorts": [
+      { "id": "input", "type": "input", "localPosition": [-1, 0.75, 0] },
+      { "id": "output", "type": "output", "localPosition": [1, 0.75, 0] }
+    ]
+  },
+  {
+    "id": "wall",
+    "assetType": "parametric",
+    "category": "environment",
+    "name": "Wall",
+    "builder": "wallBuilder",
+    "description": "Structural wall element",
+    "parts": {},
+    "thumbnailUrl": "",
+    "defaults": { "width": 5000, "height": 3000, "thickness": 200 },
+    "limits": { "width": [500, 20000], "height": [1000, 8000], "thickness": [100, 500] },
+    "parameterDefs": {
+      "width": { "type": "number", "label": "Width", "unit": "mm", "step": 100 },
+      "height": { "type": "number", "label": "Height", "unit": "mm", "step": 100 },
+      "thickness": { "type": "number", "label": "Thickness", "unit": "mm", "step": 10 }
+    }
+  },
+  {
+    "id": "door",
+    "assetType": "parametric",
+    "category": "environment",
+    "name": "Door",
+    "builder": "doorBuilder",
+    "description": "Door with frame",
+    "parts": {},
+    "thumbnailUrl": "",
+    "defaults": { "width": 1200, "height": 2400, "thickness": 100 },
+    "limits": { "width": [600, 3000], "height": [1800, 3000], "thickness": [50, 200] },
+    "parameterDefs": {
+      "width": { "type": "number", "label": "Width", "unit": "mm", "step": 50 },
+      "height": { "type": "number", "label": "Height", "unit": "mm", "step": 50 },
+      "thickness": { "type": "number", "label": "Thickness", "unit": "mm", "step": 10 }
+    }
+  },
+  {
+    "id": "window",
+    "assetType": "parametric",
+    "category": "environment",
+    "name": "Window",
+    "builder": "windowBuilder",
+    "description": "Window with frame and glass",
+    "parts": {},
+    "thumbnailUrl": "",
+    "defaults": { "width": 1500, "height": 1200, "thickness": 100 },
+    "limits": { "width": [400, 4000], "height": [400, 3000], "thickness": [50, 200] },
+    "parameterDefs": {
+      "width": { "type": "number", "label": "Width", "unit": "mm", "step": 50 },
+      "height": { "type": "number", "label": "Height", "unit": "mm", "step": 50 },
+      "thickness": { "type": "number", "label": "Thickness", "unit": "mm", "step": 10 }
+    }
+  },
+  {
+    "id": "stairs",
+    "assetType": "parametric",
+    "category": "environment",
+    "name": "Stairs",
+    "builder": "stairsBuilder",
+    "description": "Staircase with configurable steps",
+    "parts": {},
+    "thumbnailUrl": "",
+    "defaults": { "width": 1200, "stepCount": 12, "stepHeight": 180, "stepDepth": 280 },
+    "limits": { "width": [600, 3000], "stepCount": [3, 30], "stepHeight": [150, 220], "stepDepth": [200, 350] },
+    "parameterDefs": {
+      "width": { "type": "number", "label": "Width", "unit": "mm", "step": 50 },
+      "stepCount": { "type": "number", "label": "Steps", "step": 1 },
+      "stepHeight": { "type": "number", "label": "Step Height", "unit": "mm", "step": 10 },
+      "stepDepth": { "type": "number", "label": "Step Depth", "unit": "mm", "step": 10 }
+    }
+  },
+  {
+    "id": "pallet-rack",
+    "assetType": "parametric",
+    "category": "environment",
+    "name": "Pallet Rack",
+    "builder": "palletRackBuilder",
+    "description": "Industrial pallet racking",
+    "parts": {},
+    "thumbnailUrl": "",
+    "defaults": { "bayWidth": 2700, "depth": 1100, "height": 5000, "levels": 4 },
+    "limits": { "bayWidth": [1500, 4000], "depth": [800, 1500], "height": [2000, 12000], "levels": [2, 8] },
+    "parameterDefs": {
+      "bayWidth": { "type": "number", "label": "Bay Width", "unit": "mm", "step": 100 },
+      "depth": { "type": "number", "label": "Depth", "unit": "mm", "step": 50 },
+      "height": { "type": "number", "label": "Height", "unit": "mm", "step": 100 },
+      "levels": { "type": "number", "label": "Levels", "step": 1 }
+    }
+  }
+]

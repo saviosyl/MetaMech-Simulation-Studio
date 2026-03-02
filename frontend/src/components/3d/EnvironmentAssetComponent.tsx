@@ -2,6 +2,9 @@ import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { EnvironmentAsset } from '../../store/editorStore';
+import { getAssetById, ParametricAssetDef, StaticAssetDef } from '../../lib/assetManifest';
+import ParametricModel from './ParametricModel';
+import StaticModel from './StaticModel';
 
 interface EnvironmentAssetComponentProps {
   asset: EnvironmentAsset;
@@ -11,6 +14,35 @@ interface EnvironmentAssetComponentProps {
 
 const EnvironmentAssetComponent: React.FC<EnvironmentAssetComponentProps> = ({ asset, isSelected, onClick }) => {
   const meshRef = useRef<THREE.Mesh>(null);
+
+  // Check if this asset uses the new asset system
+  const assetDef = asset.assetId ? getAssetById(asset.assetId) : undefined;
+
+  if (assetDef) {
+    if (assetDef.assetType === 'parametric') {
+      return (
+        <group position={asset.position} rotation={asset.rotation} scale={asset.scale}>
+          <ParametricModel
+            assetDef={assetDef as ParametricAssetDef}
+            parameters={asset.parameters}
+            isSelected={isSelected}
+            onClick={onClick}
+          />
+        </group>
+      );
+    }
+    if (assetDef.assetType === 'static') {
+      return (
+        <group position={asset.position} rotation={asset.rotation} scale={asset.scale}>
+          <StaticModel
+            assetDef={assetDef as StaticAssetDef}
+            isSelected={isSelected}
+            onClick={onClick}
+          />
+        </group>
+      );
+    }
+  }
   
   // Simple animation for selected objects
   useFrame(() => {

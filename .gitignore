@@ -1,1 +1,24 @@
+# Build output
 frontend/dist/
+
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Large binary assets (store in R2, not GitHub)
+# Keep a few small sample GLBs for dev, but exclude large ones
+*.fbx
+*.blend
+*.max
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
