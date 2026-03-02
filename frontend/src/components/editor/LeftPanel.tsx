@@ -83,8 +83,8 @@ const LeftPanel: React.FC = () => {
   }
 
   return (
-    <div className="relative flex-shrink-0 flex" style={{ width: leftPanelWidth }}>
-      <div className="flex-1 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
+    <div style={{ flexShrink: 0, width: leftPanelWidth, maxWidth: 400, minWidth: 240, display: 'flex', height: '100%', overflow: 'hidden' }}>
+      <div style={{ flex: 1, background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3">
@@ -200,9 +200,11 @@ const LeftPanel: React.FC = () => {
 
       {/* Resize Handle */}
       <div
-        className="w-1.5 cursor-col-resize bg-transparent hover:bg-teal-400 active:bg-teal-500 transition-colors flex-shrink-0"
+        style={{ width: 6, cursor: 'col-resize', flexShrink: 0, background: 'transparent', transition: 'background 0.15s' }}
         onMouseDown={handleResizeStart}
         onDoubleClick={handleDoubleClick}
+        onMouseEnter={(e) => (e.currentTarget.style.background = '#14b8a6')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
         title="Drag to resize, double-click to collapse"
       />
     </div>

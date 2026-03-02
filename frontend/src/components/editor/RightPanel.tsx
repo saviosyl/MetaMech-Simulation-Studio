@@ -189,47 +189,57 @@ const RightPanel: React.FC = () => {
 
   if (rightPanelCollapsed) {
     return (
-      <div className="relative flex-shrink-0">
+      <div style={{ flexShrink: 0, width: 32, borderLeft: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <button
           onClick={() => setRightPanelCollapsed(false)}
-          className="w-8 h-full bg-white border-l border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+          style={{ cursor: 'pointer', padding: 4, border: 'none', background: 'none' }}
           title="Expand Properties"
         >
-          <ChevronLeft size={16} className="text-gray-500" />
+          <ChevronLeft size={16} color="#6b7280" />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="relative flex-shrink-0 flex" style={{ width: rightPanelWidth, maxWidth: 500 }}>
+    <div style={{ 
+      flexShrink: 0, 
+      width: rightPanelWidth, 
+      maxWidth: 400, 
+      minWidth: 240,
+      display: 'flex',
+      height: '100%',
+      overflow: 'hidden',
+    }}>
       {/* Resize Handle */}
       <div
-        className="w-1.5 cursor-col-resize bg-transparent hover:bg-teal-400 active:bg-teal-500 transition-colors flex-shrink-0"
+        style={{ width: 6, cursor: 'col-resize', flexShrink: 0, background: 'transparent', transition: 'background 0.15s' }}
         onMouseDown={handleResizeStart}
         onDoubleClick={handleDoubleClick}
+        onMouseEnter={(e) => (e.currentTarget.style.background = '#14b8a6')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
         title="Drag to resize, double-click to collapse"
       />
 
-      <div className="flex-1 bg-white border-l border-gray-200 flex flex-col overflow-hidden">
+      <div style={{ flex: 1, background: '#fff', borderLeft: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Header */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Settings size={18} />
+        <div style={{ padding: 12, borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: 14, fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+              <Settings size={16} />
               Properties
             </h2>
             <button
               onClick={() => setRightPanelCollapsed(true)}
-              className="p-1 rounded hover:bg-gray-100 transition-colors"
-              title="Collapse"
+              style={{ cursor: 'pointer', padding: 4, border: 'none', background: 'none', borderRadius: 4 }}
+              title="Collapse Panel"
             >
-              <ChevronRight size={16} className="text-gray-500" />
+              <ChevronRight size={16} color="#6b7280" />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
           {selectedObject ? (
             <div className="p-4 space-y-6">
               {/* Object Info */}

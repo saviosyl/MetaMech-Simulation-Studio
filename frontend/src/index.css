@@ -7,9 +7,13 @@
   padding: 0;
 }
 
-html {
+html, body, #root {
   line-height: 1.15;
   -webkit-text-size-adjust: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 body {
@@ -20,7 +24,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: #ffffff;
   color: #1f2937;
-  min-height: 100vh;
 }
 
 /* Typography */

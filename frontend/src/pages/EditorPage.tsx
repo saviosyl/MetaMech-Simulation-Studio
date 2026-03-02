@@ -54,7 +54,6 @@ const EditorPage: React.FC = () => {
     if (id) {
       loadProjectData(id);
     } else {
-      // Demo mode — load empty scene
       loadScene({});
     }
   }, [id]);
@@ -65,7 +64,7 @@ const EditorPage: React.FC = () => {
   }, [processNodes, environmentAssets, actors, edges]);
 
   useEffect(() => {
-    if (!id) return; // No auto-save in demo mode
+    if (!id) return;
     autoSaveTimerRef.current = setInterval(() => {
       if (Date.now() - lastChangeRef.current < 60000 && lastChangeRef.current > 0) {
         handleSave();
@@ -79,7 +78,6 @@ const EditorPage: React.FC = () => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
 
-      // Undo/Redo
       if ((event.metaKey || event.ctrlKey) && event.key === 'z') {
         event.preventDefault();
         if (event.shiftKey) {
@@ -90,14 +88,12 @@ const EditorPage: React.FC = () => {
         return;
       }
 
-      // Save
       if ((event.metaKey || event.ctrlKey) && event.key === 's') {
         event.preventDefault();
         handleSave();
         return;
       }
 
-      // Select All
       if ((event.metaKey || event.ctrlKey) && event.key === 'a') {
         event.preventDefault();
         selectAll();
@@ -133,7 +129,6 @@ const EditorPage: React.FC = () => {
       loadScene(project.data || {});
     } catch (error) {
       console.error('Failed to load project:', error);
-      // Fallback: load empty scene
       loadScene({});
     }
   };
@@ -164,26 +159,38 @@ const EditorPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+    <div style={{ 
+      position: 'fixed', 
+      top: 0, left: 0, right: 0, bottom: 0, 
+      display: 'flex', 
+      flexDirection: 'column',
+      overflow: 'hidden',
+    }}>
       <TopBar
         projectName={projectName}
         setProjectName={setProjectName}
         saveStatus={saveStatus}
         onSave={handleSave}
       />
-      <div className="flex-1 flex overflow-hidden">
+      <div style={{ 
+        flex: 1, 
+        display: 'flex', 
+        overflow: 'hidden',
+        minHeight: 0,
+      }}>
         <LeftPanel />
-        <div className="flex-1 relative bg-gray-900 min-w-0" onContextMenu={handleContextMenu}>
+        <div 
+          style={{ flex: 1, position: 'relative', minWidth: 0, overflow: 'hidden' }}
+          onContextMenu={handleContextMenu}
+        >
           <Viewport />
           <StatsPanel />
         </div>
         <RightPanel />
       </div>
 
-      {/* Shortcuts Panel */}
       <ShortcutsPanel />
 
-      {/* Context Menu */}
       {contextMenu && (
         <ContextMenu
           x={contextMenu.x}
