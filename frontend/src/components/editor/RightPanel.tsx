@@ -202,7 +202,7 @@ const RightPanel: React.FC = () => {
   }
 
   return (
-    <div className="relative flex-shrink-0 flex" style={{ width: rightPanelWidth }}>
+    <div className="relative flex-shrink-0 flex" style={{ width: rightPanelWidth, maxWidth: 500 }}>
       {/* Resize Handle */}
       <div
         className="w-1.5 cursor-col-resize bg-transparent hover:bg-teal-400 active:bg-teal-500 transition-colors flex-shrink-0"

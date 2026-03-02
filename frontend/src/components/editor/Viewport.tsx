@@ -8,7 +8,7 @@ import {
   TransformControls,
   Text
 } from '@react-three/drei';
-import { EffectComposer, ToneMapping, SMAA } from '@react-three/postprocessing';
+// EffectComposer removed — ToneMapping+SMAA can cause blank screens on some devices
 import * as THREE from 'three';
 import { useEditorStore, getConnectionPorts } from '../../store/editorStore';
 import ProcessNodeComponent from '../3d/ProcessNodeComponent';
@@ -364,11 +364,8 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
         maxPolarAngle={Math.PI / 2}
       />
 
-      {/* Post Processing */}
-      <EffectComposer>
-        <ToneMapping adaptive={true} />
-        <SMAA />
-      </EffectComposer>
+      {/* Scene background color — ensures viewport is never black even if Environment HDR fails */}
+      <color attach="background" args={['#1e293b']} />
 
       {/* Loading Placeholder */}
       {processNodes.length === 0 && environmentAssets.length === 0 && actors.length === 0 && (
@@ -460,6 +457,7 @@ const Viewport: React.FC = () => {
   return (
     <div 
       className="w-full h-full relative"
+      style={{ minHeight: '400px', background: '#1a1a2e' }}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
@@ -483,7 +481,7 @@ const Viewport: React.FC = () => {
 
       {/* Viewport Overlay - Instructions */}
       {processNodes.length === 0 && environmentAssets.length === 0 && actors.length === 0 && (
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center" style={{ zIndex: 10 }}>
           <div className="bg-black/20 backdrop-blur-sm rounded-xl p-8 text-white text-center max-w-md">
             <h3 className="text-xl font-semibold mb-4">Welcome to MetaMech Studio</h3>
             <p className="text-sm opacity-90 mb-4">
@@ -499,7 +497,7 @@ const Viewport: React.FC = () => {
       )}
 
       {/* Viewport Info */}
-      <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg p-2 text-white text-xs space-y-1">
+      <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg p-2 text-white text-xs space-y-1" style={{ zIndex: 10 }}>
         <div>Objects: {processNodes.length + environmentAssets.length + actors.length}</div>
         <div>Mode: {transformMode.charAt(0).toUpperCase() + transformMode.slice(1)}</div>
         {selectedObject && (
