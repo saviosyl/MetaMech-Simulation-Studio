@@ -5,7 +5,7 @@ import {
   Database, 
   RotateCw, 
   GitBranch,
-  Bridge,
+  Columns,
   ArrowUp,
   ArrowRightLeft,
   TrendingUp,
@@ -224,7 +224,7 @@ export const moduleLibrary: ModuleDefinition[] = [
     id: 'transfer-bridge',
     name: 'Transfer Bridge',
     category: 'process',
-    icon: Bridge,
+    icon: Columns,
     description: 'Short bridge segment for connecting conveyors',
     parameters: {
       length: {
