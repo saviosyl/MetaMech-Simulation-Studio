@@ -49,23 +49,25 @@ const EditorPage: React.FC = () => {
     pushHistory(useEditorStore.getState());
   }, [processNodes, environmentAssets, actors, edges]);
 
-  // Load project
+  // Load project (or start with empty scene in demo mode)
   useEffect(() => {
-    if (!id) {
-      navigate('/dashboard');
-      return;
+    if (id) {
+      loadProjectData(id);
+    } else {
+      // Demo mode — load empty scene
+      loadScene({});
     }
-    loadProjectData(id);
   }, [id]);
 
-  // Auto-save every 60 seconds
+  // Auto-save every 60 seconds (only when backend is available)
   useEffect(() => {
     lastChangeRef.current = Date.now();
   }, [processNodes, environmentAssets, actors, edges]);
 
   useEffect(() => {
+    if (!id) return; // No auto-save in demo mode
     autoSaveTimerRef.current = setInterval(() => {
-      if (id && Date.now() - lastChangeRef.current < 60000 && lastChangeRef.current > 0) {
+      if (Date.now() - lastChangeRef.current < 60000 && lastChangeRef.current > 0) {
         handleSave();
       }
     }, 60000);

@@ -18,6 +18,9 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           
+          {/* Demo route - direct editor access without auth */}
+          <Route path="/demo" element={<EditorPage />} />
+          
           {/* Protected routes */}
           <Route
             path="/dashboard"
@@ -37,11 +40,11 @@ function App() {
             }
           />
           
-          {/* Redirect root to dashboard */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          {/* Redirect root to demo for now (switch to /dashboard when backend is deployed) */}
+          <Route path="/" element={<Navigate to="/demo" replace />} />
           
-          {/* Catch all - redirect to dashboard */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          {/* Catch all */}
+          <Route path="*" element={<Navigate to="/demo" replace />} />
         </Routes>
       </Router>
     </AuthProvider>
