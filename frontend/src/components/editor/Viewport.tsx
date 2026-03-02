@@ -110,18 +110,20 @@ const DraggableObject: React.FC<{
     const rot = groupRef.current.rotation;
     const scl = groupRef.current.scale;
     
-    // Apply grid snap
+    // Force Y=0 (objects stay on ground) and apply grid snap
     const { gridSnap, gridSnapSize } = useEditorStore.getState();
-    let px = pos.x, py = pos.y, pz = pos.z;
+    let px = pos.x, pz = pos.z;
     if (gridSnap && transformMode === 'translate') {
       px = Math.round(px / gridSnapSize) * gridSnapSize;
-      py = Math.round(py / gridSnapSize) * gridSnapSize;
       pz = Math.round(pz / gridSnapSize) * gridSnapSize;
-      groupRef.current.position.set(px, py, pz);
+    }
+    // Always keep Y=0 during translate
+    if (transformMode === 'translate') {
+      groupRef.current.position.set(px, 0, pz);
     }
     
     updateObject(id, objectType, {
-      position: [px, py, pz] as [number, number, number],
+      position: [px, 0, pz] as [number, number, number],
       rotation: [rot.x, rot.y, rot.z] as [number, number, number],
       scale: [scl.x, scl.y, scl.z] as [number, number, number],
     });

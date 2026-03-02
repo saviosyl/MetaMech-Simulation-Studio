@@ -5,7 +5,7 @@ import { useEditorStore, getConnectionPorts, ProcessNode, ConnectionPort } from 
 const SNAP_THRESHOLD = 0.5;
 
 const SnapSystem: React.FC = () => {
-  const { processNodes, edges, selectedObjectId, isDragging, mateMode, setMateSelectedPort, addEdge } = useEditorStore();
+  const { processNodes, edges, selectedObjectId, isDragging, mateMode, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
 
   // Show ports for all nodes when something is selected, being dragged, or mate mode
   const showPorts = selectedObjectId !== null || isDragging || mateMode.active;
@@ -60,6 +60,22 @@ const SnapSystem: React.FC = () => {
         });
         return;
       }
+      // Auto-align: move the second-clicked object so its port aligns with the first port
+      const secondNode = processNodes.find(n => n.id === pv.nodeId);
+      if (secondNode) {
+        const secondPorts = getConnectionPorts(secondNode.type, secondNode.parameters);
+        const secondPort = secondPorts.find(p => p.id === pv.portId);
+        if (secondPort) {
+          // Calculate where the second node needs to be so its port aligns with the first port
+          const newPosition: [number, number, number] = [
+            selectedPort.worldPosition[0] - secondPort.localPosition[0],
+            0, // Always on ground
+            selectedPort.worldPosition[2] - secondPort.localPosition[2],
+          ];
+          updateObject(pv.nodeId, 'process', { position: newPosition });
+        }
+      }
+
       // Create edge: output -> input
       if (selectedPort.type === 'output') {
         addEdge(selectedPort.nodeId, selectedPort.portId, pv.nodeId, pv.portId);
@@ -172,7 +188,7 @@ export function checkSnap(
           // Calculate snap position: move dragged node so ports align
           const snapPos: [number, number, number] = [
             otherNode.position[0] + op.localPosition[0] - dp.localPosition[0],
-            otherNode.position[1] + op.localPosition[1] - dp.localPosition[1],
+            0, // Always on ground
             otherNode.position[2] + op.localPosition[2] - dp.localPosition[2],
           ];
 

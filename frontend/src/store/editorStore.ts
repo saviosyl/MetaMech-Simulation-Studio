@@ -405,7 +405,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newNode: ProcessNode = {
       id: uuidv4(),
       type,
-      position,
+      position: [position[0], 0, position[2]], // Force Y=0 (on ground)
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
       parameters: defaultParams,
@@ -432,7 +432,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newAsset: EnvironmentAsset = {
       id: uuidv4(),
       type,
-      position,
+      position: [position[0], 0, position[2]], // Force Y=0
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
       parameters: defaultParams,
@@ -459,7 +459,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newActor: Actor = {
       id: uuidv4(),
       type,
-      position,
+      position: [position[0], 0, position[2]],
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
       parameters: defaultParams,
