@@ -3,7 +3,6 @@ import {
   Package, 
   ArrowRight, 
   Database, 
-  RotateCw, 
   GitBranch,
   Columns,
   ArrowUp,

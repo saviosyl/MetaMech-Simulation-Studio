@@ -47,9 +47,9 @@ const EnvironmentAssetComponent: React.FC<EnvironmentAssetComponentProps> = ({ a
   // Simple animation for selected objects
   useFrame(() => {
     if (meshRef.current && isSelected) {
-      meshRef.current.material.emissive = new THREE.Color(0x444444);
+      (meshRef.current.material as THREE.MeshStandardMaterial).emissive = new THREE.Color(0x444444);
     } else if (meshRef.current) {
-      meshRef.current.material.emissive = new THREE.Color(0x000000);
+      (meshRef.current.material as THREE.MeshStandardMaterial).emissive = new THREE.Color(0x000000);
     }
   });
 
@@ -127,7 +127,7 @@ const EnvironmentAssetComponent: React.FC<EnvironmentAssetComponentProps> = ({ a
       {/* Selection outline */}
       {isSelected && (
         <lineSegments>
-          <edgesGeometry args={[getGeometry().args as any]} />
+          <edgesGeometry args={[(getGeometry() as any).props?.args]} />
           <lineBasicMaterial color="#06b6d4" linewidth={2} />
         </lineSegments>
       )}

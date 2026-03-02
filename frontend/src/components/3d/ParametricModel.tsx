@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { useFrame } from '@react-three/fiber';
+
 import { ParametricAssetDef } from '../../lib/assetManifest';
 import { runBuilder } from '../../lib/parametricBuilders';
 

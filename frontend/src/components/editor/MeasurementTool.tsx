@@ -1,7 +1,5 @@
-import React, { useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import React from 'react';
 import { Text, Line } from '@react-three/drei';
-import * as THREE from 'three';
 import { useEditorStore } from '../../store/editorStore';
 
 const MeasurementTool: React.FC = () => {

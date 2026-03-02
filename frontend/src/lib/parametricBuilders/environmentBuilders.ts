@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { BuilderResult, ConnectionPort } from './beltConveyorBuilder';
+import type { BuilderResult } from './beltConveyorBuilder';
 
 function addMesh(group: THREE.Group, geo: THREE.BufferGeometry, mat: THREE.Material, pos: [number, number, number], rot?: [number, number, number]) {
   const m = new THREE.Mesh(geo, mat);

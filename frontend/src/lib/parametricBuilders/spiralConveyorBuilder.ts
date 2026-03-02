@@ -19,7 +19,6 @@ function addMesh(group: THREE.Group, geo: THREE.BufferGeometry, mat: THREE.Mater
 export function buildSpiralConveyor(params: Record<string, any>): BuilderResult {
   const diameter = (params.diameter ?? 2000) / 1000;
   const totalHeight = (params.totalHeight ?? 5000) / 1000;
-  const beltW = (params.beltWidth ?? 500) / 1000;
   const direction = params.direction ?? 'up';
   const radius = diameter / 2;
 
@@ -89,11 +88,11 @@ export function buildSpiralConveyor(params: Record<string, any>): BuilderResult 
   // Entry/exit tangent sections
   const entryAngle = 0;
   const exitAngle = totalSegs * angleStep * ccw;
-  const entryX = Math.cos(entryAngle) * midR;
-  const entryZ = Math.sin(entryAngle) * midR;
-  const exitX = Math.cos(exitAngle) * ((innerR + outerR) / 2);
-  const exitZ = Math.sin(exitAngle) * ((innerR + outerR) / 2);
   const midR2 = (innerR + outerR) / 2;
+  const entryX = Math.cos(entryAngle) * midR2;
+  const entryZ = Math.sin(entryAngle) * midR2;
+  const exitX = Math.cos(exitAngle) * midR2;
+  const exitZ = Math.sin(exitAngle) * midR2;
 
   const isDown = direction === 'down';
   const ports: ConnectionPort[] = [

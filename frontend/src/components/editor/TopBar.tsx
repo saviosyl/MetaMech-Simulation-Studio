@@ -16,12 +16,11 @@ import {
   Loader2,
   Grid3X3,
   Ruler,
-  Camera,
   HelpCircle,
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuth } from '../../contexts/AuthContext';
-import { canUndo, canRedo, undo, redo } from '../../store/historyMiddleware';
+import { undo, redo } from '../../store/historyMiddleware';
 import { SaveStatus } from '../../pages/EditorPage';
 
 interface TopBarProps {

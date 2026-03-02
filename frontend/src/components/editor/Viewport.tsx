@@ -1,5 +1,5 @@
-import React, { Suspense, useRef, useCallback, useState, useEffect } from 'react';
-import { Canvas, useThree, useFrame } from '@react-three/fiber';
+import React, { Suspense, useRef, useCallback, useEffect } from 'react';
+import { Canvas } from '@react-three/fiber';
 import { 
   OrbitControls, 
   Grid, 
@@ -8,9 +8,9 @@ import {
   TransformControls,
   Text
 } from '@react-three/drei';
-import { EffectComposer, SSAO, ToneMapping, SMAA } from '@react-three/postprocessing';
+import { EffectComposer, ToneMapping, SMAA } from '@react-three/postprocessing';
 import * as THREE from 'three';
-import { useEditorStore, ProcessNode, EnvironmentAsset, Actor, getConnectionPorts } from '../../store/editorStore';
+import { useEditorStore, getConnectionPorts } from '../../store/editorStore';
 import ProcessNodeComponent from '../3d/ProcessNodeComponent';
 import EnvironmentAssetComponent from '../3d/EnvironmentAssetComponent';
 import ActorComponent from '../3d/ActorComponent';
@@ -41,7 +41,6 @@ const DraggableObject: React.FC<{
     setIsDragging,
     setDragNodeId,
     setSnapTarget,
-    snapTarget,
     addEdge,
   } = useEditorStore();
 
@@ -174,10 +173,8 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
     environmentAssets,
     actors,
     selectedObjectId,
-    selectedObjectType,
     setSelectedObject,
     sceneSettings,
-    isPlaying,
     snapTarget,
     hiddenIds,
     measureActive,
@@ -369,13 +366,6 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
 
       {/* Post Processing */}
       <EffectComposer>
-        <SSAO 
-          samples={31} 
-          radius={0.4} 
-          intensity={1} 
-          luminanceInfluence={0.6} 
-          color={new THREE.Color('black')}
-        />
         <ToneMapping adaptive={true} />
         <SMAA />
       </EffectComposer>
@@ -399,7 +389,6 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
 
 const Viewport: React.FC = () => {
   const orbitRef = useRef<any>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const {
     processNodes,
@@ -408,11 +397,9 @@ const Viewport: React.FC = () => {
     selectedObjectId,
     selectedObjectType,
     transformMode,
-    setSelectedObject,
     addProcessNode,
     addEnvironmentAsset,
     addActor,
-    sceneSettings,
   } = useEditorStore();
 
   const handleDrop = useCallback((event: React.DragEvent) => {

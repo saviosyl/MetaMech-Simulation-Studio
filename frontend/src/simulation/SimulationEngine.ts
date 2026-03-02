@@ -70,7 +70,7 @@ export class SimulationEngine {
         case 'source': this.tickSource(node, stats, elapsed); break;
         case 'conveyor': this.tickConveyor(node, stats, elapsed); break;
         case 'machine': this.tickMachine(node, stats, elapsed); break;
-        case 'buffer': this.tickBuffer(node, stats, elapsed); break;
+        case 'buffer': this.tickBuffer(node, stats); break;
         case 'sink': this.tickSink(node, stats); break;
         case 'router': this.tickRouter(node, stats); break;
         case 'pick-and-place': this.tickMachine(node, stats, elapsed); break;
