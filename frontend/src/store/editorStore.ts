@@ -35,7 +35,7 @@ export interface SceneObject {
 export interface EnvironmentAsset {
   id: string;
   type: 'wall' | 'door' | 'window' | 'stairs' | 'safety-rail' | 
-        'floor-marking' | 'pallet-rack' | 'warehouse-shell' | 'floor';
+        'floor-marking' | 'pallet-rack' | 'warehouse-shell' | 'floor' | 'pallet' | 'cardboard-box';
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -47,7 +47,7 @@ export interface EnvironmentAsset {
 
 export interface Actor {
   id: string;
-  type: 'operator' | 'engineer' | 'forklift' | 'agv';
+  type: 'operator' | 'engineer' | 'forklift' | 'agv' | 'pallet-truck';
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -201,6 +201,13 @@ interface EditorState {
   selectedObjectType: 'process' | 'environment' | 'actor' | null;
   selectedIds: string[];
   transformMode: 'translate' | 'rotate' | 'scale';
+  activeTool: 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'measure';
+  
+  // Mate mode
+  mateMode: {
+    active: boolean;
+    selectedPort: { nodeId: string; portId: string; type: 'input' | 'output'; worldPosition: [number, number, number] } | null;
+  };
   
   // Grid snap
   gridSnap: boolean;
@@ -253,6 +260,8 @@ interface EditorState {
   toggleSelectId: (id: string, type: 'process' | 'environment' | 'actor') => void;
   selectAll: () => void;
   setTransformMode: (mode: 'translate' | 'rotate' | 'scale') => void;
+  setActiveTool: (tool: 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'measure') => void;
+  setMateSelectedPort: (port: { nodeId: string; portId: string; type: 'input' | 'output'; worldPosition: [number, number, number] } | null) => void;
   setGridSnap: (snap: boolean) => void;
   setGridSnapSize: (size: number) => void;
   setMeasureActive: (active: boolean) => void;
@@ -328,6 +337,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedObjectType: null,
   selectedIds: [],
   transformMode: 'translate',
+  activeTool: 'select',
+  
+  mateMode: {
+    active: false,
+    selectedPort: null,
+  },
   
   gridSnap: false,
   gridSnapSize: 0.5,
@@ -525,6 +540,34 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ transformMode: mode });
   },
   
+  setActiveTool: (tool) => {
+    const updates: Partial<EditorState> = { activeTool: tool } as any;
+    if (tool === 'move') (updates as any).transformMode = 'translate';
+    else if (tool === 'rotate') (updates as any).transformMode = 'rotate';
+    else if (tool === 'scale') (updates as any).transformMode = 'scale';
+    
+    if (tool === 'mate') {
+      (updates as any).mateMode = { active: true, selectedPort: null };
+    } else {
+      (updates as any).mateMode = { active: false, selectedPort: null };
+    }
+    
+    if (tool === 'measure') {
+      (updates as any).measureActive = true;
+      (updates as any).measurePoints = [];
+    } else {
+      (updates as any).measureActive = false;
+    }
+    
+    set(updates as any);
+  },
+  
+  setMateSelectedPort: (port) => {
+    set(state => ({
+      mateMode: { ...state.mateMode, selectedPort: port },
+    }));
+  },
+  
   setGridSnap: (snap) => set({ gridSnap: snap }),
   setGridSnapSize: (size) => set({ gridSnapSize: size }),
   setMeasureActive: (active) => set({ measureActive: active, measurePoints: [] }),
@@ -682,12 +725,15 @@ function getDefaultParameters(type: string): Record<string, any> {
     'pallet-rack': { width: 3, height: 4, depth: 1.2, levels: 4 },
     'warehouse-shell': { width: 20, height: 8, depth: 15 },
     floor: { width: 50, depth: 50, color: '#f0f0f0' },
+    pallet: {},
+    'cardboard-box': {},
     
     // Actors
     operator: { walkSpeed: 1.5, color: '#4f46e5' },
     engineer: { walkSpeed: 1.2, color: '#059669' },
     forklift: { speed: 3.0, liftHeight: 4, capacity: 2000 },
     agv: { speed: 2.0, capacity: 500, batteryLevel: 100 },
+    'pallet-truck': { speed: 1.5 },
   };
   
   return defaults[type] || {};

@@ -524,6 +524,23 @@ export const moduleLibrary: ModuleDefinition[] = [
     },
   },
 
+  {
+    id: 'pallet',
+    name: 'Pallet',
+    category: 'environment',
+    icon: Package,
+    description: 'Standard EUR pallet',
+    parameters: {},
+  },
+  {
+    id: 'cardboard-box',
+    name: 'Cardboard Box',
+    category: 'environment',
+    icon: Package,
+    description: 'Cardboard shipping box',
+    parameters: {},
+  },
+
   // Actor Modules
   {
     id: 'operator',
@@ -632,6 +649,23 @@ export const moduleLibrary: ModuleDefinition[] = [
         label: 'Path Finding',
         default: 'shortest',
         options: ['shortest', 'safest', 'efficient'],
+      },
+    },
+  },
+  {
+    id: 'pallet-truck',
+    name: 'Pallet Truck',
+    category: 'actors',
+    icon: Package,
+    description: 'Manual pallet truck / pump truck',
+    parameters: {
+      speed: {
+        type: 'number',
+        label: 'Speed (m/s)',
+        default: 1.5,
+        min: 0.5,
+        max: 3.0,
+        step: 0.1,
       },
     },
   },

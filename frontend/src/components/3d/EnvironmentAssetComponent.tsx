@@ -1,10 +1,11 @@
-import React, { useRef } from 'react';
+import React, { useRef, Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { EnvironmentAsset } from '../../store/editorStore';
 import { getAssetById, ParametricAssetDef, StaticAssetDef } from '../../lib/assetManifest';
 import ParametricModel from './ParametricModel';
 import StaticModel from './StaticModel';
+import GLBModel from './GLBModel';
 
 interface EnvironmentAssetComponentProps {
   asset: EnvironmentAsset;
@@ -44,6 +45,38 @@ const EnvironmentAssetComponent: React.FC<EnvironmentAssetComponentProps> = ({ a
     }
   }
   
+  // GLB-based environment assets
+  const envGlbMap: Record<string, { url: string; targetSize: number }> = {
+    'pallet': { url: '/models/pallet.glb', targetSize: 1.2 },
+    'cardboard-box': { url: '/models/cardboard-box.glb', targetSize: 0.5 },
+  };
+
+  const glb = envGlbMap[asset.type];
+  if (glb) {
+    return (
+      <group
+        position={asset.position}
+        rotation={asset.rotation}
+        scale={asset.scale}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      >
+        <Suspense fallback={
+          <mesh castShadow><boxGeometry args={[0.5, 0.5, 0.5]} /><meshStandardMaterial color="#888" /></mesh>
+        }>
+          <GLBModel url={glb.url} targetSize={glb.targetSize} isSelected={isSelected} />
+        </Suspense>
+        {isSelected && (
+          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.8, 1.0, 32]} />
+            <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
+          </mesh>
+        )}
+      </group>
+    );
+  }
+
   // Simple animation for selected objects
   useFrame(() => {
     if (meshRef.current && isSelected) {
@@ -146,6 +179,8 @@ function getAssetColor(type: EnvironmentAsset['type']): string {
     'pallet-rack': '#ff6b35',  // Orange
     'warehouse-shell': '#e5e7eb', // Light gray
     'floor': '#f0f0f0',        // Very light gray
+    'pallet': '#c4a55a',
+    'cardboard-box': '#b8860b',
   };
   
   return colorMap[type] || '#6b7280';
@@ -162,6 +197,8 @@ function getMetalness(type: EnvironmentAsset['type']): number {
     'pallet-rack': 0.7,
     'warehouse-shell': 0.2,
     'floor': 0.1,
+    'pallet': 0.0,
+    'cardboard-box': 0.0,
   };
   
   return metalnessMap[type] || 0.3;
@@ -178,6 +215,8 @@ function getRoughness(type: EnvironmentAsset['type']): number {
     'pallet-rack': 0.4,
     'warehouse-shell': 0.7,
     'floor': 0.8,
+    'pallet': 0.9,
+    'cardboard-box': 0.9,
   };
   
   return roughnessMap[type] || 0.5;

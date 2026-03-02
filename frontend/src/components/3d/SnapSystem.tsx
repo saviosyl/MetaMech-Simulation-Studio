@@ -5,10 +5,10 @@ import { useEditorStore, getConnectionPorts, ProcessNode, ConnectionPort } from 
 const SNAP_THRESHOLD = 0.5;
 
 const SnapSystem: React.FC = () => {
-  const { processNodes, edges, selectedObjectId, isDragging } = useEditorStore();
+  const { processNodes, edges, selectedObjectId, isDragging, mateMode, setMateSelectedPort, addEdge } = useEditorStore();
 
-  // Show ports for all nodes when something is selected or being dragged
-  const showPorts = selectedObjectId !== null || isDragging;
+  // Show ports for all nodes when something is selected, being dragged, or mate mode
+  const showPorts = selectedObjectId !== null || isDragging || mateMode.active;
 
   const portVisuals = useMemo(() => {
     if (!showPorts) return [];
@@ -36,35 +36,92 @@ const SnapSystem: React.FC = () => {
 
   if (!showPorts) return null;
 
+  const handlePortClick = (pv: typeof portVisuals[0]) => {
+    if (!mateMode.active) return;
+
+    const selectedPort = mateMode.selectedPort;
+    if (!selectedPort) {
+      // First click - select this port
+      setMateSelectedPort({
+        nodeId: pv.nodeId,
+        portId: pv.portId,
+        type: pv.type,
+        worldPosition: pv.position,
+      });
+    } else {
+      // Second click - connect if compatible (output->input or input->output)
+      if (selectedPort.type === pv.type) {
+        // Same type, just re-select
+        setMateSelectedPort({
+          nodeId: pv.nodeId,
+          portId: pv.portId,
+          type: pv.type,
+          worldPosition: pv.position,
+        });
+        return;
+      }
+      // Create edge: output -> input
+      if (selectedPort.type === 'output') {
+        addEdge(selectedPort.nodeId, selectedPort.portId, pv.nodeId, pv.portId);
+      } else {
+        addEdge(pv.nodeId, pv.portId, selectedPort.nodeId, selectedPort.portId);
+      }
+      setMateSelectedPort(null);
+    }
+  };
+
+  const isMateSelected = (nodeId: string, portId: string) =>
+    mateMode.active && mateMode.selectedPort?.nodeId === nodeId && mateMode.selectedPort?.portId === portId;
+
   return (
     <group>
-      {portVisuals.map((pv) => (
-        <group key={`${pv.nodeId}-${pv.portId}`} position={pv.position}>
-          {/* Port sphere */}
-          <mesh>
-            <sphereGeometry args={[0.08, 12, 8]} />
-            <meshStandardMaterial
-              color={pv.connected ? '#6b7280' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
-              emissive={pv.connected ? '#333333' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
-              emissiveIntensity={pv.connected ? 0.1 : 0.5}
-              transparent
-              opacity={pv.connected ? 0.4 : 0.8}
-            />
-          </mesh>
-          {/* Outer ring indicator */}
-          {!pv.connected && (
-            <mesh rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[0.1, 0.15, 16]} />
-              <meshBasicMaterial
-                color={pv.type === 'input' ? '#3b82f6' : '#10b981'}
+      {portVisuals.map((pv) => {
+        const selected = isMateSelected(pv.nodeId, pv.portId);
+        const portSize = mateMode.active ? 0.15 : 0.08;
+        return (
+          <group key={`${pv.nodeId}-${pv.portId}`} position={pv.position}>
+            {/* Port sphere */}
+            <mesh
+              onClick={(e) => {
+                if (mateMode.active) {
+                  e.stopPropagation();
+                  handlePortClick(pv);
+                }
+              }}
+              onPointerOver={(e) => {
+                if (mateMode.active) {
+                  e.stopPropagation();
+                  document.body.style.cursor = 'pointer';
+                }
+              }}
+              onPointerOut={() => {
+                if (mateMode.active) document.body.style.cursor = 'auto';
+              }}
+            >
+              <sphereGeometry args={[portSize, 12, 8]} />
+              <meshStandardMaterial
+                color={selected ? '#ffffff' : pv.connected ? '#6b7280' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
+                emissive={selected ? '#06b6d4' : pv.connected ? '#333333' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
+                emissiveIntensity={selected ? 1.0 : pv.connected ? 0.1 : 0.5}
                 transparent
-                opacity={0.4}
-                side={THREE.DoubleSide}
+                opacity={pv.connected ? 0.4 : 0.9}
               />
             </mesh>
-          )}
-        </group>
-      ))}
+            {/* Outer ring indicator */}
+            {!pv.connected && (
+              <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[portSize + 0.02, portSize + 0.07, 16]} />
+                <meshBasicMaterial
+                  color={selected ? '#06b6d4' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
+                  transparent
+                  opacity={selected ? 0.8 : 0.4}
+                  side={THREE.DoubleSide}
+                />
+              </mesh>
+            )}
+          </group>
+        );
+      })}
     </group>
   );
 };

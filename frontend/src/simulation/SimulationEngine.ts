@@ -69,6 +69,8 @@ export class SimulationEngine {
       switch (node.type) {
         case 'source': this.tickSource(node, stats, elapsed); break;
         case 'conveyor': this.tickConveyor(node, stats, elapsed); break;
+        case 'belt-conveyor': this.tickConveyor(node, stats, elapsed); break;
+        case 'roller-conveyor': this.tickConveyor(node, stats, elapsed); break;
         case 'machine': this.tickMachine(node, stats, elapsed); break;
         case 'buffer': this.tickBuffer(node, stats); break;
         case 'sink': this.tickSink(node, stats); break;
@@ -93,6 +95,7 @@ export class SimulationEngine {
       const outEdges = this.getOutEdges(node.id);
       if (outEdges.length > 0) {
         const product = this.createProduct(node);
+        this.products.push(product);
         this.sendProductAlongEdge(product, outEdges[0]);
         stats.lastSpawnTime = this.simTime;
         stats.throughput++;
@@ -101,19 +104,60 @@ export class SimulationEngine {
   }
 
   private tickConveyor(node: ProcessNode, stats: NodeStats, dt: number) {
-    // Conveyor just passes through - products move along the edge
-    // Check if any product arrived at this node
+    // Accept arriving products into queue with timestamp
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
-      const outEdges = this.getOutEdges(node.id);
-      if (outEdges.length > 0) {
-        this.sendProductAlongEdge(product, outEdges[0]);
-        stats.throughput++;
+      product.state = 'queued';
+      stats.queue.push(product.id);
+    }
+
+    // Release products that have spent enough time (length / speed)
+    const length = node.parameters.length || 5;
+    const speed = node.parameters.speed || 1;
+    const travelTime = length / speed;
+
+    // Simple approach: release first product after travelTime
+    if (stats.queue.length > 0) {
+      if (!stats.processEndTime) {
+        stats.processEndTime = this.simTime + travelTime;
+      }
+      if (this.simTime >= stats.processEndTime) {
+        const pid = stats.queue.shift()!;
+        const product = this.products.find(p => p.id === pid);
+        if (product) {
+          const outEdges = this.getOutEdges(node.id);
+          if (outEdges.length > 0) {
+            this.sendProductAlongEdge(product, outEdges[0]);
+          } else {
+            product.state = 'at-node';
+          }
+          stats.throughput++;
+        }
+        stats.processEndTime = stats.queue.length > 0 ? this.simTime + travelTime : null;
+      }
+
+      // Animate queued products along conveyor path (input to output)
+      const ports = getConnectionPorts(node.type, node.parameters);
+      const inputPort = ports.find(p => p.type === 'input');
+      const outputPort = ports.find(p => p.type === 'output');
+      if (inputPort && outputPort) {
+        stats.queue.forEach((pid) => {
+          const product = this.products.find(p => p.id === pid);
+          if (product) {
+            const elapsed = stats.processEndTime 
+              ? travelTime - (stats.processEndTime - this.simTime)
+              : 0;
+            const t = Math.min(1, Math.max(0, elapsed / travelTime));
+            product.currentPosition = [
+              node.position[0] + inputPort.localPosition[0] + (outputPort.localPosition[0] - inputPort.localPosition[0]) * t,
+              node.position[1] + inputPort.localPosition[1] + (outputPort.localPosition[1] - inputPort.localPosition[1]) * t,
+              node.position[2] + inputPort.localPosition[2] + (outputPort.localPosition[2] - inputPort.localPosition[2]) * t,
+            ];
+          }
+        });
       }
     }
-    if (arrived.length > 0) {
-      stats.busyTime += dt;
-    }
+    if (stats.queue.length > 0) stats.busyTime += dt;
   }
 
   private tickMachine(node: ProcessNode, stats: NodeStats, dt: number) {

@@ -1,17 +1,14 @@
-import React, { useRef } from 'react';
+import React, { useRef, Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { ProcessNode } from '../../store/editorStore';
 import { getAssetById, ParametricAssetDef, StaticAssetDef } from '../../lib/assetManifest';
 import ParametricModel from './ParametricModel';
 import StaticModel from './StaticModel';
-import ConveyorModel from './models/ConveyorModel';
-import RobotArmModel from './models/RobotArmModel';
-import MachineModel from './models/MachineModel';
+import GLBModel from './GLBModel';
 import SourceModel from './models/SourceModel';
 import SinkModel from './models/SinkModel';
 import BufferModel from './models/BufferModel';
-import PalletizerModel from './models/PalletizerModel';
 
 interface ProcessNodeComponentProps {
   node: ProcessNode;
@@ -69,22 +66,32 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
     }
   }
 
+  // Map types to GLB files with target sizes
+  const glbMap: Record<string, { url: string; targetSize: number }> = {
+    'conveyor': { url: '/models/conveyor.glb', targetSize: 5 },
+    'pick-and-place': { url: '/models/fanuc-robot.glb', targetSize: 2 },
+    'machine': { url: '/models/machine.glb', targetSize: 2 },
+    'palletizer': { url: '/models/fanuc-robot.glb', targetSize: 2 },
+    'machine-static': { url: '/models/machine.glb', targetSize: 2 },
+    'fanuc-robot': { url: '/models/fanuc-robot.glb', targetSize: 2 },
+  };
+
   const renderModel = () => {
+    const glb = glbMap[node.type];
+    if (glb) {
+      return (
+        <Suspense fallback={<FallbackBox color={getNodeColor(node.type)} isSelected={isSelected} />}>
+          <GLBModel url={glb.url} targetSize={glb.targetSize} isSelected={isSelected} />
+        </Suspense>
+      );
+    }
     switch (node.type) {
-      case 'conveyor':
-        return <ConveyorModel length={node.parameters.length || 5} width={node.parameters.width || 1} isSelected={isSelected} />;
-      case 'pick-and-place':
-        return <RobotArmModel isSelected={isSelected} />;
-      case 'machine':
-        return <MachineModel isSelected={isSelected} />;
       case 'source':
         return <SourceModel isSelected={isSelected} />;
       case 'sink':
         return <SinkModel isSelected={isSelected} />;
       case 'buffer':
         return <BufferModel isSelected={isSelected} />;
-      case 'palletizer':
-        return <PalletizerModel isSelected={isSelected} />;
       default:
         return <GenericModel type={node.type} isSelected={isSelected} params={node.parameters} />;
     }
@@ -112,6 +119,14 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
     </group>
   );
 };
+
+// Fallback while GLB loads
+const FallbackBox: React.FC<{ color: string; isSelected: boolean }> = ({ color, isSelected }) => (
+  <mesh position={[0, 0.5, 0]} castShadow>
+    <boxGeometry args={[1.5, 1, 1]} />
+    <meshStandardMaterial color={color} metalness={0.7} roughness={0.3} emissive={isSelected ? '#222222' : '#000000'} />
+  </mesh>
+);
 
 // Generic model for types that don't have a dedicated model yet
 const GenericModel: React.FC<{ type: string; isSelected: boolean; params: Record<string, any> }> = ({ type, isSelected, params: _params }) => {

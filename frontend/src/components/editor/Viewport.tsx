@@ -19,6 +19,7 @@ import ConnectionLines from '../3d/ConnectionLine';
 import SimulationOverlay from '../3d/SimulationOverlay';
 import MeasurementTool from '../editor/MeasurementTool';
 import CameraControls from '../3d/CameraControls';
+import ViewportToolbar from '../editor/ViewportToolbar';
 
 // Wrapper that attaches TransformControls to the selected object
 const DraggableObject: React.FC<{
@@ -35,6 +36,7 @@ const DraggableObject: React.FC<{
   const transformRef = useRef<any>(null);
   const {
     transformMode,
+    activeTool,
     updateObject,
     processNodes,
     edges,
@@ -153,7 +155,7 @@ const DraggableObject: React.FC<{
       >
         {children}
       </group>
-      {isSelected && (
+      {isSelected && (activeTool === 'move' || activeTool === 'rotate' || activeTool === 'scale') && (
         <TransformControls
           ref={transformRef}
           object={groupRef.current || undefined}
@@ -477,6 +479,9 @@ const Viewport: React.FC = () => {
           <SceneContent orbitRef={orbitRef} />
         </Suspense>
       </Canvas>
+
+      {/* Viewport Toolbar */}
+      <ViewportToolbar />
 
       {/* Viewport Overlay - Instructions */}
       {processNodes.length === 0 && environmentAssets.length === 0 && actors.length === 0 && (

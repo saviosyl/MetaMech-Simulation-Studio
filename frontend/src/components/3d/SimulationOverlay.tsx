@@ -37,7 +37,7 @@ const SimulationOverlay: React.FC = () => {
         if (product.state === 'completed') return null;
         return (
           <mesh key={product.id} position={product.currentPosition}>
-            <boxGeometry args={[0.15, 0.15, 0.15]} />
+            <boxGeometry args={[0.2, 0.2, 0.2]} />
             <meshStandardMaterial
               color={product.color}
               emissive={product.color}
