@@ -15,7 +15,7 @@ export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const EditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const _navigate = useNavigate();
   const [projectName, setProjectName] = useState('Untitled Project');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; objectId: string | null; objectType: 'process' | 'environment' | 'actor' | null } | null>(null);
