@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useEditorStore } from '../store/editorStore';
 import { getProject, updateProject } from '../utils/api';
 import { pushHistory, undo, redo } from '../store/historyMiddleware';
@@ -15,7 +15,7 @@ export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const EditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const _navigate = useNavigate();
+
   const [projectName, setProjectName] = useState('Untitled Project');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; objectId: string | null; objectType: 'process' | 'environment' | 'actor' | null } | null>(null);
