@@ -1,5 +1,5 @@
-import React, { Suspense, useRef, useCallback } from 'react';
-import { Canvas } from '@react-three/fiber';
+import React, { Suspense, useRef, useCallback, useState, useEffect } from 'react';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { 
   OrbitControls, 
   Grid, 
@@ -10,15 +10,368 @@ import {
 } from '@react-three/drei';
 import { EffectComposer, SSAO, ToneMapping, SMAA } from '@react-three/postprocessing';
 import * as THREE from 'three';
-import { useEditorStore } from '../../store/editorStore';
+import { useEditorStore, ProcessNode, EnvironmentAsset, Actor, getConnectionPorts } from '../../store/editorStore';
 import ProcessNodeComponent from '../3d/ProcessNodeComponent';
 import EnvironmentAssetComponent from '../3d/EnvironmentAssetComponent';
 import ActorComponent from '../3d/ActorComponent';
-import SnapSystem from '../3d/SnapSystem';
+import SnapSystem, { checkSnap } from '../3d/SnapSystem';
 import ConnectionLines from '../3d/ConnectionLine';
+import SimulationOverlay from '../3d/SimulationOverlay';
+
+// Wrapper that attaches TransformControls to the selected object
+const DraggableObject: React.FC<{
+  children: React.ReactNode;
+  id: string;
+  objectType: 'process' | 'environment' | 'actor';
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+  isSelected: boolean;
+  orbitRef: React.RefObject<any>;
+}> = ({ children, id, objectType, position, rotation, scale, isSelected, orbitRef }) => {
+  const groupRef = useRef<THREE.Group>(null!);
+  const transformRef = useRef<any>(null);
+  const {
+    transformMode,
+    updateObject,
+    processNodes,
+    edges,
+    setIsDragging,
+    setDragNodeId,
+    setSnapTarget,
+    snapTarget,
+    addEdge,
+  } = useEditorStore();
+
+  useEffect(() => {
+    if (!isSelected || !transformRef.current) return;
+    const controls = transformRef.current;
+
+    const onDraggingChanged = (event: any) => {
+      if (orbitRef.current) {
+        orbitRef.current.enabled = !event.value;
+      }
+
+      if (event.value) {
+        // Started dragging
+        setIsDragging(true);
+        setDragNodeId(id);
+      } else {
+        // Stopped dragging - check snap
+        if (objectType === 'process') {
+          const node = processNodes.find(n => n.id === id);
+          if (node) {
+            const currentSnapTarget = useEditorStore.getState().snapTarget;
+            if (currentSnapTarget) {
+              // Snap position
+              updateObject(id, objectType, { position: currentSnapTarget.position });
+              if (groupRef.current) {
+                groupRef.current.position.set(...currentSnapTarget.position);
+              }
+              // Create edge - figure out direction
+              const dragPorts = getConnectionPorts(node.type, node.parameters);
+              const snap = checkSnap(
+                { ...node, position: currentSnapTarget.position },
+                processNodes.filter(n => n.id !== id),
+                edges
+              );
+              // Use the stored snap info to create connection
+              if (snap) {
+                const dragPort = dragPorts.find(p => p.id === snap.dragPortId);
+                if (dragPort) {
+                  if (dragPort.type === 'output') {
+                    addEdge(id, snap.dragPortId, snap.targetNodeId, snap.targetPortId);
+                  } else {
+                    addEdge(snap.targetNodeId, snap.targetPortId, id, snap.dragPortId);
+                  }
+                }
+              }
+            }
+          }
+        }
+        setIsDragging(false);
+        setDragNodeId(null);
+        setSnapTarget(null);
+      }
+    };
+
+    controls.addEventListener('dragging-changed', onDraggingChanged);
+    return () => {
+      controls.removeEventListener('dragging-changed', onDraggingChanged);
+    };
+  }, [isSelected, id, objectType, processNodes, edges]);
+
+  const handleObjectChange = useCallback(() => {
+    if (!groupRef.current) return;
+    const pos = groupRef.current.position;
+    const rot = groupRef.current.rotation;
+    const scl = groupRef.current.scale;
+    
+    updateObject(id, objectType, {
+      position: [pos.x, pos.y, pos.z] as [number, number, number],
+      rotation: [rot.x, rot.y, rot.z] as [number, number, number],
+      scale: [scl.x, scl.y, scl.z] as [number, number, number],
+    });
+
+    // Check snap during drag for process nodes
+    if (objectType === 'process') {
+      const node = useEditorStore.getState().processNodes.find(n => n.id === id);
+      if (node) {
+        const updatedNode = { ...node, position: [pos.x, pos.y, pos.z] as [number, number, number] };
+        const snap = checkSnap(
+          updatedNode,
+          useEditorStore.getState().processNodes.filter(n => n.id !== id),
+          useEditorStore.getState().edges
+        );
+        if (snap) {
+          setSnapTarget({ nodeId: snap.targetNodeId, portId: snap.targetPortId, position: snap.snapPosition });
+        } else {
+          setSnapTarget(null);
+        }
+      }
+    }
+  }, [id, objectType, updateObject, setSnapTarget]);
+
+  return (
+    <>
+      <group
+        ref={groupRef}
+        position={position}
+        rotation={rotation}
+        scale={scale}
+      >
+        {children}
+      </group>
+      {isSelected && (
+        <TransformControls
+          ref={transformRef}
+          object={groupRef.current || undefined}
+          mode={transformMode}
+          size={0.8}
+          onObjectChange={handleObjectChange}
+        />
+      )}
+    </>
+  );
+};
+
+// Inner scene component that has access to Three.js context
+const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }) => {
+  const {
+    processNodes,
+    environmentAssets,
+    actors,
+    selectedObjectId,
+    selectedObjectType,
+    setSelectedObject,
+    sceneSettings,
+    isPlaying,
+    snapTarget,
+  } = useEditorStore();
+
+  const handleObjectClick = useCallback((objectId: string, objectType: 'process' | 'environment' | 'actor') => {
+    setSelectedObject(objectId, objectType);
+  }, [setSelectedObject]);
+
+  const handlePointerMissed = useCallback(() => {
+    setSelectedObject(null, null);
+  }, [setSelectedObject]);
+
+  return (
+    <>
+      {/* Lighting */}
+      <ambientLight intensity={0.4} />
+      <directionalLight
+        position={[10, 10, 5]}
+        intensity={1}
+        castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-far={50}
+        shadow-camera-left={-20}
+        shadow-camera-right={20}
+        shadow-camera-top={20}
+        shadow-camera-bottom={-20}
+      />
+
+      {/* Environment */}
+      {sceneSettings.environment !== 'transparent' && (
+        <Environment 
+          preset={
+            sceneSettings.environment === 'factory' ? 'warehouse' :
+            sceneSettings.environment === 'studio-white' ? 'studio' :
+            sceneSettings.environment === 'dark-showroom' ? 'night' : 'studio'
+          } 
+        />
+      )}
+
+      {/* Grid */}
+      {sceneSettings.grid.visible && (
+        <Grid
+          position={[0, 0, 0]}
+          args={[sceneSettings.grid.size, sceneSettings.grid.divisions]}
+          cellSize={1}
+          cellThickness={0.5}
+          cellColor="#6f6f6f"
+          sectionSize={10}
+          sectionThickness={1}
+          sectionColor="#9d4b4b"
+          fadeDistance={50}
+          fadeStrength={1}
+          infiniteGrid
+        />
+      )}
+
+      {/* Axes Helper */}
+      {sceneSettings.axes.visible && (
+        <axesHelper args={[sceneSettings.axes.size]} />
+      )}
+
+      {/* Contact Shadows */}
+      <ContactShadows 
+        position={[0, -0.01, 0]} 
+        opacity={0.5} 
+        scale={50} 
+        blur={2.5} 
+        far={10} 
+      />
+
+      {/* Ground plane for raycasting (invisible) */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -0.02, 0]}
+        onPointerMissed={handlePointerMissed}
+        visible={false}
+      >
+        <planeGeometry args={[200, 200]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
+
+      {/* Scene Objects - wrapped in DraggableObject */}
+      <group>
+        {/* Process Nodes */}
+        {processNodes.map(node => (
+          <DraggableObject
+            key={node.id}
+            id={node.id}
+            objectType="process"
+            position={node.position}
+            rotation={node.rotation}
+            scale={node.scale}
+            isSelected={selectedObjectId === node.id}
+            orbitRef={orbitRef}
+          >
+            <ProcessNodeComponent
+              node={{ ...node, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] }}
+              isSelected={selectedObjectId === node.id}
+              onClick={() => handleObjectClick(node.id, 'process')}
+            />
+          </DraggableObject>
+        ))}
+
+        {/* Environment Assets */}
+        {environmentAssets.map(asset => (
+          <DraggableObject
+            key={asset.id}
+            id={asset.id}
+            objectType="environment"
+            position={asset.position}
+            rotation={asset.rotation}
+            scale={asset.scale}
+            isSelected={selectedObjectId === asset.id}
+            orbitRef={orbitRef}
+          >
+            <EnvironmentAssetComponent
+              asset={{ ...asset, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] }}
+              isSelected={selectedObjectId === asset.id}
+              onClick={() => handleObjectClick(asset.id, 'environment')}
+            />
+          </DraggableObject>
+        ))}
+
+        {/* Actors */}
+        {actors.map(actor => (
+          <DraggableObject
+            key={actor.id}
+            id={actor.id}
+            objectType="actor"
+            position={actor.position}
+            rotation={actor.rotation}
+            scale={actor.scale}
+            isSelected={selectedObjectId === actor.id}
+            orbitRef={orbitRef}
+          >
+            <ActorComponent
+              actor={{ ...actor, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] }}
+              isSelected={selectedObjectId === actor.id}
+              onClick={() => handleObjectClick(actor.id, 'actor')}
+            />
+          </DraggableObject>
+        ))}
+      </group>
+
+      {/* Snap System - shows connection ports */}
+      <SnapSystem />
+
+      {/* Snap target highlight */}
+      {snapTarget && (
+        <mesh position={snapTarget.position}>
+          <sphereGeometry args={[0.2, 16, 16]} />
+          <meshBasicMaterial color="#06b6d4" transparent opacity={0.6} />
+        </mesh>
+      )}
+
+      {/* Connection Lines between connected objects */}
+      <ConnectionLines />
+
+      {/* Simulation Overlay */}
+      <SimulationOverlay />
+
+      {/* Camera Controls */}
+      <OrbitControls
+        ref={orbitRef}
+        enablePan={true}
+        enableZoom={true}
+        enableRotate={true}
+        minDistance={2}
+        maxDistance={100}
+        minPolarAngle={0}
+        maxPolarAngle={Math.PI / 2}
+      />
+
+      {/* Post Processing */}
+      <EffectComposer>
+        <SSAO 
+          samples={31} 
+          radius={0.4} 
+          intensity={1} 
+          luminanceInfluence={0.6} 
+          color={new THREE.Color('black')}
+        />
+        <ToneMapping adaptive={true} />
+        <SMAA />
+      </EffectComposer>
+
+      {/* Loading Placeholder */}
+      {processNodes.length === 0 && environmentAssets.length === 0 && actors.length === 0 && (
+        <group position={[0, 2, 0]}>
+          <Text
+            fontSize={1}
+            color="#6b7280"
+            anchorX="center"
+            anchorY="middle"
+          >
+            Drag modules from the library to get started
+          </Text>
+        </group>
+      )}
+    </>
+  );
+};
 
 const Viewport: React.FC = () => {
-  const meshRef = useRef<THREE.Object3D>(null!);
+  const orbitRef = useRef<any>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const {
     processNodes,
@@ -41,10 +394,19 @@ const Viewport: React.FC = () => {
       const data = JSON.parse(event.dataTransfer.getData('application/json'));
       
       if (data.type === 'module') {
+        // Raycast from mouse to ground plane (y=0)
+        const rect = (event.target as HTMLElement).getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        // Use a simple ground plane intersection
+        // Camera is at roughly [10,10,10] looking at origin
+        // For a proper solution we'd need the Three.js camera, but we can approximate
+        // by placing at a reasonable position based on normalized coords
         const position: [number, number, number] = [
-          Math.random() * 10 - 5,
+          x * 8,
           0,
-          Math.random() * 10 - 5,
+          -y * 8,
         ];
         
         switch (data.category) {
@@ -68,22 +430,13 @@ const Viewport: React.FC = () => {
     event.preventDefault();
   }, []);
 
-  const handleObjectClick = useCallback((objectId: string, objectType: 'process' | 'environment' | 'actor') => {
-    setSelectedObject(objectId, objectType);
-  }, [setSelectedObject]);
-
   const getSelectedObject = () => {
     if (!selectedObjectId || !selectedObjectType) return null;
-    
     switch (selectedObjectType) {
-      case 'process':
-        return processNodes.find(node => node.id === selectedObjectId);
-      case 'environment':
-        return environmentAssets.find(asset => asset.id === selectedObjectId);
-      case 'actor':
-        return actors.find(actor => actor.id === selectedObjectId);
-      default:
-        return null;
+      case 'process': return processNodes.find(node => node.id === selectedObjectId);
+      case 'environment': return environmentAssets.find(asset => asset.id === selectedObjectId);
+      case 'actor': return actors.find(actor => actor.id === selectedObjectId);
+      default: return null;
     }
   };
 
@@ -109,152 +462,7 @@ const Viewport: React.FC = () => {
         }}
       >
         <Suspense fallback={null}>
-          {/* Lighting */}
-          <ambientLight intensity={0.4} />
-          <directionalLight
-            position={[10, 10, 5]}
-            intensity={1}
-            castShadow
-            shadow-mapSize-width={2048}
-            shadow-mapSize-height={2048}
-            shadow-camera-far={50}
-            shadow-camera-left={-20}
-            shadow-camera-right={20}
-            shadow-camera-top={20}
-            shadow-camera-bottom={-20}
-          />
-
-          {/* Environment */}
-          {sceneSettings.environment !== 'transparent' && (
-            <Environment 
-              preset={
-                sceneSettings.environment === 'factory' ? 'warehouse' :
-                sceneSettings.environment === 'studio-white' ? 'studio' :
-                sceneSettings.environment === 'dark-showroom' ? 'night' : 'studio'
-              } 
-            />
-          )}
-
-          {/* Grid */}
-          {sceneSettings.grid.visible && (
-            <Grid
-              position={[0, 0, 0]}
-              args={[sceneSettings.grid.size, sceneSettings.grid.divisions]}
-              cellSize={1}
-              cellThickness={0.5}
-              cellColor="#6f6f6f"
-              sectionSize={10}
-              sectionThickness={1}
-              sectionColor="#9d4b4b"
-              fadeDistance={50}
-              fadeStrength={1}
-              infiniteGrid
-            />
-          )}
-
-          {/* Axes Helper */}
-          {sceneSettings.axes.visible && (
-            <axesHelper args={[sceneSettings.axes.size]} />
-          )}
-
-          {/* Contact Shadows */}
-          <ContactShadows 
-            position={[0, -0.01, 0]} 
-            opacity={0.5} 
-            scale={50} 
-            blur={2.5} 
-            far={10} 
-          />
-
-          {/* Scene Objects */}
-          <group>
-            {/* Process Nodes */}
-            {processNodes.map(node => (
-              <ProcessNodeComponent
-                key={node.id}
-                node={node}
-                isSelected={selectedObjectId === node.id}
-                onClick={() => handleObjectClick(node.id, 'process')}
-              />
-            ))}
-
-            {/* Environment Assets */}
-            {environmentAssets.map(asset => (
-              <EnvironmentAssetComponent
-                key={asset.id}
-                asset={asset}
-                isSelected={selectedObjectId === asset.id}
-                onClick={() => handleObjectClick(asset.id, 'environment')}
-              />
-            ))}
-
-            {/* Actors */}
-            {actors.map(actor => (
-              <ActorComponent
-                key={actor.id}
-                actor={actor}
-                isSelected={selectedObjectId === actor.id}
-                onClick={() => handleObjectClick(actor.id, 'actor')}
-              />
-            ))}
-          </group>
-
-          {/* Snap System - shows connection ports */}
-          <SnapSystem />
-
-          {/* Connection Lines between connected objects */}
-          <ConnectionLines />
-
-          {/* Transform Controls */}
-          {selectedObject && (
-            <TransformControls
-              object={meshRef}
-              mode={transformMode}
-              size={0.8}
-              showX={true}
-              showY={true}
-              showZ={true}
-              onObjectChange={() => {}}
-            />
-          )}
-
-          {/* Camera Controls */}
-          <OrbitControls
-            enablePan={true}
-            enableZoom={true}
-            enableRotate={true}
-            minDistance={2}
-            maxDistance={100}
-            minPolarAngle={0}
-            maxPolarAngle={Math.PI / 2}
-          />
-
-          {/* Post Processing */}
-          <EffectComposer>
-            <SSAO 
-              samples={31} 
-              radius={0.4} 
-              intensity={1} 
-              luminanceInfluence={0.6} 
-              color={new THREE.Color('black')}
-            />
-            <ToneMapping adaptive={true} />
-            <SMAA />
-          </EffectComposer>
-
-          {/* Loading Placeholder */}
-          {processNodes.length === 0 && environmentAssets.length === 0 && actors.length === 0 && (
-            <group position={[0, 2, 0]}>
-              <Text
-                fontSize={1}
-                color="#6b7280"
-                anchorX="center"
-                anchorY="middle"
-              >
-                Drag modules from the library to get started
-              </Text>
-            </group>
-          )}
+          <SceneContent orbitRef={orbitRef} />
         </Suspense>
       </Canvas>
 
