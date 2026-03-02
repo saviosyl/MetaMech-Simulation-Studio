@@ -1,0 +1,13 @@
+{
+  "name": "metamech-simulation-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MetaMech Simulation Studio - scripts and tools",
+  "scripts": {
+    "generate-parts": "node scripts/generate-conveyor-parts.mjs"
+  },
+  "dependencies": {
+    "@types/three": "^0.183.1",
+    "three": "^0.183.2"
+  }
+}
