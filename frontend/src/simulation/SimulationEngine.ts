@@ -1,3 +1,19 @@
+/**
+ * SimulationEngine — Unit Conventions
+ * ====================================
+ * Internal scene units: meters (1 Three.js unit = 1 meter)
+ * 
+ * Parameter units (as entered in the UI / stored in parameters):
+ *   - Dimensions (length, width, height): millimeters (mm)
+ *   - Speeds (beltSpeed, speed): meters per minute (m/min)
+ *   - Processing times: seconds (s)
+ *   - Angles: degrees (°)
+ *   - Capacity/counts: unitless
+ * 
+ * Conversions applied in this engine:
+ *   - mm → m: divide by 1000
+ *   - m/min → m/s: divide by 60
+ */
 import { v4 as uuidv4 } from 'uuid';
 import { Product, NodeStats } from './Product';
 import { ProcessNode, ProcessEdge, getConnectionPorts } from '../store/editorStore';
@@ -90,7 +106,8 @@ export class SimulationEngine {
   }
 
   private tickSource(node: ProcessNode, stats: NodeStats, _dt: number) {
-    const interval = 1 / (node.parameters.spawnRate || 1);
+    // spawnRate is items/min → interval in seconds
+    const interval = 60 / (node.parameters.spawnRate || 60);
     if (this.simTime - stats.lastSpawnTime >= interval) {
       const outEdges = this.getOutEdges(node.id);
       if (outEdges.length > 0) {
@@ -112,9 +129,10 @@ export class SimulationEngine {
     }
 
     // Release products that have spent enough time (length / speed)
-    const length = node.parameters.length || 5;
-    const speed = node.parameters.speed || 1;
-    const travelTime = length / speed;
+    // length is in mm, speed is in m/min → convert to meters and m/s
+    const lengthM = (node.parameters.length || 5000) / 1000; // mm → m
+    const speedMps = (node.parameters.speed || node.parameters.beltSpeed || 20) / 60; // m/min → m/s
+    const travelTime = lengthM / speedMps;
 
     // Simple approach: release first product after travelTime
     if (stats.queue.length > 0) {

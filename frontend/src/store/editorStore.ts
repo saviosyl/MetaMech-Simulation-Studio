@@ -698,7 +698,7 @@ function getDefaultParameters(type: string): Record<string, any> {
     // Process nodes
     source: { spawnRate: 1.0, productType: 'default' },
     sink: { capacity: 100 },
-    conveyor: { length: 5, width: 1, speed: 1.0 },
+    conveyor: { length: 5000, width: 1000, speed: 20 },
     'belt-conveyor': { width: 600, length: 3000, height: 800, angle: 0, beltSpeed: 20, sideGuides: true, driveEnd: 'right', supportSpacing: 1500 },
     'roller-conveyor': { width: 600, length: 3000, height: 800, rollerPitch: 100, driven: true, sideRails: true },
     'fanuc-robot': {},

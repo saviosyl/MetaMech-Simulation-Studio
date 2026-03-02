@@ -24,6 +24,7 @@ const ViewportToolbar: React.FC = () => {
   const setActiveTool = useEditorStore(s => s.setActiveTool);
   const gridSnap = useEditorStore(s => s.gridSnap);
   const setGridSnap = useEditorStore(s => s.setGridSnap);
+  const gridSnapSize = useEditorStore(s => s.gridSnapSize);
 
   return (
     <div
@@ -72,7 +73,7 @@ const ViewportToolbar: React.FC = () => {
 
       {/* Grid snap toggle */}
       <button
-        title={`Grid Snap (${gridSnap ? 'ON' : 'OFF'})`}
+        title={`Grid Snap ${gridSnap ? `ON (${gridSnapSize * 1000} mm)` : 'OFF'}`}
         onClick={() => setGridSnap(!gridSnap)}
         style={{
           width: 36,

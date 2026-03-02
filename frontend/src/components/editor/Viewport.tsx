@@ -501,13 +501,27 @@ const Viewport: React.FC = () => {
       )}
 
       {/* Viewport Info */}
-      <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg p-2 text-white text-xs space-y-1" style={{ zIndex: 10 }}>
-        <div>Objects: {processNodes.length + environmentAssets.length + actors.length}</div>
-        <div>Mode: {transformMode.charAt(0).toUpperCase() + transformMode.slice(1)}</div>
-        {selectedObject && (
-          <div>Selected: {selectedObject.name}</div>
-        )}
-      </div>
+      <ViewportInfo
+        objectCount={processNodes.length + environmentAssets.length + actors.length}
+        transformMode={transformMode}
+        selectedName={selectedObject?.name}
+      />
+    </div>
+  );
+};
+
+const ViewportInfo: React.FC<{ objectCount: number; transformMode: string; selectedName?: string }> = ({ objectCount, transformMode, selectedName }) => {
+  const gridSnap = useEditorStore(s => s.gridSnap);
+  const gridSnapSize = useEditorStore(s => s.gridSnapSize);
+  return (
+    <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg p-2 text-white text-xs space-y-1" style={{ zIndex: 10 }}>
+      <div>Objects: {objectCount}</div>
+      <div>Mode: {transformMode.charAt(0).toUpperCase() + transformMode.slice(1)}</div>
+      <div>Grid: 1000 mm</div>
+      {gridSnap && <div>Snap: {gridSnapSize * 1000} mm</div>}
+      {selectedName && (
+        <div>Selected: {selectedName}</div>
+      )}
     </div>
   );
 };

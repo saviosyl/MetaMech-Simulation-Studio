@@ -12,6 +12,7 @@ import {
 import { useEditorStore } from '../../store/editorStore';
 import { getModuleDefinition } from '../../lib/moduleLibrary';
 import { getAssetById, ParametricAssetDef } from '../../lib/assetManifest';
+import { mToMm, mmToM, radToDeg, degToRad } from '../../utils/units';
 
 const RightPanel: React.FC = () => {
   const {
@@ -291,16 +292,16 @@ const RightPanel: React.FC = () => {
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Position (mm)</label>
                     <div className="grid grid-cols-3 gap-2">
                       {['X', 'Y', 'Z'].map((axis, index) => (
                         <div key={axis}>
-                          <label className="block text-xs text-gray-500 mb-1">{axis}</label>
+                          <label className="block text-xs text-gray-500 mb-1">{axis} (mm)</label>
                           <input
                             type="number"
-                            value={selectedObject.position[index].toFixed(2)}
-                            onChange={(e) => handleTransformChange('position', index, Number(e.target.value))}
-                            step="0.1"
+                            value={Math.round(mToMm(selectedObject.position[index]))}
+                            onChange={(e) => handleTransformChange('position', index, mmToM(Number(e.target.value)))}
+                            step="50"
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                           />
                         </div>
@@ -309,15 +310,15 @@ const RightPanel: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Rotation</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Rotation (°)</label>
                     <div className="grid grid-cols-3 gap-2">
                       {['X', 'Y', 'Z'].map((axis, index) => (
                         <div key={axis}>
                           <label className="block text-xs text-gray-500 mb-1">{axis}°</label>
                           <input
                             type="number"
-                            value={(selectedObject.rotation[index] * 180 / Math.PI).toFixed(1)}
-                            onChange={(e) => handleTransformChange('rotation', index, Number(e.target.value) * Math.PI / 180)}
+                            value={radToDeg(selectedObject.rotation[index]).toFixed(1)}
+                            onChange={(e) => handleTransformChange('rotation', index, degToRad(Number(e.target.value)))}
                             step="1"
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                           />
