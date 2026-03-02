@@ -17,6 +17,8 @@ import ActorComponent from '../3d/ActorComponent';
 import SnapSystem, { checkSnap } from '../3d/SnapSystem';
 import ConnectionLines from '../3d/ConnectionLine';
 import SimulationOverlay from '../3d/SimulationOverlay';
+import MeasurementTool from '../editor/MeasurementTool';
+import CameraControls from '../3d/CameraControls';
 
 // Wrapper that attaches TransformControls to the selected object
 const DraggableObject: React.FC<{
@@ -107,8 +109,18 @@ const DraggableObject: React.FC<{
     const rot = groupRef.current.rotation;
     const scl = groupRef.current.scale;
     
+    // Apply grid snap
+    const { gridSnap, gridSnapSize } = useEditorStore.getState();
+    let px = pos.x, py = pos.y, pz = pos.z;
+    if (gridSnap && transformMode === 'translate') {
+      px = Math.round(px / gridSnapSize) * gridSnapSize;
+      py = Math.round(py / gridSnapSize) * gridSnapSize;
+      pz = Math.round(pz / gridSnapSize) * gridSnapSize;
+      groupRef.current.position.set(px, py, pz);
+    }
+    
     updateObject(id, objectType, {
-      position: [pos.x, pos.y, pos.z] as [number, number, number],
+      position: [px, py, pz] as [number, number, number],
       rotation: [rot.x, rot.y, rot.z] as [number, number, number],
       scale: [scl.x, scl.y, scl.z] as [number, number, number],
     });
@@ -167,6 +179,9 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
     sceneSettings,
     isPlaying,
     snapTarget,
+    hiddenIds,
+    measureActive,
+    addMeasurePoint,
   } = useEditorStore();
 
   const handleObjectClick = useCallback((objectId: string, objectType: 'process' | 'environment' | 'actor') => {
@@ -241,6 +256,13 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.02, 0]}
         onPointerMissed={handlePointerMissed}
+        onClick={(e) => {
+          if (measureActive) {
+            e.stopPropagation();
+            const p = e.point;
+            addMeasurePoint([p.x, p.y, p.z]);
+          }
+        }}
         visible={false}
       >
         <planeGeometry args={[200, 200]} />
@@ -250,7 +272,7 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
       {/* Scene Objects - wrapped in DraggableObject */}
       <group>
         {/* Process Nodes */}
-        {processNodes.map(node => (
+        {processNodes.filter(n => !hiddenIds.has(n.id)).map(node => (
           <DraggableObject
             key={node.id}
             id={node.id}
@@ -270,7 +292,7 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
         ))}
 
         {/* Environment Assets */}
-        {environmentAssets.map(asset => (
+        {environmentAssets.filter(a => !hiddenIds.has(a.id)).map(asset => (
           <DraggableObject
             key={asset.id}
             id={asset.id}
@@ -290,7 +312,7 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
         ))}
 
         {/* Actors */}
-        {actors.map(actor => (
+        {actors.filter(a => !hiddenIds.has(a.id)).map(actor => (
           <DraggableObject
             key={actor.id}
             id={actor.id}
@@ -326,6 +348,12 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
 
       {/* Simulation Overlay */}
       <SimulationOverlay />
+
+      {/* Measurement Tool */}
+      <MeasurementTool />
+
+      {/* Camera Animation Controls */}
+      <CameraControls orbitRef={orbitRef} />
 
       {/* Camera Controls */}
       <OrbitControls

@@ -9,6 +9,7 @@ import RightPanel from '../components/editor/RightPanel';
 import Viewport from '../components/editor/Viewport';
 import ContextMenu from '../components/editor/ContextMenu';
 import StatsPanel from '../components/editor/StatsPanel';
+import ShortcutsPanel from '../components/editor/ShortcutsPanel';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -33,6 +34,14 @@ const EditorPage: React.FC = () => {
     environmentAssets,
     actors,
     edges,
+    gridSnap,
+    setGridSnap,
+    measureActive,
+    setMeasureActive,
+    setShowShortcuts,
+    showShortcuts,
+    selectAll,
+    requestFocus,
   } = useEditorStore();
 
   // Track changes for undo history
@@ -86,11 +95,22 @@ const EditorPage: React.FC = () => {
         return;
       }
 
+      // Select All
+      if ((event.metaKey || event.ctrlKey) && event.key === 'a') {
+        event.preventDefault();
+        selectAll();
+        return;
+      }
+
       switch (event.key.toLowerCase()) {
         case 'w': setTransformMode('translate'); break;
         case 'e': setTransformMode('rotate'); break;
         case 'r': setTransformMode('scale'); break;
-        case 'escape': setSelectedObject(null, null); setContextMenu(null); break;
+        case 'g': setGridSnap(!gridSnap); break;
+        case 'm': setMeasureActive(!measureActive); break;
+        case 'f': requestFocus(); break;
+        case '?': setShowShortcuts(!showShortcuts); break;
+        case 'escape': setSelectedObject(null, null); setContextMenu(null); setShowShortcuts(false); break;
         case 'delete':
         case 'backspace':
           if (selectedObjectId && selectedObjectType) {
@@ -157,6 +177,9 @@ const EditorPage: React.FC = () => {
         </div>
         <RightPanel />
       </div>
+
+      {/* Shortcuts Panel */}
+      <ShortcutsPanel />
 
       {/* Context Menu */}
       {contextMenu && (

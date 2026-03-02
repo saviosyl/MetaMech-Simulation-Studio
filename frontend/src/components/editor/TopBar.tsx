@@ -14,6 +14,10 @@ import {
   Check,
   AlertCircle,
   Loader2,
+  Grid3X3,
+  Ruler,
+  Camera,
+  HelpCircle,
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuth } from '../../contexts/AuthContext';
@@ -42,6 +46,13 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     setSimulationSpeed,
     getSceneData,
     loadScene,
+    gridSnap,
+    setGridSnap,
+    measureActive,
+    setMeasureActive,
+    cameraPresets,
+    setCameraPreset,
+    setShowShortcuts,
   } = useEditorStore();
 
   const speedOptions = [
@@ -151,6 +162,49 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         </button>
         <button onClick={handleRedo} className="p-1.5 text-gray-500 hover:text-gray-800 disabled:opacity-30" title="Redo (Ctrl+Shift+Z)">
           <Redo2 size={18} />
+        </button>
+
+        <div className="h-6 w-px bg-gray-300" />
+
+        {/* Grid Snap */}
+        <button
+          onClick={() => setGridSnap(!gridSnap)}
+          className={`p-1.5 rounded transition-colors ${gridSnap ? 'bg-teal-100 text-teal-700' : 'text-gray-500 hover:text-gray-800'}`}
+          title="Grid Snap (G)"
+        >
+          <Grid3X3 size={18} />
+        </button>
+
+        {/* Measure */}
+        <button
+          onClick={() => setMeasureActive(!measureActive)}
+          className={`p-1.5 rounded transition-colors ${measureActive ? 'bg-teal-100 text-teal-700' : 'text-gray-500 hover:text-gray-800'}`}
+          title="Measure (M)"
+        >
+          <Ruler size={18} />
+        </button>
+
+        {/* Camera Presets */}
+        <div className="flex items-center gap-0.5 ml-1">
+          {cameraPresets.map(p => (
+            <button
+              key={p.name}
+              onClick={() => setCameraPreset(p.name)}
+              className="px-1.5 py-1 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded"
+              title={`${p.name} view`}
+            >
+              {p.name[0]}
+            </button>
+          ))}
+        </div>
+
+        {/* Shortcuts */}
+        <button
+          onClick={() => setShowShortcuts(true)}
+          className="p-1.5 text-gray-500 hover:text-gray-800"
+          title="Shortcuts (?)"
+        >
+          <HelpCircle size={18} />
         </button>
       </div>
 

@@ -7,7 +7,7 @@ import { runBuilder } from '../lib/parametricBuilders';
 export interface ProcessNode {
   id: string;
   type: 'source' | 'sink' | 'conveyor' | 'buffer' | 'machine' | 'router' | 
-        'transfer-bridge' | 'popup-transfer' | 'pusher-transfer' | 
+        'transfer-bridge' | 'popup-transfer' | 'pusher-transfer' | 'merge-divert' |
         'spiral-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
         'belt-conveyor' | 'roller-conveyor' | 'fanuc-robot' | 'machine-static';
   position: [number, number, number];
@@ -199,7 +199,28 @@ interface EditorState {
   // Selection and tools
   selectedObjectId: string | null;
   selectedObjectType: 'process' | 'environment' | 'actor' | null;
+  selectedIds: string[];
   transformMode: 'translate' | 'rotate' | 'scale';
+  
+  // Grid snap
+  gridSnap: boolean;
+  gridSnapSize: number;
+  
+  // Measurement tool
+  measureActive: boolean;
+  measurePoints: [number, number, number][];
+  
+  // Camera presets
+  cameraPresets: { name: string; position: [number, number, number]; target: [number, number, number] }[];
+  activeCameraPreset: string | null;
+  cameraTargetPosition: [number, number, number] | null;
+  cameraTargetLookAt: [number, number, number] | null;
+  
+  // Shortcuts panel
+  showShortcuts: boolean;
+  
+  // Focus request
+  focusRequest: number; // increment to trigger
   
   // Simulation state
   isPlaying: boolean;
@@ -229,7 +250,20 @@ interface EditorState {
   removeObject: (id: string, type: 'process' | 'environment' | 'actor') => void;
   
   setSelectedObject: (id: string | null, type: 'process' | 'environment' | 'actor' | null) => void;
+  toggleSelectId: (id: string, type: 'process' | 'environment' | 'actor') => void;
+  selectAll: () => void;
   setTransformMode: (mode: 'translate' | 'rotate' | 'scale') => void;
+  setGridSnap: (snap: boolean) => void;
+  setGridSnapSize: (size: number) => void;
+  setMeasureActive: (active: boolean) => void;
+  addMeasurePoint: (point: [number, number, number]) => void;
+  clearMeasurePoints: () => void;
+  setCameraPreset: (name: string) => void;
+  setShowShortcuts: (show: boolean) => void;
+  requestFocus: () => void;
+  // Object visibility
+  hiddenIds: Set<string>;
+  toggleVisibility: (id: string) => void;
   
   setSceneSettings: (settings: Partial<SceneSettings>) => void;
   setActiveLibraryTab: (tab: 'process' | 'environment' | 'actors') => void;
@@ -292,7 +326,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   selectedObjectId: null,
   selectedObjectType: null,
+  selectedIds: [],
   transformMode: 'translate',
+  
+  gridSnap: false,
+  gridSnapSize: 0.5,
+  
+  measureActive: false,
+  measurePoints: [],
+  
+  cameraPresets: [
+    { name: 'Top', position: [0, 30, 0.01], target: [0, 0, 0] },
+    { name: 'Front', position: [0, 5, 20], target: [0, 2, 0] },
+    { name: 'Right', position: [20, 5, 0], target: [0, 2, 0] },
+    { name: 'Perspective', position: [15, 15, 15], target: [0, 0, 0] },
+  ],
+  activeCameraPreset: null,
+  cameraTargetPosition: null,
+  cameraTargetLookAt: null,
+  
+  showShortcuts: false,
+  focusRequest: 0,
+  hiddenIds: new Set(),
   
   isPlaying: false,
   simulationSpeed: 1.0,
@@ -440,11 +495,62 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   setSelectedObject: (id, type) => {
-    set({ selectedObjectId: id, selectedObjectType: type });
+    set({ selectedObjectId: id, selectedObjectType: type, selectedIds: id ? [id] : [] });
+  },
+  
+  toggleSelectId: (id, type) => {
+    set(state => {
+      const ids = [...state.selectedIds];
+      const idx = ids.indexOf(id);
+      if (idx >= 0) {
+        ids.splice(idx, 1);
+      } else {
+        ids.push(id);
+      }
+      return { selectedIds: ids, selectedObjectId: ids.length > 0 ? ids[ids.length - 1] : null, selectedObjectType: ids.length > 0 ? type : null };
+    });
+  },
+  
+  selectAll: () => {
+    const state = get();
+    const allIds = [
+      ...state.processNodes.map(n => n.id),
+      ...state.environmentAssets.map(a => a.id),
+      ...state.actors.map(a => a.id),
+    ];
+    set({ selectedIds: allIds });
   },
   
   setTransformMode: (mode) => {
     set({ transformMode: mode });
+  },
+  
+  setGridSnap: (snap) => set({ gridSnap: snap }),
+  setGridSnapSize: (size) => set({ gridSnapSize: size }),
+  setMeasureActive: (active) => set({ measureActive: active, measurePoints: [] }),
+  addMeasurePoint: (point) => {
+    set(state => {
+      const pts = [...state.measurePoints, point];
+      if (pts.length > 2) return { measurePoints: [point] };
+      return { measurePoints: pts };
+    });
+  },
+  clearMeasurePoints: () => set({ measurePoints: [] }),
+  setCameraPreset: (name) => {
+    const preset = get().cameraPresets.find(p => p.name === name);
+    if (preset) {
+      set({ activeCameraPreset: name, cameraTargetPosition: [...preset.position] as [number, number, number], cameraTargetLookAt: [...preset.target] as [number, number, number] });
+    }
+  },
+  setShowShortcuts: (show) => set({ showShortcuts: show }),
+  requestFocus: () => set(state => ({ focusRequest: state.focusRequest + 1 })),
+  toggleVisibility: (id) => {
+    set(state => {
+      const newHidden = new Set(state.hiddenIds);
+      if (newHidden.has(id)) newHidden.delete(id);
+      else newHidden.add(id);
+      return { hiddenIds: newHidden };
+    });
   },
   
   setSceneSettings: (settings) => {
@@ -557,11 +663,12 @@ function getDefaultParameters(type: string): Record<string, any> {
     buffer: { capacity: 10 },
     machine: { processingTime: 2.0, capacity: 1 },
     router: { mode: 'round-robin' },
-    'transfer-bridge': { length: 2 },
-    'popup-transfer': { height: 0.5, speed: 1.0 },
-    'pusher-transfer': { force: 1.0, angle: 90 },
-    'spiral-conveyor': { radius: 2, height: 5, speed: 0.5 },
-    'vertical-lifter': { height: 3, speed: 1.0 },
+    'transfer-bridge': { width: 600, length: 1000, height: 800 },
+    'popup-transfer': { width: 600, length: 1500, height: 800, popupHeight: 200, speed: 1, direction: 'left' },
+    'pusher-transfer': { width: 600, length: 2000, height: 800, pushAngle: 90, pushForce: 1, pushSide: 'left' },
+    'merge-divert': { width: 600, mainLength: 3000, branchLength: 2000, branchAngle: 30, height: 800, mode: 'divert' },
+    'spiral-conveyor': { diameter: 2000, totalHeight: 5000, beltWidth: 500, direction: 'up', speed: 1 },
+    'vertical-lifter': { platformWidth: 1000, platformDepth: 1000, liftHeight: 3000, speed: 1, loadDirection: 'front', capacity: 4 },
     'pick-and-place': { reach: 3, speed: 1.0 },
     palletizer: { palletSize: [1.2, 0.8], stackHeight: 1.5 },
     
