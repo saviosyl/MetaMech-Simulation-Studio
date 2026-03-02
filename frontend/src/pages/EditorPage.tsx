@@ -1,6 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { useEditorStore } from '../store/editorStore';
 import TopBar from '../components/editor/TopBar';
 import LeftPanel from '../components/editor/LeftPanel';
@@ -9,7 +8,6 @@ import Viewport from '../components/editor/Viewport';
 
 const EditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
   const navigate = useNavigate();
   
   const {
@@ -24,13 +22,11 @@ const EditorPage: React.FC = () => {
       return;
     }
 
-    // Load project data
     loadProjectData(id);
     
-    // Keyboard shortcuts
     const handleKeyPress = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-        return; // Don't handle shortcuts when typing
+        return;
       }
 
       switch (event.key.toLowerCase()) {
@@ -48,7 +44,6 @@ const EditorPage: React.FC = () => {
           break;
         case 'delete':
         case 'backspace':
-          // Handle delete selected object
           break;
       }
     };
@@ -57,10 +52,8 @@ const EditorPage: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [id]);
 
-  const loadProjectData = async (projectId: string) => {
+  const loadProjectData = async (_projectId: string) => {
     try {
-      // In a real implementation, this would fetch from the API
-      // For now, we'll load an empty scene
       loadScene({});
     } catch (error) {
       console.error('Failed to load project:', error);
@@ -70,20 +63,12 @@ const EditorPage: React.FC = () => {
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
-      {/* Top Bar */}
       <TopBar />
-
-      {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Module Library */}
         <LeftPanel />
-
-        {/* Center - 3D Viewport */}
-        <div className="flex-1 relative bg-gray-900">
+        <div className="flex-1 relative bg-gray-900 min-w-0">
           <Viewport />
         </div>
-
-        {/* Right Panel - Properties Inspector */}
         <RightPanel />
       </div>
     </div>

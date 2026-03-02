@@ -1,7 +1,5 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import * as THREE from 'three';
-
 // Types
 export interface ProcessNode {
   id: string;
@@ -40,7 +38,15 @@ export interface ProcessEdge {
   id: string;
   from: string;
   to: string;
+  fromPort: string;
+  toPort: string;
   parameters: Record<string, any>;
+}
+
+export interface ConnectionPort {
+  id: string;
+  type: 'input' | 'output';
+  localPosition: [number, number, number];
 }
 
 export interface Underlay {
@@ -79,6 +85,53 @@ export interface CustomProduct {
   dimensions: [number, number, number];
 }
 
+// Connection port definitions per object type
+export function getConnectionPorts(type: string, params?: Record<string, any>): ConnectionPort[] {
+  const length = params?.length || 5;
+  switch (type) {
+    case 'source':
+      return [{ id: 'output', type: 'output', localPosition: [0.75, 0.5, 0] }];
+    case 'sink':
+      return [{ id: 'input', type: 'input', localPosition: [-0.75, 0.5, 0] }];
+    case 'conveyor':
+      return [
+        { id: 'input', type: 'input', localPosition: [-length / 2, 0.1, 0] },
+        { id: 'output', type: 'output', localPosition: [length / 2, 0.1, 0] },
+      ];
+    case 'buffer':
+      return [
+        { id: 'input', type: 'input', localPosition: [-1, 0.4, 0] },
+        { id: 'output', type: 'output', localPosition: [1, 0.4, 0] },
+      ];
+    case 'machine':
+      return [
+        { id: 'input', type: 'input', localPosition: [-1, 0.75, 0] },
+        { id: 'output', type: 'output', localPosition: [1, 0.75, 0] },
+      ];
+    case 'palletizer':
+      return [
+        { id: 'input', type: 'input', localPosition: [-1.5, 1.25, 0] },
+        { id: 'output', type: 'output', localPosition: [1.5, 1.25, 0] },
+      ];
+    case 'pick-and-place':
+      return [
+        { id: 'input', type: 'input', localPosition: [-1.5, 0, 0] },
+        { id: 'output', type: 'output', localPosition: [1.5, 0, 0] },
+      ];
+    case 'router':
+      return [
+        { id: 'input', type: 'input', localPosition: [-1, 0.25, 0] },
+        { id: 'output1', type: 'output', localPosition: [1, 0.25, 0] },
+        { id: 'output2', type: 'output', localPosition: [0, 0.25, 1] },
+      ];
+    default:
+      return [
+        { id: 'input', type: 'input', localPosition: [-1, 0.5, 0] },
+        { id: 'output', type: 'output', localPosition: [1, 0.5, 0] },
+      ];
+  }
+}
+
 interface EditorState {
   // Scene objects
   processNodes: ProcessNode[];
@@ -104,12 +157,23 @@ interface EditorState {
   activeLibraryTab: 'process' | 'environment' | 'actors';
   showPropertiesPanel: boolean;
   
+  // Panel state
+  leftPanelWidth: number;
+  rightPanelWidth: number;
+  leftPanelCollapsed: boolean;
+  rightPanelCollapsed: boolean;
+  
+  // Snap state
+  isDragging: boolean;
+  dragNodeId: string | null;
+  snapTarget: { nodeId: string; portId: string; position: [number, number, number] } | null;
+  
   // Actions
   addProcessNode: (type: ProcessNode['type'], position: [number, number, number]) => void;
   addEnvironmentAsset: (type: EnvironmentAsset['type'], position: [number, number, number]) => void;
   addActor: (type: Actor['type'], position: [number, number, number]) => void;
   
-  updateObject: (id: string, type: 'process' | 'environment' | 'actor', updates: Partial<ProcessNode | EnvironmentAsset | Actor>) => void;
+  updateObject: (id: string, type: 'process' | 'environment' | 'actor', updates: Record<string, any>) => void;
   removeObject: (id: string, type: 'process' | 'environment' | 'actor') => void;
   
   setSelectedObject: (id: string | null, type: 'process' | 'environment' | 'actor' | null) => void;
@@ -117,6 +181,21 @@ interface EditorState {
   
   setSceneSettings: (settings: Partial<SceneSettings>) => void;
   setActiveLibraryTab: (tab: 'process' | 'environment' | 'actors') => void;
+  
+  // Panel actions
+  setLeftPanelWidth: (width: number) => void;
+  setRightPanelWidth: (width: number) => void;
+  setLeftPanelCollapsed: (collapsed: boolean) => void;
+  setRightPanelCollapsed: (collapsed: boolean) => void;
+  
+  // Edge/connection actions
+  addEdge: (from: string, fromPort: string, to: string, toPort: string) => void;
+  removeEdge: (id: string) => void;
+  
+  // Snap actions
+  setIsDragging: (dragging: boolean) => void;
+  setDragNodeId: (id: string | null) => void;
+  setSnapTarget: (target: { nodeId: string; portId: string; position: [number, number, number] } | null) => void;
   
   // Simulation controls
   play: () => void;
@@ -167,6 +246,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   activeLibraryTab: 'process',
   showPropertiesPanel: true,
+  
+  // Panel defaults
+  leftPanelWidth: 320,
+  rightPanelWidth: 320,
+  leftPanelCollapsed: false,
+  rightPanelCollapsed: false,
+  
+  // Snap defaults
+  isDragging: false,
+  dragNodeId: null,
+  snapTarget: null,
   
   // Actions
   addProcessNode: (type, position) => {
@@ -250,20 +340,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   removeObject: (id, type) => {
     set(state => {
-      const newState: Partial<EditorState> = {
+      const base: Partial<EditorState> = {
         selectedObjectId: state.selectedObjectId === id ? null : state.selectedObjectId,
         selectedObjectType: state.selectedObjectId === id ? null : state.selectedObjectType,
+        edges: state.edges.filter(e => e.from !== id && e.to !== id),
       };
       
       if (type === 'process') {
-        newState.processNodes = state.processNodes.filter(node => node.id !== id);
+        base.processNodes = state.processNodes.filter(node => node.id !== id);
       } else if (type === 'environment') {
-        newState.environmentAssets = state.environmentAssets.filter(asset => asset.id !== id);
+        base.environmentAssets = state.environmentAssets.filter(asset => asset.id !== id);
       } else if (type === 'actor') {
-        newState.actors = state.actors.filter(actor => actor.id !== id);
+        base.actors = state.actors.filter(actor => actor.id !== id);
       }
       
-      return { ...state, ...newState };
+      return base;
     });
   },
   
@@ -284,6 +375,34 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setActiveLibraryTab: (tab) => {
     set({ activeLibraryTab: tab });
   },
+  
+  // Panel actions
+  setLeftPanelWidth: (width) => set({ leftPanelWidth: Math.min(500, Math.max(240, width)) }),
+  setRightPanelWidth: (width) => set({ rightPanelWidth: Math.min(500, Math.max(240, width)) }),
+  setLeftPanelCollapsed: (collapsed) => set({ leftPanelCollapsed: collapsed }),
+  setRightPanelCollapsed: (collapsed) => set({ rightPanelCollapsed: collapsed }),
+  
+  // Edge actions
+  addEdge: (from, fromPort, to, toPort) => {
+    const edge: ProcessEdge = {
+      id: uuidv4(),
+      from,
+      to,
+      fromPort,
+      toPort,
+      parameters: {},
+    };
+    set(state => ({ edges: [...state.edges, edge] }));
+  },
+  
+  removeEdge: (id) => {
+    set(state => ({ edges: state.edges.filter(e => e.id !== id) }));
+  },
+  
+  // Snap actions
+  setIsDragging: (dragging) => set({ isDragging: dragging }),
+  setDragNodeId: (id) => set({ dragNodeId: id }),
+  setSnapTarget: (target) => set({ snapTarget: target }),
   
   play: () => {
     set({ isPlaying: true });

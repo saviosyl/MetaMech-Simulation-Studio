@@ -6,7 +6,6 @@ import {
   Environment, 
   ContactShadows,
   TransformControls,
-  useHelper,
   Text
 } from '@react-three/drei';
 import { EffectComposer, SSAO, ToneMapping, SMAA } from '@react-three/postprocessing';
@@ -15,9 +14,11 @@ import { useEditorStore } from '../../store/editorStore';
 import ProcessNodeComponent from '../3d/ProcessNodeComponent';
 import EnvironmentAssetComponent from '../3d/EnvironmentAssetComponent';
 import ActorComponent from '../3d/ActorComponent';
+import SnapSystem from '../3d/SnapSystem';
+import ConnectionLines from '../3d/ConnectionLine';
 
 const Viewport: React.FC = () => {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const meshRef = useRef<THREE.Object3D>(null!);
   
   const {
     processNodes,
@@ -40,7 +41,6 @@ const Viewport: React.FC = () => {
       const data = JSON.parse(event.dataTransfer.getData('application/json'));
       
       if (data.type === 'module') {
-        // Calculate drop position (simplified - in a real app, you'd use raycasting)
         const position: [number, number, number] = [
           Math.random() * 10 - 5,
           0,
@@ -199,6 +199,12 @@ const Viewport: React.FC = () => {
             ))}
           </group>
 
+          {/* Snap System - shows connection ports */}
+          <SnapSystem />
+
+          {/* Connection Lines between connected objects */}
+          <ConnectionLines />
+
           {/* Transform Controls */}
           {selectedObject && (
             <TransformControls
@@ -208,10 +214,7 @@ const Viewport: React.FC = () => {
               showX={true}
               showY={true}
               showZ={true}
-              onObjectChange={() => {
-                // Handle transform changes
-                // This would update the store with new position/rotation/scale
-              }}
+              onObjectChange={() => {}}
             />
           )}
 
@@ -233,7 +236,7 @@ const Viewport: React.FC = () => {
               radius={0.4} 
               intensity={1} 
               luminanceInfluence={0.6} 
-              color="black"
+              color={new THREE.Color('black')}
             />
             <ToneMapping adaptive={true} />
             <SMAA />
