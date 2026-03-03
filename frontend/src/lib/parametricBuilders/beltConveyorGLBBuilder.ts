@@ -2,153 +2,186 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { BuilderResult, ConnectionPort } from './beltConveyorBuilder';
 
-const PARTS_BASE = '/models/parts/belt/';
+const GLB_URL = '/models/belt_conveyor_.glb';
 
-const partNames = [
-  'head-section', 'tail-section', 'mid-section',
-  'support-leg', 'belt-surface', 'side-guide', 'motor-unit',
-] as const;
+// Cached original scene + measured bounding box
+let cachedScene: THREE.Group | null = null;
+let cachedBBox: THREE.Box3 | null = null;
+let loadingPromise: Promise<void> | null = null;
 
-type PartCache = Record<string, THREE.Group>;
-
-let partsCache: PartCache | null = null;
-let loadingPromise: Promise<PartCache> | null = null;
-
-function loadAllParts(): Promise<PartCache> {
-  if (partsCache) return Promise.resolve(partsCache);
+function loadModel(): Promise<void> {
+  if (cachedScene) return Promise.resolve();
   if (loadingPromise) return loadingPromise;
 
   const loader = new GLTFLoader();
-  loadingPromise = Promise.all(
-    partNames.map(
-      (name) =>
-        new Promise<[string, THREE.Group]>((resolve, reject) => {
-          loader.load(
-            `${PARTS_BASE}${name}.glb`,
-            (gltf) => resolve([name, gltf.scene as THREE.Group]),
-            undefined,
-            reject
-          );
-        })
-    )
-  ).then((entries) => {
-    partsCache = Object.fromEntries(entries);
-    return partsCache;
+  loadingPromise = new Promise<void>((resolve, reject) => {
+    loader.load(
+      GLB_URL,
+      (gltf) => {
+        cachedScene = gltf.scene as THREE.Group;
+        // Enable shadows on all meshes
+        cachedScene.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            (child as THREE.Mesh).castShadow = true;
+            (child as THREE.Mesh).receiveShadow = true;
+          }
+        });
+        // Measure original bounding box
+        cachedBBox = new THREE.Box3().setFromObject(cachedScene);
+        console.log('[BeltConveyorGLB] Loaded. Original bbox:', cachedBBox.min.toArray(), cachedBBox.max.toArray());
+        resolve();
+      },
+      undefined,
+      (err) => {
+        console.error('[BeltConveyorGLB] Failed to load:', err);
+        loadingPromise = null;
+        reject(err);
+      }
+    );
   });
 
   return loadingPromise;
 }
 
-function clonePart(parts: PartCache, name: string): THREE.Group {
-  const src = parts[name];
-  if (!src) throw new Error(`Part not found: ${name}`);
-  const clone = src.clone(true);
+/**
+ * Clone the cached GLB scene with fresh material instances
+ * so each conveyor instance can be independently colored/highlighted.
+ */
+function cloneScene(): THREE.Group {
+  if (!cachedScene) throw new Error('Model not loaded');
+  const clone = cachedScene.clone(true);
   clone.traverse((child) => {
-    if (child instanceof THREE.Mesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
+    if ((child as THREE.Mesh).isMesh) {
+      const mesh = child as THREE.Mesh;
+      // Clone materials so instances don't share state
+      if (Array.isArray(mesh.material)) {
+        mesh.material = mesh.material.map((m) => m.clone());
+      } else {
+        mesh.material = (mesh.material as THREE.Material).clone();
+      }
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
     }
   });
   return clone;
 }
 
 /**
- * Build a belt conveyor using pre-generated GLB parts.
- * Returns null if parts aren't loaded yet (caller should fall back to procedural).
+ * Build a belt conveyor using the uploaded GLB model.
+ * Parametrically scales width, length, height to match user parameters.
+ * Returns null if the model hasn't loaded yet (caller falls back to procedural).
  */
-export function buildBeltConveyorGLB(params: Record<string, any>): BuilderResult | null {
-  if (!partsCache) {
-    // Trigger loading for next time
-    loadAllParts();
+export function buildBeltConveyorFromGLB(params: Record<string, any>): BuilderResult | null {
+  if (!cachedScene || !cachedBBox) {
+    // Kick off loading for next render cycle
+    loadModel();
     return null;
   }
 
-  const w = (params.width ?? 600) / 1000;
-  const l = (params.length ?? 3000) / 1000;
-  const h = (params.height ?? 800) / 1000;
-  const sideGuides = params.sideGuides ?? true;
+  // --- User parameters (mm → meters) ---
+  const targetW = (params.width ?? 600) / 1000;    // width in meters
+  const targetL = (params.length ?? 3000) / 1000;   // length in meters
+  const targetH = (params.height ?? 800) / 1000;    // height in meters
+  const inclineAngle = (params.inclineAngle ?? 0) * Math.PI / 180;
   const driveEnd = params.driveEnd ?? 'right';
-  const supportSpacing = (params.supportSpacing ?? 1500) / 1000;
+  // sideGuides param is preserved in the GLB model as-is (the real model has guides built in)
 
+  // --- Original model dimensions from cached bbox ---
+  const origMin = cachedBBox.min;
+  const origSize = new THREE.Vector3();
+  cachedBBox.getSize(origSize);
+  const origCenter = new THREE.Vector3();
+  cachedBBox.getCenter(origCenter);
+
+  // The model axes (from inspection):
+  //   X → width  (~0.44m native)
+  //   Y → length (~2.1m native, negative direction)
+  //   Z → height (~0.94m native)
+  const origW = origSize.x;
+  const origL = origSize.y; // absolute length along Y
+  const origH = origSize.z;
+
+  // --- Build the output group ---
   const group = new THREE.Group();
-  const halfL = l / 2;
 
-  // Scale factor for width (parts are built at 1m width)
-  const wScale = w;
+  // Clone the GLB scene
+  const model = cloneScene();
 
-  // --- Head section ---
-  const head = clonePart(partsCache, 'head-section');
-  head.scale.set(1, 1, wScale);
-  const headX = driveEnd === 'right' ? halfL : -halfL;
-  head.position.set(headX, h, 0);
-  if (driveEnd === 'left') head.rotation.y = Math.PI;
-  group.add(head);
+  // Compute scale factors
+  const scaleX = targetW / origW;
+  const scaleY = targetL / origL;
+  const scaleZ = targetH / origH;
 
-  // --- Tail section ---
-  const tail = clonePart(partsCache, 'tail-section');
-  tail.scale.set(1, 1, wScale);
-  const tailX = driveEnd === 'right' ? -halfL : halfL;
-  tail.position.set(tailX, h, 0);
-  if (driveEnd === 'left') tail.rotation.y = Math.PI;
-  group.add(tail);
+  // Apply non-uniform scale
+  model.scale.set(scaleX, scaleY, scaleZ);
 
-  // --- Mid sections ---
-  const midLen = 0.5;
-  const usableLen = l - 0.3; // head/tail take ~0.15 each
-  const numMids = Math.max(1, Math.round(usableLen / midLen));
-  const actualMidLen = usableLen / numMids;
+  // After scaling, recalculate the bbox to center the model
+  // We need to shift so the conveyor is centered at origin (X=0, Z=0)
+  // and sits on the ground plane (bottom Z = 0)
+  const scaledCenter = origCenter.clone().multiply(new THREE.Vector3(scaleX, scaleY, scaleZ));
+  const scaledMin = origMin.clone().multiply(new THREE.Vector3(scaleX, scaleY, scaleZ));
 
-  for (let i = 0; i < numMids; i++) {
-    const mid = clonePart(partsCache, 'mid-section');
-    mid.scale.set(actualMidLen / midLen, 1, wScale);
-    const x = -halfL + 0.15 + actualMidLen * (i + 0.5);
-    mid.position.set(x, h, 0);
-    group.add(mid);
+  // Center on X (width axis), center on Y (length axis), ground on Z (height axis)
+  model.position.set(
+    -scaledCenter.x,       // center width
+    -scaledCenter.y,       // center length
+    -scaledMin.z           // place bottom at Z=0
+  );
+
+  // Now we need to rotate the model so that:
+  //   - Length runs along X (Three.js convention for conveyors in MetaMech)
+  //   - Width runs along Z
+  //   - Height runs along Y
+  // The GLB model has: X=width, Y=length, Z=height
+  // We need: X=length, Y=height, Z=width
+  // Rotation: rotate -90° around Z (swap X↔Y), then -90° around X (swap Y↔Z)
+  // Actually let's use a wrapper group for cleaner transforms
+  const orientGroup = new THREE.Group();
+  orientGroup.add(model);
+
+  // Rotate so: model-Y (length) → world-X, model-Z (height) → world-Y, model-X (width) → world-Z
+  // This is a -90° rotation around world-Z, then -90° around world-X
+  // Simpler: use rotation order and set euler
+  orientGroup.rotation.set(
+    -Math.PI / 2,  // X rotation: tip model-Z (height) up to world-Y
+    0,             // Y rotation
+    Math.PI / 2,   // Z rotation: swing model-Y (length) to world-X
+  );
+
+  // Handle drive end (mirror if needed)
+  if (driveEnd === 'left') {
+    orientGroup.scale.x *= -1;
   }
 
-  // --- Belt surface ---
-  const belt = clonePart(partsCache, 'belt-surface');
-  belt.scale.set(l - 0.04, 1, wScale);
-  belt.position.set(0, h + 0.06, 0);
-  group.add(belt);
-
-  // --- Support legs ---
-  const numLegs = Math.max(2, Math.ceil(l / supportSpacing) + 1);
-  const legSpacing = l / (numLegs - 1);
-  const legScale = (h - 0.08) / 0.7; // parts built at 0.7m height
-
-  for (let i = 0; i < numLegs; i++) {
-    const leg = clonePart(partsCache, 'support-leg');
-    leg.scale.set(1, legScale, wScale);
-    leg.position.set(-halfL + i * legSpacing, h - 0.08, 0);
-    group.add(leg);
+  // Handle incline angle
+  if (inclineAngle > 0) {
+    orientGroup.rotation.z += driveEnd === 'right' ? -inclineAngle : inclineAngle;
   }
 
-  // --- Side guides ---
-  if (sideGuides) {
-    for (const side of [-1, 1]) {
-      const guide = clonePart(partsCache, 'side-guide');
-      guide.scale.set(l - 0.08, 1, 1);
-      guide.position.set(0, h + 0.06, side * (w / 2 - 0.005));
-      group.add(guide);
-    }
-  }
+  group.add(orientGroup);
 
+  // --- Compute final bounds ---
   const bounds = new THREE.Box3().setFromObject(group);
+
+  // --- Connection ports ---
+  const halfL = targetL / 2;
+  // Estimate belt top height (roughly at targetH level)
+  const portY = targetH;
+
   const ports: ConnectionPort[] = [
-    { id: 'input', type: 'input', localPosition: [-halfL, h, 0] },
-    { id: 'output', type: 'output', localPosition: [halfL, h, 0] },
+    { id: 'input', type: 'input', localPosition: [-halfL, portY, 0] },
+    { id: 'output', type: 'output', localPosition: [halfL, portY, 0] },
   ];
 
-  return { group, ports, bounds, pathLength: l };
+  return { group, ports, bounds, pathLength: targetL };
 }
 
-/** Preload parts - call early so they're ready when needed */
-export function preloadBeltConveyorParts(): void {
-  loadAllParts();
+/** Preload the GLB model — call early so it's ready when the user drops a belt conveyor */
+export function preloadBeltConveyorGLB(): void {
+  loadModel();
 }
 
-/** Check if parts are loaded */
-export function areBeltPartsLoaded(): boolean {
-  return partsCache !== null;
+/** Check if the GLB model is loaded and ready */
+export function isBeltConveyorGLBReady(): boolean {
+  return cachedScene !== null;
 }

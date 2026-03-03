@@ -1,8 +1,10 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { ParametricAssetDef } from '../../lib/assetManifest';
 import { runBuilder } from '../../lib/parametricBuilders';
+import { isBeltConveyorGLBReady } from '../../lib/parametricBuilders/beltConveyorGLBBuilder';
 
 interface ParametricModelProps {
   assetDef: ParametricAssetDef;
@@ -13,6 +15,14 @@ interface ParametricModelProps {
 
 const ParametricModel: React.FC<ParametricModelProps> = ({ assetDef, parameters, isSelected, onClick }) => {
   const groupRef = useRef<THREE.Group>(null);
+  const [glbReady, setGlbReady] = useState(isBeltConveyorGLBReady());
+
+  // Poll for GLB readiness if this is a belt conveyor and GLB isn't loaded yet
+  useFrame(() => {
+    if (!glbReady && assetDef.builder === 'beltConveyorBuilder' && isBeltConveyorGLBReady()) {
+      setGlbReady(true);
+    }
+  });
 
   // Merge defaults with current params
   const mergedParams = useMemo(() => ({
@@ -20,24 +30,31 @@ const ParametricModel: React.FC<ParametricModelProps> = ({ assetDef, parameters,
     ...parameters,
   }), [assetDef.defaults, parameters]);
 
-  // Build the 3D group
+  // Build the 3D group — rebuilds when params change OR when GLB becomes available
   const builderResult = useMemo(() => {
     return runBuilder(assetDef.builder, mergedParams);
-  }, [assetDef.builder, JSON.stringify(mergedParams)]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetDef.builder, JSON.stringify(mergedParams), glbReady]);
 
   // Attach/detach the built group
   useEffect(() => {
     if (!groupRef.current || !builderResult) return;
     const parent = groupRef.current;
 
-    // Clear previous children
+    // Clear previous children and dispose resources
     while (parent.children.length > 0) {
       const child = parent.children[0];
       parent.remove(child);
-      if (child instanceof THREE.Mesh) {
-        child.geometry?.dispose();
-        if (child.material instanceof THREE.Material) child.material.dispose();
-      }
+      child.traverse?.((node: any) => {
+        if (node instanceof THREE.Mesh) {
+          node.geometry?.dispose();
+          if (Array.isArray(node.material)) {
+            node.material.forEach((m: THREE.Material) => m.dispose());
+          } else if (node.material instanceof THREE.Material) {
+            node.material.dispose();
+          }
+        }
+      });
     }
 
     // Add new group's children
@@ -48,7 +65,7 @@ const ParametricModel: React.FC<ParametricModelProps> = ({ assetDef, parameters,
   }, [builderResult]);
 
   if (!builderResult) {
-    // Fallback box
+    // Fallback box while loading
     return (
       <group onClick={(e) => { e.stopPropagation(); onClick(); }}>
         <mesh castShadow>
