@@ -1,25 +1,26 @@
 /**
  * BeltConveyorGLB — TRUE parametric belt conveyor from Savio's GLB model.
  *
- * The GLB is organized by Savio with named groups:
- *   - "LEG SUPPORT" nodes (2x) — complete leg station assemblies, REPEATABLE
- *   - Everything else — conveyor body (belt, rollers, motor, frame), STRETCH with length
+ * GLB structure (organized by Savio):
+ *   - "LEG SUPPORT" named nodes — complete leg station assemblies, REPEATABLE
+ *   - Everything else — conveyor body (belt, rollers, motor, frame)
  *
  * Base model: 2100mm L × 570mm W × 945mm H
- * Native axes: X=width, Y=length(negative), Z=height
- * LEG SUPPORT center Y ≈ -0.899 in base model
+ * Native axes: X=width(0→0.57), Y=length(0→-2.1), Z=height(0→0.945)
+ * Z is already UP in the model.
  *
- * Connections: infeed = idle end, outfeed = drive end
+ * World axes: X=length, Y=up, Z=width
+ * So we just need to rotate around Z to swap X↔Y, then adjust for Z-up→Y-up.
  */
 import React, { useMemo, useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
 const MODEL_URL = '/models/belt-conveyor.glb';
-const BASE_LENGTH = 2.1;   // model length in meters
-const ORIG_W = 0.57;       // model width
-const ORIG_H = 0.945;      // model height
-const LEG_CENTER_Y = -0.899; // Y center of leg stations in base model
+const BASE_LENGTH = 2.1;
+const ORIG_W = 0.57;
+const ORIG_H = 0.945;
+const LEG_CENTER_Y = -0.899; // Y center of leg station in base model
 
 interface Props {
   parameters: Record<string, any>;
@@ -46,7 +47,7 @@ function clonePart(src: THREE.Object3D): THREE.Object3D {
 const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
   const gltf = useGLTF(MODEL_URL);
 
-  // Split model into BODY (stretch) and LEG SUPPORT (repeat)
+  // Split: LEG SUPPORT (repeat) vs BODY (stretch)
   const { bodyParts, legTemplate } = useMemo(() => {
     const scene = gltf.scene;
 
@@ -61,17 +62,31 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
 
     const body: THREE.Object3D[] = [];
     let legRef: THREE.Object3D | null = null;
+    let legCount = 0;
 
     for (const child of assembly.children) {
-      if (child.name.includes('LEG SUPPORT')) {
-        // Use first LEG SUPPORT as template, skip the rest
-        if (!legRef) legRef = child;
+      const isLeg = child.name.toUpperCase().includes('LEG SUPPORT');
+      if (isLeg) {
+        legCount++;
+        if (!legRef) {
+          legRef = child;
+          console.log('[BeltConveyorGLB] Leg template found:', child.name);
+        }
       } else {
         body.push(child);
       }
     }
 
-    console.log(`[BeltConveyorGLB] Body parts: ${body.length}, Leg template: ${legRef ? 'found' : 'missing'}`);
+    console.log(`[BeltConveyorGLB] Body: ${body.length} parts, Leg stations in model: ${legCount}`);
+
+    // Measure leg template bounds
+    if (legRef) {
+      const legBBox = new THREE.Box3().setFromObject(legRef);
+      const legCenter = new THREE.Vector3();
+      legBBox.getCenter(legCenter);
+      console.log(`[BeltConveyorGLB] Leg template center: Y=${legCenter.y.toFixed(3)}, size: ${(legBBox.max.y - legBBox.min.y).toFixed(3)}`);
+    }
+
     return { bodyParts: body, legTemplate: legRef };
   }, [gltf]);
 
@@ -89,12 +104,12 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
 
     const group = new THREE.Group();
 
-    // === BODY — scale uniformly with length, width, height ===
+    // === BODY PARTS — stretch along length ===
     for (const src of bodyParts) {
       const c = clonePart(src);
-      const name = src.name.toLowerCase();
+      const name = (src.name || '').toLowerCase();
 
-      // Motor parts: mirror if motorSide = left
+      // Motor: can mirror
       if (name.includes('motor') || name.includes('0070544') || name.includes('0070311')) {
         c.scale.set(scaleW, lengthRatio, scaleH);
         if (motorSide === 'left') {
@@ -102,41 +117,37 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
           c.position.x = ORIG_W * scaleW;
         }
       } else {
-        // All other body parts: stretch with length
         c.scale.set(scaleW, lengthRatio, scaleH);
       }
-
       group.add(c);
     }
 
-    // === LEG SUPPORTS — place at regular intervals along length ===
+    // === LEG SUPPORTS — duplicate at intervals ===
     if (legTemplate) {
-      // How many stations do we need?
       const numStations = Math.max(2, Math.round(targetL / supportSpacing) + 1);
-      const actualSpacing = targetL / (numStations - 1);
+
+      console.log(`[BeltConveyorGLB] Placing ${numStations} leg stations (spacing: ${supportSpacing}m, length: ${targetL}m)`);
 
       for (let i = 0; i < numStations; i++) {
-        // Target position along the conveyor (0 = head, targetL = tail)
-        const distFromHead = actualSpacing * i;
-        // Convert to model Y coordinate (scaled)
-        // In base model, head=Y:0, tail=Y:-2.1
-        // After body scaling: head=Y:0, tail=Y:-2.1*lengthRatio
-        const targetY = -(distFromHead / targetL) * BASE_LENGTH * lengthRatio;
+        // Fraction along the conveyor (0=drive/head, 1=idle/tail)
+        const fraction = i / (numStations - 1);
 
-        // The leg template is at Y ≈ LEG_CENTER_Y in model space
-        // We need to offset it to the target position
-        const yOffset = targetY - (LEG_CENTER_Y * lengthRatio);
+        // In the SCALED model, the conveyor goes from Y=0 (head) to Y = -BASE_LENGTH * lengthRatio (tail)
+        const targetY = -fraction * BASE_LENGTH * lengthRatio;
+
+        // The template leg is at LEG_CENTER_Y in UNSCALED model space
+        // We DON'T scale the leg along length (it's a discrete part), just reposition it
+        const yOffset = targetY - LEG_CENTER_Y;
 
         const c = clonePart(legTemplate);
-        // Legs: scale width and height, but NOT length (they're discrete parts)
-        c.scale.set(scaleW, 1, scaleH);
-        c.position.y = yOffset;
+        c.scale.set(scaleW, 1, scaleH);  // scale width + height only, NOT length
+        c.position.set(0, yOffset, 0);
 
         group.add(c);
       }
     }
 
-    // Center the group: centered on width(X) and length(Y), bottom at Z=0
+    // Center: width(X) centered, length(Y) centered, bottom at Z=0
     const bbox = new THREE.Box3().setFromObject(group);
     const center = new THREE.Vector3();
     bbox.getCenter(center);
@@ -159,12 +170,31 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
     });
   }, [isSelected, builtGroup]);
 
-  // Axis remap: Model +Y (after centering) = drive end → World +X (outfeed)
-  // Model Z = height → World Y (up)
-  // Model X = width → World Z
-  // Euler (XYZ): rotate -90° around X (Z→Y), then -90° around new Y
+  // Axis remap:
+  //   Model: X=width, Y=length(-Y direction), Z=height(up)
+  //   World: X=length, Y=height(up), Z=width
+  //
+  // After centering, model is symmetric around origin.
+  // We need Z(up)→Y(up), Y(length)→X(length), X(width)→Z(width)
+  //
+  // This is a rotation of -90° around X, then +90° around the new Y:
+  //   rotX(-90°): Y→Z, Z→-Y  → now: X=width, Y=-height, Z=length
+  //   rotY(+90°): X→Z, Z→-X  → now: X=-length, Y=-height, Z=width
+  //   We also need to flip signs, so add 180° around Y
+  //
+  // Simpler: just use rotation order that works.
+  // Let's try: the model Z is up, Three.js Y is up.
+  // Standard Z-up to Y-up conversion: rotate -90° around X axis.
+  // Then to align length along world X: rotate around Y.
+  //
+  // rot X=-90°: (x,y,z) → (x, z, -y)
+  //   width stays X, height(Z) goes to Y(up) ✓, length(-Y) goes to Z → need it in X
+  // rot Y=+90°: (x,y,z) → (z, y, -x)  
+  //   so: (x, z, -y) → (-y, z, -x) = (length, height, -width)
+  //   X=length ✓, Y=height ✓, Z=-width (flipped but OK)
+  
   return (
-    <group rotation={[-Math.PI / 2, -Math.PI / 2, 0]}>
+    <group rotation={[-Math.PI / 2, Math.PI / 2, 0]}>
       <primitive object={builtGroup} />
     </group>
   );
