@@ -1,23 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import {
   Download,
-  FileSpreadsheet,
-  FileText,
-  Box,
-  Package,
   ChevronDown,
   ChevronRight,
   Layers,
   Weight,
-  Info,
 } from 'lucide-react';
 import { generateBOM, BOMResult, BOMLine } from '../../lib/bom/bomEngine';
-import {
-  exportBOMAsCSV,
-  exportBOMAsJSON,
-  canExportSTEP,
-  getSTEPExportInfo,
-} from '../../lib/bom/bomExporter';
+import ExportDialog from './ExportDialog';
 
 interface BOMPanelProps {
   /** Current parametric parameters for the selected node */
@@ -27,7 +17,6 @@ interface BOMPanelProps {
   /** Callback to trigger 3D model export (needs scene reference from parent) */
   onExportGLB?: () => void;
   onExportSTL?: () => void;
-  onExportFullPackage?: () => void;
 }
 
 const categoryLabels: Record<string, string> = {
@@ -47,11 +36,9 @@ const BOMPanel: React.FC<BOMPanelProps> = ({
   moduleType,
   onExportGLB,
   onExportSTL,
-  onExportFullPackage,
 }) => {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(categoryOrder));
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const [showStepInfo, setShowStepInfo] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   // Only generate BOM for belt conveyor (expandable to others later)
   const bom: BOMResult | null = useMemo(() => {
@@ -97,94 +84,13 @@ const BOMPanel: React.FC<BOMPanelProps> = ({
               Bill of Materials
             </span>
           </div>
-          <div className="relative">
-            <button
-              onClick={() => setShowExportMenu(!showExportMenu)}
-              className="flex items-center gap-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium transition-colors"
-            >
-              <Download size={12} />
-              Export
-            </button>
-            {showExportMenu && (
-              <div className="absolute right-0 top-full mt-1 w-52 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50 py-1">
-                <button
-                  onClick={() => { exportBOMAsCSV(bom); setShowExportMenu(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-700 text-left text-xs"
-                >
-                  <FileSpreadsheet size={14} className="text-green-400" />
-                  <div>
-                    <div className="text-white font-medium">BOM as CSV</div>
-                    <div className="text-gray-400">Opens in Excel / Sheets</div>
-                  </div>
-                </button>
-                <button
-                  onClick={() => { exportBOMAsJSON(bom); setShowExportMenu(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-700 text-left text-xs"
-                >
-                  <FileText size={14} className="text-blue-400" />
-                  <div>
-                    <div className="text-white font-medium">BOM as JSON</div>
-                    <div className="text-gray-400">Machine-readable</div>
-                  </div>
-                </button>
-                <div className="border-t border-gray-700 my-1" />
-                {onExportGLB && (
-                  <button
-                    onClick={() => { onExportGLB(); setShowExportMenu(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-700 text-left text-xs"
-                  >
-                    <Box size={14} className="text-purple-400" />
-                    <div>
-                      <div className="text-white font-medium">3D Model as GLB</div>
-                      <div className="text-gray-400">Import into Blender / SW</div>
-                    </div>
-                  </button>
-                )}
-                {onExportSTL && (
-                  <button
-                    onClick={() => { onExportSTL(); setShowExportMenu(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-700 text-left text-xs"
-                  >
-                    <Package size={14} className="text-orange-400" />
-                    <div>
-                      <div className="text-white font-medium">3D Model as STL</div>
-                      <div className="text-white font-medium flex items-center gap-1">
-                        SolidWorks / Manufacturing
-                      </div>
-                    </div>
-                  </button>
-                )}
-                <button
-                  onClick={() => { setShowStepInfo(!showStepInfo); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-700 text-left text-xs"
-                >
-                  <Info size={14} className="text-yellow-400" />
-                  <div>
-                    <div className="text-gray-400 font-medium">STEP Export</div>
-                    <div className="text-gray-500">{canExportSTEP() ? 'Available' : 'Coming soon'}</div>
-                  </div>
-                </button>
-                {showStepInfo && (
-                  <div className="px-3 py-2 text-xs text-gray-400 bg-gray-750 border-t border-gray-700">
-                    {getSTEPExportInfo()}
-                  </div>
-                )}
-                <div className="border-t border-gray-700 my-1" />
-                {onExportFullPackage && (
-                  <button
-                    onClick={() => { onExportFullPackage(); setShowExportMenu(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-700 text-left text-xs"
-                  >
-                    <Download size={14} className="text-cyan-400" />
-                    <div>
-                      <div className="text-white font-medium">Full Package</div>
-                      <div className="text-gray-400">BOM + GLB + STL</div>
-                    </div>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          <button
+            onClick={() => setShowExportDialog(true)}
+            className="flex items-center gap-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium transition-colors"
+          >
+            <Download size={12} />
+            Export
+          </button>
         </div>
 
         {/* Config summary */}
@@ -270,6 +176,16 @@ const BOMPanel: React.FC<BOMPanelProps> = ({
       <div className="px-3 py-2 border-t border-gray-700 bg-gray-800/50 text-[10px] text-gray-500">
         BOM auto-updates with parameter changes • Part numbers from item profile system
       </div>
+
+      {/* Export Dialog */}
+      {showExportDialog && (
+        <ExportDialog
+          bom={bom}
+          onClose={() => setShowExportDialog(false)}
+          onExportGLB={onExportGLB}
+          onExportSTL={onExportSTL}
+        />
+      )}
     </div>
   );
 };

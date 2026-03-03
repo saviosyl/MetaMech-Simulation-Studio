@@ -449,10 +449,6 @@ const RightPanel: React.FC = () => {
                           const bom = generateBOM(selectedObject.parameters);
                           alert(`STL export: ${bom.config.length}×${bom.config.width}mm — Connect scene ref to enable 3D export`);
                         }}
-                        onExportFullPackage={() => {
-                          const bom = generateBOM(selectedObject.parameters);
-                          alert(`Full package: ${bom.config.length}×${bom.config.width}mm — Connect scene ref to enable 3D export`);
-                        }}
                       />
                     </div>
                   )}
