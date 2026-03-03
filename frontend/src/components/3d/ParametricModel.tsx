@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -15,12 +15,16 @@ interface ParametricModelProps {
 
 const ParametricModel: React.FC<ParametricModelProps> = ({ assetDef, parameters, isSelected, onClick }) => {
   const groupRef = useRef<THREE.Group>(null);
-  const [glbReady, setGlbReady] = useState(isBeltConveyorGLBReady());
+  
+  // Track GLB readiness with a version counter to force rebuilds
+  const [buildVersion, setBuildVersion] = useState(0);
+  const glbWasReady = useRef(isBeltConveyorGLBReady());
 
-  // Poll for GLB readiness if this is a belt conveyor and GLB isn't loaded yet
+  // Poll every frame: if GLB just became ready, bump version to force rebuild
   useFrame(() => {
-    if (!glbReady && assetDef.builder === 'beltConveyorBuilder' && isBeltConveyorGLBReady()) {
-      setGlbReady(true);
+    if (!glbWasReady.current && isBeltConveyorGLBReady()) {
+      glbWasReady.current = true;
+      setBuildVersion(v => v + 1);
     }
   });
 
@@ -34,38 +38,32 @@ const ParametricModel: React.FC<ParametricModelProps> = ({ assetDef, parameters,
   const builderResult = useMemo(() => {
     return runBuilder(assetDef.builder, mergedParams);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetDef.builder, JSON.stringify(mergedParams), glbReady]);
+  }, [assetDef.builder, JSON.stringify(mergedParams), buildVersion]);
 
-  // Attach/detach the built group
+  // Safely detach old children (without disposing shared GLB geometries)
+  const clearGroup = useCallback((parent: THREE.Group) => {
+    while (parent.children.length > 0) {
+      const child = parent.children[0];
+      parent.remove(child);
+    }
+  }, []);
+
+  // Attach the built group
   useEffect(() => {
     if (!groupRef.current || !builderResult) return;
     const parent = groupRef.current;
 
-    // Clear previous children and dispose resources
-    while (parent.children.length > 0) {
-      const child = parent.children[0];
-      parent.remove(child);
-      child.traverse?.((node: any) => {
-        if (node instanceof THREE.Mesh) {
-          node.geometry?.dispose();
-          if (Array.isArray(node.material)) {
-            node.material.forEach((m: THREE.Material) => m.dispose());
-          } else if (node.material instanceof THREE.Material) {
-            node.material.dispose();
-          }
-        }
-      });
-    }
+    // Remove previous children
+    clearGroup(parent);
 
     // Add new group's children
     const builtGroup = builderResult.group;
     while (builtGroup.children.length > 0) {
       parent.add(builtGroup.children[0]);
     }
-  }, [builderResult]);
+  }, [builderResult, clearGroup]);
 
   if (!builderResult) {
-    // Fallback box while loading
     return (
       <group onClick={(e) => { e.stopPropagation(); onClick(); }}>
         <mesh castShadow>

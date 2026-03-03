@@ -21,8 +21,11 @@ preloadBeltConveyorGLB();
  */
 function beltConveyorBuilderWithGLB(params: Record<string, any>): BuilderResult {
   const glbResult = buildBeltConveyorFromGLB(params);
-  if (glbResult) return glbResult;
-  // GLB not loaded yet — procedural fallback for first frame only
+  if (glbResult) {
+    console.log('[BeltConveyor] Using GLB model ✓');
+    return glbResult;
+  }
+  console.log('[BeltConveyor] GLB not ready, using procedural fallback');
   return buildBeltConveyor(params);
 }
 
