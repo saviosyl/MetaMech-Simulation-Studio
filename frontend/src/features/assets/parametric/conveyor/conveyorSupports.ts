@@ -49,51 +49,53 @@ export function computeSupportPositions(lengthMm: number, spacingMm: number): nu
   return positions.sort((a, b) => a - b);
 }
 
-/** Build a single support station */
+/** Build a single support station
+ *
+ * Conveyor axes: X = length, Y = height, Z = width
+ * Posts spread along Z (width), cross brace spans Z.
+ */
 function buildSupportStation(widthM: number, heightM: number, adjustMm: number, hasFeet: boolean): THREE.Group {
   const station = new THREE.Group();
   const halfW = widthM / 2;
-  const postW = 0.04; // 40mm post width
-  const postD = 0.04;
+  const postSection = 0.04; // 40mm square extrusion
   const footD = 0.04;
   const adjustM = adjustMm / 1000;
 
-  // Two vertical posts (left + right)
+  // Two vertical posts — left (−Z) and right (+Z)
   for (const side of [-1, 1]) {
-    const postH = heightM - postW; // leave room for top plate
-    const postGeo = new THREE.BoxGeometry(postW, postH, postD);
+    const postH = heightM - postSection;
+    const postGeo = new THREE.BoxGeometry(postSection, postH, postSection);
     const post = new THREE.Mesh(postGeo, matAluminum);
-    post.position.set(side * (halfW - postW / 2), postH / 2, 0);
+    post.position.set(0, postH / 2, side * (halfW - postSection / 2));
     post.castShadow = true;
     station.add(post);
 
-    // Top swivel plate
-    const plateGeo = new THREE.BoxGeometry(postW * 1.5, postW * 0.4, postD * 1.5);
+    // Top swivel plate (connects post to frame rail)
+    const plateGeo = new THREE.BoxGeometry(postSection * 1.5, postSection * 0.4, postSection * 1.5);
     const plate = new THREE.Mesh(plateGeo, matDarkSteel);
-    plate.position.set(side * (halfW - postW / 2), heightM - postW * 0.2, 0);
+    plate.position.set(0, heightM - postSection * 0.2, side * (halfW - postSection / 2));
     plate.castShadow = true;
     station.add(plate);
 
     // Foot plate + adjustable foot
     if (hasFeet) {
-      // Foot plate
-      const fpGeo = new THREE.BoxGeometry(postW * 2, 0.005, postD * 2);
+      const fpGeo = new THREE.BoxGeometry(postSection * 2, 0.005, postSection * 2);
       const fp = new THREE.Mesh(fpGeo, matFootPad);
-      fp.position.set(side * (halfW - postW / 2), 0.0025, 0);
+      fp.position.set(0, 0.0025, side * (halfW - postSection / 2));
       station.add(fp);
 
-      // Adjustable foot (threaded rod + pad)
       const footGeo = new THREE.CylinderGeometry(footD / 2, footD / 2 * 1.3, adjustM + 0.015, 8);
       const foot = new THREE.Mesh(footGeo, matDarkSteel);
-      foot.position.set(side * (halfW - postW / 2), -(adjustM + 0.015) / 2, 0);
+      foot.position.set(0, -(adjustM + 0.015) / 2, side * (halfW - postSection / 2));
       station.add(foot);
     }
   }
 
-  // Cross brace (horizontal bar between posts)
+  // Cross brace — horizontal bar spanning between posts along Z (width)
   const braceY = heightM * 0.35;
-  const braceLen = widthM - postW * 2;
-  const braceGeo = new THREE.BoxGeometry(braceLen, postW * 0.6, postD * 0.6);
+  const braceLen = widthM - postSection * 2;
+  // Brace: thin along X (length), short along Y, spans Z (width)
+  const braceGeo = new THREE.BoxGeometry(postSection * 0.6, postSection * 0.6, braceLen);
   const brace = new THREE.Mesh(braceGeo, matAluminum);
   brace.position.set(0, braceY, 0);
   brace.castShadow = true;
