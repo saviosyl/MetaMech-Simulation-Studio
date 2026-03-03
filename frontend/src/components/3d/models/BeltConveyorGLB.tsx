@@ -1,12 +1,11 @@
 /**
  * BeltConveyorGLB — Parametric belt conveyor from real SolidWorks GLB.
  *
- * SolidWorks GLTF bakes Z-up → Y-up. After loading: X=width, Y=height(up), Z=length.
- * Three.js replaces spaces with underscores: "LEG SUPPORT" → "LEG_SUPPORT".
- *
- * Leg strategy: legs are added INSIDE the scaled root group.
- * They counter-scale on Z to stay as discrete (non-stretched) parts.
- * Fixed leg at 250mm from each end, additional legs in middle.
+ * SIMPLE APPROACH: 
+ * 1. Clone the whole scene, scale it (body + original 2 legs all scale together)
+ * 2. For additional legs: clone from INSIDE the already-scaled clone
+ * 3. Original 2 legs stay visible and correct (they're part of the model!)
+ * 4. Extra legs cloned from those, repositioned along Z
  */
 import React, { useMemo, useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
@@ -14,7 +13,7 @@ import * as THREE from 'three';
 
 const MODEL_URL = '/models/belt-conveyor.glb';
 const DRACO_PATH = 'https://www.gstatic.com/draco/versioned/decoders/1.5.6/';
-const END_OFFSET_M = 0.25; // 250mm from each end (in meters, unscaled model space)
+const END_OFFSET_M = 0.25;
 const MAX_LEG_STATIONS = 30;
 
 interface Props {
@@ -22,18 +21,28 @@ interface Props {
   isSelected: boolean;
 }
 
-function findNodesByName(root: THREE.Object3D, substr: string): THREE.Object3D[] {
+function findLegNodes(root: THREE.Object3D): THREE.Object3D[] {
   const results: THREE.Object3D[] = [];
-  const upper = substr.toUpperCase();
+  // Name-based search (Three.js converts spaces to underscores)
   root.traverse((node) => {
-    if (node.name && node.name.toUpperCase().includes(upper)) {
+    if (node.name && node.name.toUpperCase().includes('LEG_SUPPORT')) {
       results.push(node);
     }
   });
+  // Fallback: structure-based
+  if (results.length === 0) {
+    root.traverse((node) => {
+      if (node.children.length >= 15 && node.children.length <= 20 && node !== root) {
+        let has = false;
+        node.traverse((s) => { if (s.name && (s.name.includes('0060885') || s.name.includes('0026574'))) has = true; });
+        if (has) results.push(node);
+      }
+    });
+  }
   return results;
 }
 
-function deepClone(src: THREE.Object3D): THREE.Object3D {
+function deepCloneNode(src: THREE.Object3D): THREE.Object3D {
   const clone = src.clone(true);
   clone.traverse((child) => {
     if ((child as THREE.Mesh).isMesh) {
@@ -53,49 +62,30 @@ function deepClone(src: THREE.Object3D): THREE.Object3D {
 const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
   const gltf = useGLTF(MODEL_URL, DRACO_PATH);
 
-  const analysis = useMemo(() => {
+  // Measure base model once
+  const baseInfo = useMemo(() => {
     const scene = gltf.scene;
-    const sceneBBox = new THREE.Box3().setFromObject(scene);
-    const sceneSize = new THREE.Vector3();
-    sceneBBox.getSize(sceneSize);
+    const bbox = new THREE.Box3().setFromObject(scene);
+    const size = new THREE.Vector3();
+    bbox.getSize(size);
 
-    // Find legs by name (underscore version)
-    let legNodes = findNodesByName(scene, 'LEG_SUPPORT');
-    // Fallback: by structure
-    if (legNodes.length === 0) {
-      scene.traverse((node) => {
-        if (node.children.length >= 15 && node.children.length <= 20 && node !== scene) {
-          let hasLegParts = false;
-          node.traverse((sub) => {
-            if (sub.name && (sub.name.includes('0060885') || sub.name.includes('0026574'))) hasLegParts = true;
-          });
-          if (hasLegParts) legNodes.push(node);
-        }
-      });
+    // Find legs in original to get their Z positions
+    const legs = findLegNodes(scene);
+    const legZPositions: number[] = [];
+    for (const leg of legs) {
+      const lb = new THREE.Box3().setFromObject(leg);
+      const lc = new THREE.Vector3();
+      lb.getCenter(lc);
+      legZPositions.push(lc.z);
     }
+    legZPositions.sort((a, b) => a - b); // sort by Z (most negative first)
 
-    let legTemplate: THREE.Object3D | null = null;
-    let legCenterZ = -1.2; // fallback
+    console.log(`[BeltConveyorGLB] Base: ${size.x.toFixed(2)}×${size.y.toFixed(2)}×${size.z.toFixed(2)}, legs: ${legs.length} at Z=[${legZPositions.map(z => z.toFixed(2)).join(', ')}]`);
 
-    if (legNodes.length > 0) {
-      legTemplate = legNodes[0];
-      const box = new THREE.Box3().setFromObject(legTemplate);
-      const center = new THREE.Vector3();
-      box.getCenter(center);
-      legCenterZ = center.z;
-    }
-
-    // Find the assembly node (parent of all parts)
-    let assemblyNode: THREE.Object3D | null = null;
-    for (const child of scene.children) {
-      if (child.children.length > 10) { assemblyNode = child; break; }
-    }
-
-    console.log(`[BeltConveyorGLB] Size: ${sceneSize.x.toFixed(2)}×${sceneSize.y.toFixed(2)}×${sceneSize.z.toFixed(2)}, Legs: ${legNodes.length}, legCenterZ: ${legCenterZ.toFixed(3)}`);
-
-    return { legNodes, legTemplate, legCenterZ, baseWidth: sceneSize.x, baseHeight: sceneSize.y, baseLength: sceneSize.z, sceneBBox, assemblyNode };
+    return { baseWidth: size.x, baseHeight: size.y, baseLength: size.z, bbox, legZPositions };
   }, [gltf]);
 
+  // Build parametric model
   const builtGroup = useMemo(() => {
     const targetL = (parameters.length ?? 3000) / 1000;
     const targetW = (parameters.width ?? 600) / 1000;
@@ -104,93 +94,97 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
     const supportSpacing = (parameters.supportSpacing ?? 1500) / 1000;
     const showLegs = parameters.showLegs !== false;
 
-    const scaleL = targetL / analysis.baseLength;
-    const scaleW = targetW / analysis.baseWidth;
-    const scaleH = targetH / analysis.baseHeight;
+    const scaleL = targetL / baseInfo.baseLength;
+    const scaleW = targetW / baseInfo.baseWidth;
+    const scaleH = targetH / baseInfo.baseHeight;
 
-    // Clone entire scene
-    const root = deepClone(gltf.scene);
+    // Clone whole scene (includes body + original 2 legs)
+    const root = deepCloneNode(gltf.scene);
 
-    // Find and hide ALL original legs in clone
-    const clonedLegs = findNodesByName(root, 'LEG_SUPPORT');
-    if (clonedLegs.length === 0) {
-      root.traverse((node) => {
-        if (node.children.length >= 15 && node.children.length <= 20 && node !== root) {
-          let has = false;
-          node.traverse((s) => { if (s.name && (s.name.includes('0060885') || s.name.includes('0026574'))) has = true; });
-          if (has) clonedLegs.push(node);
-        }
-      });
+    // Find legs inside the clone
+    const clonedLegs = findLegNodes(root);
+
+    if (!showLegs) {
+      // Hide all legs
+      clonedLegs.forEach(leg => { leg.visible = false; });
     }
-    clonedLegs.forEach(leg => { leg.visible = false; });
 
-    // Scale the entire root: X=width, Y=height, Z=length
+    // Scale everything: X=width, Y=height, Z=length
+    // Original legs scale WITH the body — they stay in correct position
     root.scale.set(scaleW, scaleH, scaleL);
 
     // Motor mirror
     if (motorSide === 'left') {
-      [...findNodesByName(root, '0070544'), ...findNodesByName(root, '0070311')].forEach(part => {
-        part.scale.x *= -1;
+      root.traverse((node) => {
+        if (node.name && (node.name.includes('0070544') || node.name.includes('0070311'))) {
+          node.scale.x *= -1;
+        }
       });
     }
 
-    // === ADD LEGS INSIDE THE SCALED ROOT ===
-    // Since root is scaled, legs added inside will be in the correct coordinate space.
-    // But we need to counter-scale Z so legs don't stretch along length.
-    if (analysis.legTemplate && showLegs && analysis.assemblyNode) {
-      // Find the assembly node in the clone (it's root's child with many children)
-      let clonedAssembly: THREE.Object3D | null = null;
-      for (const child of root.children) {
-        if (child.children.length > 10) { clonedAssembly = child; break; }
-      }
-      if (!clonedAssembly) clonedAssembly = root;
+    // === ADDITIONAL LEGS ===
+    // Original model has 2 legs. We may need more based on support spacing.
+    if (showLegs && clonedLegs.length > 0 && baseInfo.legZPositions.length >= 2) {
+      const templateLeg = clonedLegs[0]; // use first leg as template
+      const parentNode = templateLeg.parent!;
 
-      // Leg positions in UNSCALED model space
-      // Model Z goes from sceneBBox.max.z (~0) to sceneBBox.min.z (~-3.6)
-      const zHead = analysis.sceneBBox.max.z; // head/drive end (~0)
-      const zTail = analysis.sceneBBox.min.z; // tail/idle end (~-3.6)
+      // In the SCALED root, positions are in model space (root.scale applies on render).
+      // The model Z goes from bbox.max.z (~0) to bbox.min.z (~-3.6)
+      const zHead = baseInfo.bbox.max.z;
+      const zTail = baseInfo.bbox.min.z;
 
-      // 250mm from each end in SCALED space → convert to unscaled
-      const endOffsetUnscaled = END_OFFSET_M / scaleL;
-      const zDriveEnd = zHead - endOffsetUnscaled;
-      const zIdleEnd = zTail + endOffsetUnscaled;
+      // End positions: 250mm from each end in OUTPUT space → convert to MODEL space
+      const endOffsetModel = END_OFFSET_M / scaleL;
+      const zDriveEnd = zHead - endOffsetModel;
+      const zIdleEnd = zTail + endOffsetModel;
 
-      // Middle legs: support spacing is in scaled meters → convert to unscaled
-      const supportSpacingUnscaled = supportSpacing / scaleL;
-      const middleSpan = Math.abs(zDriveEnd - zIdleEnd);
-      const numMiddleLegs = middleSpan > supportSpacingUnscaled
-        ? Math.min(MAX_LEG_STATIONS - 2, Math.max(0, Math.floor(middleSpan / supportSpacingUnscaled) - 1))
+      // All desired leg positions in MODEL space
+      const supportSpacingModel = supportSpacing / scaleL;
+      const span = Math.abs(zDriveEnd - zIdleEnd);
+      const numMiddle = span > supportSpacingModel
+        ? Math.min(MAX_LEG_STATIONS - 2, Math.max(0, Math.floor(span / supportSpacingModel) - 1))
         : 0;
 
-      const legZPositions: number[] = [zIdleEnd, zDriveEnd];
-      if (numMiddleLegs > 0) {
-        const spacing = middleSpan / (numMiddleLegs + 1);
-        for (let i = 1; i <= numMiddleLegs; i++) {
-          legZPositions.push(zDriveEnd - spacing * i);
+      const desiredZ: number[] = [zIdleEnd, zDriveEnd];
+      if (numMiddle > 0) {
+        const step = span / (numMiddle + 1);
+        for (let i = 1; i <= numMiddle; i++) {
+          desiredZ.push(zDriveEnd - step * i);
         }
       }
 
-      console.log(`[BeltConveyorGLB] ${legZPositions.length} legs inside root (scaleL=${scaleL.toFixed(3)})`);
+      // Remove positions that are close to existing legs (within 0.05m)
+      const existingZ = baseInfo.legZPositions;
+      const newPositions = desiredZ.filter(dz => {
+        return !existingZ.some(ez => Math.abs(dz - ez) < 0.05);
+      });
 
-      // Clone the ORIGINAL leg template (from gltf.scene, not the scaled clone)
-      for (const targetZ of legZPositions) {
-        const legClone = deepClone(analysis.legTemplate);
-        legClone.visible = true;
+      console.log(`[BeltConveyorGLB] Adding ${newPositions.length} extra legs (${clonedLegs.length} original kept)`);
 
-        // Shift Z from template position to target position
-        const zShift = targetZ - analysis.legCenterZ;
-        legClone.position.z += zShift;
+      // Template leg center Z in model space
+      const templateBox = new THREE.Box3().setFromObject(templateLeg);
+      const templateCenter = new THREE.Vector3();
+      templateBox.getCenter(templateCenter);
 
-        // Counter-scale Z: the root scales Z by scaleL, but we don't want legs stretched
-        // So apply 1/scaleL on the leg's Z to cancel out the root's Z scaling
-        legClone.scale.z = 1 / scaleL;
+      for (const targetZ of newPositions) {
+        const newLeg = deepCloneNode(templateLeg);
+        newLeg.visible = true;
 
-        // Add INSIDE the assembly (shares X/Y scaling with body)
-        clonedAssembly.add(legClone);
+        // Offset: shift from template Z to target Z (in model space)
+        // The leg inherits its parent's local coordinate system
+        // We need to shift relative to where the template is
+        newLeg.position.z += (targetZ - templateCenter.z);
+
+        // Counter-scale Z so the leg doesn't stretch
+        // Parent has scale Z = scaleL, we want leg Z scale = 1 effectively
+        // So set leg scale.z = 1/scaleL (cancels parent's Z scale)
+        newLeg.scale.z = 1 / scaleL;
+
+        parentNode.add(newLeg);
       }
     }
 
-    // Center the whole thing
+    // Wrap in group and center
     const group = new THREE.Group();
     group.add(root);
 
@@ -200,8 +194,9 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
     group.position.set(-center.x, -bbox.min.y, -center.z);
 
     return group;
-  }, [parameters, gltf, analysis]);
+  }, [parameters, gltf, baseInfo]);
 
+  // Selection highlight
   useEffect(() => {
     builtGroup.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
@@ -215,6 +210,8 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
     });
   }, [isSelected, builtGroup]);
 
+  // Loaded space: X=width, Y=height(up), Z=length
+  // Rotate +90° around Y to map Z(length) → X
   return (
     <group rotation={[0, Math.PI / 2, 0]}>
       <primitive object={builtGroup} />

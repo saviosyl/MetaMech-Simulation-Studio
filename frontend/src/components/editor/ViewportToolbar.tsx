@@ -7,7 +7,6 @@ interface ToolButton {
   id: ToolType;
   label: string;
   icon: string;
-  isToggle?: boolean;
 }
 
 const tools: ToolButton[] = [
@@ -24,7 +23,59 @@ const ViewportToolbar: React.FC = () => {
   const setActiveTool = useEditorStore(s => s.setActiveTool);
   const gridSnap = useEditorStore(s => s.gridSnap);
   const setGridSnap = useEditorStore(s => s.setGridSnap);
-  const gridSnapSize = useEditorStore(s => s.gridSnapSize);
+  const selectedObjectId = useEditorStore(s => s.selectedObjectId);
+  const edges = useEditorStore(s => s.edges);
+  const removeEdge = useEditorStore(s => s.removeEdge);
+  const hiddenIds = useEditorStore(s => s.hiddenIds);
+  const toggleVisibility = useEditorStore(s => s.toggleVisibility);
+  const processNodes = useEditorStore(s => s.processNodes);
+
+  // Check if selected node has any connections
+  const selectedEdges = selectedObjectId
+    ? edges.filter(e => e.from === selectedObjectId || e.to === selectedObjectId)
+    : [];
+
+  // Disconnect all mates for selected node
+  const disconnectSelected = () => {
+    for (const edge of selectedEdges) {
+      removeEdge(edge.id);
+    }
+  };
+
+  // Toggle visibility of all non-conveyor items (sources, sinks, etc)
+  const [showHelpers, setShowHelpers] = React.useState(true);
+  const toggleHelpers = () => {
+    const helperTypes = ['source', 'sink'];
+    for (const node of processNodes) {
+      if (helperTypes.includes(node.type)) {
+        // Only toggle if current state matches
+        const isHidden = hiddenIds.has(node.id);
+        if (showHelpers ? !isHidden : isHidden) {
+          toggleVisibility(node.id);
+        }
+      }
+    }
+    setShowHelpers(!showHelpers);
+  };
+
+  const btnStyle = (active: boolean): React.CSSProperties => ({
+    width: 36,
+    height: 36,
+    border: 'none',
+    borderRadius: 12,
+    background: active ? 'rgba(6,182,212,0.5)' : 'transparent',
+    color: active ? '#fff' : '#aaa',
+    fontSize: 18,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'background 0.15s',
+  });
+
+  const divider = (
+    <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+  );
 
   return (
     <div
@@ -37,60 +88,64 @@ const ViewportToolbar: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         gap: 2,
-        background: 'rgba(0,0,0,0.7)',
-        backdropFilter: 'blur(8px)',
+        background: 'rgba(0,0,0,0.75)',
+        backdropFilter: 'blur(10px)',
         borderRadius: 24,
         padding: '4px 8px',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
+        boxShadow: '0 2px 16px rgba(0,0,0,0.5)',
+        border: '1px solid rgba(255,255,255,0.08)',
       }}
     >
+      {/* Main tools */}
       {tools.map(tool => (
         <button
           key={tool.id}
           title={tool.label}
           onClick={() => setActiveTool(tool.id)}
-          style={{
-            width: 36,
-            height: 36,
-            border: 'none',
-            borderRadius: 12,
-            background: activeTool === tool.id ? 'rgba(6,182,212,0.5)' : 'transparent',
-            color: activeTool === tool.id ? '#fff' : '#aaa',
-            fontSize: 18,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'background 0.15s',
-          }}
+          style={btnStyle(activeTool === tool.id)}
         >
           {tool.icon}
         </button>
       ))}
 
-      {/* Divider */}
-      <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+      {divider}
 
-      {/* Grid snap toggle */}
+      {/* Grid snap */}
       <button
-        title={`Grid Snap ${gridSnap ? `ON (${gridSnapSize * 1000} mm)` : 'OFF'}`}
+        title={`Grid Snap ${gridSnap ? 'ON' : 'OFF'}`}
         onClick={() => setGridSnap(!gridSnap)}
-        style={{
-          width: 36,
-          height: 36,
-          border: 'none',
-          borderRadius: 12,
-          background: gridSnap ? 'rgba(6,182,212,0.5)' : 'transparent',
-          color: gridSnap ? '#fff' : '#aaa',
-          fontSize: 18,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'background 0.15s',
-        }}
+        style={btnStyle(gridSnap)}
       >
         ⊞
+      </button>
+
+      {/* Disconnect mate */}
+      {selectedEdges.length > 0 && (
+        <>
+          {divider}
+          <button
+            title={`Disconnect (${selectedEdges.length} connection${selectedEdges.length > 1 ? 's' : ''})`}
+            onClick={disconnectSelected}
+            style={{
+              ...btnStyle(false),
+              color: '#ef4444',
+              fontSize: 16,
+            }}
+          >
+            ✂
+          </button>
+        </>
+      )}
+
+      {divider}
+
+      {/* Show/hide helpers (sources, sinks) */}
+      <button
+        title={showHelpers ? 'Hide Helpers (Sources, Sinks)' : 'Show Helpers'}
+        onClick={toggleHelpers}
+        style={btnStyle(!showHelpers)}
+      >
+        {showHelpers ? '👁' : '👁‍🗨'}
       </button>
     </div>
   );
