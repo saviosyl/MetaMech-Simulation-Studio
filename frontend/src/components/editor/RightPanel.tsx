@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { 
   Settings, 
   Move3D, 
@@ -7,12 +7,15 @@ import {
   Palette,
   Sliders,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Layers
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModuleDefinition } from '../../lib/moduleLibrary';
 import { getAssetById, ParametricAssetDef } from '../../lib/assetManifest';
 import { mToMm, mmToM, radToDeg, degToRad } from '../../utils/units';
+import BOMPanel from './BOMPanel';
+import { generateBOM } from '../../lib/bom/bomEngine';
 
 const RightPanel: React.FC = () => {
   const {
@@ -33,6 +36,7 @@ const RightPanel: React.FC = () => {
   } = useEditorStore();
 
   const isResizing = useRef(false);
+  const [showBOM, setShowBOM] = useState(true);
 
   const selectedObject = React.useMemo(() => {
     if (!selectedObjectId || !selectedObjectType) return null;
@@ -415,6 +419,43 @@ const RightPanel: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* BOM Panel for Belt Conveyor */}
+              {selectedObject.type === 'belt-conveyor' && (
+                <div>
+                  <button
+                    onClick={() => setShowBOM(!showBOM)}
+                    className="w-full flex items-center justify-between py-2 text-sm font-medium text-gray-900 hover:text-teal-600 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Layers size={16} />
+                      Bill of Materials
+                    </span>
+                    <span className="text-xs text-gray-500">{showBOM ? '▼' : '▶'}</span>
+                  </button>
+                  {showBOM && (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-900 text-white -mx-1">
+                      <BOMPanel
+                        parameters={selectedObject.parameters}
+                        moduleType={selectedObject.type}
+                        onExportGLB={() => {
+                          // TODO: wire to actual 3D scene ref for export
+                          const bom = generateBOM(selectedObject.parameters);
+                          alert(`GLB export: ${bom.config.length}×${bom.config.width}mm — Connect scene ref to enable 3D export`);
+                        }}
+                        onExportSTL={() => {
+                          const bom = generateBOM(selectedObject.parameters);
+                          alert(`STL export: ${bom.config.length}×${bom.config.width}mm — Connect scene ref to enable 3D export`);
+                        }}
+                        onExportFullPackage={() => {
+                          const bom = generateBOM(selectedObject.parameters);
+                          alert(`Full package: ${bom.config.length}×${bom.config.width}mm — Connect scene ref to enable 3D export`);
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
