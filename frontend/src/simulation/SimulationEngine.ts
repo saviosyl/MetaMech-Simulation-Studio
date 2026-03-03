@@ -1,24 +1,24 @@
 /**
- * SimulationEngine — Unit Conventions
- * ====================================
- * Internal scene units: meters (1 Three.js unit = 1 meter)
+ * SimulationEngine — Real-time industrial simulation
  * 
- * Parameter units (as entered in the UI / stored in parameters):
- *   - Dimensions (length, width, height): millimeters (mm)
- *   - Speeds (beltSpeed, speed): meters per minute (m/min)
- *   - Processing times: seconds (s)
- *   - Angles: degrees (°)
- *   - Capacity/counts: unitless
- * 
- * Conversions applied in this engine:
- *   - mm → m: divide by 1000
- *   - m/min → m/s: divide by 60
+ * Units:
+ *   - Dimensions: mm in parameters, meters internally
+ *   - Speed: m/min in parameters → m/s internally
+ *   - PPM: products per minute
  */
 import { v4 as uuidv4 } from 'uuid';
 import { Product, NodeStats } from './Product';
 import { ProcessNode, ProcessEdge, getConnectionPorts } from '../store/editorStore';
 
-const PRODUCT_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
+const COLOR_MAP: Record<string, string> = {
+  brown: '#8B4513',
+  red: '#ef4444',
+  blue: '#3b82f6',
+  green: '#10b981',
+  yellow: '#eab308',
+  white: '#f5f5f5',
+};
+const RANDOM_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 export class SimulationEngine {
   products: Product[] = [];
@@ -84,9 +84,10 @@ export class SimulationEngine {
 
       switch (node.type) {
         case 'source': this.tickSource(node, stats, elapsed); break;
-        case 'conveyor': this.tickConveyor(node, stats, elapsed); break;
-        case 'belt-conveyor': this.tickConveyor(node, stats, elapsed); break;
-        case 'roller-conveyor': this.tickConveyor(node, stats, elapsed); break;
+        case 'conveyor':
+        case 'belt-conveyor':
+        case 'roller-conveyor':
+          this.tickConveyor(node, stats, elapsed); break;
         case 'machine': this.tickMachine(node, stats, elapsed); break;
         case 'buffer': this.tickBuffer(node, stats); break;
         case 'sink': this.tickSink(node, stats); break;
@@ -101,13 +102,16 @@ export class SimulationEngine {
       stats.queueLength = stats.queue.length;
     }
 
-    // Move products along edges
     this.tickMovingProducts(elapsed);
   }
 
   private tickSource(node: ProcessNode, stats: NodeStats, _dt: number) {
-    // spawnRate is items/min → interval in seconds
-    const interval = 60 / (node.parameters.spawnRate || 60);
+    const ppm = node.parameters.spawnRate || node.parameters.ppm || 30;
+    const interval = 60 / ppm;
+    const maxItems = node.parameters.maxItems || 0;
+
+    if (maxItems > 0 && stats.throughput >= maxItems) return;
+
     if (this.simTime - stats.lastSpawnTime >= interval) {
       const outEdges = this.getOutEdges(node.id);
       if (outEdges.length > 0) {
@@ -121,67 +125,69 @@ export class SimulationEngine {
   }
 
   private tickConveyor(node: ProcessNode, stats: NodeStats, dt: number) {
-    // Accept arriving products into queue with timestamp
+    // Accept arriving products
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
       product.state = 'queued';
+      product.conveyorEntryTime = this.simTime;
       stats.queue.push(product.id);
     }
 
-    // Release products that have spent enough time (length / speed)
-    // length is in mm, speed is in m/min → convert to meters and m/s
-    const lengthM = (node.parameters.length || 5000) / 1000; // mm → m
-    const speedMps = (node.parameters.speed || node.parameters.beltSpeed || 20) / 60; // m/min → m/s
+    // Conveyor parameters
+    const lengthM = (node.parameters.length || 3000) / 1000;
+    const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60; // m/min → m/s
     const travelTime = lengthM / speedMps;
 
-    // Simple approach: release first product after travelTime
-    if (stats.queue.length > 0) {
-      if (!stats.processEndTime) {
-        stats.processEndTime = this.simTime + travelTime;
-      }
-      if (this.simTime >= stats.processEndTime) {
-        const pid = stats.queue.shift()!;
-        const product = this.products.find(p => p.id === pid);
-        if (product) {
-          const outEdges = this.getOutEdges(node.id);
-          if (outEdges.length > 0) {
-            this.sendProductAlongEdge(product, outEdges[0]);
-          } else {
-            product.state = 'at-node';
-          }
-          stats.throughput++;
-        }
-        stats.processEndTime = stats.queue.length > 0 ? this.simTime + travelTime : null;
+    // Get port positions for animation
+    const ports = getConnectionPorts(node.type, node.parameters);
+    const inputPort = ports.find(p => p.type === 'input');
+    const outputPort = ports.find(p => p.type === 'output');
+
+    // Release products that have traveled the full length
+    const toRelease: string[] = [];
+    for (const pid of stats.queue) {
+      const product = this.products.find(p => p.id === pid);
+      if (!product || !product.conveyorEntryTime) continue;
+
+      const timeOnBelt = this.simTime - product.conveyorEntryTime;
+      const t = Math.min(1, timeOnBelt / travelTime);
+
+      // Animate position: interpolate between input and output ports
+      if (inputPort && outputPort) {
+        product.currentPosition = [
+          node.position[0] + inputPort.localPosition[0] + (outputPort.localPosition[0] - inputPort.localPosition[0]) * t,
+          node.position[1] + inputPort.localPosition[1],
+          node.position[2] + inputPort.localPosition[2] + (outputPort.localPosition[2] - inputPort.localPosition[2]) * t,
+        ];
       }
 
-      // Animate queued products along conveyor path (input to output)
-      const ports = getConnectionPorts(node.type, node.parameters);
-      const inputPort = ports.find(p => p.type === 'input');
-      const outputPort = ports.find(p => p.type === 'output');
-      if (inputPort && outputPort) {
-        stats.queue.forEach((pid) => {
-          const product = this.products.find(p => p.id === pid);
-          if (product) {
-            const elapsed = stats.processEndTime 
-              ? travelTime - (stats.processEndTime - this.simTime)
-              : 0;
-            const t = Math.min(1, Math.max(0, elapsed / travelTime));
-            product.currentPosition = [
-              node.position[0] + inputPort.localPosition[0] + (outputPort.localPosition[0] - inputPort.localPosition[0]) * t,
-              node.position[1] + inputPort.localPosition[1] + (outputPort.localPosition[1] - inputPort.localPosition[1]) * t,
-              node.position[2] + inputPort.localPosition[2] + (outputPort.localPosition[2] - inputPort.localPosition[2]) * t,
-            ];
-          }
-        });
+      if (t >= 1) {
+        toRelease.push(pid);
       }
     }
+
+    // Release completed products
+    for (const pid of toRelease) {
+      stats.queue = stats.queue.filter(id => id !== pid);
+      const product = this.products.find(p => p.id === pid);
+      if (product) {
+        const outEdges = this.getOutEdges(node.id);
+        if (outEdges.length > 0) {
+          this.sendProductAlongEdge(product, outEdges[0]);
+        } else {
+          // End of line — product stays at output
+          product.state = 'at-node';
+        }
+        stats.throughput++;
+      }
+    }
+
     if (stats.queue.length > 0) stats.busyTime += dt;
   }
 
   private tickMachine(node: ProcessNode, stats: NodeStats, dt: number) {
     const processingTime = node.parameters.processingTime || 2;
 
-    // If processing, check if done
     if (stats.processing && stats.processEndTime !== null && this.simTime >= stats.processEndTime) {
       const product = this.products.find(p => p.id === stats.currentProductId);
       if (product) {
@@ -199,7 +205,6 @@ export class SimulationEngine {
       stats.throughput++;
     }
 
-    // If not processing, take from queue
     if (!stats.processing && stats.queue.length > 0) {
       const pid = stats.queue.shift()!;
       const product = this.products.find(p => p.id === pid);
@@ -212,11 +217,8 @@ export class SimulationEngine {
       }
     }
 
-    if (stats.processing) {
-      stats.busyTime += dt;
-    }
+    if (stats.processing) stats.busyTime += dt;
 
-    // Accept arriving products into queue
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
       product.state = 'queued';
@@ -227,7 +229,6 @@ export class SimulationEngine {
   private tickBuffer(node: ProcessNode, stats: NodeStats) {
     const capacity = node.parameters.capacity || 10;
 
-    // Accept arriving products into queue
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
       if (stats.queue.length < capacity) {
@@ -236,7 +237,6 @@ export class SimulationEngine {
       }
     }
 
-    // Release FIFO to output
     if (stats.queue.length > 0) {
       const outEdges = this.getOutEdges(node.id);
       if (outEdges.length > 0) {
@@ -257,7 +257,6 @@ export class SimulationEngine {
       product.completedAt = this.simTime;
       stats.throughput++;
     }
-    // Remove completed products at sink
     this.products = this.products.filter(p => !(p.state === 'completed' && p.currentNodeId === node.id));
   }
 
@@ -275,7 +274,7 @@ export class SimulationEngine {
   }
 
   private tickPalletizer(node: ProcessNode, stats: NodeStats, dt: number) {
-    const palletSize = 4; // products per pallet
+    const palletSize = 4;
 
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
@@ -287,13 +286,10 @@ export class SimulationEngine {
     if (stats.palletCount >= palletSize) {
       const outEdges = this.getOutEdges(node.id);
       if (outEdges.length > 0) {
-        // Release all as a batch
         for (let i = 0; i < palletSize && stats.queue.length > 0; i++) {
           const pid = stats.queue.shift()!;
           const product = this.products.find(p => p.id === pid);
-          if (product) {
-            this.sendProductAlongEdge(product, outEdges[0]);
-          }
+          if (product) this.sendProductAlongEdge(product, outEdges[0]);
         }
         stats.palletCount = Math.max(0, stats.palletCount - palletSize);
         stats.throughput++;
@@ -314,9 +310,12 @@ export class SimulationEngine {
       const toNode = this.nodes.find(n => n.id === edge.to);
       if (!fromNode || !toNode) continue;
 
-      // Speed: use conveyor speed if from a conveyor, else default 2
-      let speed = 2;
-      if (fromNode.type === 'conveyor') speed = fromNode.parameters.speed || 1;
+      // Use belt speed if from a conveyor type
+      let speedMps = 2; // default m/s for edge travel
+      const convTypes = ['conveyor', 'belt-conveyor', 'roller-conveyor'];
+      if (convTypes.includes(fromNode.type)) {
+        speedMps = (fromNode.parameters.beltSpeed || fromNode.parameters.speed || 20) / 60;
+      }
 
       const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters);
       const toPorts = getConnectionPorts(toNode.type, toNode.parameters);
@@ -339,10 +338,11 @@ export class SimulationEngine {
       const dy = end[1] - start[1];
       const dz = end[2] - start[2];
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
       if (dist < 0.01) {
         product.progress = 1;
       } else {
-        product.progress += (speed * dt) / dist;
+        product.progress += (speedMps * dt) / dist;
       }
 
       if (product.progress >= 1) {
@@ -351,10 +351,11 @@ export class SimulationEngine {
         product.currentNodeId = edge.to;
         product.currentEdgeId = null;
         product.currentPosition = [...end];
+        product.conveyorEntryTime = null;
       } else {
         product.currentPosition = [
           start[0] + dx * product.progress,
-          start[1] + dy * product.progress + Math.sin(product.progress * Math.PI) * 0.1,
+          start[1] + dy * product.progress,
           start[2] + dz * product.progress,
         ];
       }
@@ -362,12 +363,25 @@ export class SimulationEngine {
   }
 
   private createProduct(node: ProcessNode): Product {
-    const color = PRODUCT_COLORS[this.colorIndex % PRODUCT_COLORS.length];
-    this.colorIndex++;
+    const productColor = node.parameters.productColor || 'brown';
+    let color: string;
+    if (productColor === 'random') {
+      color = RANDOM_COLORS[this.colorIndex % RANDOM_COLORS.length];
+      this.colorIndex++;
+    } else {
+      color = COLOR_MAP[productColor] || COLOR_MAP.brown;
+    }
+
+    // Product size from source parameters (mm → meters)
+    const pL = (node.parameters.productLength || 300) / 1000;
+    const pW = (node.parameters.productWidth || 200) / 1000;
+    const pH = (node.parameters.productHeight || 150) / 1000;
+
     return {
       id: uuidv4(),
-      type: node.parameters.productType || 'default',
+      type: node.parameters.productType || 'box',
       color,
+      size: [pL, pW, pH],
       currentPosition: [...node.position] as [number, number, number],
       targetPosition: [0, 0, 0],
       progress: 0,
@@ -376,6 +390,7 @@ export class SimulationEngine {
       state: 'at-node',
       createdAt: this.simTime,
       completedAt: null,
+      conveyorEntryTime: null,
     };
   }
 
@@ -383,6 +398,7 @@ export class SimulationEngine {
     product.state = 'moving';
     product.currentEdgeId = edge.id;
     product.progress = 0;
+    product.conveyorEntryTime = null;
   }
 
   private getOutEdges(nodeId: string): ProcessEdge[] {
@@ -406,23 +422,18 @@ export class SimulationEngine {
 
     for (const node of this.nodes) {
       const stats = this.nodeStats.get(node.id)!;
-      if (node.type === 'sink') {
-        totalThroughput += stats.throughput;
-      }
+      if (node.type === 'sink') totalThroughput += stats.throughput;
       if (node.type === 'machine' || node.type === 'pick-and-place') {
         machineUtils.push({ nodeId: node.id, name: node.name, utilization: stats.utilization });
       }
       if (node.type === 'buffer') {
         bufferLevels.push({
-          nodeId: node.id,
-          name: node.name,
-          level: stats.queueLength,
-          capacity: node.parameters.capacity || 10,
+          nodeId: node.id, name: node.name,
+          level: stats.queueLength, capacity: node.parameters.capacity || 10,
         });
       }
     }
 
-    // Average cycle time from completed products
     const completed = this.products.filter(p => p.completedAt !== null);
     for (const p of completed) {
       totalCycleTime += (p.completedAt! - p.createdAt);
@@ -430,8 +441,7 @@ export class SimulationEngine {
     }
 
     const bottleneck = machineUtils.length > 0
-      ? machineUtils.reduce((a, b) => a.utilization > b.utilization ? a : b)
-      : null;
+      ? machineUtils.reduce((a, b) => a.utilization > b.utilization ? a : b) : null;
 
     return {
       totalThroughput,
@@ -446,5 +456,4 @@ export class SimulationEngine {
   }
 }
 
-// Singleton
 export const simulationEngine = new SimulationEngine();

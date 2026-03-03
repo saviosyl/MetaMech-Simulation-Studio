@@ -5,7 +5,7 @@
  * After loading: X=width, Y=height(up), Z=length(negative direction)
  * We rotate π/2 around Y to map Z(length) → X(length).
  *
- * LEG SUPPORT assemblies: two named groups at different Z positions.
+ * LEG SUPPORT assemblies: two named groups in the GLB (nodes 76, 110).
  * These are hidden + cloned at regular intervals for parametric legs.
  */
 import React, { useMemo, useEffect } from 'react';
@@ -13,7 +13,8 @@ import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
 const MODEL_URL = '/models/belt-conveyor.glb';
-const DRACO_PATH = 'https://www.gstatic.com/draco/versioned/decoders/1.5.6/';
+// Use local DRACO decoders (bundled in public/draco/)
+const DRACO_PATH = '/draco/';
 
 interface Props {
   parameters: Record<string, any>;
@@ -23,8 +24,9 @@ interface Props {
 /** Deep search: find all nodes whose name includes a substring */
 function findNodesByName(root: THREE.Object3D, substr: string): THREE.Object3D[] {
   const results: THREE.Object3D[] = [];
+  const upper = substr.toUpperCase();
   root.traverse((node) => {
-    if (node.name && node.name.toUpperCase().includes(substr.toUpperCase())) {
+    if (node.name && node.name.toUpperCase().includes(upper)) {
       results.push(node);
     }
   });
@@ -52,28 +54,50 @@ function deepClone(src: THREE.Object3D): THREE.Object3D {
 const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
   const gltf = useGLTF(MODEL_URL, DRACO_PATH);
 
-  // Analyze scene: find leg supports, measure dimensions
+  // Analyze scene once
   const analysis = useMemo(() => {
     const scene = gltf.scene;
 
-    // Measure the loaded scene bounds (after SolidWorks Y-up bake)
+    // Measure loaded scene bounds
     const sceneBBox = new THREE.Box3().setFromObject(scene);
     const sceneSize = new THREE.Vector3();
     sceneBBox.getSize(sceneSize);
-    console.log('[BeltConveyorGLB] Loaded scene bounds:',
-      'X:', sceneBBox.min.x.toFixed(3), '→', sceneBBox.max.x.toFixed(3), `(${sceneSize.x.toFixed(3)})`,
-      'Y:', sceneBBox.min.y.toFixed(3), '→', sceneBBox.max.y.toFixed(3), `(${sceneSize.y.toFixed(3)})`,
-      'Z:', sceneBBox.min.z.toFixed(3), '→', sceneBBox.max.z.toFixed(3), `(${sceneSize.z.toFixed(3)})`
+    console.log('[BeltConveyorGLB] Scene bounds:',
+      `X: ${sceneBBox.min.x.toFixed(3)}→${sceneBBox.max.x.toFixed(3)} (${sceneSize.x.toFixed(3)})`,
+      `Y: ${sceneBBox.min.y.toFixed(3)}→${sceneBBox.max.y.toFixed(3)} (${sceneSize.y.toFixed(3)})`,
+      `Z: ${sceneBBox.min.z.toFixed(3)}→${sceneBBox.max.z.toFixed(3)} (${sceneSize.z.toFixed(3)})`
     );
 
     // Find leg support nodes
     const legNodes = findNodesByName(scene, 'LEG SUPPORT');
     console.log(`[BeltConveyorGLB] Found ${legNodes.length} LEG SUPPORT nodes`);
 
-    let legTemplate: THREE.Object3D | null = null;
-    let legWorldZ = 0; // Z position of template leg in loaded space
+    // If name search fails, try finding by child count (17 children = leg assembly)
+    let effectiveLegNodes = legNodes;
+    if (legNodes.length === 0) {
+      console.log('[BeltConveyorGLB] Name search failed, trying structure-based detection...');
+      // Walk second-level children looking for groups with ~17 children
+      scene.traverse((node) => {
+        if (node.children.length >= 15 && node.children.length <= 20 && node !== scene) {
+          // Check if it has foot-plate-like meshes
+          let hasLegParts = false;
+          node.traverse((sub) => {
+            if (sub.name && (sub.name.includes('0060885') || sub.name.includes('0026574') || sub.name.includes('0071639'))) {
+              hasLegParts = true;
+            }
+          });
+          if (hasLegParts) {
+            console.log(`[BeltConveyorGLB] Structure-detected leg: "${node.name}" (${node.children.length} children)`);
+            effectiveLegNodes.push(node);
+          }
+        }
+      });
+    }
 
-    for (const leg of legNodes) {
+    let legTemplate: THREE.Object3D | null = null;
+    let legWorldZ = 0;
+
+    for (const leg of effectiveLegNodes) {
       const box = new THREE.Box3().setFromObject(leg);
       const center = new THREE.Vector3();
       box.getCenter(center);
@@ -84,13 +108,30 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
       }
     }
 
-    // Base dimensions in loaded space (after SolidWorks bake):
-    // X = width, Y = height, Z = length (negative)
-    const baseWidth = sceneSize.x;   // ~0.57
-    const baseHeight = sceneSize.y;  // ~0.945
-    const baseLength = sceneSize.z;  // ~2.1
+    // Debug: log all direct children of the assembly
+    let assembly: THREE.Object3D | null = null;
+    for (const child of scene.children) {
+      if (child.children.length > 10) {
+        assembly = child;
+        break;
+      }
+    }
+    if (assembly && effectiveLegNodes.length === 0) {
+      console.log('[BeltConveyorGLB] Assembly children (looking for legs):');
+      for (const child of assembly.children) {
+        console.log(`  "${child.name?.substring(0, 60)}" children:${child.children.length}`);
+      }
+    }
 
-    return { legNodes, legTemplate, legWorldZ, baseWidth, baseHeight, baseLength, sceneBBox };
+    return {
+      legNodes: effectiveLegNodes,
+      legTemplate,
+      legWorldZ,
+      baseWidth: sceneSize.x,
+      baseHeight: sceneSize.y,
+      baseLength: sceneSize.z,
+      sceneBBox,
+    };
   }, [gltf]);
 
   // Build parametric model
@@ -105,23 +146,31 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
     const scaleW = targetW / analysis.baseWidth;
     const scaleH = targetH / analysis.baseHeight;
 
-    // Clone the entire scene
+    // Clone scene
     const root = deepClone(gltf.scene);
 
-    // Find and hide leg supports in clone
+    // Hide original leg supports
     const clonedLegs = findNodesByName(root, 'LEG SUPPORT');
+    // Also try structure-based hiding
+    if (clonedLegs.length === 0) {
+      root.traverse((node) => {
+        if (node.children.length >= 15 && node.children.length <= 20 && node !== root) {
+          let hasLegParts = false;
+          node.traverse((sub) => {
+            if (sub.name && (sub.name.includes('0060885') || sub.name.includes('0026574'))) hasLegParts = true;
+          });
+          if (hasLegParts) clonedLegs.push(node);
+        }
+      });
+    }
     clonedLegs.forEach(leg => { leg.visible = false; });
 
-    // Scale the body: X=width, Y=height, Z=length
+    // Scale body: X=width, Y=height, Z=length
     root.scale.set(scaleW, scaleH, scaleL);
 
     // Motor mirror
     if (motorSide === 'left') {
-      const motorParts = [
-        ...findNodesByName(root, '0070544'),
-        ...findNodesByName(root, '0070311')
-      ];
-      motorParts.forEach(part => {
+      [...findNodesByName(root, '0070544'), ...findNodesByName(root, '0070311')].forEach(part => {
         part.scale.x *= -1;
       });
     }
@@ -129,51 +178,37 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
     const group = new THREE.Group();
     group.add(root);
 
-    // Place leg stations at intervals
+    // Place leg stations
     if (analysis.legTemplate) {
       const numStations = Math.max(2, Math.round(targetL / supportSpacing) + 1);
-      console.log(`[BeltConveyorGLB] Placing ${numStations} leg stations (spacing ${supportSpacing}m)`);
+      console.log(`[BeltConveyorGLB] Placing ${numStations} leg stations`);
 
-      // In loaded space, Z is length. Scene goes from some Z_min to Z_max.
-      const zMin = analysis.sceneBBox.min.z; // tail end (most negative)
-      const zMax = analysis.sceneBBox.max.z; // head end (near 0)
-
-      // After scaling, the body spans zMin*scaleL to zMax*scaleL
+      const zMin = analysis.sceneBBox.min.z;
+      const zMax = analysis.sceneBBox.max.z;
       const scaledZMin = zMin * scaleL;
       const scaledZMax = zMax * scaleL;
 
       for (let i = 0; i < numStations; i++) {
         const fraction = i / (numStations - 1);
-        // Target Z in scaled space
         const targetZ = scaledZMax - fraction * (scaledZMax - scaledZMin);
 
         const legClone = deepClone(analysis.legTemplate);
         legClone.visible = true;
-
-        // Measure where the cloned leg currently is
-        const legBox = new THREE.Box3().setFromObject(legClone);
-        const legCenter = new THREE.Vector3();
-        legBox.getCenter(legCenter);
-
-        // Offset to move it to target position
-        // Scale width(X) and height(Y), keep Z at 1 (discrete part)
         legClone.scale.set(scaleW, scaleH, 1);
 
-        // Recalculate center after scaling
+        // Measure center after scaling
         const legBoxScaled = new THREE.Box3().setFromObject(legClone);
         const legCenterScaled = new THREE.Vector3();
         legBoxScaled.getCenter(legCenterScaled);
 
-        // Move to target Z
+        // Move to target position
         legClone.position.z += (targetZ - legCenterScaled.z);
-        // Align X center with body
-        legClone.position.x += (analysis.sceneBBox.min.x * scaleW + analysis.sceneBBox.max.x * scaleW) / 2 - legCenterScaled.x;
 
         group.add(legClone);
       }
     }
 
-    // Center: X centered, Z centered, bottom at Y=0
+    // Center
     const bbox = new THREE.Box3().setFromObject(group);
     const center = new THREE.Vector3();
     bbox.getCenter(center);
@@ -196,10 +231,8 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
     });
   }, [isSelected, builtGroup]);
 
-  // Loaded space: X=width, Y=height(up), Z=length
-  // We want: X=length, Y=height(up), Z=width
-  // Rotate +90° around Y: (x,y,z) → (z, y, -x)
-  //   Z(length) → X ✓, Y(height) → Y ✓, X(width) → -Z ✓
+  // After SolidWorks Y-up bake: X=width, Y=height(up), Z=length
+  // Rotate +90° around Y: Z(length)→X, Y stays up, X(width)→-Z
   return (
     <group rotation={[0, Math.PI / 2, 0]}>
       <primitive object={builtGroup} />

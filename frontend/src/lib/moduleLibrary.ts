@@ -43,8 +43,8 @@ export const moduleLibrary: ModuleDefinition[] = [
     parameters: {
       spawnRate: {
         type: 'number',
-        label: 'Spawn Rate (items/min)',
-        default: 60,
+        label: 'PPM (Products/min)',
+        default: 30,
         min: 1,
         max: 600,
         step: 1,
@@ -52,8 +52,38 @@ export const moduleLibrary: ModuleDefinition[] = [
       productType: {
         type: 'select',
         label: 'Product Type',
-        default: 'default',
-        options: ['default', 'box', 'pallet', 'custom'],
+        default: 'box',
+        options: ['box', 'cylinder', 'bottle', 'pallet', 'tote'],
+      },
+      productLength: {
+        type: 'number',
+        label: 'Product Length (mm)',
+        default: 300,
+        min: 10,
+        max: 2000,
+        step: 10,
+      },
+      productWidth: {
+        type: 'number',
+        label: 'Product Width (mm)',
+        default: 200,
+        min: 10,
+        max: 2000,
+        step: 10,
+      },
+      productHeight: {
+        type: 'number',
+        label: 'Product Height (mm)',
+        default: 150,
+        min: 10,
+        max: 2000,
+        step: 10,
+      },
+      productColor: {
+        type: 'select',
+        label: 'Product Color',
+        default: 'brown',
+        options: ['brown', 'red', 'blue', 'green', 'yellow', 'white', 'random'],
       },
       maxItems: {
         type: 'number',
