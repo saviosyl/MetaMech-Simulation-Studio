@@ -16,6 +16,9 @@ import React, { useMemo, useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
+// Enable DRACO decoding (Savio's GLB is DRACO-compressed)
+const DRACO_PATH = 'https://www.gstatic.com/draco/versioned/decoders/1.5.6/';
+
 const MODEL_URL = '/models/belt-conveyor.glb';
 const BASE_LENGTH = 2.1;
 const ORIG_W = 0.57;
@@ -45,7 +48,7 @@ function clonePart(src: THREE.Object3D): THREE.Object3D {
 }
 
 const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
-  const gltf = useGLTF(MODEL_URL);
+  const gltf = useGLTF(MODEL_URL, DRACO_PATH);
 
   // Split: LEG SUPPORT (repeat) vs BODY (stretch)
   const { bodyParts, legTemplate } = useMemo(() => {
@@ -200,6 +203,6 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
   );
 };
 
-useGLTF.preload(MODEL_URL);
+useGLTF.preload(MODEL_URL, DRACO_PATH);
 
 export default BeltConveyorGLB;

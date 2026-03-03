@@ -1,6 +1,6 @@
 import type { BuilderResult } from './beltConveyorBuilder';
 import { buildBeltConveyor } from './beltConveyorBuilder';
-import { buildBeltConveyorFromGLB, preloadBeltConveyorGLB } from './beltConveyorGLBBuilder';
+import { buildBeltConveyorFromGLB } from './beltConveyorGLBBuilder';
 import { buildRollerConveyor } from './rollerConveyorBuilder';
 import { buildModularConveyorStraight, buildModularConveyorCurve } from './modularConveyorBuilder';
 import { wallBuilder, doorBuilder, windowBuilder, palletRackBuilder, stairsBuilder } from './environmentBuilders';
@@ -12,8 +12,8 @@ export type { BuilderResult, ConnectionPort } from './beltConveyorBuilder';
 
 export type BuilderFunction = (params: Record<string, any>) => BuilderResult;
 
-// Start preloading the belt conveyor GLB immediately so it's ready on first use
-preloadBeltConveyorGLB();
+// Belt conveyor GLB is now loaded directly via useGLTF in BeltConveyorGLB.tsx
+// preloadBeltConveyorGLB(); // disabled — old builder no longer used for belt-conveyor
 
 /**
  * Belt conveyor builder: uses the real uploaded GLB model,
