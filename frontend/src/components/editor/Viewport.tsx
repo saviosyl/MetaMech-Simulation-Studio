@@ -6,7 +6,9 @@ import {
   Environment, 
   ContactShadows,
   TransformControls,
-  Text
+  Text,
+  GizmoHelper,
+  GizmoViewport,
 } from '@react-three/drei';
 // EffectComposer removed — ToneMapping+SMAA can cause blank screens on some devices
 import * as THREE from 'three';
@@ -480,6 +482,13 @@ const Viewport: React.FC = () => {
         <Suspense fallback={null}>
           <SceneContent orbitRef={orbitRef} />
         </Suspense>
+        {/* 3D UCS Orientation Gizmo — bottom left */}
+        <GizmoHelper alignment="bottom-left" margin={[60, 60]}>
+          <GizmoViewport
+            axisColors={['#ef4444', '#22c55e', '#3b82f6']}
+            labelColor="white"
+          />
+        </GizmoHelper>
       </Canvas>
 
       {/* Viewport Toolbar */}

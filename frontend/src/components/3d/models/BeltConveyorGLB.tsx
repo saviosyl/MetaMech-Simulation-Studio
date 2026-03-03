@@ -117,6 +117,7 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
     const targetH = (parameters.height ?? 800) / 1000;
     const motorSide = parameters.motorSide ?? 'right';
     const supportSpacing = (parameters.supportSpacing ?? 1500) / 1000;
+    const showLegs = parameters.showLegs !== false; // default true
 
     const scaleL = targetL / analysis.baseLength;
     const scaleW = targetW / analysis.baseWidth;
@@ -156,7 +157,7 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
 
     // === LEG PLACEMENT (Savio's strategy) ===
     // Fixed legs at 250mm from each end, additional in middle
-    if (analysis.legTemplate) {
+    if (analysis.legTemplate && showLegs) {
       // Measure template center BEFORE any scaling (original position in scene)
       const origBox = new THREE.Box3().setFromObject(analysis.legTemplate);
       const origCenter = new THREE.Vector3();
@@ -187,22 +188,37 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
         }
       }
 
-      console.log(`[BeltConveyorGLB] Placing ${legPositions.length} legs, origCenter=(${origCenter.x.toFixed(3)},${origCenter.y.toFixed(3)},${origCenter.z.toFixed(3)})`);
+      // Scaled body center for alignment
+      const scaledBodyCenterX = bodyCenterX * scaleW;
+
+      console.log(`[BeltConveyorGLB] Placing ${legPositions.length} legs, origCenter=(${origCenter.x.toFixed(3)},${origCenter.y.toFixed(3)},${origCenter.z.toFixed(3)}), bodyCenter=${scaledBodyCenterX.toFixed(3)}`);
 
       for (const targetZ of legPositions) {
         const legClone = deepClone(analysis.legTemplate);
         legClone.visible = true;
 
-        // Position: shift from original template position to target
-        // Z: move along length to target position
-        legClone.position.z += (targetZ - origCenter.z);
-        // X: align center with scaled body center
-        legClone.position.x += (bodyCenterX * scaleW - bodyCenterX);
+        // Use wrapper group: center the leg at origin, scale, then position
+        // This ensures scaling happens around the leg's center, not around world origin
+        const wrapper = new THREE.Group();
 
-        // Scale: width(X) and height(Y) match body, Z stays 1 (discrete part)
-        legClone.scale.set(scaleW, scaleH, 1);
+        // 1. Offset leg so its center is at origin
+        legClone.position.x += -origCenter.x;
+        legClone.position.y += -origCenter.y;
+        legClone.position.z += -origCenter.z;
 
-        group.add(legClone);
+        wrapper.add(legClone);
+
+        // 2. Scale the wrapper (scales around origin = leg center)
+        wrapper.scale.set(scaleW, scaleH, 1);
+
+        // 3. Position wrapper at target location
+        wrapper.position.set(
+          scaledBodyCenterX,  // X: aligned with body center
+          origCenter.y * scaleH,  // Y: same height ratio as body
+          targetZ              // Z: target position along length
+        );
+
+        group.add(wrapper);
       }
     }
 

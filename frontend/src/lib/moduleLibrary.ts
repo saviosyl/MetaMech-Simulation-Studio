@@ -138,6 +138,7 @@ export const moduleLibrary: ModuleDefinition[] = [
       sideGuides: { type: 'boolean', label: 'Side Guides', default: true },
       guideHeight: { type: 'number', label: 'Guide Height (mm)', default: 60, min: 30, max: 150, step: 10 },
       supportSpacing: { type: 'number', label: 'Support Spacing (mm)', default: 1500, min: 500, max: 3000, step: 100 },
+      showLegs: { type: 'boolean', label: 'Show Leg Supports', default: true },
     },
   },
   {

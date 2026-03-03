@@ -130,9 +130,9 @@ export function getConnectionPorts(type: string, params?: Record<string, any>, a
   const length = params?.length || 5;
   switch (type) {
     case 'source':
-      return [{ id: 'output', type: 'output', localPosition: [0.75, 0.5, 0] }];
+      return [{ id: 'output', type: 'output', localPosition: [0.02, 0.05, 0] }];  // 20mm from center
     case 'sink':
-      return [{ id: 'input', type: 'input', localPosition: [-0.75, 0.5, 0] }];
+      return [{ id: 'input', type: 'input', localPosition: [-0.02, 0.05, 0] }];  // 20mm from center
     case 'conveyor':
       return [
         { id: 'input', type: 'input', localPosition: [-length / 2, 0.1, 0] },
