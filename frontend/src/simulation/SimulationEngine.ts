@@ -1,10 +1,10 @@
 /**
- * SimulationEngine — Real-time industrial simulation
- * 
- * Units:
- *   - Dimensions: mm in parameters, meters internally
- *   - Speed: m/min in parameters → m/s internally
- *   - PPM: products per minute
+ * SimulationEngine — Real-time industrial conveyor simulation
+ *
+ * Products spawn at sources, travel along conveyors at belt speed,
+ * transfer between connected conveyors, and arrive at sinks.
+ *
+ * Products are always centered on the conveyor width and ride on top of the belt.
  */
 import { v4 as uuidv4 } from 'uuid';
 import { Product, NodeStats } from './Product';
@@ -19,6 +19,8 @@ const COLOR_MAP: Record<string, string> = {
   white: '#f5f5f5',
 };
 const RANDOM_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
+
+const CONVEYOR_TYPES = ['conveyor', 'belt-conveyor', 'roller-conveyor'];
 
 export class SimulationEngine {
   products: Product[] = [];
@@ -103,8 +105,12 @@ export class SimulationEngine {
     }
 
     this.tickMovingProducts(elapsed);
+
+    // Cleanup completed products that left the system
+    this.products = this.products.filter(p => p.state !== 'completed' || (this.simTime - (p.completedAt || 0)) < 2);
   }
 
+  // ─── Source: spawn products ──────────────────────────────────
   private tickSource(node: ProcessNode, stats: NodeStats, _dt: number) {
     const ppm = node.parameters.spawnRate || node.parameters.ppm || 30;
     const interval = 60 / ppm;
@@ -124,6 +130,7 @@ export class SimulationEngine {
     }
   }
 
+  // ─── Conveyor: products ride the belt ────────────────────────
   private tickConveyor(node: ProcessNode, stats: NodeStats, dt: number) {
     // Accept arriving products
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
@@ -135,15 +142,15 @@ export class SimulationEngine {
 
     // Conveyor parameters
     const lengthM = (node.parameters.length || 3000) / 1000;
-    const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60; // m/min → m/s
+    const beltHeightM = (node.parameters.height || 800) / 1000;
+    const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
     const travelTime = lengthM / speedMps;
 
-    // Get port positions for animation
+    // Get port positions
     const ports = getConnectionPorts(node.type, node.parameters);
     const inputPort = ports.find(p => p.type === 'input');
     const outputPort = ports.find(p => p.type === 'output');
 
-    // Release products that have traveled the full length
     const toRelease: string[] = [];
     for (const pid of stats.queue) {
       const product = this.products.find(p => p.id === pid);
@@ -152,21 +159,31 @@ export class SimulationEngine {
       const timeOnBelt = this.simTime - product.conveyorEntryTime;
       const t = Math.min(1, timeOnBelt / travelTime);
 
-      // Animate position: interpolate between input and output ports
+      // Animate: interpolate from input port to output port
       if (inputPort && outputPort) {
+        const inX = node.position[0] + inputPort.localPosition[0];
+        const outX = node.position[0] + outputPort.localPosition[0];
+        const inZ = node.position[2] + inputPort.localPosition[2];
+        const outZ = node.position[2] + outputPort.localPosition[2];
+
         product.currentPosition = [
-          node.position[0] + inputPort.localPosition[0] + (outputPort.localPosition[0] - inputPort.localPosition[0]) * t,
-          node.position[1] + inputPort.localPosition[1],
-          node.position[2] + inputPort.localPosition[2] + (outputPort.localPosition[2] - inputPort.localPosition[2]) * t,
+          inX + (outX - inX) * t,
+          node.position[1] + beltHeightM,  // ride ON TOP of belt
+          inZ + (outZ - inZ) * t,           // centered on conveyor width
+        ];
+      } else {
+        // Fallback: animate along X axis
+        const halfL = lengthM / 2;
+        product.currentPosition = [
+          node.position[0] - halfL + lengthM * t,
+          node.position[1] + beltHeightM,
+          node.position[2],
         ];
       }
 
-      if (t >= 1) {
-        toRelease.push(pid);
-      }
+      if (t >= 1) toRelease.push(pid);
     }
 
-    // Release completed products
     for (const pid of toRelease) {
       stats.queue = stats.queue.filter(id => id !== pid);
       const product = this.products.find(p => p.id === pid);
@@ -175,7 +192,6 @@ export class SimulationEngine {
         if (outEdges.length > 0) {
           this.sendProductAlongEdge(product, outEdges[0]);
         } else {
-          // End of line — product stays at output
           product.state = 'at-node';
         }
         stats.throughput++;
@@ -185,6 +201,7 @@ export class SimulationEngine {
     if (stats.queue.length > 0) stats.busyTime += dt;
   }
 
+  // ─── Machine: process with cycle time ────────────────────────
   private tickMachine(node: ProcessNode, stats: NodeStats, dt: number) {
     const processingTime = node.parameters.processingTime || 2;
 
@@ -226,6 +243,7 @@ export class SimulationEngine {
     }
   }
 
+  // ─── Buffer ──────────────────────────────────────────────────
   private tickBuffer(node: ProcessNode, stats: NodeStats) {
     const capacity = node.parameters.capacity || 10;
 
@@ -250,6 +268,7 @@ export class SimulationEngine {
     }
   }
 
+  // ─── Sink ────────────────────────────────────────────────────
   private tickSink(node: ProcessNode, stats: NodeStats) {
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
@@ -260,6 +279,7 @@ export class SimulationEngine {
     this.products = this.products.filter(p => !(p.state === 'completed' && p.currentNodeId === node.id));
   }
 
+  // ─── Router ──────────────────────────────────────────────────
   private tickRouter(node: ProcessNode, stats: NodeStats) {
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     const outEdges = this.getOutEdges(node.id);
@@ -273,8 +293,9 @@ export class SimulationEngine {
     }
   }
 
+  // ─── Palletizer ──────────────────────────────────────────────
   private tickPalletizer(node: ProcessNode, stats: NodeStats, dt: number) {
-    const palletSize = 4;
+    const palletSize = node.parameters.palletSize || 4;
 
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
@@ -299,6 +320,7 @@ export class SimulationEngine {
     if (stats.queue.length > 0) stats.busyTime += dt;
   }
 
+  // ─── Edge travel (between nodes) ────────────────────────────
   private tickMovingProducts(dt: number) {
     for (const product of this.products) {
       if (product.state !== 'moving' || !product.currentEdgeId) continue;
@@ -310,10 +332,9 @@ export class SimulationEngine {
       const toNode = this.nodes.find(n => n.id === edge.to);
       if (!fromNode || !toNode) continue;
 
-      // Use belt speed if from a conveyor type
-      let speedMps = 2; // default m/s for edge travel
-      const convTypes = ['conveyor', 'belt-conveyor', 'roller-conveyor'];
-      if (convTypes.includes(fromNode.type)) {
+      // Use belt speed from source conveyor, or default
+      let speedMps = 2;
+      if (CONVEYOR_TYPES.includes(fromNode.type)) {
         speedMps = (fromNode.parameters.beltSpeed || fromNode.parameters.speed || 20) / 60;
       }
 
@@ -353,15 +374,21 @@ export class SimulationEngine {
         product.currentPosition = [...end];
         product.conveyorEntryTime = null;
       } else {
+        // Keep Y at the belt height of the destination conveyor
+        const toHeight = CONVEYOR_TYPES.includes(toNode.type)
+          ? (toNode.parameters.height || 800) / 1000
+          : end[1];
+
         product.currentPosition = [
           start[0] + dx * product.progress,
-          start[1] + dy * product.progress,
+          toNode.position[1] + toHeight,
           start[2] + dz * product.progress,
         ];
       }
     }
   }
 
+  // ─── Helpers ─────────────────────────────────────────────────
   private createProduct(node: ProcessNode): Product {
     const productColor = node.parameters.productColor || 'brown';
     let color: string;
@@ -372,7 +399,6 @@ export class SimulationEngine {
       color = COLOR_MAP[productColor] || COLOR_MAP.brown;
     }
 
-    // Product size from source parameters (mm → meters)
     const pL = (node.parameters.productLength || 300) / 1000;
     const pW = (node.parameters.productWidth || 200) / 1000;
     const pH = (node.parameters.productHeight || 150) / 1000;

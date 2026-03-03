@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
-import { useEditorStore, getConnectionPorts } from '../../store/editorStore';
+import { useEditorStore } from '../../store/editorStore';
 import { simulationEngine } from '../../simulation/SimulationEngine';
 import { Product } from '../../simulation/Product';
 

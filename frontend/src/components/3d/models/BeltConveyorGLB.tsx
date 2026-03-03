@@ -13,8 +13,8 @@ import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
 const MODEL_URL = '/models/belt-conveyor.glb';
-// Use local DRACO decoders (bundled in public/draco/)
-const DRACO_PATH = '/draco/';
+// DRACO decoder from Google CDN (model is DRACO-compressed by SolidWorks)
+const DRACO_PATH = 'https://www.gstatic.com/draco/versioned/decoders/1.5.6/';
 
 interface Props {
   parameters: Record<string, any>;
