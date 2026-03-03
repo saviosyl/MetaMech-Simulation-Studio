@@ -67,13 +67,20 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
     let legRef: THREE.Object3D | null = null;
     let legCount = 0;
 
+    // Debug: log ALL children names so we can find leg supports
+    console.log('[BeltConveyorGLB] Assembly children names:');
     for (const child of assembly.children) {
-      const isLeg = child.name.toUpperCase().includes('LEG SUPPORT');
+      console.log('  →', JSON.stringify(child.name), 'type:', child.type, 'children:', child.children?.length || 0);
+    }
+
+    for (const child of assembly.children) {
+      const nameUpper = (child.name || '').toUpperCase();
+      const isLeg = nameUpper.includes('LEG') || nameUpper.includes('SUPPORT');
       if (isLeg) {
         legCount++;
         if (!legRef) {
           legRef = child;
-          console.log('[BeltConveyorGLB] Leg template found:', child.name);
+          console.log('[BeltConveyorGLB] ✓ Leg template found:', child.name);
         }
       } else {
         body.push(child);
