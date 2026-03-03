@@ -1,9 +1,9 @@
 /**
  * BeltConveyorGLB — Parametric belt conveyor from real SolidWorks GLB.
  *
- * KEY INSIGHT: Legs are added inside the scaled root, cloned from a
- * sibling leg. Position offset uses MODEL-SPACE coordinates only
- * (from the unscaled original), applied to the leg's LOCAL position.
+ * CRITICAL: baseLength must be measured from BODY ONLY (excluding legs),
+ * because legs extend beyond the belt. Body length ≈ 2.1m, but scene
+ * with legs = 3.6m. Using scene bounds would give wrong scale factor.
  */
 import React, { useMemo, useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
@@ -58,15 +58,44 @@ function deepCloneNode(src: THREE.Object3D): THREE.Object3D {
 const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
   const gltf = useGLTF(MODEL_URL, DRACO_PATH);
 
-  // Measure base model ONCE from the unscaled original
   const baseInfo = useMemo(() => {
     const scene = gltf.scene;
-    const bbox = new THREE.Box3().setFromObject(scene);
-    const size = new THREE.Vector3();
-    bbox.getSize(size);
 
-    // Find legs and record both their BOUNDS CENTER and LOCAL POSITION
+    // Find legs
     const legs = findLegNodes(scene);
+    const legNames = new Set<string>();
+    legs.forEach(l => legNames.add(l.name));
+
+    // Measure BODY-ONLY bounds (exclude leg supports!)
+    // This is critical — legs extend beyond the belt
+    const bodyBBox = new THREE.Box3();
+    const legBBox = new THREE.Box3();
+    
+    // Find the assembly node
+    let assembly: THREE.Object3D | null = null;
+    for (const child of scene.children) {
+      if (child.children.length > 10) { assembly = child; break; }
+    }
+    
+    if (assembly) {
+      for (const child of assembly.children) {
+        const isLeg = legNames.has(child.name) || 
+                      child.name.toUpperCase().includes('LEG_SUPPORT');
+        const childBox = new THREE.Box3().setFromObject(child);
+        if (!childBox.isEmpty()) {
+          if (isLeg) {
+            legBBox.union(childBox);
+          } else {
+            bodyBBox.union(childBox);
+          }
+        }
+      }
+    }
+
+    const bodySize = new THREE.Vector3();
+    bodyBBox.getSize(bodySize);
+
+    // Leg data
     const legData: { centerZ: number; posZ: number }[] = [];
     for (const leg of legs) {
       const lb = new THREE.Box3().setFromObject(leg);
@@ -76,13 +105,19 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
     }
     legData.sort((a, b) => a.centerZ - b.centerZ);
 
-    console.log(`[BeltConveyorGLB] Base: ${size.x.toFixed(2)}×${size.y.toFixed(2)}×${size.z.toFixed(2)}, legs: ${legs.length}`);
-    legData.forEach((d, i) => console.log(`  Leg ${i}: center.z=${d.centerZ.toFixed(3)}, position.z=${d.posZ.toFixed(3)}`));
+    console.log(`[BeltConveyorGLB] BODY: ${bodySize.x.toFixed(3)}W × ${bodySize.y.toFixed(3)}H × ${bodySize.z.toFixed(3)}L`);
+    console.log(`[BeltConveyorGLB] Body Z: ${bodyBBox.min.z.toFixed(3)} → ${bodyBBox.max.z.toFixed(3)}`);
+    legData.forEach((d, i) => console.log(`  Leg ${i}: center.z=${d.centerZ.toFixed(3)}, pos.z=${d.posZ.toFixed(3)}`));
 
-    return { baseWidth: size.x, baseHeight: size.y, baseLength: size.z, bbox, legData };
+    return {
+      bodyWidth: bodySize.x,
+      bodyHeight: bodySize.y,
+      bodyLength: bodySize.z,  // TRUE belt length, not including legs
+      bodyBBox,
+      legData,
+    };
   }, [gltf]);
 
-  // Build parametric model
   const builtGroup = useMemo(() => {
     const targetL = (parameters.length ?? 3000) / 1000;
     const targetW = (parameters.width ?? 600) / 1000;
@@ -91,19 +126,18 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
     const supportSpacing = (parameters.supportSpacing ?? 1500) / 1000;
     const showLegs = parameters.showLegs !== false;
 
-    const scaleL = targetL / baseInfo.baseLength;
-    const scaleW = targetW / baseInfo.baseWidth;
-    const scaleH = targetH / baseInfo.baseHeight;
+    // Scale based on BODY dimensions (not scene with legs)
+    const scaleL = targetL / baseInfo.bodyLength;
+    const scaleW = targetW / baseInfo.bodyWidth;
+    const scaleH = targetH / baseInfo.bodyHeight;
 
-    // Clone whole scene
     const root = deepCloneNode(gltf.scene);
+    
+    // Hide ALL original legs (we'll place our own)
     const clonedLegs = findLegNodes(root);
+    clonedLegs.forEach(leg => { leg.visible = false; });
 
-    if (!showLegs) {
-      clonedLegs.forEach(leg => { leg.visible = false; });
-    }
-
-    // Scale everything
+    // Scale body
     root.scale.set(scaleW, scaleH, scaleL);
 
     // Motor mirror
@@ -115,66 +149,65 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
       });
     }
 
-    // === EXTRA LEGS ===
-    if (showLegs && clonedLegs.length > 0 && baseInfo.legData.length > 0) {
-      const templateLeg = clonedLegs[0];
-      const parentNode = templateLeg.parent!;
+    const group = new THREE.Group();
+    group.add(root);
 
-      // Use the ORIGINAL (unscaled) data for all position math
-      const templateCenterZ = baseInfo.legData[0].centerZ; // bounds center in model space
-      const templatePosZ = baseInfo.legData[0].posZ;        // local position in model space
+    // === PLACE ALL LEGS (hide originals, place fresh ones) ===
+    if (showLegs && baseInfo.legData.length > 0) {
+      // Use the first ORIGINAL leg from gltf.scene as template
+      const origLegs = findLegNodes(gltf.scene);
+      if (origLegs.length > 0) {
+        const templateLeg = origLegs[0];
+        const templatePosZ = baseInfo.legData[0].posZ;
+        const templateCenterZ = baseInfo.legData[0].centerZ;
+        const internalOffset = templateCenterZ - templatePosZ;
 
-      // The offset between local position and bounds center (internal structure offset)
-      const internalOffset = templateCenterZ - templatePosZ;
+        // Body spans in loaded space: bodyBBox.min.z to bodyBBox.max.z
+        const bodyZHead = baseInfo.bodyBBox.max.z; // drive/head end
+        const bodyZTail = baseInfo.bodyBBox.min.z; // idle/tail end
 
-      // Model space: Z goes from bbox.max.z (~0) to bbox.min.z (~-3.6)
-      const zHead = baseInfo.bbox.max.z;
-      const zTail = baseInfo.bbox.min.z;
+        // Desired leg CENTERS in model space (body coordinates)
+        // 250mm from each end in OUTPUT space → convert to model space
+        const endOffsetModel = END_OFFSET_M / scaleL;
+        const zDriveCenter = bodyZHead - endOffsetModel;
+        const zIdleCenter = bodyZTail + endOffsetModel;
 
-      // Desired leg CENTER positions in MODEL space
-      // 250mm from each end (in output space → divide by scaleL for model space)
-      const endOffsetModel = END_OFFSET_M / scaleL;
-      const zDriveCenter = zHead - endOffsetModel;
-      const zIdleCenter = zTail + endOffsetModel;
+        // Middle legs
+        const spacingModel = supportSpacing / scaleL;
+        const span = Math.abs(zDriveCenter - zIdleCenter);
+        const numMiddle = span > spacingModel
+          ? Math.min(MAX_LEG_STATIONS - 2, Math.max(0, Math.floor(span / spacingModel) - 1))
+          : 0;
 
-      // Middle legs
-      const supportSpacingModel = supportSpacing / scaleL;
-      const span = Math.abs(zDriveCenter - zIdleCenter);
-      const numMiddle = span > supportSpacingModel
-        ? Math.min(MAX_LEG_STATIONS - 2, Math.max(0, Math.floor(span / supportSpacingModel) - 1))
-        : 0;
-
-      const desiredCenters: number[] = [zIdleCenter, zDriveCenter];
-      if (numMiddle > 0) {
-        const step = span / (numMiddle + 1);
-        for (let i = 1; i <= numMiddle; i++) {
-          desiredCenters.push(zDriveCenter - step * i);
+        const centers: number[] = [zDriveCenter, zIdleCenter];
+        if (numMiddle > 0) {
+          const step = span / (numMiddle + 1);
+          for (let i = 1; i <= numMiddle; i++) {
+            centers.push(zDriveCenter - step * i);
+          }
         }
-      }
 
-      // Filter out positions close to existing legs (< 0.1m in model space)
-      const existingCenters = baseInfo.legData.map(d => d.centerZ);
-      const newCenters = desiredCenters.filter(dc =>
-        !existingCenters.some(ec => Math.abs(dc - ec) < 0.1)
-      );
+        console.log(`[BeltConveyorGLB] Placing ${centers.length} legs (scaleL=${scaleL.toFixed(3)}, bodyZ: ${bodyZTail.toFixed(2)}→${bodyZHead.toFixed(2)})`);
 
-      console.log(`[BeltConveyorGLB] ${newCenters.length} extra legs needed (${existingCenters.length} originals kept)`);
+        // Find assembly in clone to add legs to
+        let clonedAssembly: THREE.Object3D = root;
+        for (const child of root.children) {
+          if (child.children.length > 10) { clonedAssembly = child; break; }
+        }
 
-      for (const targetCenterZ of newCenters) {
-        const newLeg = deepCloneNode(templateLeg);
-        newLeg.visible = true;
-
-        // Convert desired CENTER position to LOCAL position:
-        // localPosZ = targetCenterZ - internalOffset
-        newLeg.position.z = targetCenterZ - internalOffset;
-
-        parentNode.add(newLeg);
+        for (const centerZ of centers) {
+          const newLeg = deepCloneNode(templateLeg);
+          newLeg.visible = true;
+          // Set position: convert center to local position
+          newLeg.position.z = centerZ - internalOffset;
+          // Counter-scale Z so legs don't stretch with the body
+          newLeg.scale.z = 1 / scaleL;
+          clonedAssembly.add(newLeg);
+        }
       }
     }
 
-    // Wrap and center
-    const group = new THREE.Group();
-    group.add(root);
+    // Center
     const bbox = new THREE.Box3().setFromObject(group);
     const center = new THREE.Vector3();
     bbox.getCenter(center);

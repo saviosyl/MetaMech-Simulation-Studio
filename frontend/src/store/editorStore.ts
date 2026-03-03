@@ -143,9 +143,10 @@ export function getConnectionPorts(type: string, params?: Record<string, any>, a
     case 'modular-conveyor-straight': {
       const pL = ((params?.length || 3000) / 1000);
       const pH = ((params?.height || 800) / 1000);
+      const portInset = 0.02; // 20mm from belt end
       return [
-        { id: 'input', type: 'input', localPosition: [-pL / 2, pH, 0] },
-        { id: 'output', type: 'output', localPosition: [pL / 2, pH, 0] },
+        { id: 'input', type: 'input', localPosition: [-pL / 2 + portInset, pH, 0] },
+        { id: 'output', type: 'output', localPosition: [pL / 2 - portInset, pH, 0] },
       ];
     }
     case 'modular-conveyor-90-curve':
