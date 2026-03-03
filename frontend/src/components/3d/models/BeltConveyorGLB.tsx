@@ -157,24 +157,29 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
     // === LEG PLACEMENT (Savio's strategy) ===
     // Fixed legs at 250mm from each end, additional in middle
     if (analysis.legTemplate) {
-      // In loaded space, Z goes from max (head/drive, ~0) to min (tail/idle, ~-3.6)
-      // After body scaling: Z goes from max*scaleL to min*scaleL
-      const zHead = analysis.sceneBBox.max.z * scaleL; // head end (~0)
-      const zTail = analysis.sceneBBox.min.z * scaleL;  // tail end (negative)
-      // Head end = zHead, so leg near head = zHead - 0.25 (more negative)
-      // Tail end = zTail, so leg near tail = zTail + 0.25 (less negative)
-      const endOffsetScaled = END_OFFSET;
-      const zDriveEnd = zHead - endOffsetScaled;
-      const zIdleEnd = zTail + endOffsetScaled;
+      // Measure template center BEFORE any scaling (original position in scene)
+      const origBox = new THREE.Box3().setFromObject(analysis.legTemplate);
+      const origCenter = new THREE.Vector3();
+      origBox.getCenter(origCenter);
 
-      // Calculate middle legs
+      // Body center X for width alignment
+      const bodyCenterX = (analysis.sceneBBox.min.x + analysis.sceneBBox.max.x) / 2;
+
+      // In scaled space, body spans:
+      const zHead = analysis.sceneBBox.max.z * scaleL; // drive/head (~0)
+      const zTail = analysis.sceneBBox.min.z * scaleL;  // idle/tail (negative)
+
+      // Fixed end positions (250mm inward from each end)
+      const zDriveEnd = zHead - END_OFFSET;
+      const zIdleEnd = zTail + END_OFFSET;
+
+      // Middle legs based on support spacing
       const middleSpan = Math.abs(zDriveEnd - zIdleEnd);
       const numMiddleLegs = middleSpan > supportSpacing
         ? Math.min(MAX_LEG_STATIONS - 2, Math.max(0, Math.floor(middleSpan / supportSpacing) - 1))
         : 0;
 
-      // Collect all leg Z positions
-      const legPositions: number[] = [zIdleEnd, zDriveEnd]; // always have end legs
+      const legPositions: number[] = [zIdleEnd, zDriveEnd];
       if (numMiddleLegs > 0) {
         const middleSpacing = middleSpan / (numMiddleLegs + 1);
         for (let i = 1; i <= numMiddleLegs; i++) {
@@ -182,20 +187,20 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
         }
       }
 
-      console.log(`[BeltConveyorGLB] Placing ${legPositions.length} leg stations (${numMiddleLegs} middle)`);
+      console.log(`[BeltConveyorGLB] Placing ${legPositions.length} legs, origCenter=(${origCenter.x.toFixed(3)},${origCenter.y.toFixed(3)},${origCenter.z.toFixed(3)})`);
 
       for (const targetZ of legPositions) {
         const legClone = deepClone(analysis.legTemplate);
         legClone.visible = true;
+
+        // Position: shift from original template position to target
+        // Z: move along length to target position
+        legClone.position.z += (targetZ - origCenter.z);
+        // X: align center with scaled body center
+        legClone.position.x += (bodyCenterX * scaleW - bodyCenterX);
+
+        // Scale: width(X) and height(Y) match body, Z stays 1 (discrete part)
         legClone.scale.set(scaleW, scaleH, 1);
-
-        // Measure center after scaling
-        const legBox = new THREE.Box3().setFromObject(legClone);
-        const legCenter = new THREE.Vector3();
-        legBox.getCenter(legCenter);
-
-        // Move to target Z
-        legClone.position.z += (targetZ - legCenter.z);
 
         group.add(legClone);
       }
