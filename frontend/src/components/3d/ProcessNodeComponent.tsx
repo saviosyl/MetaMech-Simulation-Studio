@@ -6,6 +6,7 @@ import { getAssetById, ParametricAssetDef, StaticAssetDef } from '../../lib/asse
 import ParametricModel from './ParametricModel';
 import StaticModel from './StaticModel';
 import GLBModel from './GLBModel';
+import BeltConveyorGLB from './models/BeltConveyorGLB';
 import SourceModel from './models/SourceModel';
 import SinkModel from './models/SinkModel';
 import BufferModel from './models/BufferModel';
@@ -29,6 +30,39 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
 
   // Check if this node uses the new asset system
   const assetDef = node.assetId ? getAssetById(node.assetId) : undefined;
+
+  // BELT CONVEYOR: always use the real GLB model directly
+  if (node.type === 'belt-conveyor') {
+    return (
+      <group
+        ref={groupRef}
+        position={node.position}
+        rotation={node.rotation}
+        scale={node.scale}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      >
+        <Suspense fallback={
+          <mesh castShadow>
+            <boxGeometry args={[3, 0.8, 0.6]} />
+            <meshStandardMaterial color="#666" wireframe />
+          </mesh>
+        }>
+          <BeltConveyorGLB
+            parameters={node.parameters}
+            isSelected={isSelected}
+          />
+        </Suspense>
+        {isSelected && (
+          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[1.5, 1.7, 32]} />
+            <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
+          </mesh>
+        )}
+      </group>
+    );
+  }
 
   if (assetDef) {
     if (assetDef.assetType === 'parametric') {
