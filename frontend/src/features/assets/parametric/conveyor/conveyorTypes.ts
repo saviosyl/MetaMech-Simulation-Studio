@@ -1,0 +1,77 @@
+/**
+ * Conveyor Type Definitions — MetaMech Simulation Studio
+ */
+
+export type ConveyorType = 'belt' | 'roller' | 'modular';
+export type DriveType = 'end' | 'center';
+
+export interface ConveyorParams {
+  conveyorType: ConveyorType;
+  driveType: DriveType;
+  widthMm: number;
+  lengthMm: number;
+  heightMm: number;
+  angleDeg: number;
+  sideGuidesEnabled: boolean;
+  sideGuideHeightMm: number;
+  adjustableFeetEnabled: boolean;
+  footAdjustmentMm: number;
+  supportSpacingMm: number;
+  speedMpm: number;
+  direction: 'forward' | 'reverse';
+  motorSide: 'left' | 'right';
+  showSupports: boolean;
+}
+
+export interface ConveyorSimulationMetadata {
+  pathLengthMm: number;
+  speedMpm: number;
+  entryPort: { position: [number, number, number]; direction: [number, number, number] };
+  exitPort: { position: [number, number, number]; direction: [number, number, number] };
+  transportMode: ConveyorType;
+}
+
+export interface SnapPoint {
+  id: string;
+  type: 'input' | 'output' | 'anchor';
+  localPosition: [number, number, number];
+  direction: [number, number, number];
+}
+
+export interface BuiltConveyor {
+  root: THREE.Group;
+  snapPoints: SnapPoint[];
+  simulationMeta: ConveyorSimulationMetadata;
+  bounds: { min: [number, number, number]; max: [number, number, number] };
+}
+
+export const CONVEYOR_DEFAULTS: ConveyorParams = {
+  conveyorType: 'belt',
+  driveType: 'end',
+  widthMm: 600,
+  lengthMm: 3000,
+  heightMm: 800,
+  angleDeg: 0,
+  sideGuidesEnabled: false,
+  sideGuideHeightMm: 60,
+  adjustableFeetEnabled: true,
+  footAdjustmentMm: 25,
+  supportSpacingMm: 1500,
+  speedMpm: 20,
+  direction: 'forward',
+  motorSide: 'right',
+  showSupports: true,
+};
+
+export const CONVEYOR_LIMITS: Record<string, { min: number; max: number; step?: number }> = {
+  widthMm: { min: 200, max: 1500, step: 50 },
+  lengthMm: { min: 500, max: 15000, step: 100 },
+  heightMm: { min: 300, max: 3000, step: 50 },
+  angleDeg: { min: 0, max: 35, step: 1 },
+  sideGuideHeightMm: { min: 20, max: 200, step: 10 },
+  footAdjustmentMm: { min: 0, max: 100, step: 5 },
+  supportSpacingMm: { min: 500, max: 4000, step: 100 },
+  speedMpm: { min: 1, max: 120, step: 1 },
+};
+
+import * as THREE from 'three';
