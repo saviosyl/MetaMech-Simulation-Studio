@@ -194,7 +194,7 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
   //   X=length ✓, Y=height ✓, Z=-width (flipped but OK)
   
   return (
-    <group rotation={[-Math.PI / 2, Math.PI / 2, 0]}>
+    <group rotation={[0, Math.PI / 2, 0]}>
       <primitive object={builtGroup} />
     </group>
   );
