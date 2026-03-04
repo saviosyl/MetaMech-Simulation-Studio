@@ -18,12 +18,18 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor
+// Response interceptor — don't redirect on network errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      window.location.href = '/login';
+    // Only redirect on actual 401 from a working backend
+    // Don't redirect on network errors (ECONNREFUSED etc.)
+    if (error.response?.status === 401 && !window.location.pathname.startsWith('/login')) {
+      // Check if user has local auth — if so, don't redirect
+      const stored = localStorage.getItem('metamech_auth_user');
+      if (!stored) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

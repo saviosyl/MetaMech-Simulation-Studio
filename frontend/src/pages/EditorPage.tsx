@@ -54,7 +54,18 @@ const EditorPage: React.FC = () => {
     if (id) {
       loadProjectData(id);
     } else {
-      loadScene({});
+      // Demo mode: try to restore from localStorage
+      const saved = localStorage.getItem('metamech_autosave');
+      const savedName = localStorage.getItem('metamech_autosave_name');
+      if (saved) {
+        try {
+          const data = JSON.parse(saved);
+          loadScene(data.scene || data);
+          if (savedName) setProjectName(savedName);
+        } catch { loadScene({}); }
+      } else {
+        loadScene({});
+      }
     }
   }, [id]);
 
@@ -134,10 +145,36 @@ const EditorPage: React.FC = () => {
   };
 
   const handleSave = useCallback(async () => {
-    if (!id) return;
     setSaveStatus('saving');
     try {
-      await updateProject(id, { name: projectName, data: getSceneData() });
+      if (id) {
+        // Backend save (when connected to API)
+        await updateProject(id, { name: projectName, data: getSceneData() });
+      } else {
+        // Local save — download project file
+        const sceneData = getSceneData();
+        const projectData = {
+          version: '1.0',
+          projectName,
+          projectNumber: `MM-${Date.now().toString(36).toUpperCase()}`,
+          savedAt: new Date().toISOString(),
+          scene: sceneData,
+        };
+        const dataStr = JSON.stringify(projectData, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, '_');
+        link.download = `${projectData.projectNumber}_${safeName}.metamech.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        // Also save to localStorage for quick recovery
+        localStorage.setItem('metamech_autosave', dataStr);
+        localStorage.setItem('metamech_autosave_name', projectName);
+      }
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {

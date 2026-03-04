@@ -102,7 +102,7 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
 };
 
 const SimulationOverlay: React.FC = () => {
-  const { isPlaying, simulationSpeed, processNodes, edges } = useEditorStore();
+  const { isPlaying, isPaused, simulationSpeed, processNodes, edges } = useEditorStore();
   const initialized = useRef(false);
   const [, setTick] = useState(0);
 
@@ -111,21 +111,23 @@ const SimulationOverlay: React.FC = () => {
       simulationEngine.init(processNodes, edges);
       initialized.current = true;
     }
-    if (!isPlaying) {
+    // Only reset on true reset (not paused, not playing)
+    if (!isPlaying && !isPaused) {
       initialized.current = false;
       simulationEngine.reset();
       setTick(0);
     }
-  }, [isPlaying, processNodes, edges]);
+  }, [isPlaying, isPaused, processNodes, edges]);
 
   useFrame((_, delta) => {
-    if (!isPlaying) return;
+    if (!isPlaying) return; // Paused: skip tick but keep products
     simulationEngine.tick(Math.min(delta, 0.1), simulationSpeed);
     // Force re-render every ~100ms to pick up new/removed products
     setTick(t => t + 1);
   });
 
-  if (!isPlaying) return null;
+  // Show products when playing OR paused (not when fully reset)
+  if (!isPlaying && !isPaused) return null;
 
   const products = simulationEngine.getProducts();
   const nodeStatsMap = simulationEngine.getNodeStats();

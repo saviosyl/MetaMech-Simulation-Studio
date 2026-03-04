@@ -38,6 +38,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   
   const {
     isPlaying,
+    isPaused,
     simulationSpeed,
     play,
     pause,

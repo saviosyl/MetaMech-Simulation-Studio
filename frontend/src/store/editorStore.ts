@@ -359,6 +359,7 @@ interface EditorState {
   
   // Simulation state
   isPlaying: boolean;
+  isPaused: boolean;
   simulationSpeed: number;
   
   // UI state
@@ -493,6 +494,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   hiddenIds: new Set(),
   
   isPlaying: false,
+  isPaused: false,
   simulationSpeed: 1.0,
   
   activeLibraryTab: 'process',
@@ -763,15 +765,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSnapTarget: (target) => set({ snapTarget: target }),
   
   play: () => {
-    set({ isPlaying: true });
+    set({ isPlaying: true, isPaused: false });
   },
   
   pause: () => {
-    set({ isPlaying: false });
+    // Pause freezes simulation in place — products remain visible
+    set({ isPlaying: false, isPaused: true });
   },
   
   reset: () => {
-    set({ isPlaying: false });
+    // Reset stops and clears everything
+    set({ isPlaying: false, isPaused: false });
   },
   
   setSimulationSpeed: (speed) => {
@@ -861,10 +865,10 @@ function getDefaultParameters(type: string): Record<string, any> {
     'cardboard-box': {},
     
     // Robots
-    'cartesian-robot': { reachX: 2000, reachY: 1500, reachZ: 1000, baseHeight: 2500, cycleTime: 4, speedFactor: 1, toolType: 'vacuum', pedestalEnabled: false, pedestalHeight: 500 },
-    cobot: { reach: 850, payload: 10, baseHeight: 200, cycleTime: 3, speedFactor: 1, toolType: 'gripper', pedestalEnabled: true, pedestalHeight: 800 },
-    'robot-5axis': { reach: 1400, payload: 25, baseHeight: 400, cycleTime: 3, speedFactor: 1, toolType: 'gripper', pedestalEnabled: false, pedestalHeight: 0 },
-    'robot-6axis': { reach: 2000, payload: 60, baseHeight: 500, cycleTime: 4, speedFactor: 1, toolType: 'gripper', pedestalEnabled: true, pedestalHeight: 600 },
+    'cartesian-robot': { reachX: 2000, reachY: 1500, reachZ: 1000, baseHeight: 2500, cycleTime: 4, speedFactor: 1, toolType: 'vacuum', pedestalEnabled: false, pedestalHeight: 500, pickHeight: 800, placeHeight: 800 },
+    cobot: { reach: 850, payload: 10, baseHeight: 200, cycleTime: 3, speedFactor: 1, toolType: 'gripper', pedestalEnabled: true, pedestalHeight: 800, pickHeight: 800, placeHeight: 800 },
+    'robot-5axis': { reach: 1400, payload: 25, baseHeight: 400, cycleTime: 3, speedFactor: 1, toolType: 'gripper', pedestalEnabled: false, pedestalHeight: 0, pickHeight: 800, placeHeight: 800 },
+    'robot-6axis': { reach: 2000, payload: 60, baseHeight: 500, cycleTime: 4, speedFactor: 1, toolType: 'gripper', pedestalEnabled: true, pedestalHeight: 600, pickHeight: 800, placeHeight: 800 },
 
     // Pallets
     'eur-pallet': { length: 1200, width: 800, height: 144, deckStyle: 'standard', maxLayers: 5, rows: 4, columns: 3, productSpacing: 10, layerPattern: 'aligned' },

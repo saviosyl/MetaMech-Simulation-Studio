@@ -790,6 +790,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       toolType: { type: 'select', label: 'Tool Type', default: 'vacuum', options: ['vacuum', 'gripper', 'magnetic'] },
       pedestalEnabled: { type: 'boolean', label: 'Pedestal', default: false },
       pedestalHeight: { type: 'number', label: 'Pedestal Height (mm)', default: 500, min: 0, max: 2000, step: 100 },
+      pickHeight: { type: 'number', label: 'Pick Height (mm)', default: 800, min: 0, max: 3000, step: 50 },
+      placeHeight: { type: 'number', label: 'Place Height (mm)', default: 800, min: 0, max: 3000, step: 50 },
     },
   },
   {
@@ -807,6 +809,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       toolType: { type: 'select', label: 'Tool Type', default: 'gripper', options: ['vacuum', 'gripper', 'magnetic'] },
       pedestalEnabled: { type: 'boolean', label: 'Pedestal', default: true },
       pedestalHeight: { type: 'number', label: 'Pedestal Height (mm)', default: 800, min: 0, max: 2000, step: 100 },
+      pickHeight: { type: 'number', label: 'Pick Height (mm)', default: 800, min: 0, max: 3000, step: 50 },
+      placeHeight: { type: 'number', label: 'Place Height (mm)', default: 800, min: 0, max: 3000, step: 50 },
     },
   },
   {
@@ -824,6 +828,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       toolType: { type: 'select', label: 'Tool Type', default: 'gripper', options: ['vacuum', 'gripper', 'magnetic', 'weld'] },
       pedestalEnabled: { type: 'boolean', label: 'Pedestal', default: false },
       pedestalHeight: { type: 'number', label: 'Pedestal Height (mm)', default: 0, min: 0, max: 2000, step: 100 },
+      pickHeight: { type: 'number', label: 'Pick Height (mm)', default: 800, min: 0, max: 3000, step: 50 },
+      placeHeight: { type: 'number', label: 'Place Height (mm)', default: 800, min: 0, max: 3000, step: 50 },
     },
   },
   {
@@ -841,6 +847,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       toolType: { type: 'select', label: 'Tool Type', default: 'gripper', options: ['vacuum', 'gripper', 'magnetic', 'weld'] },
       pedestalEnabled: { type: 'boolean', label: 'Pedestal', default: true },
       pedestalHeight: { type: 'number', label: 'Pedestal Height (mm)', default: 600, min: 0, max: 3000, step: 100 },
+      pickHeight: { type: 'number', label: 'Pick Height (mm)', default: 800, min: 0, max: 3000, step: 50 },
+      placeHeight: { type: 'number', label: 'Place Height (mm)', default: 800, min: 0, max: 3000, step: 50 },
     },
   },
 

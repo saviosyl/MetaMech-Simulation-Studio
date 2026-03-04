@@ -570,8 +570,8 @@ export class SimulationEngine {
       cycleTime: node.parameters.cycleTime || 4,
       speedFactor: node.parameters.speedFactor || 1,
       approachHeight: 0.3,
-      pickHeight: bH + pedH,
-      placeHeight: bH + pedH,
+      pickHeight: (node.parameters.pickHeight || 800) / 1000,
+      placeHeight: (node.parameters.placeHeight || 800) / 1000,
       homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
     };
 
@@ -1060,6 +1060,14 @@ export class SimulationEngine {
 
   getProducts(): Product[] {
     return this.products;
+  }
+
+  getRobotStates(): Map<string, RobotState> {
+    return this.robotStates;
+  }
+
+  getPalletStates(): Map<string, PalletState> {
+    return this.palletStates;
   }
 
   getNodeStats(): Map<string, NodeStats> {

@@ -262,13 +262,13 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
       case 'machine':
         return <IndustrialMachineModel parameters={node.parameters} isSelected={isSelected} />;
       case 'cartesian-robot':
-        return <CartesianRobotModel parameters={node.parameters} isSelected={isSelected} />;
+        return <CartesianRobotModel parameters={node.parameters} isSelected={isSelected} nodeId={node.id} />;
       case 'cobot':
-        return <CobotModel parameters={node.parameters} isSelected={isSelected} />;
+        return <CobotModel parameters={node.parameters} isSelected={isSelected} nodeId={node.id} />;
       case 'robot-5axis':
-        return <Robot5AxisModel parameters={node.parameters} isSelected={isSelected} />;
+        return <Robot5AxisModel parameters={node.parameters} isSelected={isSelected} nodeId={node.id} />;
       case 'robot-6axis':
-        return <Robot6AxisModel parameters={node.parameters} isSelected={isSelected} />;
+        return <Robot6AxisModel parameters={node.parameters} isSelected={isSelected} nodeId={node.id} />;
       case 'eur-pallet':
       case 'standard-pallet':
       case 'custom-pallet':

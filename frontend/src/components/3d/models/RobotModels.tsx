@@ -17,6 +17,8 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { simulationEngine } from '../../../simulation/SimulationEngine';
+import { useEditorStore } from '../../../store/editorStore';
 
 // ─── Shared Industrial Materials ───────────────────────────────
 // Body paint: warm industrial orange (KUKA-style)
@@ -75,6 +77,22 @@ const matSafetyZone = new THREE.MeshBasicMaterial({
 interface RobotProps {
   parameters: Record<string, any>;
   isSelected: boolean;
+  nodeId?: string;
+}
+
+/** Get simulation-driven joint angles from robot phase/progress */
+function useSimulationPose(nodeId?: string) {
+  const isPlaying = useEditorStore(s => s.isPlaying);
+  const isPaused = useEditorStore(s => s.isPaused);
+  const simActive = isPlaying || isPaused;
+
+  if (!simActive || !nodeId) return null;
+
+  const robotStates = simulationEngine.getRobotStates();
+  const state = robotStates.get(nodeId);
+  if (!state) return null;
+
+  return state;
 }
 
 // ─── Shared Sub-Components ─────────────────────────────────────
@@ -248,7 +266,7 @@ function ArmLink({
 // 1. CARTESIAN (GANTRY) ROBOT
 // ═══════════════════════════════════════════════════════════════
 
-export const CartesianRobotModel: React.FC<RobotProps> = ({ parameters, isSelected }) => {
+export const CartesianRobotModel: React.FC<RobotProps> = ({ parameters, isSelected, nodeId }) => {
   const carriageRef = useRef<THREE.Group>(null);
 
   const rX = (parameters.reachX || 2000) / 1000;
@@ -258,15 +276,35 @@ export const CartesianRobotModel: React.FC<RobotProps> = ({ parameters, isSelect
   const pedH = parameters.pedestalEnabled ? (parameters.pedestalHeight || 0) / 1000 : 0;
   const em = isSelected ? new THREE.Color('#222') : new THREE.Color('#000');
 
-  const colW = 0.12;   // Column section width
-  const beamH = 0.14;  // Beam section height
-  const beamD = 0.10;  // Beam section depth
+  const colW = 0.12;
+  const beamH = 0.14;
+  const beamD = 0.10;
   const carriageW = 0.18;
+
+  const simState = useSimulationPose(nodeId);
 
   useFrame(({ clock }) => {
     if (carriageRef.current) {
-      const t = (Math.sin(clock.getElapsedTime() * 0.6) + 1) / 2;
-      carriageRef.current.position.x = -rX / 2 + t * rX * 0.85;
+      if (simState) {
+        const p = simState.phaseProgress;
+        const ease = p * p * (3 - 2 * p);
+        let targetX = 0;
+        switch (simState.phase) {
+          case 'idle': targetX = 0; break;
+          case 'approach-pick': case 'pick': case 'retract-pick':
+            targetX = -rX * 0.35; break;
+          case 'move-to-place':
+            targetX = -rX * 0.35 + rX * 0.7 * ease; break;
+          case 'approach-place': case 'place': case 'retract-place':
+            targetX = rX * 0.35; break;
+          case 'return':
+            targetX = rX * 0.35 * (1 - ease); break;
+        }
+        carriageRef.current.position.x += (targetX - carriageRef.current.position.x) * 0.12;
+      } else {
+        const t = (Math.sin(clock.getElapsedTime() * 0.6) + 1) / 2;
+        carriageRef.current.position.x = -rX / 2 + t * rX * 0.85;
+      }
     }
   });
 
@@ -445,7 +483,7 @@ export const CartesianRobotModel: React.FC<RobotProps> = ({ parameters, isSelect
 // 2. COLLABORATIVE ROBOT (COBOT)
 // ═══════════════════════════════════════════════════════════════
 
-export const CobotModel: React.FC<RobotProps> = ({ parameters, isSelected }) => {
+export const CobotModel: React.FC<RobotProps> = ({ parameters, isSelected, nodeId }) => {
   const j1Ref = useRef<THREE.Group>(null);
   const j2Ref = useRef<THREE.Group>(null);
 
@@ -456,15 +494,34 @@ export const CobotModel: React.FC<RobotProps> = ({ parameters, isSelected }) => 
 
   const seg1 = reach * 0.46;
   const seg2 = reach * 0.42;
-  const linkW = 0.075;   // Link body width
-  const linkD = 0.065;   // Link body depth
-  const jointR = 0.048;  // Joint housing radius
+  const linkW = 0.075;
+  const linkD = 0.065;
+  const jointR = 0.048;
+
+  const simState = useSimulationPose(nodeId);
 
   useFrame(({ clock }) => {
-    if (j1Ref.current && j2Ref.current) {
+    if (simState) {
+      const p = simState.phaseProgress;
+      const ease = p * p * (3 - 2 * p);
+      let j1z = 0, j2z = -0.25;
+      switch (simState.phase) {
+        case 'idle': j1z = 0; j2z = -0.25; break;
+        case 'approach-pick': j1z = 0.3 * ease; j2z = -0.25 - 0.4 * ease; break;
+        case 'pick': j1z = 0.3; j2z = -0.65; break;
+        case 'retract-pick': j1z = 0.3 - 0.15 * ease; j2z = -0.65 + 0.2 * ease; break;
+        case 'move-to-place': j1z = 0.15 - 0.45 * ease; j2z = -0.45; break;
+        case 'approach-place': j1z = -0.3; j2z = -0.45 - 0.2 * ease; break;
+        case 'place': j1z = -0.3; j2z = -0.65; break;
+        case 'retract-place': j1z = -0.3; j2z = -0.65 + 0.2 * ease; break;
+        case 'return': j1z = -0.3 * (1 - ease); j2z = -0.45 * (1 - ease) - 0.25 * ease; break;
+      }
+      if (j1Ref.current) j1Ref.current.rotation.z += (j1z - j1Ref.current.rotation.z) * 0.12;
+      if (j2Ref.current) j2Ref.current.rotation.z += (j2z - j2Ref.current.rotation.z) * 0.12;
+    } else {
       const t = clock.getElapsedTime() * 0.4;
-      j1Ref.current.rotation.z = Math.sin(t) * 0.35;
-      j2Ref.current.rotation.z = Math.sin(t * 1.2 + 1) * 0.5 - 0.25;
+      if (j1Ref.current) j1Ref.current.rotation.z = Math.sin(t) * 0.35;
+      if (j2Ref.current) j2Ref.current.rotation.z = Math.sin(t * 1.2 + 1) * 0.5 - 0.25;
     }
   });
 
@@ -582,7 +639,7 @@ export const CobotModel: React.FC<RobotProps> = ({ parameters, isSelected }) => 
 // 3. 5-AXIS INDUSTRIAL ROBOT
 // ═══════════════════════════════════════════════════════════════
 
-export const Robot5AxisModel: React.FC<RobotProps> = ({ parameters, isSelected }) => {
+export const Robot5AxisModel: React.FC<RobotProps> = ({ parameters, isSelected, nodeId }) => {
   const turretRef = useRef<THREE.Group>(null);
   const armRef = useRef<THREE.Group>(null);
 
@@ -597,9 +654,30 @@ export const Robot5AxisModel: React.FC<RobotProps> = ({ parameters, isSelected }
   const armW = 0.11;
   const armD = 0.10;
 
+  const simState = useSimulationPose(nodeId);
+
   useFrame(({ clock }) => {
-    if (turretRef.current) turretRef.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.35) * 0.7;
-    if (armRef.current) armRef.current.rotation.z = Math.sin(clock.getElapsedTime() * 0.5 + 0.5) * 0.4 - 0.15;
+    if (simState) {
+      const p = simState.phaseProgress;
+      const ease = p * p * (3 - 2 * p);
+      let tY = 0, aZ = -0.15;
+      switch (simState.phase) {
+        case 'idle': tY = 0; aZ = -0.15; break;
+        case 'approach-pick': tY = -0.5 * ease; aZ = -0.15 - 0.4 * ease; break;
+        case 'pick': tY = -0.5; aZ = -0.55; break;
+        case 'retract-pick': tY = -0.5; aZ = -0.55 + 0.2 * ease; break;
+        case 'move-to-place': tY = -0.5 + 1.0 * ease; aZ = -0.35; break;
+        case 'approach-place': tY = 0.5; aZ = -0.35 - 0.2 * ease; break;
+        case 'place': tY = 0.5; aZ = -0.55; break;
+        case 'retract-place': tY = 0.5; aZ = -0.55 + 0.2 * ease; break;
+        case 'return': tY = 0.5 * (1 - ease); aZ = -0.35 * (1 - ease) - 0.15 * ease; break;
+      }
+      if (turretRef.current) turretRef.current.rotation.y += (tY - turretRef.current.rotation.y) * 0.12;
+      if (armRef.current) armRef.current.rotation.z += (aZ - armRef.current.rotation.z) * 0.12;
+    } else {
+      if (turretRef.current) turretRef.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.35) * 0.7;
+      if (armRef.current) armRef.current.rotation.z = Math.sin(clock.getElapsedTime() * 0.5 + 0.5) * 0.4 - 0.15;
+    }
   });
 
   return (
@@ -707,7 +785,7 @@ export const Robot5AxisModel: React.FC<RobotProps> = ({ parameters, isSelected }
 // 4. 6-AXIS INDUSTRIAL ROBOT (HERO MODEL)
 // ═══════════════════════════════════════════════════════════════
 
-export const Robot6AxisModel: React.FC<RobotProps> = ({ parameters, isSelected }) => {
+export const Robot6AxisModel: React.FC<RobotProps> = ({ parameters, isSelected, nodeId }) => {
   const j1Ref = useRef<THREE.Group>(null);
   const j2Ref = useRef<THREE.Group>(null);
   const j3Ref = useRef<THREE.Group>(null);
@@ -726,11 +804,45 @@ export const Robot6AxisModel: React.FC<RobotProps> = ({ parameters, isSelected }
   const forearmW = 0.095;
   const forearmD = 0.09;
 
+  const simState = useSimulationPose(nodeId);
+
   useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if (j1Ref.current) j1Ref.current.rotation.y = Math.sin(t * 0.3) * 0.85;
-    if (j2Ref.current) j2Ref.current.rotation.z = Math.sin(t * 0.45 + 0.3) * 0.4 + 0.15;
-    if (j3Ref.current) j3Ref.current.rotation.z = Math.sin(t * 0.6 + 1.0) * 0.35 - 0.25;
+    if (simState) {
+      // Simulation-driven animation
+      const p = simState.phaseProgress;
+      const ease = p * p * (3 - 2 * p); // smoothstep
+
+      let j1y = 0, j2z = 0.15, j3z = -0.25;
+      switch (simState.phase) {
+        case 'idle':
+          j1y = 0; j2z = 0.15; j3z = -0.25; break;
+        case 'approach-pick':
+          j1y = -0.6 * ease; j2z = 0.15 + 0.35 * ease; j3z = -0.25 - 0.3 * ease; break;
+        case 'pick':
+          j1y = -0.6; j2z = 0.5; j3z = -0.55; break;
+        case 'retract-pick':
+          j1y = -0.6; j2z = 0.5 - 0.2 * ease; j3z = -0.55 + 0.15 * ease; break;
+        case 'move-to-place':
+          j1y = -0.6 + 1.2 * ease; j2z = 0.3; j3z = -0.4; break;
+        case 'approach-place':
+          j1y = 0.6; j2z = 0.3 + 0.2 * ease; j3z = -0.4 - 0.15 * ease; break;
+        case 'place':
+          j1y = 0.6; j2z = 0.5; j3z = -0.55; break;
+        case 'retract-place':
+          j1y = 0.6; j2z = 0.5 - 0.2 * ease; j3z = -0.55 + 0.15 * ease; break;
+        case 'return':
+          j1y = 0.6 * (1 - ease); j2z = 0.3 * (1 - ease) + 0.15; j3z = -0.4 * (1 - ease) - 0.25 * ease; break;
+      }
+      if (j1Ref.current) j1Ref.current.rotation.y += (j1y - j1Ref.current.rotation.y) * 0.12;
+      if (j2Ref.current) j2Ref.current.rotation.z += (j2z - j2Ref.current.rotation.z) * 0.12;
+      if (j3Ref.current) j3Ref.current.rotation.z += (j3z - j3Ref.current.rotation.z) * 0.12;
+    } else {
+      // Demo idle animation
+      const t = clock.getElapsedTime();
+      if (j1Ref.current) j1Ref.current.rotation.y = Math.sin(t * 0.3) * 0.85;
+      if (j2Ref.current) j2Ref.current.rotation.z = Math.sin(t * 0.45 + 0.3) * 0.4 + 0.15;
+      if (j3Ref.current) j3Ref.current.rotation.z = Math.sin(t * 0.6 + 1.0) * 0.35 - 0.25;
+    }
   });
 
   return (

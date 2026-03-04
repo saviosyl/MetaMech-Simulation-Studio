@@ -40,11 +40,11 @@ function App() {
             }
           />
           
-          {/* Redirect root to demo for now (switch to /dashboard when backend is deployed) */}
-          <Route path="/" element={<Navigate to="/demo" replace />} />
+          {/* Redirect root to login */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
           
           {/* Catch all */}
-          <Route path="*" element={<Navigate to="/demo" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Router>
     </AuthProvider>
