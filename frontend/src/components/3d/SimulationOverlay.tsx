@@ -12,7 +12,7 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
   const [pL, pW, pH] = product.size;
   const halfH = pH / 2;
 
-  // Update position every frame via ref (no re-render needed)
+  // Update position and rotation every frame via ref (no re-render needed)
   useFrame(() => {
     if (groupRef.current) {
       groupRef.current.position.set(
@@ -20,6 +20,15 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
         product.currentPosition[1] + halfH,
         product.currentPosition[2]
       );
+      // Smooth rotation: follow path tangent (Y-axis rotation)
+      const targetRot = product.currentRotationY ?? 0;
+      const currentRot = groupRef.current.rotation.y;
+      // Lerp rotation for smooth transitions (avoid snapping)
+      let delta = targetRot - currentRot;
+      // Normalize to [-PI, PI]
+      while (delta > Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      groupRef.current.rotation.y = currentRot + delta * 0.15;
     }
   });
 

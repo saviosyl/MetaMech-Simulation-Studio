@@ -4,6 +4,7 @@ export interface Product {
   color: string;
   size: [number, number, number]; // [length, width, height] in meters
   currentPosition: [number, number, number];
+  currentRotationY: number;       // Y-axis rotation in radians (follows path tangent)
   targetPosition: [number, number, number];
   progress: number;   // 0-1 along current edge or conveyor
   currentNodeId: string;

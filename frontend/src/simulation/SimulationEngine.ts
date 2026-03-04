@@ -160,18 +160,34 @@ export class SimulationEngine {
 
   // ─── Conveyor: products ride the belt via transport path ──────
   private tickConveyor(node: ProcessNode, stats: NodeStats, dt: number) {
-    // Accept arriving products
+    // Accept arriving products — stagger entry times so they don't overlap
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
-    for (const product of arrived) {
-      product.state = 'queued';
-      product.conveyorEntryTime = this.simTime;
-      stats.queue.push(product.id);
-    }
-
-    // Create transport path for this conveyor
     const path = createTransportPath(node.type, node.parameters);
     const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
-    const travelTime = path ? path.length / speedMps : ((node.parameters.length || 3000) / 1000) / speedMps;
+    const pathLen = path ? path.length : ((node.parameters.length || 3000) / 1000);
+    const travelTime = pathLen / speedMps;
+
+    // Minimum spacing: product length + gap (in time units along path)
+    const productSpacingM = 0.35; // ~350mm minimum gap between products
+    const spacingTime = productSpacingM / speedMps;
+
+    for (const product of arrived) {
+      // Stagger: if there are products already on this belt, ensure min spacing
+      let entryTime = this.simTime;
+      if (stats.queue.length > 0) {
+        const lastPid = stats.queue[stats.queue.length - 1];
+        const lastProduct = this.products.find(p => p.id === lastPid);
+        if (lastProduct && lastProduct.conveyorEntryTime !== null) {
+          const earliestEntry = lastProduct.conveyorEntryTime + spacingTime;
+          if (entryTime < earliestEntry) {
+            entryTime = earliestEntry;
+          }
+        }
+      }
+      product.state = 'queued';
+      product.conveyorEntryTime = entryTime;
+      stats.queue.push(product.id);
+    }
 
     const toRelease: string[] = [];
     for (const pid of stats.queue) {
@@ -179,11 +195,17 @@ export class SimulationEngine {
       if (!product || !product.conveyorEntryTime) continue;
 
       const timeOnBelt = this.simTime - product.conveyorEntryTime;
+      if (timeOnBelt < 0) continue; // not yet entered (stagger delay)
+
       const t = Math.min(1, timeOnBelt / travelTime);
 
       // Use transport path for accurate positioning (handles inclines, curves, spirals)
       if (path) {
         product.currentPosition = path.getWorldPosition(t, node.position, node.rotation, node.scale);
+
+        // Compute rotation from path tangent — key for bend/spiral conveyors
+        const tangent = path.getWorldTangent(t, node.rotation);
+        product.currentRotationY = Math.atan2(tangent[0], tangent[2]);
       } else {
         // Fallback for unknown conveyor types: use port interpolation
         const ports = getConnectionPorts(node.type, node.parameters);
@@ -197,6 +219,10 @@ export class SimulationEngine {
             inWorld[1] + (outWorld[1] - inWorld[1]) * t,
             inWorld[2] + (outWorld[2] - inWorld[2]) * t,
           ];
+          // Compute rotation from port-to-port direction
+          const dx = outWorld[0] - inWorld[0];
+          const dz = outWorld[2] - inWorld[2];
+          product.currentRotationY = Math.atan2(dx, dz);
         }
       }
 
@@ -391,6 +417,11 @@ export class SimulationEngine {
         product.progress = 1;
       } else {
         product.progress += (speedMps * dt) / dist;
+      }
+
+      // Compute rotation from edge direction
+      if (dist > 0.01) {
+        product.currentRotationY = Math.atan2(dx, dz);
       }
 
       if (product.progress >= 1) {
@@ -740,6 +771,7 @@ export class SimulationEngine {
       color,
       size: [pL, pW, pH],
       currentPosition: [...node.position] as [number, number, number],
+      currentRotationY: 0,
       targetPosition: [0, 0, 0],
       progress: 0,
       currentNodeId: node.id,
