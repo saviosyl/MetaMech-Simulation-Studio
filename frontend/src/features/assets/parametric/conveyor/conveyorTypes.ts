@@ -21,6 +21,7 @@ export interface ConveyorParams {
   direction: 'forward' | 'reverse';
   motorSide: 'left' | 'right';
   showSupports: boolean;
+  supportType: 'floor' | 'overhang' | 'cantilever';
   // Cleated belt specific
   cleatHeightMm: number;
   cleatSpacingMm: number;
@@ -67,6 +68,7 @@ export const CONVEYOR_DEFAULTS: ConveyorParams = {
   direction: 'forward',
   motorSide: 'right',
   showSupports: true,
+  supportType: 'floor',
   cleatHeightMm: 25,
   cleatSpacingMm: 150,
   cleatStyle: 'straight',

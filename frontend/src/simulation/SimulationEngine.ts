@@ -11,6 +11,8 @@ import { Product, NodeStats, FlowState, FlowEvent } from './Product';
 import { ProcessNode, ProcessEdge, getConnectionPorts } from '../store/editorStore';
 import { getPortWorldPosition } from '../lib/nodeTransform';
 import { createTransportPath } from '../lib/transportPath';
+import { createRobotState, tickRobot, RobotState, RobotConfig } from './RobotMotionController';
+import { createPalletState, getNextSlotPosition, fillSlot, paramsToPalletDef, PalletState } from './PalletizingController';
 
 const COLOR_MAP: Record<string, string> = {
   brown: '#8B4513',
@@ -28,6 +30,8 @@ const MAX_FLOW_EVENTS = 200; // cap event log size
 export class SimulationEngine {
   products: Product[] = [];
   nodeStats: Map<string, NodeStats> = new Map();
+  robotStates: Map<string, RobotState> = new Map();
+  palletStates: Map<string, PalletState> = new Map();
   simTime: number = 0;
   nodes: ProcessNode[] = [];
   edges: ProcessEdge[] = [];
@@ -65,12 +69,50 @@ export class SimulationEngine {
         totalItemsBlocked: 0,
         events: [],
       });
+
+      // Init robot states
+      const ROBOT_TYPES = ['cartesian-robot', 'cobot', 'robot-5axis', 'robot-6axis'];
+      if (ROBOT_TYPES.includes(node.type)) {
+        const pedH = node.parameters.pedestalEnabled ? (node.parameters.pedestalHeight || 0) / 1000 : 0;
+        const bH = (node.parameters.baseHeight || 500) / 1000;
+        const homeY = pedH + bH + 0.5;
+        const config: RobotConfig = {
+          cycleTime: node.parameters.cycleTime || 4,
+          speedFactor: node.parameters.speedFactor || 1,
+          approachHeight: 0.3,
+          pickHeight: bH + pedH,
+          placeHeight: bH + pedH,
+          homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
+        };
+        const rState = createRobotState(config);
+        // Find pick source (input edge) and place target (output edge)
+        const inEdges = edges.filter(e => e.to === node.id);
+        const outEdges = edges.filter(e => e.from === node.id);
+        if (inEdges.length > 0) {
+          const srcNode = nodes.find(n => n.id === inEdges[0].from);
+          if (srcNode) rState.pickPosition = [...srcNode.position] as [number, number, number];
+        }
+        if (outEdges.length > 0) {
+          const tgtNode = nodes.find(n => n.id === outEdges[0].to);
+          if (tgtNode) rState.placePosition = [...tgtNode.position] as [number, number, number];
+        }
+        this.robotStates.set(node.id, rState);
+      }
+
+      // Init pallet states
+      const PALLET_TYPES = ['eur-pallet', 'standard-pallet', 'custom-pallet'];
+      if (PALLET_TYPES.includes(node.type)) {
+        const def = paramsToPalletDef(node.parameters);
+        this.palletStates.set(node.id, createPalletState(def));
+      }
     }
   }
 
   reset() {
     this.products = [];
     this.simTime = 0;
+    this.robotStates.clear();
+    this.palletStates.clear();
     this.nodeStats.forEach(s => {
       s.throughput = 0;
       s.utilization = 0;
@@ -120,6 +162,13 @@ export class SimulationEngine {
         case 'sink': this.tickSink(node, stats); break;
         case 'router': this.tickRouter(node, stats); break;
         case 'pick-and-place': this.tickMachine(node, stats, elapsed); break;
+        case 'cartesian-robot':
+        case 'cobot':
+        case 'robot-5axis':
+        case 'robot-6axis': this.tickRobotNode(node, stats, elapsed); break;
+        case 'eur-pallet':
+        case 'standard-pallet':
+        case 'custom-pallet': /* pallets are passive — tracked via palletStates */ break;
         case 'palletizer': this.tickPalletizer(node, stats, elapsed); break;
         case 'stopper': this.tickStopper(node, stats, elapsed); break;
         case 'sensor': this.tickSensor(node, stats, elapsed); break;
@@ -505,6 +554,99 @@ export class SimulationEngine {
     } else {
       this.setFlowState(stats, 'idle', dt);
     }
+  }
+
+  // ─── Robot: pick-and-place cycle ───────────────────────────────
+  private tickRobotNode(node: ProcessNode, stats: NodeStats, dt: number) {
+    const rState = this.robotStates.get(node.id);
+    if (!rState) return;
+
+    const pedH = node.parameters.pedestalEnabled ? (node.parameters.pedestalHeight || 0) / 1000 : 0;
+    const bH = (node.parameters.baseHeight || 500) / 1000;
+    const homeY = pedH + bH + 0.5;
+
+    const config: RobotConfig = {
+      cycleTime: node.parameters.cycleTime || 4,
+      speedFactor: node.parameters.speedFactor || 1,
+      approachHeight: 0.3,
+      pickHeight: bH + pedH,
+      placeHeight: bH + pedH,
+      homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
+    };
+
+    // Find available product at pick source
+    const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
+    for (const product of arrived) {
+      if (!stats.queue.includes(product.id)) {
+        product.state = 'queued';
+        stats.queue.push(product.id);
+      }
+    }
+
+    let availableProductId: string | null = null;
+    if (stats.queue.length > 0 && rState.phase === 'idle') {
+      availableProductId = stats.queue[0];
+    }
+
+    // Tick the motion controller
+    const placedId = tickRobot(rState, config, this.simTime, availableProductId);
+
+    // If robot just picked a product, remove from queue
+    if (rState.phase === 'retract-pick' && rState.phaseProgress < 0.1 && rState.heldProductId) {
+      stats.queue = stats.queue.filter(id => id !== rState.heldProductId);
+      const held = this.products.find(p => p.id === rState.heldProductId);
+      if (held) held.state = 'processing';
+    }
+
+    // Move held product to TCP position
+    if (rState.heldProductId) {
+      const held = this.products.find(p => p.id === rState.heldProductId);
+      if (held) {
+        held.currentPosition = [...rState.toolCenterPoint];
+      }
+    }
+
+    // If robot just placed a product
+    if (placedId) {
+      const placed = this.products.find(p => p.id === placedId);
+      if (placed) {
+        // Check if place target is a pallet
+        const outEdges = this.getOutEdges(node.id);
+        let placedOnPallet = false;
+        for (const edge of outEdges) {
+          const palletState = this.palletStates.get(edge.to);
+          const palletNode = this.nodes.find(n => n.id === edge.to);
+          if (palletState && palletNode && !palletState.complete) {
+            const slot = getNextSlotPosition(palletState, [
+              (placed.size[0] * 1000), (placed.size[1] * 1000), (placed.size[2] * 1000),
+            ]);
+            if (slot) {
+              placed.currentPosition = [
+                palletNode.position[0] + slot.x,
+                palletNode.position[1] + slot.y,
+                palletNode.position[2] + slot.z,
+              ];
+              placed.currentRotationY = slot.rotationY;
+              placed.state = 'completed';
+              fillSlot(palletState, placedId);
+              placedOnPallet = true;
+            }
+            break;
+          }
+        }
+        if (!placedOnPallet) {
+          // Send to next node via edge
+          if (outEdges.length > 0) {
+            this.sendProductAlongEdge(placed, outEdges[0]);
+          } else {
+            placed.state = 'completed';
+          }
+        }
+        stats.throughput++;
+      }
+    }
+
+    if (rState.phase !== 'idle') stats.busyTime += dt;
   }
 
   // ─── Stopper: blocks product flow ─────────────────────────────

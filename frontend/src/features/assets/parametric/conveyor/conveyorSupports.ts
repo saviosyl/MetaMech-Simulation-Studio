@@ -109,17 +109,100 @@ export function buildSupportAssembly(params: ConveyorParams): THREE.Group | null
 
   const widthM = params.widthMm / 1000;
   const heightM = params.heightMm / 1000;
+  const lengthM = params.lengthMm / 1000;
   const positions = computeSupportPositions(params.lengthMm, params.supportSpacingMm);
+  const supportType = params.supportType || 'floor';
 
-  for (const xPos of positions) {
-    const station = buildSupportStation(
-      widthM + 0.02, // slightly wider than belt
-      heightM,
-      params.adjustableFeetEnabled ? params.footAdjustmentMm : 0,
-      params.adjustableFeetEnabled,
-    );
-    station.position.x = xPos;
-    group.add(station);
+  if (supportType === 'overhang') {
+    // Overhang: single overhead beam with hanging brackets
+    const beamY = heightM + 0.6; // 600mm above belt
+    const beamGeo = new THREE.BoxGeometry(lengthM + 0.1, 0.08, 0.08);
+    const beam = new THREE.Mesh(beamGeo, matAluminum);
+    beam.position.set(0, beamY, 0);
+    beam.castShadow = true;
+    group.add(beam);
+
+    // Hanging rods from beam to frame at each support position
+    for (const xPos of positions) {
+      for (const side of [-1, 1]) {
+        const rodH = beamY - heightM + 0.02;
+        const rod = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.008, rodH, 8),
+          matDarkSteel,
+        );
+        rod.position.set(xPos, heightM + rodH / 2, side * (widthM / 2 + 0.03));
+        rod.castShadow = true;
+        group.add(rod);
+
+        // Mounting bracket at frame
+        const bracket = new THREE.Mesh(
+          new THREE.BoxGeometry(0.05, 0.02, 0.05),
+          matDarkSteel,
+        );
+        bracket.position.set(xPos, heightM, side * (widthM / 2 + 0.03));
+        group.add(bracket);
+      }
+    }
+
+    // Two ceiling mount posts at ends
+    const postHeight = 1.0; // 1m above beam
+    for (const xEnd of [positions[0], positions[positions.length - 1]]) {
+      const post = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, postHeight, 0.06),
+        matAluminum,
+      );
+      post.position.set(xEnd, beamY + postHeight / 2, 0);
+      post.castShadow = true;
+      group.add(post);
+    }
+
+  } else if (supportType === 'cantilever') {
+    // Cantilever: wall-mount brackets from one side
+    for (const xPos of positions) {
+      const armLen = widthM + 0.15;
+      const armY = heightM - 0.04;
+
+      // Cantilever arm
+      const arm = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.06, armLen),
+        matAluminum,
+      );
+      arm.position.set(xPos, armY, -armLen / 2 + widthM / 2 + 0.05);
+      arm.castShadow = true;
+      group.add(arm);
+
+      // Wall plate
+      const wallPlate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.2, 0.01),
+        matDarkSteel,
+      );
+      wallPlate.position.set(xPos, armY, -armLen + widthM / 2 + 0.05);
+      group.add(wallPlate);
+
+      // Diagonal brace
+      const braceLen = Math.sqrt(armLen * armLen + 0.3 * 0.3) * 0.6;
+      const braceAngle = Math.atan2(0.3, armLen * 0.6);
+      const brace = new THREE.Mesh(
+        new THREE.BoxGeometry(0.025, 0.025, braceLen),
+        matAluminum,
+      );
+      brace.position.set(xPos, armY - 0.15, -armLen * 0.3 + widthM / 2 + 0.05);
+      brace.rotation.x = braceAngle;
+      group.add(brace);
+    }
+
+  } else {
+    // Standard floor support
+    for (const xPos of positions) {
+      const station = buildSupportStation(
+        widthM + 0.02,
+        heightM,
+        params.adjustableFeetEnabled ? params.footAdjustmentMm : 0,
+        params.adjustableFeetEnabled,
+      );
+      station.position.x = xPos;
+      group.add(station);
+    }
   }
 
   return group;

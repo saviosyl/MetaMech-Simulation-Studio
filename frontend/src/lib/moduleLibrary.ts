@@ -141,6 +141,7 @@ export const moduleLibrary: ModuleDefinition[] = [
       guideHeight: { type: 'number', label: 'Guide Height (mm)', default: 60, min: 20, max: 200, step: 10 },
       supportSpacing: { type: 'number', label: 'Support Spacing (mm)', default: 1500, min: 500, max: 4000, step: 100 },
       showLegs: { type: 'boolean', label: 'Show Supports', default: true },
+      supportType: { type: 'select', label: 'Support Type', default: 'floor', options: ['floor', 'overhang', 'cantilever'] },
       adjustableFeetEnabled: { type: 'boolean', label: 'Adjustable Feet', default: true },
       accumulationMode: { type: 'boolean', label: 'Accumulation Mode', default: false },
       accumulationZones: { type: 'number', label: 'Accumulation Zones', default: 6, min: 2, max: 20, step: 1 },
