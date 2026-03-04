@@ -7,30 +7,24 @@
 import * as THREE from 'three';
 import { SpiralConveyorParams } from './spiralTypes';
 
-// ── Shared materials ──
+// Premium shared materials
+import {
+  matBelt,
+  matDarkSteel,
+  matGuideRail,
+  matGalvanized as matBracket,
+  matAluminum as matColumn,
+  matCastIron as matBase,
+  matDarkSteel as matBaseTop,
+  matStainlessSteel as matFrameCore,
+} from '../premiumMaterials';
+
+// Spiral-specific materials (belt surface needs double-side for proper visual)
 const matSlat = new THREE.MeshStandardMaterial({
-  color: 0x3a3a3a, metalness: 0.3, roughness: 0.7, side: THREE.DoubleSide,
+  color: 0x2a2a2a, metalness: 0.15, roughness: 0.70, side: THREE.DoubleSide,
 });
 const matSlatEdge = new THREE.MeshStandardMaterial({
-  color: 0x4a6080, metalness: 0.5, roughness: 0.4,
-});
-const matGuideRail = new THREE.MeshStandardMaterial({
-  color: 0xb8b8b8, metalness: 0.7, roughness: 0.25,
-});
-const matBracket = new THREE.MeshStandardMaterial({
-  color: 0x888888, metalness: 0.6, roughness: 0.3,
-});
-const matColumn = new THREE.MeshStandardMaterial({
-  color: 0x707070, metalness: 0.75, roughness: 0.2,
-});
-const matBase = new THREE.MeshStandardMaterial({
-  color: 0x505050, metalness: 0.7, roughness: 0.3,
-});
-const matBaseTop = new THREE.MeshStandardMaterial({
-  color: 0x606060, metalness: 0.65, roughness: 0.35,
-});
-const matFrameCore = new THREE.MeshStandardMaterial({
-  color: 0x5a5a5a, metalness: 0.7, roughness: 0.3,
+  color: 0x3a6080, metalness: 0.40, roughness: 0.45,
 });
 
 // ── Constants ──
