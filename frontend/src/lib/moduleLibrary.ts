@@ -210,6 +210,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       width: { type: 'number', label: 'Belt Width (mm)', default: 400, min: 200, max: 1200, step: 50 },
       bladeHeight: { type: 'number', label: 'Blade Height (mm)', default: 80, min: 30, max: 200, step: 10 },
       mountHeight: { type: 'number', label: 'Mount Height (mm)', default: 800, min: 300, max: 3000, step: 50 },
+      mountPosition: { type: 'number', label: 'Position Along Path', default: 0.5, min: 0, max: 1, step: 0.05 },
+      mountSide: { type: 'select', label: 'Mount Side', default: 'center', options: ['left', 'right', 'center'] },
     },
   },
   {
@@ -227,6 +229,7 @@ export const moduleLibrary: ModuleDefinition[] = [
       plateHeight: { type: 'number', label: 'Plate Height (mm)', default: 100, min: 50, max: 200, step: 10 },
       mountHeight: { type: 'number', label: 'Mount Height (mm)', default: 800, min: 300, max: 3000, step: 50 },
       extended: { type: 'boolean', label: 'Extended', default: false },
+      mountPosition: { type: 'number', label: 'Position Along Path', default: 0.5, min: 0, max: 1, step: 0.05 },
     },
   },
   {
@@ -243,6 +246,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       sensorHeight: { type: 'number', label: 'Height Above Belt (mm)', default: 80, min: 20, max: 300, step: 10 },
       beltWidth: { type: 'number', label: 'Belt Width (mm)', default: 600, min: 200, max: 1200, step: 50 },
       showBeam: { type: 'boolean', label: 'Show Beam', default: true },
+      mountPosition: { type: 'number', label: 'Position Along Path', default: 0.5, min: 0, max: 1, step: 0.05 },
+      mountSide: { type: 'select', label: 'Mount Side', default: 'center', options: ['left', 'right', 'center'] },
     },
   },
   {
