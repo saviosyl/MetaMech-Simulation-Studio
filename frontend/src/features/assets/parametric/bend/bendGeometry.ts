@@ -99,6 +99,43 @@ function buildCurvedFrame(params: BendConveyorParams): THREE.Group {
     frame.add(cross);
   }
 
+  // Bed plate (curved slider bed underneath the belt)
+  const bedSegs = Math.max(8, Math.ceil(angleDeg / 5));
+  const bedSegAngle = angleDeg / bedSegs;
+  for (let i = 0; i < bedSegs; i++) {
+    const a0 = i * bedSegAngle;
+    const a1 = (i + 1) * bedSegAngle;
+    const aMid = (a0 + a1) / 2;
+    const [x0, z0] = arcXZ(a0, radiusM, params.bendDirection);
+    const [x1, z1] = arcXZ(a1, radiusM, params.bendDirection);
+    const [xm, zm] = arcXZ(aMid, radiusM, params.bendDirection);
+    const segLen = Math.sqrt((x1 - x0) ** 2 + (z1 - z0) ** 2);
+    const angle = Math.atan2(x1 - x0, z1 - z0);
+    const bed = new THREE.Mesh(
+      new THREE.BoxGeometry(halfW * 2 - 0.01, 0.003, segLen),
+      matDarkSteel,
+    );
+    bed.position.set(xm, heightM - 0.002, zm);
+    bed.rotation.y = -angle;
+    frame.add(bed);
+  }
+
+  // End plates (infeed and outfeed)
+  for (const endAngle of [0, angleDeg]) {
+    const [xi, zi] = arcXZ(endAngle, radiusM - halfW - railD, params.bendDirection);
+    const [xo, zo] = arcXZ(endAngle, radiusM + halfW + railD, params.bendDirection);
+    const plateLen = Math.sqrt((xo - xi) ** 2 + (zo - zi) ** 2);
+    const plateAngle = Math.atan2(xo - xi, zo - zi);
+    const plate = new THREE.Mesh(
+      new THREE.BoxGeometry(0.008, railH + 0.01, plateLen),
+      matDarkSteel,
+    );
+    plate.position.set((xi + xo) / 2, heightM - railH / 2, (zi + zo) / 2);
+    plate.rotation.y = -plateAngle;
+    plate.castShadow = true;
+    frame.add(plate);
+  }
+
   return frame;
 }
 
