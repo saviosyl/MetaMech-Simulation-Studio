@@ -210,54 +210,87 @@ export class SimulationEngine {
 
   // ─── Conveyor: products ride the belt via transport path ──────
   private tickConveyor(node: ProcessNode, stats: NodeStats, dt: number) {
-    // Accept arriving products — stagger entry times so they don't overlap
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     const path = createTransportPath(node.type, node.parameters);
     const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
     const pathLen = path ? path.length : ((node.parameters.length || 3000) / 1000);
-    const travelTime = pathLen / speedMps;
+    const MIN_GAP_M = 0.03; // 30mm minimum gap between products
 
-    // Minimum spacing: product length + gap (in time units along path)
-    const productSpacingM = 0.35; // ~350mm minimum gap between products
-    const spacingTime = productSpacingM / speedMps;
-
+    // Accept new arrivals at path start
     for (const product of arrived) {
-      // Stagger: if there are products already on this belt, ensure min spacing
-      let entryTime = this.simTime;
-      if (stats.queue.length > 0) {
-        const lastPid = stats.queue[stats.queue.length - 1];
-        const lastProduct = this.products.find(p => p.id === lastPid);
-        if (lastProduct && lastProduct.conveyorEntryTime !== null) {
-          const earliestEntry = lastProduct.conveyorEntryTime + spacingTime;
-          if (entryTime < earliestEntry) {
-            entryTime = earliestEntry;
-          }
+      product.state = 'queued';
+      product.pathPosition = 0;
+      product.conveyorEntryTime = this.simTime;
+      if (!stats.queue.includes(product.id)) {
+        stats.queue.push(product.id);
+      }
+    }
+
+    // Build array of products on this conveyor, sorted frontmost first
+    const queuedProducts: Product[] = [];
+    for (const pid of stats.queue) {
+      const p = this.products.find(pr => pr.id === pid);
+      if (p) queuedProducts.push(p);
+    }
+    queuedProducts.sort((a, b) => b.pathPosition - a.pathPosition);
+
+    // Check if downstream exit is blocked
+    const outEdges = this.getOutEdges(node.id);
+    let exitBlocked = outEdges.length === 0;
+    if (!exitBlocked && outEdges.length > 0) {
+      const nextNodeId = outEdges[0].to;
+      const nextNode = this.nodes.find(n => n.id === nextNodeId);
+      if (nextNode) {
+        // Stopper engaged = exit blocked
+        if (nextNode.type === 'stopper') {
+          const engaged = nextNode.parameters.engaged ?? true;
+          const enabled = nextNode.parameters.enabled ?? true;
+          if (enabled && engaged) exitBlocked = true;
+        }
+        // Next conveyor backpressure: if its first product is near input, block
+        const nextStats = this.nodeStats.get(nextNodeId);
+        if (nextStats && nextStats.queue.length > 0) {
+          const nextProds = nextStats.queue.map(id => this.products.find(p => p.id === id)).filter(Boolean) as Product[];
+          const nearestToInput = nextProds.reduce((min, p) => p.pathPosition < min ? p.pathPosition : min, 1);
+          if (nearestToInput < 0.05) exitBlocked = true;
         }
       }
-      product.state = 'queued';
-      product.conveyorEntryTime = entryTime;
-      stats.queue.push(product.id);
     }
 
     const toRelease: string[] = [];
-    for (const pid of stats.queue) {
-      const product = this.products.find(p => p.id === pid);
-      if (!product || !product.conveyorEntryTime) continue;
+    // prevFrontEdge: the rear boundary of the product ahead (in normalized path coords)
+    // For the frontmost product, this is either 1.0 (exit blocked) or Infinity (free exit)
+    let prevFrontEdge = exitBlocked ? 1.0 : Infinity;
 
-      const timeOnBelt = this.simTime - product.conveyorEntryTime;
-      if (timeOnBelt < 0) continue; // not yet entered (stagger delay)
+    for (const product of queuedProducts) {
+      const advanceT = (speedMps * dt) / pathLen;
+      let targetPos = product.pathPosition + advanceT;
 
-      const t = Math.min(1, timeOnBelt / travelTime);
+      // Product extents in normalized path coordinates
+      const halfLenT = (product.productLength / 2) / pathLen;
+      const gapT = MIN_GAP_M / pathLen;
 
-      // Use transport path for accurate positioning (handles inclines, curves, spirals)
+      // Clamp: can't advance past the rear edge of the product ahead minus gap
+      if (prevFrontEdge < Infinity) {
+        const maxAllowed = prevFrontEdge - gapT - halfLenT;
+        if (targetPos > maxAllowed) {
+          targetPos = maxAllowed;
+        }
+      }
+
+      targetPos = Math.max(0, Math.min(1, targetPos));
+      product.pathPosition = targetPos;
+
+      // This product's rear edge is the boundary for the next (trailing) product
+      prevFrontEdge = targetPos - halfLenT;
+
+      // Convert 1D path position to 3D world position
+      const t = product.pathPosition;
       if (path) {
         product.currentPosition = path.getWorldPosition(t, node.position, node.rotation, node.scale);
-
-        // Compute rotation from path tangent — key for bend/spiral conveyors
         const tangent = path.getWorldTangent(t, node.rotation);
         product.currentRotationY = Math.atan2(tangent[0], tangent[2]);
       } else {
-        // Fallback for unknown conveyor types: use port interpolation
         const ports = getConnectionPorts(node.type, node.parameters);
         const inputPort = ports.find(p => p.type === 'input');
         const outputPort = ports.find(p => p.type === 'output');
@@ -269,21 +302,23 @@ export class SimulationEngine {
             inWorld[1] + (outWorld[1] - inWorld[1]) * t,
             inWorld[2] + (outWorld[2] - inWorld[2]) * t,
           ];
-          // Compute rotation from port-to-port direction
           const dx = outWorld[0] - inWorld[0];
           const dz = outWorld[2] - inWorld[2];
           product.currentRotationY = Math.atan2(dx, dz);
         }
       }
 
-      if (t >= 1) toRelease.push(pid);
+      // Release when reaching end of conveyor (and exit is not blocked)
+      if (product.pathPosition >= 1.0 - 0.001 && !exitBlocked) {
+        toRelease.push(product.id);
+      }
     }
 
     for (const pid of toRelease) {
       stats.queue = stats.queue.filter(id => id !== pid);
       const product = this.products.find(p => p.id === pid);
       if (product) {
-        const outEdges = this.getOutEdges(node.id);
+        product.pathPosition = 0;
         if (outEdges.length > 0) {
           this.sendProductAlongEdge(product, outEdges[0]);
         } else {
@@ -298,7 +333,6 @@ export class SimulationEngine {
     // Flow state evaluation
     this.evaluateConveyorFlowState(node, stats, dt);
   }
-
   // ─── Machine: process with cycle time ────────────────────────
   private tickMachine(node: ProcessNode, stats: NodeStats, dt: number) {
     const processingTime = node.parameters.processingTime || 2;
@@ -1044,6 +1078,8 @@ export class SimulationEngine {
       conveyorEntryTime: null,
       blockedSince: null,
       stoppedBy: null,
+      pathPosition: 0,
+      productLength: pL,
     };
   }
 

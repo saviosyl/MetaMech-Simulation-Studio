@@ -15,6 +15,10 @@ export interface Product {
   conveyorEntryTime: number | null; // when product entered current conveyor
   blockedSince: number | null;      // when product became blocked
   stoppedBy: string | null;         // stopper node ID that stopped this product
+
+  // ─── 1D path occupancy fields ──────────────────
+  pathPosition: number;          // 0-1 position along conveyor path (front of product)
+  productLength: number;         // meters — physical length along path direction
 }
 
 /** Flow state for a node — describes current operational condition */
