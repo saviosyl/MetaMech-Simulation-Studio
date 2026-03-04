@@ -155,6 +155,7 @@ export function editorParamsToSpiralParams(p: Record<string, any>): Partial<Spir
     supportStyle: p.supportStyle || 'standard',
     baseType: p.baseType || 'reinforced',
     centerStructure: p.centerStructure || 'column',
+    beltColor: p.beltColor || undefined,
   };
 }
 

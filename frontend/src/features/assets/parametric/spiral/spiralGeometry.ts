@@ -23,6 +23,7 @@ import {
   matDarkSteel,
   matStainlessSteel,
   matBelt,
+  getBeltMaterial,
   matFootPad,
 } from '../premiumMaterials';
 
@@ -189,6 +190,7 @@ export function buildCenterStructure(params: SpiralConveyorParams): THREE.Group 
 export function buildSpiralBelt(params: SpiralConveyorParams): THREE.Group {
   const group = new THREE.Group();
   group.name = 'spiralBelt';
+  const beltMat = params.beltColor ? getBeltMaterial(params.beltColor) : matBelt;
 
   const radius = params.diameterMm / 2000;
   const beltW = params.beltWidthMm / 1000;
@@ -281,7 +283,7 @@ export function buildSpiralBelt(params: SpiralConveyorParams): THREE.Group {
   innerGeo.setAttribute('position', new THREE.Float32BufferAttribute(innerVerts, 3));
   innerGeo.setIndex(innerIdx);
   innerGeo.computeVertexNormals();
-  group.add(new THREE.Mesh(innerGeo, matBelt));
+  group.add(new THREE.Mesh(innerGeo, beltMat));
 
   // ─── Outer edge face ───
   const outerVerts: number[] = [];
@@ -306,7 +308,7 @@ export function buildSpiralBelt(params: SpiralConveyorParams): THREE.Group {
   outerGeo.setAttribute('position', new THREE.Float32BufferAttribute(outerVerts, 3));
   outerGeo.setIndex(outerIdx);
   outerGeo.computeVertexNormals();
-  group.add(new THREE.Mesh(outerGeo, matBelt));
+  group.add(new THREE.Mesh(outerGeo, beltMat));
 
   // ─── Slat grooves (visual texture lines across belt surface) ───
   // Use thin box segments instead of Lines for better visibility

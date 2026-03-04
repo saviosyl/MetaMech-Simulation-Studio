@@ -23,6 +23,7 @@ import { BendConveyorParams } from './bendTypes';
 import {
   matStainlessSteel,
   matBelt,
+  getBeltMaterial,
   matChrome,
   matModularBelt,
   matGuideRail,
@@ -207,10 +208,11 @@ function buildBeltSurface(p: BendConveyorParams): THREE.Group {
   const H = p.heightMm / 1000;
   const segs = Math.max(24, Math.ceil(p.bendAngleDeg / 2));
 
-  // Main belt — smooth curved slab
+  // Main belt — smooth curved slab (uses custom color if provided)
+  const beltMat = p.beltColor ? getBeltMaterial(p.beltColor) : matBelt;
   group.add(curvedSlab(
     R - halfW + 0.003, R + halfW - 0.003,
-    H, 0.005, p.bendAngleDeg, p.bendDirection, segs, matBelt,
+    H, 0.005, p.bendAngleDeg, p.bendDirection, segs, beltMat,
   ));
 
   return group;

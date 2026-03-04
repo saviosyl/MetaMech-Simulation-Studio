@@ -217,6 +217,45 @@ export function createSpiralScenario(): Scenario {
   };
 }
 
+// ─── End-of-Line Palletizing Demo ──────────────────────────────
+function createEndOfLineScenario(): Scenario {
+  const sourceId = uuidv4();
+  const conv1Id = uuidv4();
+  const stopperId = uuidv4();
+  const sensorId = uuidv4();
+  const conv2Id = uuidv4();
+  const robotId = uuidv4();
+  const palletConvId = uuidv4();
+  const palletId = uuidv4();
+  const outConvId = uuidv4();
+  const sinkId = uuidv4();
+
+  return {
+    name: 'End-of-Line Palletizing',
+    description: 'Complete FMCG end-of-line: source → conveyor → stopper → sensor → robot → pallet → outfeed. Demonstrates robot pick-and-place with palletizing.',
+    nodes: [
+      { id: sourceId, type: 'source', position: [-8, 0, 0], rotation: [0, 0, 0], parameters: { spawnRate: 15, productType: 'box', productColor: '#8b5cf6', productLength: 300, productWidth: 200, productHeight: 150 }, name: 'Case Source' },
+      { id: conv1Id, type: 'belt-conveyor', position: [-5, 0, 0], rotation: [0, 0, 0], parameters: { length: 3000, width: 600, height: 800, beltSpeed: 25 }, name: 'Infeed Conveyor' },
+      { id: stopperId, type: 'stopper', position: [-2.5, 0, 0], rotation: [0, 0, 0], parameters: { stopperMode: 'timed-release', holdTime: 3, width: 600, mountHeight: 800 }, name: 'Metered Stopper' },
+      { id: sensorId, type: 'sensor', position: [-1.5, 0, 0.4], rotation: [0, 0, 0], parameters: { sensorTag: 'SE001', sensorType: 'through-beam', mountHeight: 800 }, name: 'Pre-Robot Sensor' },
+      { id: conv2Id, type: 'belt-conveyor', position: [-1, 0, 0], rotation: [0, 0, 0], parameters: { length: 2000, width: 600, height: 800, beltSpeed: 20 }, name: 'Robot Infeed' },
+      { id: robotId, type: 'robot-6axis', position: [1.5, 0, 0], rotation: [0, 0, 0], parameters: { reach: 2000, payload: 60, baseHeight: 500, cycleTime: 4, speedFactor: 1, toolType: 'vacuum', pedestalEnabled: true, pedestalHeight: 600, pickHeight: 800, placeHeight: 200 }, name: 'Palletizer Robot' },
+      { id: palletId, type: 'eur-pallet', position: [3.5, 0, 0], rotation: [0, 0, 0], parameters: { palletType: 'EUR', layerPattern: 'column', maxLayers: 4 }, name: 'EUR Pallet' },
+      { id: outConvId, type: 'belt-conveyor', position: [6, 0, 0], rotation: [0, 0, 0], parameters: { length: 2000, width: 800, height: 400, beltSpeed: 10 }, name: 'Pallet Outfeed' },
+      { id: sinkId, type: 'sink', position: [8.5, 0, 0], rotation: [0, 0, 0], parameters: {}, name: 'Dispatch' },
+    ],
+    edges: [
+      { id: uuidv4(), from: sourceId, to: conv1Id, fromPort: 'output', toPort: 'input' },
+      { id: uuidv4(), from: conv1Id, to: stopperId, fromPort: 'output', toPort: 'input' },
+      { id: uuidv4(), from: stopperId, to: conv2Id, fromPort: 'output', toPort: 'input' },
+      { id: uuidv4(), from: conv2Id, to: robotId, fromPort: 'output', toPort: 'pick' },
+      { id: uuidv4(), from: robotId, to: palletId, fromPort: 'place', toPort: 'input' },
+      { id: uuidv4(), from: outConvId, to: sinkId, fromPort: 'output', toPort: 'input' },
+    ],
+    rules: [],
+  };
+}
+
 // ─── All scenarios ─────────────────────────────────────────────
 export function getAllScenarios(): { id: string; create: () => Scenario }[] {
   return [
@@ -226,5 +265,6 @@ export function getAllScenarios(): { id: string; create: () => Scenario }[] {
     { id: 'incline-transport', create: createInclineScenario },
     { id: 'bend-routing', create: createBendRoutingScenario },
     { id: 'spiral-transport', create: createSpiralScenario },
+    { id: 'end-of-line', create: createEndOfLineScenario },
   ];
 }

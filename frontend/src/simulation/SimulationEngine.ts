@@ -1060,14 +1060,18 @@ export class SimulationEngine {
       return Math.sqrt(dx * dx + dz * dz) < detectionRange;
     });
 
-    const wasTrigger = stats.flowState === 'running';
+    const wasTrigger = stats.processing;
     if (nearbyProduct) {
+      stats.processing = true;
+      stats.currentProductId = nearbyProduct.id;
       if (!wasTrigger) {
         this.addFlowEvent(stats, 'sensor-trigger', `Detected product ${nearbyProduct.id.slice(0, 8)}`);
       }
       this.setFlowState(stats, 'running', dt);
       stats.busyTime += dt;
     } else {
+      stats.processing = false;
+      stats.currentProductId = null;
       if (wasTrigger) {
         this.addFlowEvent(stats, 'sensor-clear', 'Detection zone clear');
       }

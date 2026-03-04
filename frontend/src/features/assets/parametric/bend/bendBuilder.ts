@@ -157,5 +157,6 @@ export function editorParamsToBendParams(p: Record<string, any>): Partial<BendCo
     adjustableFeetEnabled: p.adjustableFeetEnabled ?? true,
     footAdjustmentMm: p.footAdjustmentMm ?? 25,
     motorSide: p.motorSide || 'outer',
+    beltColor: p.beltColor || undefined,
   };
 }

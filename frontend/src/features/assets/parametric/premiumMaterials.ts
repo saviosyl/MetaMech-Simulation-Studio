@@ -94,6 +94,16 @@ export const matBelt = new THREE.MeshStandardMaterial({
   roughness: 0.75,
 });
 
+/** Create belt material with custom color (or return default if no color/default) */
+export function getBeltMaterial(color?: string): THREE.MeshStandardMaterial {
+  if (!color || color === '#1e1e1e') return matBelt;
+  return new THREE.MeshStandardMaterial({
+    color,
+    metalness: 0.05,
+    roughness: 0.75,
+  });
+}
+
 /** Modular belt — blue/teal plastic chain */
 export const matModularBelt = new THREE.MeshStandardMaterial({
   color: 0x3b8ba0,

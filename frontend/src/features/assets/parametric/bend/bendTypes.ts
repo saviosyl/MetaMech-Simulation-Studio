@@ -25,6 +25,7 @@ export interface BendConveyorParams {
   adjustableFeetEnabled: boolean;
   footAdjustmentMm: number;
   motorSide: 'inner' | 'outer';
+  beltColor?: string;
 }
 
 export interface BendSimulationMeta {

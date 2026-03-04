@@ -24,6 +24,7 @@ export interface SpiralConveyorParams {
   supportStyle: SupportStyle;
   baseType: BaseType;
   centerStructure: CenterStructure;
+  beltColor?: string;
 }
 
 export interface SpiralSnapPoint {
