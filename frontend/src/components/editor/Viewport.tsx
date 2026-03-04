@@ -429,6 +429,8 @@ const Viewport: React.FC = () => {
         
         switch (data.category) {
           case 'process':
+          case 'robots':
+          case 'pallets':
             addProcessNode(data.moduleId, position);
             break;
           case 'environment':
