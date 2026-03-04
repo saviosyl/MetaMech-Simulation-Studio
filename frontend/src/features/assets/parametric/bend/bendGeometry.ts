@@ -1,18 +1,22 @@
 /**
  * Bend Conveyor Geometry — Premium Industrial Curved Conveyor
  *
- * Rebuilt to match the straight conveyor family design language:
- * - Proper curved frame side rails (C-channel profile)
- * - Believable belt or modular top surface
- * - Slider bed underneath belt
- * - Inner/outer side guides
- * - Proper supports with cross braces
- * - Entry/exit tangent end plates
- * - Drive roller at outfeed
+ * FULL REDESIGN — uses smooth BufferGeometry arcs, not segmented boxes.
  *
- * Arc center at local origin (0, 0, 0).
- * Infeed at angle=0, outfeed at angle=bendAngle.
- * All geometry is local — parent node transform handles world placement.
+ * Design language matches the straight conveyor family:
+ * - Continuous curved frame side rails (C-profile, 40mm)
+ * - Smooth curved transport surface (belt/roller/modular)
+ * - Slider bed underneath belt
+ * - Curved side guides with top rail
+ * - Support stations with posts, plates, feet, cross braces
+ * - Drive roller at outfeed + motor housing
+ * - Tangent entry/exit end plates with visible flanges
+ *
+ * Arc geometry: center of curvature at local origin.
+ * Infeed at angle = 0 (positive Z), sweeps clockwise (right) or counterclockwise (left).
+ * Convention:
+ *   angle=0 → point at (0, y, R)
+ *   angle=θ right → point at (R·sin θ, y, R·cos θ)
  */
 import * as THREE from 'three';
 import { BendConveyorParams } from './bendTypes';
@@ -25,48 +29,92 @@ import {
   matAluminum,
   matDarkSteel,
   matFootPad,
+  matIndustrialBlue,
 } from '../premiumMaterials';
 
-// ─── Helpers ───────────────────────────────────────────────────
+// ─── Arc Helpers ───────────────────────────────────────────────
 
-function arcPos(angleDeg: number, radius: number, dir: 'left' | 'right'): [number, number] {
+/** Get XZ position on arc at given angle (degrees) and radius */
+function arcXZ(angleDeg: number, radius: number, dir: 'left' | 'right'): [number, number] {
   const a = (angleDeg * Math.PI) / 180;
-  const x = dir === 'right' ? Math.sin(a) * radius : -Math.sin(a) * radius;
-  const z = Math.cos(a) * radius;
-  return [x, z];
+  return dir === 'right'
+    ? [Math.sin(a) * radius, Math.cos(a) * radius]
+    : [-Math.sin(a) * radius, Math.cos(a) * radius];
 }
 
-/** Create a curved strip (frame rail, guide, bed plate) as segmented boxes */
-function buildCurvedStrip(
-  params: { radiusM: number; angleDeg: number; dir: 'left' | 'right'; heightY: number; width: number; height: number; segments: number },
-  material: THREE.Material,
-): THREE.Group {
-  const g = new THREE.Group();
-  const { radiusM, angleDeg, dir, heightY, width, height, segments } = params;
-  const segAngle = angleDeg / segments;
+/** Build a smooth curved ribbon as a BufferGeometry mesh.
+ *  The ribbon has width (radial direction) and height (Y direction)
+ *  and follows an arc from angle 0 to bendAngleDeg.
+ */
+function curvedRibbon(
+  innerR: number, outerR: number, y: number, height: number,
+  angleDeg: number, dir: 'left' | 'right', segments: number,
+  material: THREE.Material, receiveShadow = false,
+): THREE.Mesh {
+  const verts: number[] = [];
+  const indices: number[] = [];
+  const normals: number[] = [];
+
+  // 4 rows: bottom-inner, bottom-outer, top-inner, top-outer
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const [xiBot, ziBot] = arcXZ(t * angleDeg, innerR, dir);
+    const [xoBot, zoBot] = arcXZ(t * angleDeg, outerR, dir);
+
+    // Bottom inner
+    verts.push(xiBot, y, ziBot);
+    normals.push(0, -1, 0);
+    // Bottom outer
+    verts.push(xoBot, y, zoBot);
+    normals.push(0, -1, 0);
+    // Top inner
+    verts.push(xiBot, y + height, ziBot);
+    normals.push(0, 1, 0);
+    // Top outer
+    verts.push(xoBot, y + height, zoBot);
+    normals.push(0, 1, 0);
+  }
 
   for (let i = 0; i < segments; i++) {
-    const a0 = i * segAngle;
-    const a1 = (i + 1) * segAngle;
-    const aMid = (a0 + a1) / 2;
+    const base = i * 4;
+    const next = (i + 1) * 4;
 
-    const [x0, z0] = arcPos(a0, radiusM, dir);
-    const [x1, z1] = arcPos(a1, radiusM, dir);
-    const [xm, zm] = arcPos(aMid, radiusM, dir);
+    // Top face (indices 2,3 → top inner/outer)
+    indices.push(base + 2, next + 2, base + 3);
+    indices.push(base + 3, next + 2, next + 3);
 
-    const segLen = Math.sqrt((x1 - x0) ** 2 + (z1 - z0) ** 2);
-    const angle = Math.atan2(x1 - x0, z1 - z0);
+    // Bottom face
+    indices.push(base, base + 1, next);
+    indices.push(base + 1, next + 1, next);
 
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(width, height, segLen),
-      material,
-    );
-    mesh.position.set(xm, heightY, zm);
-    mesh.rotation.y = -angle;
-    mesh.castShadow = true;
-    g.add(mesh);
+    // Outer side face (indices 1,3 → outer bottom/top)
+    indices.push(base + 1, base + 3, next + 1);
+    indices.push(base + 3, next + 3, next + 1);
+
+    // Inner side face (indices 0,2 → inner bottom/top)
+    indices.push(base, next, base + 2);
+    indices.push(base + 2, next, next + 2);
   }
-  return g;
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = receiveShadow;
+  return mesh;
+}
+
+/** Build a thin curved slab (for belt surface, slider bed, etc.) */
+function curvedSlab(
+  innerR: number, outerR: number, y: number, thickness: number,
+  angleDeg: number, dir: 'left' | 'right', segments: number,
+  material: THREE.Material,
+): THREE.Mesh {
+  return curvedRibbon(innerR, outerR, y, thickness, angleDeg, dir, segments, material, true);
 }
 
 // ─── Frame ─────────────────────────────────────────────────────
@@ -78,72 +126,72 @@ function buildFrame(p: BendConveyorParams): THREE.Group {
   const R = p.radiusMm / 1000;
   const halfW = p.widthMm / 2000;
   const H = p.heightMm / 1000;
-  const railW = 0.04;
-  const railH = 0.05;
-  const segs = Math.max(12, Math.ceil(p.bendAngleDeg / 4));
+  const railH = 0.04; // 40mm — matches straight conveyor
+  const railD = 0.04; // 40mm depth
+  const segs = Math.max(16, Math.ceil(p.bendAngleDeg / 3));
 
-  // Inner and outer side rails (C-channel appearance)
-  for (const offset of [-halfW - railW / 2, halfW + railW / 2]) {
-    // Main rail
-    frame.add(buildCurvedStrip({
-      radiusM: R + offset, angleDeg: p.bendAngleDeg, dir: p.bendDirection,
-      heightY: H - railH / 2, width: railW, height: railH, segments: segs,
-    }, matStainlessSteel));
+  // Inner side rail
+  frame.add(curvedRibbon(
+    R - halfW - railD, R - halfW,
+    H - railH, railH, p.bendAngleDeg, p.bendDirection, segs, matStainlessSteel,
+  ));
 
-    // Bottom lip (C-channel lower flange)
-    frame.add(buildCurvedStrip({
-      radiusM: R + offset, angleDeg: p.bendAngleDeg, dir: p.bendDirection,
-      heightY: H - railH - 0.005, width: railW, height: 0.008, segments: segs,
-    }, matStainlessSteel));
+  // Outer side rail
+  frame.add(curvedRibbon(
+    R + halfW, R + halfW + railD,
+    H - railH, railH, p.bendAngleDeg, p.bendDirection, segs, matStainlessSteel,
+  ));
 
-    // Inner web of C-channel (slight inset)
-    const webR = offset > 0 ? R + offset - railW * 0.3 : R + offset + railW * 0.3;
-    frame.add(buildCurvedStrip({
-      radiusM: webR, angleDeg: p.bendAngleDeg, dir: p.bendDirection,
-      heightY: H - railH / 2, width: 0.003, height: railH - 0.01, segments: segs,
-    }, matDarkSteel));
-  }
+  // Slider bed plate (under belt, between rails)
+  frame.add(curvedSlab(
+    R - halfW + 0.005, R + halfW - 0.005,
+    H - 0.003, 0.003, p.bendAngleDeg, p.bendDirection, segs, matDarkSteel,
+  ));
 
-  // Slider bed plate (curved, under belt)
-  frame.add(buildCurvedStrip({
-    radiusM: R, angleDeg: p.bendAngleDeg, dir: p.bendDirection,
-    heightY: H - 0.003, width: halfW * 2 - 0.01, height: 0.004, segments: segs,
-  }, matDarkSteel));
-
-  // Radial cross members
+  // Cross members (radial beams connecting inner to outer rail)
   const crossCount = Math.max(2, Math.floor(p.bendAngleDeg / 25) + 1);
   for (let i = 0; i < crossCount; i++) {
-    const a = (p.bendAngleDeg * i) / (crossCount - 1);
-    const [xi, zi] = arcPos(a, R - halfW - railW, p.bendDirection);
-    const [xo, zo] = arcPos(a, R + halfW + railW, p.bendDirection);
+    const a = crossCount === 1 ? p.bendAngleDeg / 2 : (p.bendAngleDeg * i) / (crossCount - 1);
+    const [xi, zi] = arcXZ(a, R - halfW - railD, p.bendDirection);
+    const [xo, zo] = arcXZ(a, R + halfW + railD, p.bendDirection);
 
     const len = Math.sqrt((xo - xi) ** 2 + (zo - zi) ** 2);
     const ang = Math.atan2(xo - xi, zo - zi);
 
     const cross = new THREE.Mesh(
-      new THREE.BoxGeometry(0.035, 0.035, len),
+      new THREE.BoxGeometry(0.03, 0.03, len),
       matStainlessSteel,
     );
-    cross.position.set((xi + xo) / 2, H - railH - 0.02, (zi + zo) / 2);
+    cross.position.set((xi + xo) / 2, H - railH - 0.015, (zi + zo) / 2);
     cross.rotation.y = -ang;
     frame.add(cross);
   }
 
-  // End plates (infeed + outfeed)
+  // End plates at infeed and outfeed (tangent end flanges)
   for (const endA of [0, p.bendAngleDeg]) {
-    const [xi, zi] = arcPos(endA, R - halfW - railW, p.bendDirection);
-    const [xo, zo] = arcPos(endA, R + halfW + railW, p.bendDirection);
+    const [xi, zi] = arcXZ(endA, R - halfW - railD, p.bendDirection);
+    const [xo, zo] = arcXZ(endA, R + halfW + railD, p.bendDirection);
     const len = Math.sqrt((xo - xi) ** 2 + (zo - zi) ** 2);
     const ang = Math.atan2(xo - xi, zo - zi);
 
+    // Vertical end plate
     const plate = new THREE.Mesh(
-      new THREE.BoxGeometry(0.008, railH + 0.01, len),
+      new THREE.BoxGeometry(0.006, railH + 0.01, len),
       matDarkSteel,
     );
     plate.position.set((xi + xo) / 2, H - railH / 2, (zi + zo) / 2);
     plate.rotation.y = -ang;
     plate.castShadow = true;
     frame.add(plate);
+
+    // Top lip of end plate (flange)
+    const lip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.015, 0.005, len),
+      matStainlessSteel,
+    );
+    lip.position.set((xi + xo) / 2, H + 0.002, (zi + zo) / 2);
+    lip.rotation.y = -ang;
+    frame.add(lip);
   }
 
   return frame;
@@ -152,15 +200,20 @@ function buildFrame(p: BendConveyorParams): THREE.Group {
 // ─── Belt Surface ──────────────────────────────────────────────
 
 function buildBeltSurface(p: BendConveyorParams): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'beltSurface';
   const R = p.radiusMm / 1000;
-  const W = p.widthMm / 1000;
+  const halfW = p.widthMm / 2000;
   const H = p.heightMm / 1000;
-  const segs = Math.max(16, Math.ceil(p.bendAngleDeg / 2.5));
+  const segs = Math.max(24, Math.ceil(p.bendAngleDeg / 2));
 
-  return buildCurvedStrip({
-    radiusM: R, angleDeg: p.bendAngleDeg, dir: p.bendDirection,
-    heightY: H + 0.003, width: W - 0.005, height: 0.005, segments: segs,
-  }, matBelt);
+  // Main belt — smooth curved slab
+  group.add(curvedSlab(
+    R - halfW + 0.003, R + halfW - 0.003,
+    H, 0.005, p.bendAngleDeg, p.bendDirection, segs, matBelt,
+  ));
+
+  return group;
 }
 
 // ─── Roller Surface ────────────────────────────────────────────
@@ -170,25 +223,25 @@ function buildRollerSurface(p: BendConveyorParams): THREE.Group {
   group.name = 'rollerSurface';
 
   const R = p.radiusMm / 1000;
-  const W = p.widthMm / 1000;
+  const halfW = p.widthMm / 2000;
   const H = p.heightMm / 1000;
-  const rollerR = 0.022;
+  const rollerR = 0.025; // 25mm radius — matches straight
 
-  // Tapered rollers along the curve
-  const pitchDeg = (75 / (R * Math.PI * 2)) * 360; // ~75mm pitch at center
-  const count = Math.max(4, Math.floor(p.bendAngleDeg / pitchDeg));
+  // Tapered rollers along arc at ~75mm pitch
+  const arcLen = R * (p.bendAngleDeg * Math.PI / 180);
+  const pitchM = 0.075;
+  const count = Math.max(3, Math.floor(arcLen / pitchM));
 
   for (let i = 0; i < count; i++) {
     const a = (p.bendAngleDeg * (i + 0.5)) / count;
-    const [xc, zc] = arcPos(a, R, p.bendDirection);
-    const [xi, zi] = arcPos(a, R - W / 2, p.bendDirection);
-    const [xo, zo] = arcPos(a, R + W / 2, p.bendDirection);
+    const [xi, zi] = arcXZ(a, R - halfW + 0.005, p.bendDirection);
+    const [xo, zo] = arcXZ(a, R + halfW - 0.005, p.bendDirection);
 
     const rollerLen = Math.sqrt((xo - xi) ** 2 + (zo - zi) ** 2);
-    const rollerAng = Math.atan2(xo - xi, zo - zi);
+    const ang = Math.atan2(xo - xi, zo - zi);
 
-    // Tapered roller (inner smaller for differential speed)
-    const innerR = rollerR * 0.82;
+    // Tapered — inner end slightly smaller for differential speed
+    const innerR = rollerR * 0.8;
     const outerR = rollerR;
     const geo = new THREE.CylinderGeometry(
       p.bendDirection === 'right' ? innerR : outerR,
@@ -197,10 +250,21 @@ function buildRollerSurface(p: BendConveyorParams): THREE.Group {
     );
 
     const roller = new THREE.Mesh(geo, matChrome);
-    roller.position.set(xc, H + rollerR, zc);
-    roller.rotation.set(0, -rollerAng, Math.PI / 2);
+    roller.position.set((xi + xo) / 2, H + rollerR, (zi + zo) / 2);
+    roller.rotation.set(0, -ang, Math.PI / 2);
     roller.castShadow = true;
     group.add(roller);
+
+    // Shaft ends visible at each side
+    for (const [sx, sz] of [[xi, zi], [xo, zo]]) {
+      const shaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.005, 0.005, 0.02, 6),
+        matDarkSteel,
+      );
+      shaft.position.set(sx, H + rollerR, sz);
+      shaft.rotation.set(0, -ang, Math.PI / 2);
+      group.add(shaft);
+    }
   }
 
   return group;
@@ -209,34 +273,77 @@ function buildRollerSurface(p: BendConveyorParams): THREE.Group {
 // ─── Modular Surface ───────────────────────────────────────────
 
 function buildModularSurface(p: BendConveyorParams): THREE.Group {
-  const R = p.radiusMm / 1000;
-  const W = p.widthMm / 1000;
-  const H = p.heightMm / 1000;
-  const segs = Math.max(12, Math.ceil(p.bendAngleDeg / 2));
-
   const group = new THREE.Group();
   group.name = 'modularSurface';
-  const segAngle = p.bendAngleDeg / segs;
-  const gap = 0.002;
+  const R = p.radiusMm / 1000;
+  const halfW = p.widthMm / 2000;
+  const H = p.heightMm / 1000;
 
-  for (let i = 0; i < segs; i++) {
-    const a0 = i * segAngle + 0.2;
-    const a1 = (i + 1) * segAngle - 0.2;
-    const aMid = (a0 + a1) / 2;
-    const [x0, z0] = arcPos(a0, R, p.bendDirection);
-    const [x1, z1] = arcPos(a1, R, p.bendDirection);
-    const [xm, zm] = arcPos(aMid, R, p.bendDirection);
-    const len = Math.sqrt((x1 - x0) ** 2 + (z1 - z0) ** 2);
-    const ang = Math.atan2(x1 - x0, z1 - z0);
+  // Modular chain links — segmented curved slabs with visible gaps
+  const linkCount = Math.max(8, Math.ceil(p.bendAngleDeg / 4));
+  const linkAngle = p.bendAngleDeg / linkCount;
+  const gapAngle = 0.3; // small gap between links (degrees)
 
-    const seg = new THREE.Mesh(
-      new THREE.BoxGeometry(W - 0.01, 0.008, len - gap),
-      matModularBelt,
-    );
-    seg.position.set(xm, H + 0.004, zm);
-    seg.rotation.y = -ang;
-    seg.receiveShadow = true;
-    group.add(seg);
+  for (let i = 0; i < linkCount; i++) {
+    const startA = i * linkAngle + gapAngle / 2;
+    const endA = (i + 1) * linkAngle - gapAngle / 2;
+    const spanDeg = endA - startA;
+    if (spanDeg <= 0) continue;
+
+    // Each link is a small curved slab
+    const linkSegs = Math.max(3, Math.ceil(spanDeg / 3));
+
+    // Create link by building a mini curved slab
+    const verts: number[] = [];
+    const indices: number[] = [];
+    for (let j = 0; j <= linkSegs; j++) {
+      const t = j / linkSegs;
+      const a = startA + t * spanDeg;
+      const [xi, zi] = arcXZ(a, R - halfW + 0.003, p.bendDirection);
+      const [xo, zo] = arcXZ(a, R + halfW - 0.003, p.bendDirection);
+
+      // Bottom
+      verts.push(xi, H, zi);
+      verts.push(xo, H, zo);
+      // Top
+      verts.push(xi, H + 0.008, zi);
+      verts.push(xo, H + 0.008, zo);
+
+      if (j < linkSegs) {
+        const b = j * 4;
+        const n = (j + 1) * 4;
+        // Top face
+        indices.push(b + 2, n + 2, b + 3);
+        indices.push(b + 3, n + 2, n + 3);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+
+    const link = new THREE.Mesh(geo, matModularBelt);
+    link.receiveShadow = true;
+    group.add(link);
+
+    // Hinge pin at each link joint
+    if (i < linkCount - 1) {
+      const pinA = (i + 1) * linkAngle;
+      const [px, pz] = arcXZ(pinA, R, p.bendDirection);
+      const [pxi, pzi] = arcXZ(pinA, R - halfW + 0.005, p.bendDirection);
+      const [pxo, pzo] = arcXZ(pinA, R + halfW - 0.005, p.bendDirection);
+      const pinLen = Math.sqrt((pxo - pxi) ** 2 + (pzo - pzi) ** 2);
+      const pinAng = Math.atan2(pxo - pxi, pzo - pzi);
+
+      const pin = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.002, 0.002, pinLen, 6),
+        matDarkSteel,
+      );
+      pin.position.set(px, H + 0.004, pz);
+      pin.rotation.set(0, -pinAng, Math.PI / 2);
+      group.add(pin);
+    }
   }
 
   return group;
@@ -254,22 +361,24 @@ export function buildCurvedGuides(p: BendConveyorParams): THREE.Group | null {
   const halfW = p.widthMm / 2000;
   const H = p.heightMm / 1000;
   const guideH = p.sideGuideHeightMm / 1000;
-  const segs = Math.max(10, Math.ceil(p.bendAngleDeg / 4));
+  const segs = Math.max(16, Math.ceil(p.bendAngleDeg / 3));
 
   for (const side of ['inner', 'outer'] as const) {
-    const r = side === 'inner' ? R - halfW - 0.002 : R + halfW + 0.002;
+    const guideInnerR = side === 'inner' ? R - halfW - 0.002 : R + halfW;
+    const guideOuterR = side === 'inner' ? R - halfW : R + halfW + 0.002;
 
-    // Guide rail
-    group.add(buildCurvedStrip({
-      radiusM: r, angleDeg: p.bendAngleDeg, dir: p.bendDirection,
-      heightY: H + guideH / 2 + 0.005, width: 0.004, height: guideH, segments: segs,
-    }, matGuideRail));
+    // Guide wall — smooth curved ribbon
+    group.add(curvedRibbon(
+      guideInnerR, guideOuterR,
+      H + 0.005, guideH, p.bendAngleDeg, p.bendDirection, segs, matGuideRail,
+    ));
 
-    // Top cap rail
-    group.add(buildCurvedStrip({
-      radiusM: r, angleDeg: p.bendAngleDeg, dir: p.bendDirection,
-      heightY: H + guideH + 0.006, width: 0.015, height: 0.004, segments: segs,
-    }, matGuideRail));
+    // Top cap rail — wider for product containment feel
+    const capMidR = (guideInnerR + guideOuterR) / 2;
+    group.add(curvedRibbon(
+      capMidR - 0.008, capMidR + 0.008,
+      H + 0.005 + guideH, 0.004, p.bendAngleDeg, p.bendDirection, segs, matGuideRail,
+    ));
   }
 
   return group;
@@ -284,60 +393,71 @@ export function buildCurvedSupports(p: BendConveyorParams): THREE.Group | null {
   group.name = 'supports';
 
   const R = p.radiusMm / 1000;
-  const W = p.widthMm / 1000;
+  const halfW = p.widthMm / 2000;
   const H = p.heightMm / 1000;
+  const railD = 0.04;
   const spacingDeg = p.supportSpacingDeg;
   const numSupports = Math.max(2, Math.floor(p.bendAngleDeg / spacingDeg) + 1);
   const postSize = 0.04;
 
   for (let i = 0; i < numSupports; i++) {
-    const a = (p.bendAngleDeg * i) / (numSupports - 1);
+    const a = numSupports === 1
+      ? p.bendAngleDeg / 2
+      : (p.bendAngleDeg * i) / (numSupports - 1);
     const station = new THREE.Group();
 
+    // Two posts (inner + outer) at this angle
     for (const side of [-1, 1]) {
-      const r = R + side * (W / 2 + 0.02);
-      const [px, pz] = arcPos(a, r, p.bendDirection);
-      const postH = H - postSize;
+      const r = R + side * (halfW + railD + postSize / 2);
+      const [px, pz] = arcXZ(a, r, p.bendDirection);
+      const legH = H - railD - postSize * 0.4;
 
-      // Vertical post (aluminum extrusion profile)
+      // Vertical post (aluminum extrusion appearance)
       const post = new THREE.Mesh(
-        new THREE.BoxGeometry(postSize, postH, postSize),
+        new THREE.BoxGeometry(postSize, legH, postSize),
         matAluminum,
       );
-      post.position.set(px, postH / 2, pz);
+      post.position.set(px, legH / 2, pz);
       post.castShadow = true;
       station.add(post);
 
-      // Top mounting plate
-      const plate = new THREE.Mesh(
-        new THREE.BoxGeometry(postSize * 1.6, postSize * 0.4, postSize * 1.6),
+      // Post T-slot groove (dark line down center)
+      const groove = new THREE.Mesh(
+        new THREE.BoxGeometry(postSize * 0.25, legH - 0.02, postSize + 0.001),
         matDarkSteel,
       );
-      plate.position.set(px, H - postSize * 0.2, pz);
+      groove.position.set(px, legH / 2, pz);
+      station.add(groove);
+
+      // Top mounting plate
+      const plate = new THREE.Mesh(
+        new THREE.BoxGeometry(postSize * 1.5, 0.008, postSize * 1.5),
+        matDarkSteel,
+      );
+      plate.position.set(px, legH + 0.004, pz);
       station.add(plate);
 
-      // Foot pad
+      // Foot pad with adjustment bolt
       if (p.adjustableFeetEnabled) {
         const foot = new THREE.Mesh(
-          new THREE.BoxGeometry(postSize * 2.2, 0.006, postSize * 2.2),
+          new THREE.BoxGeometry(postSize * 2, 0.005, postSize * 2),
           matFootPad,
         );
-        foot.position.set(px, 0.003, pz);
+        foot.position.set(px, 0.0025, pz);
         station.add(foot);
 
-        // Adjustment bolt
         const bolt = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.008, 0.008, 0.025, 6),
+          new THREE.CylinderGeometry(0.007, 0.007, 0.02, 6),
           matDarkSteel,
         );
-        bolt.position.set(px, 0.018, pz);
+        bolt.position.set(px, 0.015, pz);
         station.add(bolt);
       }
     }
 
-    // Cross brace
-    const [xi, zi] = arcPos(a, R - W / 2 - 0.02, p.bendDirection);
-    const [xo, zo] = arcPos(a, R + W / 2 + 0.02, p.bendDirection);
+    // Cross brace between posts
+    const [xi, zi] = arcXZ(a, R - halfW - railD - postSize / 2, p.bendDirection);
+    const [xo, zo] = arcXZ(a, R + halfW + railD + postSize / 2, p.bendDirection);
     const braceLen = Math.sqrt((xo - xi) ** 2 + (zo - zi) ** 2);
     const braceAng = Math.atan2(xo - xi, zo - zi);
 
@@ -345,7 +465,7 @@ export function buildCurvedSupports(p: BendConveyorParams): THREE.Group | null {
       new THREE.BoxGeometry(postSize * 0.7, postSize * 0.7, braceLen),
       matAluminum,
     );
-    brace.position.set((xi + xo) / 2, H * 0.35, (zi + zo) / 2);
+    brace.position.set((xi + xo) / 2, H * 0.3, (zi + zo) / 2);
     brace.rotation.y = -braceAng;
     station.add(brace);
 
@@ -362,40 +482,60 @@ function buildDrive(p: BendConveyorParams): THREE.Group {
   group.name = 'drive';
 
   const R = p.radiusMm / 1000;
-  const W = p.widthMm / 1000;
+  const halfW = p.widthMm / 2000;
   const H = p.heightMm / 1000;
-  const rollerR = 0.028;
 
-  // Drive roller at outfeed
-  for (const [endA, r] of [[p.bendAngleDeg, rollerR], [0, rollerR * 0.75]] as [number, number][]) {
-    const [xi, zi] = arcPos(endA, R - W / 2, p.bendDirection);
-    const [xo, zo] = arcPos(endA, R + W / 2, p.bendDirection);
-    const rollerLen = Math.sqrt((xo - xi) ** 2 + (zo - zi) ** 2) + 0.015;
+  // Head roller at outfeed + tail roller at infeed
+  for (const [endA, headR] of [[p.bendAngleDeg, 0.028], [0, 0.022]] as [number, number][]) {
+    const [xi, zi] = arcXZ(endA, R - halfW + 0.005, p.bendDirection);
+    const [xo, zo] = arcXZ(endA, R + halfW - 0.005, p.bendDirection);
+    const rollerLen = Math.sqrt((xo - xi) ** 2 + (zo - zi) ** 2) + 0.01;
     const ang = Math.atan2(xo - xi, zo - zi);
 
     const roller = new THREE.Mesh(
-      new THREE.CylinderGeometry(r, r, rollerLen, 16),
+      new THREE.CylinderGeometry(headR, headR, rollerLen, 16),
       matDarkSteel,
     );
     roller.position.set((xi + xo) / 2, H, (zi + zo) / 2);
     roller.rotation.set(0, -ang, Math.PI / 2);
     roller.castShadow = true;
     group.add(roller);
+
+    // Bearing housings at each end
+    for (const [bx, bz] of [[xi, zi], [xo, zo]]) {
+      const bearing = new THREE.Mesh(
+        new THREE.BoxGeometry(0.03, 0.03, 0.03),
+        matDarkSteel,
+      );
+      bearing.position.set(bx, H, bz);
+      group.add(bearing);
+    }
   }
 
-  // Motor housing on outfeed outer side
-  const motorA = p.bendAngleDeg;
+  // Motor housing on outfeed side
   const motorSide = p.motorSide === 'inner' ? -1 : 1;
-  const motorR = R + motorSide * (W / 2 + 0.06);
-  const [mx, mz] = arcPos(motorA, motorR, p.bendDirection);
+  const motorR = R + motorSide * (halfW + 0.08);
+  const [mx, mz] = arcXZ(p.bendAngleDeg, motorR, p.bendDirection);
 
   const motor = new THREE.Mesh(
     new THREE.BoxGeometry(0.08, 0.1, 0.12),
-    matDarkSteel,
+    matIndustrialBlue,
   );
-  motor.position.set(mx, H - 0.05, mz);
+  motor.position.set(mx, H - 0.06, mz);
   motor.castShadow = true;
   group.add(motor);
+
+  // Motor shaft
+  const [shx, shz] = arcXZ(p.bendAngleDeg, R + motorSide * halfW, p.bendDirection);
+  const shaftLen = Math.sqrt((mx - shx) ** 2 + (mz - shz) ** 2);
+  const shaftAng = Math.atan2(mx - shx, mz - shz);
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.008, 0.008, shaftLen, 8),
+    matDarkSteel,
+  );
+  shaft.position.set((mx + shx) / 2, H, (mz + shz) / 2);
+  shaft.rotation.set(0, -shaftAng, Math.PI / 2);
+  group.add(shaft);
 
   return group;
 }

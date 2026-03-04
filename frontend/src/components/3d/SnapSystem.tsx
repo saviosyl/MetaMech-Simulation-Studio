@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { useEditorStore, getConnectionPorts, ProcessNode, ConnectionPort } from '../../store/editorStore';
 import { getPortWorldPosition, alignNodeToPort } from '../../lib/nodeTransform';
+// Accessory snap — will be wired in Task 6
+// import { findNearestConveyorSnap, isAccessoryType, applyAccessorySnap } from '../../lib/accessorySnap';
 
 const SNAP_THRESHOLD = 0.5;
 
