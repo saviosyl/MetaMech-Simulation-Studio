@@ -7,7 +7,7 @@
  * Products are always centered on the conveyor width and ride on top of the belt.
  */
 import { v4 as uuidv4 } from 'uuid';
-import { Product, NodeStats } from './Product';
+import { Product, NodeStats, FlowState, FlowEvent } from './Product';
 import { ProcessNode, ProcessEdge, getConnectionPorts } from '../store/editorStore';
 
 const COLOR_MAP: Record<string, string> = {
@@ -20,7 +20,8 @@ const COLOR_MAP: Record<string, string> = {
 };
 const RANDOM_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
 
-const CONVEYOR_TYPES = ['conveyor', 'belt-conveyor', 'roller-conveyor'];
+const CONVEYOR_TYPES = ['conveyor', 'belt-conveyor', 'roller-conveyor', 'bend-conveyor'];
+const MAX_FLOW_EVENTS = 200; // cap event log size
 
 export class SimulationEngine {
   products: Product[] = [];
@@ -53,6 +54,14 @@ export class SimulationEngine {
         lastSpawnTime: -Infinity,
         routerIndex: 0,
         palletCount: 0,
+        flowState: 'idle',
+        blockedTime: 0,
+        starvedTime: 0,
+        stoppedTime: 0,
+        lastFlowStateChange: 0,
+        peakQueueLength: 0,
+        totalItemsBlocked: 0,
+        events: [],
       });
     }
   }
@@ -73,6 +82,14 @@ export class SimulationEngine {
       s.lastSpawnTime = -Infinity;
       s.routerIndex = 0;
       s.palletCount = 0;
+      s.flowState = 'idle';
+      s.blockedTime = 0;
+      s.starvedTime = 0;
+      s.stoppedTime = 0;
+      s.lastFlowStateChange = 0;
+      s.peakQueueLength = 0;
+      s.totalItemsBlocked = 0;
+      s.events = [];
     });
   }
 
@@ -96,6 +113,8 @@ export class SimulationEngine {
         case 'router': this.tickRouter(node, stats); break;
         case 'pick-and-place': this.tickMachine(node, stats, elapsed); break;
         case 'palletizer': this.tickPalletizer(node, stats, elapsed); break;
+        case 'stopper': this.tickStopper(node, stats, elapsed); break;
+        case 'sensor': this.tickSensor(node, stats, elapsed); break;
       }
 
       if (stats.totalTime > 0) {
@@ -199,6 +218,9 @@ export class SimulationEngine {
     }
 
     if (stats.queue.length > 0) stats.busyTime += dt;
+
+    // Flow state evaluation
+    this.evaluateConveyorFlowState(node, stats, dt);
   }
 
   // ─── Machine: process with cycle time ────────────────────────
@@ -240,6 +262,19 @@ export class SimulationEngine {
     for (const product of arrived) {
       product.state = 'queued';
       stats.queue.push(product.id);
+    }
+
+    // Flow state: blocked if queue is building up, starved if empty and waiting
+    if (stats.processing) {
+      this.setFlowState(stats, 'running', dt);
+    } else if (stats.queue.length === 0) {
+      const inEdges = this.edges.filter(e => e.to === node.id);
+      if (inEdges.length > 0 && this.simTime > 2) {
+        this.setFlowState(stats, 'starved', dt);
+        stats.starvedTime += dt;
+      } else {
+        this.setFlowState(stats, 'idle', dt);
+      }
     }
   }
 
@@ -388,6 +423,148 @@ export class SimulationEngine {
     }
   }
 
+  // ─── Stopper: blocks product flow ─────────────────────────────
+  private tickStopper(node: ProcessNode, stats: NodeStats, dt: number) {
+    const engaged = node.parameters.engaged ?? true;
+    const enabled = node.parameters.enabled ?? true;
+
+    if (!enabled || !engaged) {
+      // Release any stopped products
+      const stopped = this.products.filter(p => p.stoppedBy === node.id);
+      for (const product of stopped) {
+        product.state = 'queued';
+        product.stoppedBy = null;
+        this.addFlowEvent(stats, 'released', `Product ${product.id.slice(0, 8)} released`);
+      }
+      this.setFlowState(stats, 'idle', dt);
+      return;
+    }
+
+    // Stop arriving products
+    const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
+    for (const product of arrived) {
+      product.state = 'stopped';
+      product.stoppedBy = node.id;
+      product.blockedSince = this.simTime;
+      this.addFlowEvent(stats, 'stopped', `Product ${product.id.slice(0, 8)} stopped`);
+    }
+
+    const stoppedCount = this.products.filter(p => p.stoppedBy === node.id).length;
+    if (stoppedCount > 0) {
+      this.setFlowState(stats, 'stopped', dt);
+      stats.stoppedTime += dt;
+    } else {
+      this.setFlowState(stats, 'idle', dt);
+    }
+  }
+
+  // ─── Sensor: detects product presence ────────────────────────
+  private tickSensor(node: ProcessNode, stats: NodeStats, dt: number) {
+    // Check if any product is near the sensor position
+    const sensorPos = node.position;
+    const detectionRange = 0.3; // 300mm detection zone
+    const nearbyProduct = this.products.find(p => {
+      if (p.state === 'completed') return false;
+      const dx = p.currentPosition[0] - sensorPos[0];
+      const dz = p.currentPosition[2] - sensorPos[2];
+      return Math.sqrt(dx * dx + dz * dz) < detectionRange;
+    });
+
+    const wasTrigger = stats.flowState === 'running';
+    if (nearbyProduct) {
+      if (!wasTrigger) {
+        this.addFlowEvent(stats, 'sensor-trigger', `Detected product ${nearbyProduct.id.slice(0, 8)}`);
+      }
+      this.setFlowState(stats, 'running', dt);
+      stats.busyTime += dt;
+    } else {
+      if (wasTrigger) {
+        this.addFlowEvent(stats, 'sensor-clear', 'Detection zone clear');
+      }
+      this.setFlowState(stats, 'idle', dt);
+    }
+  }
+
+  // ─── Flow state management ───────────────────────────────────
+  private setFlowState(stats: NodeStats, newState: FlowState, _dt: number) {
+    if (stats.flowState !== newState) {
+      stats.lastFlowStateChange = this.simTime;
+      stats.flowState = newState;
+    }
+  }
+
+  private addFlowEvent(stats: NodeStats, type: FlowEvent['type'], detail?: string) {
+    stats.events.push({ time: this.simTime, type, nodeId: stats.nodeId, detail });
+    if (stats.events.length > MAX_FLOW_EVENTS) {
+      stats.events = stats.events.slice(-MAX_FLOW_EVENTS);
+    }
+  }
+
+  /** Evaluate flow state for conveyors: blocked if output is full, starved if input is empty */
+  private evaluateConveyorFlowState(node: ProcessNode, stats: NodeStats, dt: number) {
+    const outEdges = this.getOutEdges(node.id);
+    const inEdges = this.edges.filter(e => e.to === node.id);
+
+    // Track peak queue
+    if (stats.queue.length > stats.peakQueueLength) {
+      stats.peakQueueLength = stats.queue.length;
+    }
+
+    // Check if output is blocked (downstream full/stopped)
+    let outputBlocked = false;
+    if (outEdges.length > 0) {
+      for (const edge of outEdges) {
+        const downstreamStats = this.nodeStats.get(edge.to);
+        const downstreamNode = this.nodes.find(n => n.id === edge.to);
+        if (downstreamStats && downstreamNode) {
+          // Blocked if downstream is a machine that is processing, or a buffer at capacity
+          if (downstreamNode.type === 'machine' && downstreamStats.processing) {
+            outputBlocked = true;
+          }
+          if (downstreamNode.type === 'buffer') {
+            const cap = downstreamNode.parameters.capacity || 10;
+            if (downstreamStats.queue.length >= cap) outputBlocked = true;
+          }
+          if (downstreamNode.type === 'stopper' && (downstreamNode.parameters.engaged ?? true)) {
+            outputBlocked = true;
+          }
+          if (downstreamStats.flowState === 'blocked' || downstreamStats.flowState === 'stopped') {
+            outputBlocked = true;
+          }
+        }
+      }
+    } else {
+      // No output — dead end → blocked if there are products
+      if (stats.queue.length > 0) outputBlocked = true;
+    }
+
+    // Starved = has input edges but queue is empty and has been for a while
+    const isStarved = inEdges.length > 0 && stats.queue.length === 0 && this.simTime > 2;
+
+    const prevState = stats.flowState;
+
+    if (outputBlocked && stats.queue.length > 0) {
+      this.setFlowState(stats, 'blocked', dt);
+      stats.blockedTime += dt;
+      if (prevState !== 'blocked') {
+        stats.totalItemsBlocked += stats.queue.length;
+        this.addFlowEvent(stats, 'blocked', `Queue: ${stats.queue.length}, downstream full`);
+      }
+    } else if (isStarved) {
+      this.setFlowState(stats, 'starved', dt);
+      stats.starvedTime += dt;
+      if (prevState !== 'starved') {
+        this.addFlowEvent(stats, 'starved', 'No incoming products');
+      }
+    } else if (stats.queue.length > 0) {
+      if (prevState === 'blocked') this.addFlowEvent(stats, 'unblocked', 'Flow resumed');
+      if (prevState === 'starved') this.addFlowEvent(stats, 'fed', 'Product received');
+      this.setFlowState(stats, 'running', dt);
+    } else {
+      this.setFlowState(stats, 'idle', dt);
+    }
+  }
+
   // ─── Helpers ─────────────────────────────────────────────────
   private createProduct(node: ProcessNode): Product {
     const productColor = node.parameters.productColor || 'brown';
@@ -417,6 +594,8 @@ export class SimulationEngine {
       createdAt: this.simTime,
       completedAt: null,
       conveyorEntryTime: null,
+      blockedSince: null,
+      stoppedBy: null,
     };
   }
 
@@ -469,6 +648,21 @@ export class SimulationEngine {
     const bottleneck = machineUtils.length > 0
       ? machineUtils.reduce((a, b) => a.utilization > b.utilization ? a : b) : null;
 
+    // Flow state summary
+    const flowStates: { nodeId: string; name: string; state: FlowState; blockedPct: number; starvedPct: number }[] = [];
+    for (const node of this.nodes) {
+      const stats = this.nodeStats.get(node.id)!;
+      if (CONVEYOR_TYPES.includes(node.type) || node.type === 'machine' || node.type === 'buffer') {
+        flowStates.push({
+          nodeId: node.id,
+          name: node.name,
+          state: stats.flowState,
+          blockedPct: stats.totalTime > 0 ? (stats.blockedTime / stats.totalTime) * 100 : 0,
+          starvedPct: stats.totalTime > 0 ? (stats.starvedTime / stats.totalTime) * 100 : 0,
+        });
+      }
+    }
+
     return {
       totalThroughput,
       throughputPerMin: this.simTime > 0 ? (totalThroughput / this.simTime) * 60 : 0,
@@ -478,6 +672,7 @@ export class SimulationEngine {
       bottleneck,
       simTime: this.simTime,
       productCount: this.products.length,
+      flowStates,
     };
   }
 }

@@ -8,11 +8,16 @@ export interface Product {
   progress: number;   // 0-1 along current edge or conveyor
   currentNodeId: string;
   currentEdgeId: string | null;
-  state: 'at-node' | 'moving' | 'processing' | 'queued' | 'completed';
+  state: 'at-node' | 'moving' | 'processing' | 'queued' | 'completed' | 'blocked' | 'stopped';
   createdAt: number;
   completedAt: number | null;
   conveyorEntryTime: number | null; // when product entered current conveyor
+  blockedSince: number | null;      // when product became blocked
+  stoppedBy: string | null;         // stopper node ID that stopped this product
 }
+
+/** Flow state for a node — describes current operational condition */
+export type FlowState = 'running' | 'blocked' | 'starved' | 'stopped' | 'idle' | 'faulted';
 
 export interface NodeStats {
   nodeId: string;
@@ -28,4 +33,21 @@ export interface NodeStats {
   lastSpawnTime: number;
   routerIndex: number;
   palletCount: number;
+
+  // Flow state tracking (Task 18)
+  flowState: FlowState;
+  blockedTime: number;          // cumulative time in blocked state
+  starvedTime: number;          // cumulative time in starved state
+  stoppedTime: number;          // cumulative time stopped by stopper
+  lastFlowStateChange: number;  // sim time of last flow state transition
+  peakQueueLength: number;      // highest queue length observed
+  totalItemsBlocked: number;    // count of items that experienced blocking
+  events: FlowEvent[];          // recent flow events for reporting
+}
+
+export interface FlowEvent {
+  time: number;
+  type: 'blocked' | 'unblocked' | 'starved' | 'fed' | 'stopped' | 'released' | 'sensor-trigger' | 'sensor-clear';
+  nodeId: string;
+  detail?: string;
 }
