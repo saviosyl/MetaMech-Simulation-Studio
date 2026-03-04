@@ -234,25 +234,49 @@ export function buildCenterStructure(params: SpiralConveyorParams): THREE.Group 
   const columnHeight = totalHeight + 0.15; // extend slightly above
 
   if (params.centerStructure === 'column') {
-    // Heavy cylindrical column
-    const colRadius = Math.min(0.2, params.diameterMm / 8000); // proportional
-    const colGeo = new THREE.CylinderGeometry(colRadius, colRadius, columnHeight, 24);
-    const col = new THREE.Mesh(colGeo, matColumn);
-    col.position.y = columnHeight / 2;
-    col.castShadow = true;
-    group.add(col);
+    // Industrial drum/column — proportional to spiral diameter
+    const colRadius = Math.max(0.08, Math.min(0.25, params.diameterMm / 6000));
 
-    // Column cap
-    const capGeo = new THREE.CylinderGeometry(colRadius * 1.3, colRadius * 1.3, 0.03, 24);
-    const cap = new THREE.Mesh(capGeo, matColumn);
-    cap.position.y = columnHeight + 0.015;
-    group.add(cap);
+    // Main drum (slightly tapered for industrial look)
+    const drumGeo = new THREE.CylinderGeometry(colRadius * 0.95, colRadius, columnHeight, 32);
+    const drum = new THREE.Mesh(drumGeo, matColumn);
+    drum.position.y = columnHeight / 2;
+    drum.castShadow = true;
+    group.add(drum);
 
-    // Column base ring
-    const baseRingGeo = new THREE.CylinderGeometry(colRadius * 1.5, colRadius * 1.5, 0.04, 24);
-    const baseRing = new THREE.Mesh(baseRingGeo, matColumn);
-    baseRing.position.y = 0.02;
-    group.add(baseRing);
+    // Horizontal stiffening rings every ~500mm
+    const ringCount = Math.max(3, Math.ceil(columnHeight / 0.5));
+    for (let r = 0; r <= ringCount; r++) {
+      const ry = (columnHeight * r) / ringCount;
+      const ringGeo = new THREE.TorusGeometry(colRadius + 0.008, 0.008, 8, 24);
+      const ring = new THREE.Mesh(ringGeo, matBaseTop);
+      ring.position.y = ry;
+      ring.rotation.x = Math.PI / 2;
+      group.add(ring);
+    }
+
+    // Heavy top plate with mounting flange
+    const topPlateGeo = new THREE.CylinderGeometry(colRadius * 1.4, colRadius * 1.4, 0.04, 32);
+    const topPlate = new THREE.Mesh(topPlateGeo, matBaseTop);
+    topPlate.position.y = columnHeight + 0.02;
+    group.add(topPlate);
+
+    // Base flange (wider, heavy foundation)
+    const baseFlangeGeo = new THREE.CylinderGeometry(colRadius * 1.6, colRadius * 1.6, 0.05, 32);
+    const baseFlange = new THREE.Mesh(baseFlangeGeo, matBase);
+    baseFlange.position.y = 0.025;
+    group.add(baseFlange);
+
+    // Anchor bolt pattern on base
+    for (let b = 0; b < 6; b++) {
+      const bAngle = (b * Math.PI * 2) / 6;
+      const bx = Math.cos(bAngle) * colRadius * 1.3;
+      const bz = Math.sin(bAngle) * colRadius * 1.3;
+      const boltGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.06, 6);
+      const bolt = new THREE.Mesh(boltGeo, matBaseTop);
+      bolt.position.set(bx, 0.03, bz);
+      group.add(bolt);
+    }
 
   } else {
     // Framed core — 4 vertical posts with cross braces
