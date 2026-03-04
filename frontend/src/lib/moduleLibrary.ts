@@ -142,6 +142,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       supportSpacing: { type: 'number', label: 'Support Spacing (mm)', default: 1500, min: 500, max: 4000, step: 100 },
       showLegs: { type: 'boolean', label: 'Show Supports', default: true },
       adjustableFeetEnabled: { type: 'boolean', label: 'Adjustable Feet', default: true },
+      accumulationMode: { type: 'boolean', label: 'Accumulation Mode', default: false },
+      accumulationZones: { type: 'number', label: 'Accumulation Zones', default: 6, min: 2, max: 20, step: 1 },
       cleatHeight: { type: 'number', label: 'Cleat Height (mm)', default: 25, min: 10, max: 80, step: 5 },
       cleatSpacing: { type: 'number', label: 'Cleat Spacing (mm)', default: 150, min: 50, max: 500, step: 25 },
       cleatStyle: { type: 'select', label: 'Cleat Style', default: 'straight', options: ['straight', 'chevron', 'angled'] },

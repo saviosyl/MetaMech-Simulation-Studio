@@ -106,7 +106,13 @@ export class SimulationEngine {
         case 'conveyor':
         case 'belt-conveyor':
         case 'roller-conveyor':
-          this.tickConveyor(node, stats, elapsed); break;
+        case 'bend-conveyor':
+          if (node.parameters.accumulationMode) {
+            this.tickAccumulationConveyor(node, stats, elapsed);
+          } else {
+            this.tickConveyor(node, stats, elapsed);
+          }
+          break;
         case 'machine': this.tickMachine(node, stats, elapsed); break;
         case 'buffer': this.tickBuffer(node, stats); break;
         case 'sink': this.tickSink(node, stats); break;
@@ -456,6 +462,114 @@ export class SimulationEngine {
     } else {
       this.setFlowState(stats, 'idle', dt);
     }
+  }
+
+  // ─── Accumulation Conveyor: zone-based buffering on belt ─────
+  private tickAccumulationConveyor(node: ProcessNode, stats: NodeStats, dt: number) {
+    // Accumulation mode: products queue up on the conveyor surface with spacing
+    // instead of jamming at the output. Products stop in zones, then release in order.
+    const lengthM = (node.parameters.length || 3000) / 1000;
+    const beltHeightM = (node.parameters.height || 800) / 1000;
+    const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
+    const zoneCount = node.parameters.accumulationZones || Math.max(2, Math.floor(lengthM / 0.5));
+    const zoneLength = lengthM / zoneCount;
+
+    // Accept arriving products
+    const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
+    for (const product of arrived) {
+      product.state = 'queued';
+      product.conveyorEntryTime = this.simTime;
+      stats.queue.push(product.id);
+    }
+
+    const ports = getConnectionPorts(node.type, node.parameters);
+    const inputPort = ports.find(p => p.type === 'input');
+    const outputPort = ports.find(p => p.type === 'output');
+
+    // Check if output is blocked
+    const outEdges = this.getOutEdges(node.id);
+    let outputBlocked = false;
+    if (outEdges.length > 0) {
+      for (const edge of outEdges) {
+        const ds = this.nodeStats.get(edge.to);
+        const dn = this.nodes.find(n => n.id === edge.to);
+        if (ds && dn) {
+          if (dn.type === 'stopper' && (dn.parameters.engaged ?? true)) outputBlocked = true;
+          if (ds.flowState === 'blocked' || ds.flowState === 'stopped') outputBlocked = true;
+          if (dn.type === 'machine' && ds.processing) outputBlocked = true;
+          if (dn.type === 'buffer' && ds.queue.length >= (dn.parameters.capacity || 10)) outputBlocked = true;
+        }
+      }
+    } else {
+      outputBlocked = true; // dead end
+    }
+
+    // Zone logic: each product occupies a zone, products accumulate from output end
+    const toRelease: string[] = [];
+    for (let qi = 0; qi < stats.queue.length; qi++) {
+      const pid = stats.queue[qi];
+      const product = this.products.find(p => p.id === pid);
+      if (!product || !product.conveyorEntryTime) continue;
+
+      const timeOnBelt = this.simTime - product.conveyorEntryTime;
+      const travelTime = lengthM / speedMps;
+      const naturalT = Math.min(1, timeOnBelt / travelTime);
+
+      // Target zone position: front-most product goes to last zone (output end)
+      // Products behind it stack up in preceding zones
+      const reverseIndex = stats.queue.length - 1 - qi; // 0 = closest to output
+      let targetT: number;
+
+      if (outputBlocked) {
+        // Accumulate: stack from output end backwards
+        const zoneIndex = Math.min(reverseIndex, zoneCount - 1);
+        targetT = 1.0 - (zoneIndex * zoneLength + zoneLength / 2) / lengthM;
+        targetT = Math.max(0.05, targetT);
+      } else {
+        // Release: all products move toward output
+        targetT = 1.0;
+      }
+
+      // Clamp to target (can't go past target, smooth approach)
+      const t = Math.min(naturalT, targetT);
+
+      // Position
+      if (inputPort && outputPort) {
+        const inX = node.position[0] + inputPort.localPosition[0];
+        const outX = node.position[0] + outputPort.localPosition[0];
+        const inZ = node.position[2] + inputPort.localPosition[2];
+        const outZ = node.position[2] + outputPort.localPosition[2];
+        product.currentPosition = [
+          inX + (outX - inX) * t,
+          node.position[1] + beltHeightM,
+          inZ + (outZ - inZ) * t,
+        ];
+      } else {
+        const halfL = lengthM / 2;
+        product.currentPosition = [
+          node.position[0] - halfL + lengthM * t,
+          node.position[1] + beltHeightM,
+          node.position[2],
+        ];
+      }
+
+      if (t >= 0.99 && !outputBlocked) toRelease.push(pid);
+    }
+
+    for (const pid of toRelease) {
+      stats.queue = stats.queue.filter(id => id !== pid);
+      const product = this.products.find(p => p.id === pid);
+      if (product) {
+        const oe = this.getOutEdges(node.id);
+        if (oe.length > 0) {
+          this.sendProductAlongEdge(product, oe[0]);
+        }
+        stats.throughput++;
+      }
+    }
+
+    if (stats.queue.length > 0) stats.busyTime += dt;
+    this.evaluateConveyorFlowState(node, stats, dt);
   }
 
   // ─── Sensor: detects product presence ────────────────────────
