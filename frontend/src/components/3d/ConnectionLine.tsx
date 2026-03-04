@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Line } from '@react-three/drei';
 import { useEditorStore, getConnectionPorts } from '../../store/editorStore';
+import { getPortWorldPosition } from '../../lib/nodeTransform';
 
 const ConnectionLines: React.FC = () => {
   const { processNodes, edges } = useEditorStore();
@@ -17,16 +18,8 @@ const ConnectionLines: React.FC = () => {
       const toPort = toPorts.find(p => p.id === edge.toPort);
       if (!fromPort || !toPort) return null;
 
-      const start: [number, number, number] = [
-        fromNode.position[0] + fromPort.localPosition[0],
-        fromNode.position[1] + fromPort.localPosition[1],
-        fromNode.position[2] + fromPort.localPosition[2],
-      ];
-      const end: [number, number, number] = [
-        toNode.position[0] + toPort.localPosition[0],
-        toNode.position[1] + toPort.localPosition[1],
-        toNode.position[2] + toPort.localPosition[2],
-      ];
+      const start = getPortWorldPosition(fromPort.localPosition, fromNode);
+      const end = getPortWorldPosition(toPort.localPosition, toNode);
 
       // Create a slight arc
       const mid: [number, number, number] = [

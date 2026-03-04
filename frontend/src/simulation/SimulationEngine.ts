@@ -9,6 +9,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Product, NodeStats, FlowState, FlowEvent } from './Product';
 import { ProcessNode, ProcessEdge, getConnectionPorts } from '../store/editorStore';
+import { getPortWorldPosition } from '../lib/nodeTransform';
 
 const COLOR_MAP: Record<string, string> = {
   brown: '#8B4513',
@@ -184,26 +185,21 @@ export class SimulationEngine {
       const timeOnBelt = this.simTime - product.conveyorEntryTime;
       const t = Math.min(1, timeOnBelt / travelTime);
 
-      // Animate: interpolate from input port to output port
+      // Animate: interpolate from input port to output port (rotation-aware)
       if (inputPort && outputPort) {
-        const inX = node.position[0] + inputPort.localPosition[0];
-        const outX = node.position[0] + outputPort.localPosition[0];
-        const inZ = node.position[2] + inputPort.localPosition[2];
-        const outZ = node.position[2] + outputPort.localPosition[2];
+        const inWorld = getPortWorldPosition(inputPort.localPosition, node);
+        const outWorld = getPortWorldPosition(outputPort.localPosition, node);
 
         product.currentPosition = [
-          inX + (outX - inX) * t,
-          node.position[1] + beltHeightM,  // ride ON TOP of belt
-          inZ + (outZ - inZ) * t,           // centered on conveyor width
+          inWorld[0] + (outWorld[0] - inWorld[0]) * t,
+          inWorld[1] + (outWorld[1] - inWorld[1]) * t,
+          inWorld[2] + (outWorld[2] - inWorld[2]) * t,
         ];
       } else {
-        // Fallback: animate along X axis
+        // Fallback: animate along local X axis, then rotate to world
         const halfL = lengthM / 2;
-        product.currentPosition = [
-          node.position[0] - halfL + lengthM * t,
-          node.position[1] + beltHeightM,
-          node.position[2],
-        ];
+        const localPos: [number, number, number] = [-halfL + lengthM * t, beltHeightM, 0];
+        product.currentPosition = getPortWorldPosition(localPos, node);
       }
 
       if (t >= 1) toRelease.push(pid);
@@ -385,16 +381,8 @@ export class SimulationEngine {
       const tp = toPorts.find(p => p.id === edge.toPort);
       if (!fp || !tp) continue;
 
-      const start: [number, number, number] = [
-        fromNode.position[0] + fp.localPosition[0],
-        fromNode.position[1] + fp.localPosition[1],
-        fromNode.position[2] + fp.localPosition[2],
-      ];
-      const end: [number, number, number] = [
-        toNode.position[0] + tp.localPosition[0],
-        toNode.position[1] + tp.localPosition[1],
-        toNode.position[2] + tp.localPosition[2],
-      ];
+      const start = getPortWorldPosition(fp.localPosition, fromNode);
+      const end = getPortWorldPosition(tp.localPosition, toNode);
 
       const dx = end[0] - start[0];
       const dy = end[1] - start[1];
@@ -415,14 +403,10 @@ export class SimulationEngine {
         product.currentPosition = [...end];
         product.conveyorEntryTime = null;
       } else {
-        // Keep Y at the belt height of the destination conveyor
-        const toHeight = CONVEYOR_TYPES.includes(toNode.type)
-          ? (toNode.parameters.height || 800) / 1000
-          : end[1];
-
+        // Interpolate along the edge path between start and end world positions
         product.currentPosition = [
           start[0] + dx * product.progress,
-          toNode.position[1] + toHeight,
+          start[1] + dy * product.progress,
           start[2] + dz * product.progress,
         ];
       }
@@ -533,24 +517,19 @@ export class SimulationEngine {
       // Clamp to target (can't go past target, smooth approach)
       const t = Math.min(naturalT, targetT);
 
-      // Position
+      // Position (rotation-aware)
       if (inputPort && outputPort) {
-        const inX = node.position[0] + inputPort.localPosition[0];
-        const outX = node.position[0] + outputPort.localPosition[0];
-        const inZ = node.position[2] + inputPort.localPosition[2];
-        const outZ = node.position[2] + outputPort.localPosition[2];
+        const inWorld = getPortWorldPosition(inputPort.localPosition, node);
+        const outWorld = getPortWorldPosition(outputPort.localPosition, node);
         product.currentPosition = [
-          inX + (outX - inX) * t,
-          node.position[1] + beltHeightM,
-          inZ + (outZ - inZ) * t,
+          inWorld[0] + (outWorld[0] - inWorld[0]) * t,
+          inWorld[1] + (outWorld[1] - inWorld[1]) * t,
+          inWorld[2] + (outWorld[2] - inWorld[2]) * t,
         ];
       } else {
         const halfL = lengthM / 2;
-        product.currentPosition = [
-          node.position[0] - halfL + lengthM * t,
-          node.position[1] + beltHeightM,
-          node.position[2],
-        ];
+        const localPos: [number, number, number] = [-halfL + lengthM * t, beltHeightM, 0];
+        product.currentPosition = getPortWorldPosition(localPos, node);
       }
 
       if (t >= 0.99 && !outputBlocked) toRelease.push(pid);

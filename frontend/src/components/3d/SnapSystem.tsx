@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { useEditorStore, getConnectionPorts, ProcessNode, ConnectionPort } from '../../store/editorStore';
+import { getPortWorldPosition, alignNodeToPort } from '../../lib/nodeTransform';
 
 const SNAP_THRESHOLD = 0.5;
 
@@ -18,11 +19,7 @@ const SnapSystem: React.FC = () => {
     processNodes.forEach((node: ProcessNode) => {
       const ports = getConnectionPorts(node.type, node.parameters);
       ports.forEach((port: ConnectionPort) => {
-        const worldPos: [number, number, number] = [
-          node.position[0] + port.localPosition[0],
-          node.position[1] + port.localPosition[1],
-          node.position[2] + port.localPosition[2],
-        ];
+        const worldPos = getPortWorldPosition(port.localPosition, node);
         const connected = edges.some(e =>
           (e.from === node.id && e.fromPort === port.id) ||
           (e.to === node.id && e.toPort === port.id)
@@ -67,11 +64,13 @@ const SnapSystem: React.FC = () => {
         const secondPort = secondPorts.find(p => p.id === pv.portId);
         if (secondPort) {
           // Calculate where the second node needs to be so its port aligns with the first port
-          const newPosition: [number, number, number] = [
-            selectedPort.worldPosition[0] - secondPort.localPosition[0],
-            0, // Always on ground
-            selectedPort.worldPosition[2] - secondPort.localPosition[2],
-          ];
+          // Uses rotation-aware alignment
+          const newPosition = alignNodeToPort(
+            secondPort.localPosition,
+            selectedPort.worldPosition,
+            secondNode.rotation,
+            secondNode.scale,
+          );
           updateObject(pv.nodeId, 'process', { position: newPosition });
         }
       }
@@ -155,11 +154,7 @@ export function checkSnap(
     const otherPorts = getConnectionPorts(otherNode.type, otherNode.parameters);
 
     for (const dp of dragPorts) {
-      const dpWorld = [
-        draggedNode.position[0] + dp.localPosition[0],
-        draggedNode.position[1] + dp.localPosition[1],
-        draggedNode.position[2] + dp.localPosition[2],
-      ];
+      const dpWorld = getPortWorldPosition(dp.localPosition, draggedNode);
 
       for (const op of otherPorts) {
         // Only connect output->input
@@ -172,11 +167,7 @@ export function checkSnap(
         );
         if (alreadyConnected) continue;
 
-        const opWorld = [
-          otherNode.position[0] + op.localPosition[0],
-          otherNode.position[1] + op.localPosition[1],
-          otherNode.position[2] + op.localPosition[2],
-        ];
+        const opWorld = getPortWorldPosition(op.localPosition, otherNode);
 
         const dist = Math.sqrt(
           (dpWorld[0] - opWorld[0]) ** 2 +
@@ -185,12 +176,8 @@ export function checkSnap(
         );
 
         if (dist < SNAP_THRESHOLD) {
-          // Calculate snap position: move dragged node so ports align
-          const snapPos: [number, number, number] = [
-            otherNode.position[0] + op.localPosition[0] - dp.localPosition[0],
-            0, // Always on ground
-            otherNode.position[2] + op.localPosition[2] - dp.localPosition[2],
-          ];
+          // Calculate snap position: move dragged node so ports align (rotation-aware)
+          const snapPos = alignNodeToPort(dp.localPosition, opWorld, draggedNode.rotation, draggedNode.scale);
 
           return {
             targetNodeId: otherNode.id,
