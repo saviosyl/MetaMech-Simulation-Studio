@@ -294,7 +294,7 @@ const FallbackBox: React.FC<{ color: string; isSelected: boolean }> = ({ color, 
 );
 
 // Generic model for types that don't have a dedicated model yet
-const GenericModel: React.FC<{ type: string; isSelected: boolean; params: Record<string, any> }> = ({ type, isSelected, params: _params }) => {
+const GenericModel: React.FC<{ type: string; isSelected: boolean; params: Record<string, any> }> = ({ type, isSelected, params }) => {
   const em = isSelected ? '#222222' : '#000000';
   const color = getNodeColor(type);
 
@@ -361,27 +361,83 @@ const GenericModel: React.FC<{ type: string; isSelected: boolean; params: Record
         </group>
       );
 
-    case 'vertical-lifter':
+    case 'vertical-lifter': {
+      const lPW = (params.platformWidth || 1000) / 1000;
+      const lPD = (params.platformDepth || 1000) / 1000;
+      const lH = (params.liftHeight || 3000) / 1000;
+      const colInset = 0.06;
+      const colSize = 0.08;
+      const corners: [number, number][] = [
+        [-lPW/2 + colInset, -lPD/2 + colInset],
+        [-lPW/2 + colInset, lPD/2 - colInset],
+        [lPW/2 - colInset, -lPD/2 + colInset],
+        [lPW/2 - colInset, lPD/2 - colInset],
+      ];
       return (
         <group>
-          <mesh position={[0, 0.15, 0]} castShadow>
-            <boxGeometry args={[1.5, 0.3, 1.5]} />
-            <meshStandardMaterial color="#3a3a3a" metalness={0.8} roughness={0.3} emissive={em} />
+          {/* Heavy base plate */}
+          <mesh position={[0, 0.025, 0]} castShadow receiveShadow>
+            <boxGeometry args={[lPW + 0.1, 0.05, lPD + 0.1]} />
+            <meshStandardMaterial color="#3a3a3a" metalness={0.8} roughness={0.25} emissive={em} />
           </mesh>
-          {/* Vertical columns */}
-          {[[-0.6, -0.6], [-0.6, 0.6], [0.6, -0.6], [0.6, 0.6]].map(([x, z], i) => (
-            <mesh key={i} position={[x, 1.5, z]} castShadow>
-              <boxGeometry args={[0.1, 2.7, 0.1]} />
-              <meshStandardMaterial color={color} metalness={0.7} roughness={0.3} emissive={em} />
+          {/* Floor anchor bolts */}
+          {corners.map(([cx, cz], i) => (
+            <mesh key={`bolt-${i}`} position={[cx, 0.005, cz]}>
+              <cylinderGeometry args={[0.02, 0.025, 0.01, 8]} />
+              <meshStandardMaterial color="#555" metalness={0.9} roughness={0.2} />
             </mesh>
           ))}
-          {/* Platform */}
-          <mesh position={[0, 1.5, 0]} castShadow>
-            <boxGeometry args={[1.2, 0.1, 1.2]} />
+          {/* Vertical columns (C-channel style) */}
+          {corners.map(([cx, cz], i) => (
+            <group key={`col-${i}`}>
+              <mesh position={[cx, lH / 2 + 0.05, cz]} castShadow>
+                <boxGeometry args={[colSize, lH, colSize]} />
+                <meshStandardMaterial color="#c0c0c0" metalness={0.75} roughness={0.3} emissive={em} />
+              </mesh>
+              {/* Column channel groove */}
+              <mesh position={[cx, lH / 2 + 0.05, cz]}>
+                <boxGeometry args={[colSize * 0.4, lH - 0.1, colSize + 0.002]} />
+                <meshStandardMaterial color="#888" metalness={0.7} roughness={0.25} />
+              </mesh>
+            </group>
+          ))}
+          {/* Top frame beam */}
+          <mesh position={[0, lH + 0.05 + colSize/2, 0]} castShadow>
+            <boxGeometry args={[lPW, colSize, lPD]} />
+            <meshStandardMaterial color="#4a4a4a" metalness={0.75} roughness={0.3} emissive={em} />
+          </mesh>
+          {/* Cross braces (X pattern on two sides) */}
+          {[[-lPW/2 + colInset, 0], [lPW/2 - colInset, 0]].map(([bx, _bz], i) => (
+            <mesh key={`brace-${i}`} position={[bx, lH * 0.5, 0]} rotation={[0, 0, Math.atan2(lH, lPD)]} castShadow>
+              <boxGeometry args={[0.02, Math.sqrt(lH*lH + lPD*lPD) * 0.7, 0.02]} />
+              <meshStandardMaterial color="#999" metalness={0.6} roughness={0.4} />
+            </mesh>
+          ))}
+          {/* Platform (rides in the middle by default) */}
+          <mesh position={[0, lH * 0.5, 0]} castShadow>
+            <boxGeometry args={[lPW - 0.04, 0.04, lPD - 0.04]} />
             <meshStandardMaterial color="#888888" metalness={0.7} roughness={0.3} emissive={em} />
           </mesh>
+          {/* Platform roller conveyor surface */}
+          {Array.from({length: 5}).map((_, ri) => {
+            const rz = -lPD/2 + 0.1 + (lPD - 0.2) * (ri / 4);
+            return (
+              <mesh key={`roller-${ri}`} position={[0, lH * 0.5 + 0.03, rz]} rotation={[0, 0, Math.PI/2]}>
+                <cylinderGeometry args={[0.015, 0.015, lPW - 0.1, 8]} />
+                <meshStandardMaterial color="#aaa" metalness={0.85} roughness={0.15} />
+              </mesh>
+            );
+          })}
+          {/* Safety guard rails */}
+          {[[-lPW/2 - 0.01, 0], [lPW/2 + 0.01, 0]].map(([gx, _gz], i) => (
+            <mesh key={`guard-${i}`} position={[gx, lH * 0.5 + 0.15, 0]}>
+              <boxGeometry args={[0.005, 0.3, lPD - 0.04]} />
+              <meshStandardMaterial color="#e8b710" metalness={0.3} roughness={0.5} />
+            </mesh>
+          ))}
         </group>
       );
+    }
 
     default:
       return (

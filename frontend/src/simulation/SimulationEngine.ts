@@ -123,6 +123,7 @@ export class SimulationEngine {
         case 'palletizer': this.tickPalletizer(node, stats, elapsed); break;
         case 'stopper': this.tickStopper(node, stats, elapsed); break;
         case 'sensor': this.tickSensor(node, stats, elapsed); break;
+        case 'vertical-lifter': this.tickLift(node, stats, elapsed); break;
       }
 
       if (stats.totalTime > 0) {
@@ -407,6 +408,71 @@ export class SimulationEngine {
           start[2] + dz * product.progress,
         ];
       }
+    }
+  }
+
+  // ─── Vertical Lifter: products ride platform up/down ──────────
+  private tickLift(node: ProcessNode, stats: NodeStats, dt: number) {
+    const liftHeightM = (node.parameters.liftHeight || 3000) / 1000;
+    const speedMps = (node.parameters.speed || 1);  // m/s
+    const travelTime = liftHeightM / speedMps;
+    const capacity = node.parameters.capacity || 1;
+
+    // Accept arriving products
+    const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
+    for (const product of arrived) {
+      if (stats.queue.length < capacity) {
+        product.state = 'queued';
+        product.conveyorEntryTime = this.simTime;
+        stats.queue.push(product.id);
+      }
+    }
+
+    // Animate products on the lift platform
+    const ports = getConnectionPorts(node.type, node.parameters);
+    const inputPort = ports.find(p => p.type === 'input');
+    const outputPort = ports.find(p => p.type === 'output');
+    const infeedY = inputPort ? inputPort.localPosition[1] : 0.15;
+    const outfeedY = outputPort ? outputPort.localPosition[1] : liftHeightM;
+
+    const toRelease: string[] = [];
+    for (const pid of stats.queue) {
+      const product = this.products.find(p => p.id === pid);
+      if (!product || !product.conveyorEntryTime) continue;
+
+      const elapsed = this.simTime - product.conveyorEntryTime;
+      const t = Math.min(1, elapsed / travelTime);
+
+      // Product rides the platform from infeed Y to outfeed Y
+      const currentY = infeedY + (outfeedY - infeedY) * t;
+      product.currentPosition = [
+        node.position[0],
+        node.position[1] + currentY,
+        node.position[2],
+      ];
+
+      if (t >= 1) toRelease.push(pid);
+    }
+
+    for (const pid of toRelease) {
+      stats.queue = stats.queue.filter(id => id !== pid);
+      const product = this.products.find(p => p.id === pid);
+      if (product) {
+        const outEdges = this.getOutEdges(node.id);
+        if (outEdges.length > 0) {
+          this.sendProductAlongEdge(product, outEdges[0]);
+        } else {
+          product.state = 'at-node';
+        }
+        stats.throughput++;
+      }
+    }
+
+    if (stats.queue.length > 0) {
+      stats.busyTime += dt;
+      this.setFlowState(stats, 'running', dt);
+    } else {
+      this.setFlowState(stats, 'idle', dt);
     }
   }
 

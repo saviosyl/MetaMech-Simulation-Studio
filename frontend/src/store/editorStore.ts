@@ -224,6 +224,31 @@ export function getConnectionPorts(type: string, params?: Record<string, any>, a
         { id: 'reject', type: 'output', localPosition: [0, pMH, params?.side === 'left' ? -0.5 : 0.5] },
       ];
     }
+    case 'vertical-lifter': {
+      const platW = (params?.platformWidth || 1000) / 1000;
+      const platD = (params?.platformDepth || 1000) / 1000;
+      const liftH = (params?.liftHeight || 3000) / 1000;
+      const loadDir = params?.loadDirection || 'front';
+      // Infeed at ground level, outfeed at top
+      const infeedY = 0.15; // just above base
+      const outfeedY = liftH;
+      // Direction offsets based on loadDirection
+      const dirMap: Record<string, [number, number]> = {
+        front: [0, -platD / 2],
+        back: [0, platD / 2],
+        left: [-platW / 2, 0],
+        right: [platW / 2, 0],
+      };
+      const [inX, inZ] = dirMap[loadDir] || [0, -platD / 2];
+      return [
+        { id: 'input', type: 'input', localPosition: [inX, infeedY, inZ] as [number, number, number] },
+        { id: 'output', type: 'output', localPosition: [-inX, outfeedY, -inZ] as [number, number, number] },
+      ];
+    }
+    case 'sensor': {
+      // Sensor has no transport ports, only detection
+      return [];
+    }
     default:
       return [
         { id: 'input', type: 'input', localPosition: [-1, 0.5, 0] },
