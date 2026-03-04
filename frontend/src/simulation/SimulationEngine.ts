@@ -626,18 +626,30 @@ export class SimulationEngine {
     // Tick the motion controller
     const placedId = tickRobot(rState, config, this.simTime, availableProductId);
 
-    // If robot just picked a product, remove from queue
+    // If robot just picked a product, remove from source ownership
     if (rState.phase === 'retract-pick' && rState.phaseProgress < 0.1 && rState.heldProductId) {
       stats.queue = stats.queue.filter(id => id !== rState.heldProductId);
       const held = this.products.find(p => p.id === rState.heldProductId);
-      if (held) held.state = 'processing';
+      if (held) {
+        held.state = 'processing';
+        held.currentNodeId = node.id;    // Now owned by robot
+        held.currentEdgeId = null;
+        held.stoppedBy = null;
+        held.conveyorEntryTime = null;
+        held.pathPosition = 0;
+        // Remove from any conveyor queue it might still be in
+        for (const [, ns] of this.nodeStats) {
+          ns.queue = ns.queue.filter(id => id !== rState.heldProductId);
+        }
+      }
     }
 
-    // Move held product to TCP position
+    // Move held product to TCP position (physically attached to end effector)
     if (rState.heldProductId) {
       const held = this.products.find(p => p.id === rState.heldProductId);
       if (held) {
         held.currentPosition = [...rState.toolCenterPoint];
+        // Keep product visually level (robot Y rotation doesn't tilt product)
       }
     }
 
@@ -670,11 +682,15 @@ export class SimulationEngine {
           }
         }
         if (!placedOnPallet) {
-          // Send to next node via edge
+          // Send to next node — could be a conveyor, buffer, or other target
           if (outEdges.length > 0) {
+            placed.pathPosition = 0;  // Start at beginning of destination
+            placed.conveyorEntryTime = null;
             this.sendProductAlongEdge(placed, outEdges[0]);
           } else {
+            // No output edge — place at robot's place position
             placed.state = 'completed';
+            placed.currentPosition = [...rState.toolCenterPoint];
           }
         }
         stats.throughput++;
@@ -686,10 +702,11 @@ export class SimulationEngine {
 
   // ─── Stopper: blocks product flow ─────────────────────────────
   private tickStopper(node: ProcessNode, stats: NodeStats, dt: number) {
-    const mode = node.parameters.stopperMode || 'normally-closed';
+    const mode = node.parameters.stopperMode || 'timed-auto';
     const enabled = node.parameters.enabled ?? true;
     const holdTime = node.parameters.holdTime || 3;
-    const meteringInterval = node.parameters.meteringInterval || 2;
+    const releaseCount = node.parameters.releaseCount || 1;
+    const openDuration = node.parameters.openDuration || 2;
 
     if (!enabled) {
       this.releaseAllStopped(node, stats);
@@ -709,14 +726,8 @@ export class SimulationEngine {
     const stopped = this.products.filter(p => p.stoppedBy === node.id);
 
     switch (mode) {
-      case 'normally-closed': {
-        // Basic: stop all, release when engaged=false
-        const engaged = node.parameters.engaged ?? true;
-        if (!engaged) this.releaseAllStopped(node, stats);
-        break;
-      }
-      case 'timed-release': {
-        // Hold for N seconds, then release all
+      case 'timed-auto': {
+        // Mode A: Stop → hold X seconds → release all → repeat
         for (const p of stopped) {
           if (p.blockedSince && (this.simTime - p.blockedSince) >= holdTime) {
             this.releaseProduct(p, node, stats);
@@ -724,40 +735,92 @@ export class SimulationEngine {
         }
         break;
       }
-      case 'release-one': {
-        // Release one per trigger (release when engaged toggles to false)
-        const engaged = node.parameters.engaged ?? true;
-        if (!engaged && stopped.length > 0) {
-          this.releaseProduct(stopped[0], node, stats);
-          // Re-engage automatically
-          node.parameters.engaged = true;
+      case 'timed-release-n':
+      case 'timed-batch': {
+        // Mode B: Stop → hold X seconds → release N products → stop again
+        if (stats.processEndTime === null && stopped.length > 0) {
+          // Start hold timer from first product arrival
+          const earliest = stopped.reduce((min, p) => Math.min(min, p.blockedSince || Infinity), Infinity);
+          if (earliest < Infinity) stats.processEndTime = earliest + holdTime;
+        }
+        if (stats.processEndTime !== null && this.simTime >= stats.processEndTime) {
+          const toRelease = stopped.slice(0, releaseCount);
+          for (const p of toRelease) this.releaseProduct(p, node, stats);
+          stats.processEndTime = null; // Reset timer for next batch
         }
         break;
       }
-      case 'metering': {
-        // Release one every N seconds
-        if (stats.processEndTime === null) stats.processEndTime = this.simTime + meteringInterval;
-        if (stats.processEndTime !== null && this.simTime >= stats.processEndTime && stopped.length > 0) {
-          this.releaseProduct(stopped[0], node, stats);
-          stats.processEndTime = this.simTime + meteringInterval;
+      case 'sensor-triggered':
+      case 'sensor-release': {
+        // Mode C: Accumulate → sensor tag goes TRUE → release all
+        const sensorTag = node.parameters.sensorTag || '';
+        if (sensorTag) {
+          // Find the sensor node by tag
+          const sensorNode = this.nodes.find(n =>
+            n.type === 'sensor' && n.parameters.sensorTag === sensorTag
+          );
+          if (sensorNode) {
+            const sensorStats = this.nodeStats.get(sensorNode.id);
+            // Sensor is "triggered" if a product is within its detection zone
+            const triggered = sensorStats && sensorStats.processing;
+            if (triggered) {
+              this.releaseAllStopped(node, stats);
+            }
+          }
         }
         break;
       }
-      case 'batch-release': {
-        // Release N items per trigger
-        const batchSize = node.parameters.batchSize || 3;
+      case 'external-trigger': {
+        // Mode D: Stay closed until engaged=false (toggled by user/rule)
         const engaged = node.parameters.engaged ?? true;
         if (!engaged) {
-          const toRelease = stopped.slice(0, batchSize);
-          for (const p of toRelease) this.releaseProduct(p, node, stats);
-          node.parameters.engaged = true;
+          this.releaseAllStopped(node, stats);
+          node.parameters.engaged = true; // Re-engage after release
+        }
+        break;
+      }
+      case 'pulse-open': {
+        // Mode E: Open for X seconds, then close again
+        if (stats.processEndTime === null && stopped.length > 0) {
+          const earliest = stopped.reduce((min, p) => Math.min(min, p.blockedSince || Infinity), Infinity);
+          if (earliest < Infinity) stats.processEndTime = earliest + holdTime;
+        }
+        if (stats.processEndTime !== null && this.simTime >= stats.processEndTime) {
+          // Open window: release products for openDuration seconds
+          const windowEnd = stats.processEndTime + openDuration;
+          if (this.simTime < windowEnd) {
+            // Window is open — release as they arrive
+            for (const p of stopped) this.releaseProduct(p, node, stats);
+          } else {
+            // Window closed — reset timer
+            stats.processEndTime = null;
+          }
+        }
+        break;
+      }
+      case 'downstream-clear': {
+        // Mode F: Release only when downstream conveyor/node has space
+        const outEdges = this.getOutEdges(node.id);
+        let downstreamClear = true;
+        if (outEdges.length > 0) {
+          const nextNodeId = outEdges[0].to;
+          const nextStats = this.nodeStats.get(nextNodeId);
+          if (nextStats && nextStats.queue.length > 0) {
+            downstreamClear = false;
+          }
+        }
+        if (downstreamClear && stopped.length > 0) {
+          this.releaseProduct(stopped[0], node, stats);
         }
         break;
       }
       default: {
-        // Fallback: basic engaged toggle
-        const engaged = node.parameters.engaged ?? true;
-        if (!engaged) this.releaseAllStopped(node, stats);
+        // Fallback: timed auto
+        for (const p of stopped) {
+          if (p.blockedSince && (this.simTime - p.blockedSince) >= holdTime) {
+            this.releaseProduct(p, node, stats);
+          }
+        }
       }
     }
 
@@ -769,6 +832,7 @@ export class SimulationEngine {
       this.setFlowState(stats, 'idle', dt);
     }
   }
+
 
   private releaseProduct(product: Product, node: ProcessNode, stats: NodeStats) {
     product.state = 'at-node';

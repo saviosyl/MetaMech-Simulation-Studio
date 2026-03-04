@@ -569,6 +569,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
       : getDefaultParameters(type);
 
+    // Auto-generate unique sensor tag
+    if (type === 'sensor' && !defaultParams.sensorTag) {
+      const existingSensors = get().processNodes.filter(n => n.type === 'sensor');
+      const usedTags = new Set(existingSensors.map(n => n.parameters.sensorTag || ''));
+      let tagNum = existingSensors.length + 1;
+      while (usedTags.has(`SE${String(tagNum).padStart(3, '0')}`)) tagNum++;
+      defaultParams.sensorTag = `SE${String(tagNum).padStart(3, '0')}`;
+    }
+
     const newNode: ProcessNode = {
       id: uuidv4(),
       type,
