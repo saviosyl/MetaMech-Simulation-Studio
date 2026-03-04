@@ -194,14 +194,30 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       const dir = params?.bendDirection || 'right';
       const sinA = Math.sin(cAngle);
       const cosA = Math.cos(cAngle);
-      // Arc center at origin; infeed at angle=0 on the arc, outfeed at bendAngle
-      const inX = dir === 'right' ? 0 : 0;
+      const sign = dir === 'right' ? 1 : -1;
+
+      // Arc center is at local origin. Infeed at angle=0, outfeed at bendAngle.
+      // Positions on the arc:
+      const inX = 0;
       const inZ = cRadius;
-      const outX = dir === 'right' ? sinA * cRadius : -sinA * cRadius;
+      const outX = sign * sinA * cRadius;
       const outZ = cosA * cRadius;
+
+      // TANGENT directions (critical for correct mate alignment):
+      // At infeed (angle=0): tangent along the arc = perpendicular to radius
+      //   For right bend: tangent points in -X direction (into the bend)
+      //   Input port faces TOWARD the infeed, so direction = +X (away from bend = toward incoming straight)
+      // At outfeed (angle=bendAngle): tangent is rotated by bendAngle from infeed tangent
+      const infeedDir: [number, number, number] = [-sign, 0, 0]; // input faces back along incoming straight
+      const outfeedDir: [number, number, number] = [
+        sign * cosA,  // rotated tangent X
+        0,
+        -sinA,        // rotated tangent Z
+      ];
+
       return [
-        { id: 'input', type: 'input', localPosition: [inX, pH, inZ] },
-        { id: 'output', type: 'output', localPosition: [outX, pH, outZ] },
+        { id: 'input', type: 'input', localPosition: [inX, pH, inZ], direction: infeedDir },
+        { id: 'output', type: 'output', localPosition: [outX, pH, outZ], direction: outfeedDir },
       ];
     }
     case 'buffer':
