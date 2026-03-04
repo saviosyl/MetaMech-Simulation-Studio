@@ -6,11 +6,13 @@
  */
 import * as THREE from 'three';
 
-const matBody = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.7, roughness: 0.3 });
-const matBlade = new THREE.MeshStandardMaterial({ color: 0xcc3333, metalness: 0.5, roughness: 0.4 });
-const matCylinder = new THREE.MeshStandardMaterial({ color: 0x336699, metalness: 0.6, roughness: 0.3 });
-const matBracket = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.6, roughness: 0.3 });
-const matRod = new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.8, roughness: 0.15 });
+import {
+  matDarkSteel as matBody,
+  matSafetyRed as matBlade,
+  matIndustrialBlue as matCylinder,
+  matGalvanized as matBracket,
+  matChrome as matRod,
+} from '../premiumMaterials';
 
 export interface StopperParams {
   enabled: boolean;

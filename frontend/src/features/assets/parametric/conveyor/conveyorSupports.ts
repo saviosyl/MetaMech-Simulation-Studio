@@ -10,16 +10,12 @@
 import * as THREE from 'three';
 import { ConveyorParams } from './conveyorTypes';
 
-// Materials (shared, reused)
-const matAluminum = new THREE.MeshStandardMaterial({
-  color: 0xc0c0c0, metalness: 0.7, roughness: 0.3,
-});
-const matDarkSteel = new THREE.MeshStandardMaterial({
-  color: 0x404040, metalness: 0.8, roughness: 0.2,
-});
-const matFootPad = new THREE.MeshStandardMaterial({
-  color: 0x333333, metalness: 0.5, roughness: 0.6,
-});
+// Premium shared materials
+import {
+  matAluminum,
+  matDarkSteel,
+  matFootPad,
+} from '../premiumMaterials';
 
 /** Compute support positions along the conveyor length */
 export function computeSupportPositions(lengthMm: number, spacingMm: number): number[] {

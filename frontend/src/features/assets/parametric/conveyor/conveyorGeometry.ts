@@ -7,15 +7,17 @@
 import * as THREE from 'three';
 import { ConveyorParams } from './conveyorTypes';
 
-// Shared materials
-const matFrame = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.7, roughness: 0.3 });
-const matBelt = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.1, roughness: 0.8 });
-const matRoller = new THREE.MeshStandardMaterial({ color: 0x999999, metalness: 0.8, roughness: 0.2 });
-const matModular = new THREE.MeshStandardMaterial({ color: 0x4488aa, metalness: 0.3, roughness: 0.5 });
-const matDrive = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6, roughness: 0.4 });
-const matMotor = new THREE.MeshStandardMaterial({ color: 0x336699, metalness: 0.7, roughness: 0.3 });
-const matCleat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.15, roughness: 0.85 });
-const matSidewall = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.1, roughness: 0.9 });
+// Premium shared materials
+import {
+  matStainlessSteel as matFrame,
+  matBelt,
+  matChrome as matRoller,
+  matModularBelt as matModular,
+  matDarkSteel as matDrive,
+  matIndustrialBlue as matMotor,
+  matCleatRubber as matCleat,
+  matSidewall,
+} from '../premiumMaterials';
 
 /** Build frame side rails */
 function buildFrame(lengthM: number, widthM: number, heightM: number): THREE.Group {

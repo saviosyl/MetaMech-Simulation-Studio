@@ -6,12 +6,14 @@
  */
 import * as THREE from 'three';
 
-const matFrame = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.7, roughness: 0.3 });
-const matPlate = new THREE.MeshStandardMaterial({ color: 0xee8833, metalness: 0.4, roughness: 0.5 });
-const matCylinder = new THREE.MeshStandardMaterial({ color: 0x336699, metalness: 0.6, roughness: 0.3 });
-const matRod = new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.8, roughness: 0.15 });
-const matGuide = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.6, roughness: 0.3 });
-const matSensor = new THREE.MeshStandardMaterial({ color: 0x22aa44, metalness: 0.3, roughness: 0.6, transparent: true, opacity: 0.9 });
+import {
+  matCastIron as matFrame,
+  matPusherOrange as matPlate,
+  matIndustrialBlue as matCylinder,
+  matChrome as matRod,
+  matGalvanized as matGuide,
+  matSensorBody as matSensor,
+} from '../premiumMaterials';
 
 export interface PusherParams {
   enabled: boolean;

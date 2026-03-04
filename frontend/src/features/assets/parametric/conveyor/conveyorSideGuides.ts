@@ -4,9 +4,7 @@
 import * as THREE from 'three';
 import { ConveyorParams } from './conveyorTypes';
 
-const matGuide = new THREE.MeshStandardMaterial({
-  color: 0xd0d0d0, metalness: 0.5, roughness: 0.4,
-});
+import { matGuideRail as matGuide } from '../premiumMaterials';
 
 export function buildSideGuides(params: ConveyorParams): THREE.Group | null {
   if (!params.sideGuidesEnabled) return null;

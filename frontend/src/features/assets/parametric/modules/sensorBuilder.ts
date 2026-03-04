@@ -13,14 +13,16 @@
  */
 import * as THREE from 'three';
 
-const matBody = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.6, roughness: 0.4 });
-const matLens = new THREE.MeshStandardMaterial({ color: 0x882222, metalness: 0.3, roughness: 0.2, transparent: true, opacity: 0.85 });
-const matBracket = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.7, roughness: 0.3 });
-const matCable = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.1, roughness: 0.9 });
-const matReflector = new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.9, roughness: 0.1 });
-const matLedOn = new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 0.8 });
-const matLedOff = new THREE.MeshStandardMaterial({ color: 0x004400, emissive: 0x002200, emissiveIntensity: 0.2 });
-const matBeam = new THREE.MeshStandardMaterial({ color: 0xff2222, transparent: true, opacity: 0.15, emissive: 0xff0000, emissiveIntensity: 0.3 });
+import {
+  matSensorBody as matBody,
+  matSensorLens as matLens,
+  matGalvanized as matBracket,
+  matCable,
+  matReflector,
+  matLedOn,
+  matLedOff,
+  matBeam,
+} from '../premiumMaterials';
 
 export type SensorType = 'through-beam' | 'retro-reflective' | 'diffuse';
 

@@ -13,16 +13,18 @@
 import * as THREE from 'three';
 import { BendConveyorParams } from './bendTypes';
 
-// Shared materials
-const matFrame = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.7, roughness: 0.3 });
-const matBelt = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.1, roughness: 0.8 });
-const matRoller = new THREE.MeshStandardMaterial({ color: 0x999999, metalness: 0.8, roughness: 0.2 });
-const matModular = new THREE.MeshStandardMaterial({ color: 0x4488aa, metalness: 0.3, roughness: 0.5 });
-const matGuide = new THREE.MeshStandardMaterial({ color: 0xd0d0d0, metalness: 0.5, roughness: 0.4 });
-const matAluminum = new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.7, roughness: 0.3 });
-const matDarkSteel = new THREE.MeshStandardMaterial({ color: 0x404040, metalness: 0.8, roughness: 0.2 });
-const matFootPad = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5, roughness: 0.6 });
-const matDrive = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6, roughness: 0.4 });
+// Premium shared materials
+import {
+  matStainlessSteel as matFrame,
+  matBelt,
+  matChrome as matRoller,
+  matModularBelt as matModular,
+  matGuideRail as matGuide,
+  matAluminum,
+  matDarkSteel,
+  matFootPad,
+  matDarkSteel as matDrive,
+} from '../premiumMaterials';
 
 /** Convert polar (angle, radius) to XZ position on the arc */
 function arcXZ(angleDeg: number, radius: number, dir: 'left' | 'right'): [number, number] {
