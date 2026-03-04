@@ -24,7 +24,7 @@ const COLOR_MAP: Record<string, string> = {
 };
 const RANDOM_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
 
-const CONVEYOR_TYPES = ['conveyor', 'belt-conveyor', 'roller-conveyor', 'bend-conveyor'];
+const CONVEYOR_TYPES = ['conveyor', 'belt-conveyor', 'roller-conveyor', 'bend-conveyor', 'modular-conveyor-straight', 'modular-conveyor-90-curve', 'modular-conveyor-45-curve', 'spiral-conveyor', 'incline-conveyor'];
 const MAX_FLOW_EVENTS = 200; // cap event log size
 
 export class SimulationEngine {
@@ -85,17 +85,36 @@ export class SimulationEngine {
           homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
         };
         const rState = createRobotState(config);
-        // Find pick source (input edge) and place target (output edge)
+        const reach = (node.parameters.reach || node.parameters.reachX || 1400) / 1000;
+        const pickH = (node.parameters.pickHeight || 800) / 1000;
+        const placeH = (node.parameters.placeHeight || 800) / 1000;
+
+        // Find pick source: input edge → source node position, or default to left side of robot
         const inEdges = edges.filter(e => e.to === node.id);
         const outEdges = edges.filter(e => e.from === node.id);
         if (inEdges.length > 0) {
           const srcNode = nodes.find(n => n.id === inEdges[0].from);
-          if (srcNode) rState.pickPosition = [...srcNode.position] as [number, number, number];
+          if (srcNode) {
+            rState.pickPosition = [srcNode.position[0], pickH, srcNode.position[2]];
+          }
         }
+        if (!rState.pickPosition) {
+          // Default: pick from left side at reach distance
+          rState.pickPosition = [node.position[0] - reach * 0.4, pickH, node.position[2]];
+        }
+
+        // Find place target: output edge → target node position, or default to right side
         if (outEdges.length > 0) {
           const tgtNode = nodes.find(n => n.id === outEdges[0].to);
-          if (tgtNode) rState.placePosition = [...tgtNode.position] as [number, number, number];
+          if (tgtNode) {
+            rState.placePosition = [tgtNode.position[0], placeH, tgtNode.position[2]];
+          }
         }
+        if (!rState.placePosition) {
+          // Default: place to right side at reach distance
+          rState.placePosition = [node.position[0] + reach * 0.4, placeH, node.position[2]];
+        }
+
         this.robotStates.set(node.id, rState);
       }
 
@@ -151,6 +170,11 @@ export class SimulationEngine {
         case 'belt-conveyor':
         case 'roller-conveyor':
         case 'bend-conveyor':
+        case 'modular-conveyor-straight':
+        case 'modular-conveyor-90-curve':
+        case 'modular-conveyor-45-curve':
+        case 'spiral-conveyor':
+        case 'incline-conveyor':
           if (node.parameters.accumulationMode) {
             this.tickAccumulationConveyor(node, stats, elapsed);
           } else {
@@ -174,6 +198,20 @@ export class SimulationEngine {
         case 'pusher': this.tickPusher(node, stats, elapsed); break;
         case 'sensor': this.tickSensor(node, stats, elapsed); break;
         case 'vertical-lifter': this.tickLift(node, stats, elapsed); break;
+        default: {
+          // Unknown node type: pass products through to output
+          const defArrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
+          const defOut = this.getOutEdges(node.id);
+          for (const p of defArrived) {
+            if (defOut.length > 0) {
+              this.sendProductAlongEdge(p, defOut[0]);
+            } else {
+              p.state = 'completed';
+              p.completedAt = this.simTime;
+            }
+          }
+          break;
+        }
       }
 
       if (stats.totalTime > 0) {
@@ -609,7 +647,7 @@ export class SimulationEngine {
       homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
     };
 
-    // Find available product at pick source
+    // Find available product at pick source — accept arriving products into queue
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
       if (!stats.queue.includes(product.id)) {
@@ -618,18 +656,23 @@ export class SimulationEngine {
       }
     }
 
+    // Only offer a product to the state machine when idle (ready for next cycle)
     let availableProductId: string | null = null;
     if (stats.queue.length > 0 && rState.phase === 'idle') {
       availableProductId = stats.queue[0];
+    }
+    // Also pass the in-flight target so pick phase can confirm it
+    const targetId = (rState as any)._targetProductId as string | undefined;
+    if (targetId && !availableProductId) {
+      availableProductId = targetId;
     }
 
     // Tick the motion controller
     const placedId = tickRobot(rState, config, this.simTime, availableProductId);
 
-    // If robot just picked a product, remove from source ownership
-    if (rState.phase === 'retract-pick' && rState.phaseProgress < 0.1 && rState.heldProductId) {
-      stats.queue = stats.queue.filter(id => id !== rState.heldProductId);
-      const held = this.products.find(p => p.id === rState.heldProductId);
+    // If robot just gripped a product (entering retract-pick), take ownership
+    if (rState.heldProductId && rState.phase === 'retract-pick' && rState.phaseProgress < 0.15) {
+      const held = this.products.find(p => p.id === rState.heldProductId && p.state !== 'processing');
       if (held) {
         held.state = 'processing';
         held.currentNodeId = node.id;    // Now owned by robot
@@ -637,19 +680,21 @@ export class SimulationEngine {
         held.stoppedBy = null;
         held.conveyorEntryTime = null;
         held.pathPosition = 0;
-        // Remove from any conveyor queue it might still be in
+        // Remove from ALL queues
+        stats.queue = stats.queue.filter(id => id !== rState.heldProductId);
         for (const [, ns] of this.nodeStats) {
           ns.queue = ns.queue.filter(id => id !== rState.heldProductId);
         }
       }
     }
 
-    // Move held product to TCP position (physically attached to end effector)
-    if (rState.heldProductId) {
+    // Move held product to TCP position — only AFTER pick phase (physically gripping)
+    // During approach-pick and pick, product stays at conveyor/queue position
+    const GRIP_PHASES: string[] = ['retract-pick', 'move-to-place', 'approach-place', 'place', 'retract-place', 'return'];
+    if (rState.heldProductId && GRIP_PHASES.includes(rState.phase)) {
       const held = this.products.find(p => p.id === rState.heldProductId);
       if (held) {
         held.currentPosition = [...rState.toolCenterPoint];
-        // Keep product visually level (robot Y rotation doesn't tilt product)
       }
     }
 

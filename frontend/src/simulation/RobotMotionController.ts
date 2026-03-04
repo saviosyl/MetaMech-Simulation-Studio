@@ -96,7 +96,9 @@ export function tickRobot(
       // Start a new pick cycle
       state.phase = 'approach-pick';
       state.phaseStartTime = simTime;
-      state.heldProductId = null;
+      state.heldProductId = null; // Not yet holding anything
+      // Store target in a temporary way — we'll pick it up at the 'pick' phase
+      (state as any)._targetProductId = availableProductId;
     }
     return null;
   }
@@ -115,7 +117,9 @@ export function tickRobot(
 
     // Special actions at phase completion
     if (state.phase === 'pick') {
-      state.heldProductId = availableProductId;
+      // Grip the product — transfer ownership
+      state.heldProductId = (state as any)._targetProductId || availableProductId;
+      (state as any)._targetProductId = null;
     } else if (state.phase === 'place') {
       placedProductId = state.heldProductId;
       state.heldProductId = null;
