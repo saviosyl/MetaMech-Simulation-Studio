@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Product, NodeStats, FlowState, FlowEvent } from './Product';
 import { ProcessNode, ProcessEdge, getConnectionPorts } from '../store/editorStore';
 import { getPortWorldPosition } from '../lib/nodeTransform';
+import { createTransportPath } from '../lib/transportPath';
 
 const COLOR_MAP: Record<string, string> = {
   brown: '#8B4513',
@@ -156,7 +157,7 @@ export class SimulationEngine {
     }
   }
 
-  // ─── Conveyor: products ride the belt ────────────────────────
+  // ─── Conveyor: products ride the belt via transport path ──────
   private tickConveyor(node: ProcessNode, stats: NodeStats, dt: number) {
     // Accept arriving products
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
@@ -166,16 +167,10 @@ export class SimulationEngine {
       stats.queue.push(product.id);
     }
 
-    // Conveyor parameters
-    const lengthM = (node.parameters.length || 3000) / 1000;
-    const beltHeightM = (node.parameters.height || 800) / 1000;
+    // Create transport path for this conveyor
+    const path = createTransportPath(node.type, node.parameters);
     const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
-    const travelTime = lengthM / speedMps;
-
-    // Get port positions
-    const ports = getConnectionPorts(node.type, node.parameters);
-    const inputPort = ports.find(p => p.type === 'input');
-    const outputPort = ports.find(p => p.type === 'output');
+    const travelTime = path ? path.length / speedMps : ((node.parameters.length || 3000) / 1000) / speedMps;
 
     const toRelease: string[] = [];
     for (const pid of stats.queue) {
@@ -185,21 +180,23 @@ export class SimulationEngine {
       const timeOnBelt = this.simTime - product.conveyorEntryTime;
       const t = Math.min(1, timeOnBelt / travelTime);
 
-      // Animate: interpolate from input port to output port (rotation-aware)
-      if (inputPort && outputPort) {
-        const inWorld = getPortWorldPosition(inputPort.localPosition, node);
-        const outWorld = getPortWorldPosition(outputPort.localPosition, node);
-
-        product.currentPosition = [
-          inWorld[0] + (outWorld[0] - inWorld[0]) * t,
-          inWorld[1] + (outWorld[1] - inWorld[1]) * t,
-          inWorld[2] + (outWorld[2] - inWorld[2]) * t,
-        ];
+      // Use transport path for accurate positioning (handles inclines, curves, spirals)
+      if (path) {
+        product.currentPosition = path.getWorldPosition(t, node.position, node.rotation, node.scale);
       } else {
-        // Fallback: animate along local X axis, then rotate to world
-        const halfL = lengthM / 2;
-        const localPos: [number, number, number] = [-halfL + lengthM * t, beltHeightM, 0];
-        product.currentPosition = getPortWorldPosition(localPos, node);
+        // Fallback for unknown conveyor types: use port interpolation
+        const ports = getConnectionPorts(node.type, node.parameters);
+        const inputPort = ports.find(p => p.type === 'input');
+        const outputPort = ports.find(p => p.type === 'output');
+        if (inputPort && outputPort) {
+          const inWorld = getPortWorldPosition(inputPort.localPosition, node);
+          const outWorld = getPortWorldPosition(outputPort.localPosition, node);
+          product.currentPosition = [
+            inWorld[0] + (outWorld[0] - inWorld[0]) * t,
+            inWorld[1] + (outWorld[1] - inWorld[1]) * t,
+            inWorld[2] + (outWorld[2] - inWorld[2]) * t,
+          ];
+        }
       }
 
       if (t >= 1) toRelease.push(pid);
@@ -453,7 +450,6 @@ export class SimulationEngine {
     // Accumulation mode: products queue up on the conveyor surface with spacing
     // instead of jamming at the output. Products stop in zones, then release in order.
     const lengthM = (node.parameters.length || 3000) / 1000;
-    const beltHeightM = (node.parameters.height || 800) / 1000;
     const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
     const zoneCount = node.parameters.accumulationZones || Math.max(2, Math.floor(lengthM / 0.5));
     const zoneLength = lengthM / zoneCount;
@@ -517,8 +513,11 @@ export class SimulationEngine {
       // Clamp to target (can't go past target, smooth approach)
       const t = Math.min(naturalT, targetT);
 
-      // Position (rotation-aware)
-      if (inputPort && outputPort) {
+      // Position using transport path
+      const accPath = createTransportPath(node.type, node.parameters);
+      if (accPath) {
+        product.currentPosition = accPath.getWorldPosition(t, node.position, node.rotation, node.scale);
+      } else if (inputPort && outputPort) {
         const inWorld = getPortWorldPosition(inputPort.localPosition, node);
         const outWorld = getPortWorldPosition(outputPort.localPosition, node);
         product.currentPosition = [
@@ -526,10 +525,6 @@ export class SimulationEngine {
           inWorld[1] + (outWorld[1] - inWorld[1]) * t,
           inWorld[2] + (outWorld[2] - inWorld[2]) * t,
         ];
-      } else {
-        const halfL = lengthM / 2;
-        const localPos: [number, number, number] = [-halfL + lengthM * t, beltHeightM, 0];
-        product.currentPosition = getPortWorldPosition(localPos, node);
       }
 
       if (t >= 0.99 && !outputBlocked) toRelease.push(pid);
