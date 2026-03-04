@@ -105,6 +105,21 @@ export function getPortWorldPosition(
 }
 
 /**
+ * Get all ports for a node in world coordinates.
+ * Single function to get complete port data including world positions.
+ */
+export function getWorldPorts(
+  node: { type: string; position: Vec3; rotation: Vec3; scale?: Vec3; parameters?: Record<string, any>; assetId?: string },
+  getConnectionPortsFn: (type: string, params?: Record<string, any>, assetId?: string) => { id: string; type: 'input' | 'output'; localPosition: Vec3 }[],
+): { id: string; type: 'input' | 'output'; localPosition: Vec3; worldPosition: Vec3 }[] {
+  const localPorts = getConnectionPortsFn(node.type, node.parameters, node.assetId);
+  return localPorts.map(port => ({
+    ...port,
+    worldPosition: localToWorld(port.localPosition, node.position, node.rotation, node.scale as Vec3),
+  }));
+}
+
+/**
  * Calculate the position to place a node so that its port aligns with a target world position.
  * Inverse of localToWorld for the port offset.
  */

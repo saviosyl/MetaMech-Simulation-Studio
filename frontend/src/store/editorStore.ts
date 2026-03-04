@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { AssetDef, getAssetManifest, getAssetById, ParametricAssetDef } from '../lib/assetManifest';
 import { runBuilder } from '../lib/parametricBuilders';
+import { getPortWorldPosition, getWorldPorts as computeWorldPorts } from '../lib/nodeTransform';
 
 // Types
 export interface ProcessNode {
@@ -230,6 +231,27 @@ export function getConnectionPorts(type: string, params?: Record<string, any>, a
       ];
   }
 }
+
+/**
+ * Get all ports for a node with both local and world positions.
+ * This is the canonical way to get port positions that account for rotation.
+ * Local positions are from getConnectionPorts(); world positions apply the node's TRS transform.
+ * 
+ * Architecture note:
+ * - Ports are ALWAYS defined in local space (relative to parent object center)
+ * - World positions are computed on-the-fly from node.position + node.rotation
+ * - Changing parameters triggers React re-render → ports auto-recompute
+ * - Serialization stores only (position, rotation, parameters) — ports derive from params
+ */
+export function getWorldConnectionPorts(node: ProcessNode | EnvironmentAsset | Actor): { id: string; type: 'input' | 'output'; localPosition: [number, number, number]; worldPosition: [number, number, number] }[] {
+  return computeWorldPorts(
+    { ...node, type: (node as ProcessNode).type },
+    (type, params, assetId) => getConnectionPorts(type, params, assetId),
+  );
+}
+
+/** Re-export for external use */
+export { getPortWorldPosition };
 
 interface EditorState {
   // Asset manifest
