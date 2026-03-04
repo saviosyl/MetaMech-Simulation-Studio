@@ -10,6 +10,7 @@ import BeltConveyorGLB from './models/BeltConveyorGLB';
 import SpiralConveyorModel from './models/SpiralConveyorModel';
 import StopperModel from './models/StopperModel';
 import PusherModel from './models/PusherModel';
+import BendConveyorModel from './models/BendConveyorModel';
 import SourceModel from './models/SourceModel';
 import SinkModel from './models/SinkModel';
 import BufferModel from './models/BufferModel';
@@ -134,6 +135,36 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
           <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[0.5, 0.6, 32]} />
             <meshBasicMaterial color="#ee8833" transparent opacity={0.5} side={THREE.DoubleSide} />
+          </mesh>
+        )}
+      </group>
+    );
+  }
+
+  // BEND CONVEYOR
+  if (node.type === 'bend-conveyor') {
+    return (
+      <group
+        ref={groupRef}
+        position={node.position}
+        rotation={node.rotation}
+        scale={node.scale}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      >
+        <Suspense fallback={
+          <mesh castShadow>
+            <torusGeometry args={[1, 0.3, 8, 16, Math.PI / 2]} />
+            <meshStandardMaterial color="#666" wireframe />
+          </mesh>
+        }>
+          <BendConveyorModel parameters={node.parameters} isSelected={isSelected} />
+        </Suspense>
+        {isSelected && (
+          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[1.5, 1.7, 32]} />
+            <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
           </mesh>
         )}
       </group>

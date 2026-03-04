@@ -10,7 +10,7 @@ export interface ProcessNode {
         'transfer-bridge' | 'popup-transfer' | 'pusher-transfer' | 'merge-divert' |
         'spiral-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
         'belt-conveyor' | 'roller-conveyor' | 'fanuc-robot' | 'machine-static' |
-        'stopper' | 'pusher';
+        'stopper' | 'pusher' | 'bend-conveyor';
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -151,13 +151,22 @@ export function getConnectionPorts(type: string, params?: Record<string, any>, a
       ];
     }
     case 'modular-conveyor-90-curve':
-    case 'modular-conveyor-45-curve': {
+    case 'modular-conveyor-45-curve':
+    case 'bend-conveyor': {
       const pH = ((params?.height || 800) / 1000);
-      const cAngle = (params?.curveAngle || 90) * Math.PI / 180;
-      const cRadius = (params?.curveRadius || 1000) / 1000;
+      const cAngle = (params?.bendAngle || params?.curveAngle || 90) * Math.PI / 180;
+      const cRadius = (params?.radius || params?.curveRadius || 1000) / 1000;
+      const dir = params?.bendDirection || 'right';
+      const sinA = Math.sin(cAngle);
+      const cosA = Math.cos(cAngle);
+      // Arc center at origin; infeed at angle=0 on the arc, outfeed at bendAngle
+      const inX = dir === 'right' ? 0 : 0;
+      const inZ = cRadius;
+      const outX = dir === 'right' ? sinA * cRadius : -sinA * cRadius;
+      const outZ = cosA * cRadius;
       return [
-        { id: 'input', type: 'input', localPosition: [cRadius, pH, 0] },
-        { id: 'output', type: 'output', localPosition: [cRadius * Math.cos(cAngle), pH, cRadius * Math.sin(cAngle)] },
+        { id: 'input', type: 'input', localPosition: [inX, pH, inZ] },
+        { id: 'output', type: 'output', localPosition: [outX, pH, outZ] },
       ];
     }
     case 'buffer':
@@ -751,6 +760,7 @@ function getDefaultParameters(type: string): Record<string, any> {
     'popup-transfer': { width: 600, length: 1500, height: 800, popupHeight: 200, speed: 1, direction: 'left' },
     'pusher-transfer': { width: 600, length: 2000, height: 800, pushAngle: 90, pushForce: 1, pushSide: 'left' },
     'merge-divert': { width: 600, mainLength: 3000, branchLength: 2000, branchAngle: 30, height: 800, mode: 'divert' },
+    'bend-conveyor': { bendAngle: '90', bendDirection: 'right', surfaceType: 'belt', width: 600, radius: 1000, height: 800, speed: 20, sideGuides: true, guideHeight: 60, showLegs: true, supportSpacing: 45, adjustableFeetEnabled: true },
     'spiral-conveyor': { diameter: 2000, totalHeight: 5000, beltWidth: 500, direction: 'up', speed: 1 },
     'vertical-lifter': { platformWidth: 1000, platformDepth: 1000, liftHeight: 3000, speed: 1, loadDirection: 'front', capacity: 4 },
     'pick-and-place': { reach: 3, speed: 1.0 },
