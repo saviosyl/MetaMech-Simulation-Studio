@@ -15,6 +15,8 @@ import SensorModel from './models/SensorModel';
 import SourceModel from './models/SourceModel';
 import SinkModel from './models/SinkModel';
 import BufferModel from './models/BufferModel';
+import { CartesianRobotModel, CobotModel, Robot5AxisModel, Robot6AxisModel } from './models/RobotModels';
+import { PalletModel } from './models/PalletModels';
 
 interface ProcessNodeComponentProps {
   node: ProcessNode;
@@ -257,6 +259,18 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         return <SinkModel isSelected={isSelected} />;
       case 'buffer':
         return <BufferModel isSelected={isSelected} />;
+      case 'cartesian-robot':
+        return <CartesianRobotModel parameters={node.parameters} isSelected={isSelected} />;
+      case 'cobot':
+        return <CobotModel parameters={node.parameters} isSelected={isSelected} />;
+      case 'robot-5axis':
+        return <Robot5AxisModel parameters={node.parameters} isSelected={isSelected} />;
+      case 'robot-6axis':
+        return <Robot6AxisModel parameters={node.parameters} isSelected={isSelected} />;
+      case 'eur-pallet':
+      case 'standard-pallet':
+      case 'custom-pallet':
+        return <PalletModel parameters={node.parameters} isSelected={isSelected} />;
       default:
         return <GenericModel type={node.type} isSelected={isSelected} params={node.parameters} />;
     }
@@ -466,6 +480,13 @@ function getNodeColor(type: string): string {
     'vertical-lifter': '#f59e0b',
     'pick-and-place': '#ec4899',
     'palletizer': '#84cc16',
+    'cartesian-robot': '#e8600a',
+    'cobot': '#22aa55',
+    'robot-5axis': '#e8600a',
+    'robot-6axis': '#e8600a',
+    'eur-pallet': '#c4a574',
+    'standard-pallet': '#c4a574',
+    'custom-pallet': '#c4a574',
   };
   return colorMap[type] || '#6b7280';
 }

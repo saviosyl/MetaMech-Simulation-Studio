@@ -19,7 +19,7 @@ import {
 export interface ModuleDefinition {
   id: string;
   name: string;
-  category: 'process' | 'environment' | 'actors';
+  category: 'process' | 'environment' | 'actors' | 'robots' | 'pallets';
   icon: any;
   description: string;
   assetId?: string; // references AssetDef.id in manifest
@@ -764,12 +764,140 @@ export const moduleLibrary: ModuleDefinition[] = [
       },
     },
   },
+
+  // ─── Robots ───────────────────────────────────────────────────
+  {
+    id: 'cartesian-robot',
+    name: 'Cartesian Robot',
+    category: 'robots',
+    icon: MoveHorizontal,
+    description: 'Gantry-style linear axis robot for pick-and-place and palletizing',
+    parameters: {
+      reachX: { type: 'number', label: 'X Travel (mm)', default: 2000, min: 500, max: 6000, step: 100 },
+      reachY: { type: 'number', label: 'Y Travel (mm)', default: 1500, min: 500, max: 4000, step: 100 },
+      reachZ: { type: 'number', label: 'Z Travel (mm)', default: 1000, min: 300, max: 3000, step: 100 },
+      baseHeight: { type: 'number', label: 'Base Height (mm)', default: 2500, min: 1500, max: 4000, step: 100 },
+      cycleTime: { type: 'number', label: 'Cycle Time (s)', default: 4, min: 1, max: 30, step: 0.5 },
+      speedFactor: { type: 'number', label: 'Speed Factor', default: 1, min: 0.1, max: 3, step: 0.1 },
+      toolType: { type: 'select', label: 'Tool Type', default: 'vacuum', options: ['vacuum', 'gripper', 'magnetic'] },
+      pedestalEnabled: { type: 'boolean', label: 'Pedestal', default: false },
+      pedestalHeight: { type: 'number', label: 'Pedestal Height (mm)', default: 500, min: 0, max: 2000, step: 100 },
+    },
+  },
+  {
+    id: 'cobot',
+    name: 'Collaborative Robot',
+    category: 'robots',
+    icon: RotateCw,
+    description: 'Modern collaborative robot arm for safe human-robot interaction',
+    parameters: {
+      reach: { type: 'number', label: 'Reach (mm)', default: 850, min: 500, max: 1300, step: 50 },
+      payload: { type: 'number', label: 'Payload (kg)', default: 10, min: 3, max: 25, step: 1 },
+      baseHeight: { type: 'number', label: 'Base Height (mm)', default: 200, min: 100, max: 500, step: 50 },
+      cycleTime: { type: 'number', label: 'Cycle Time (s)', default: 3, min: 1, max: 20, step: 0.5 },
+      speedFactor: { type: 'number', label: 'Speed Factor', default: 1, min: 0.1, max: 3, step: 0.1 },
+      toolType: { type: 'select', label: 'Tool Type', default: 'gripper', options: ['vacuum', 'gripper', 'magnetic'] },
+      pedestalEnabled: { type: 'boolean', label: 'Pedestal', default: true },
+      pedestalHeight: { type: 'number', label: 'Pedestal Height (mm)', default: 800, min: 0, max: 2000, step: 100 },
+    },
+  },
+  {
+    id: 'robot-5axis',
+    name: '5-Axis Robot',
+    category: 'robots',
+    icon: Wrench,
+    description: 'Industrial 5-axis articulated robot for high-speed handling',
+    parameters: {
+      reach: { type: 'number', label: 'Reach (mm)', default: 1400, min: 700, max: 3000, step: 50 },
+      payload: { type: 'number', label: 'Payload (kg)', default: 25, min: 5, max: 120, step: 5 },
+      baseHeight: { type: 'number', label: 'Base Height (mm)', default: 400, min: 200, max: 800, step: 50 },
+      cycleTime: { type: 'number', label: 'Cycle Time (s)', default: 3, min: 0.5, max: 20, step: 0.5 },
+      speedFactor: { type: 'number', label: 'Speed Factor', default: 1, min: 0.1, max: 3, step: 0.1 },
+      toolType: { type: 'select', label: 'Tool Type', default: 'gripper', options: ['vacuum', 'gripper', 'magnetic', 'weld'] },
+      pedestalEnabled: { type: 'boolean', label: 'Pedestal', default: false },
+      pedestalHeight: { type: 'number', label: 'Pedestal Height (mm)', default: 0, min: 0, max: 2000, step: 100 },
+    },
+  },
+  {
+    id: 'robot-6axis',
+    name: '6-Axis Robot',
+    category: 'robots',
+    icon: Cog,
+    description: 'Premium 6-axis industrial robot for complex automation tasks',
+    parameters: {
+      reach: { type: 'number', label: 'Reach (mm)', default: 2000, min: 900, max: 4000, step: 50 },
+      payload: { type: 'number', label: 'Payload (kg)', default: 60, min: 10, max: 300, step: 10 },
+      baseHeight: { type: 'number', label: 'Base Height (mm)', default: 500, min: 300, max: 1000, step: 50 },
+      cycleTime: { type: 'number', label: 'Cycle Time (s)', default: 4, min: 0.5, max: 30, step: 0.5 },
+      speedFactor: { type: 'number', label: 'Speed Factor', default: 1, min: 0.1, max: 3, step: 0.1 },
+      toolType: { type: 'select', label: 'Tool Type', default: 'gripper', options: ['vacuum', 'gripper', 'magnetic', 'weld'] },
+      pedestalEnabled: { type: 'boolean', label: 'Pedestal', default: true },
+      pedestalHeight: { type: 'number', label: 'Pedestal Height (mm)', default: 600, min: 0, max: 3000, step: 100 },
+    },
+  },
+
+  // ─── Pallets ─────────────────────────────────────────────────
+  {
+    id: 'eur-pallet',
+    name: 'EUR Pallet',
+    category: 'pallets',
+    icon: SquareStack,
+    description: 'Standard EUR/EPAL pallet (1200×800mm)',
+    parameters: {
+      length: { type: 'number', label: 'Length (mm)', default: 1200, min: 800, max: 1600, step: 50 },
+      width: { type: 'number', label: 'Width (mm)', default: 800, min: 600, max: 1200, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 144, min: 100, max: 200, step: 10 },
+      deckStyle: { type: 'select', label: 'Deck Style', default: 'standard', options: ['standard', 'full-deck'] },
+      maxLayers: { type: 'number', label: 'Max Layers', default: 5, min: 1, max: 15, step: 1 },
+      rows: { type: 'number', label: 'Rows', default: 4, min: 1, max: 10, step: 1 },
+      columns: { type: 'number', label: 'Columns', default: 3, min: 1, max: 10, step: 1 },
+      productSpacing: { type: 'number', label: 'Product Spacing (mm)', default: 10, min: 0, max: 50, step: 5 },
+      layerPattern: { type: 'select', label: 'Layer Pattern', default: 'aligned', options: ['aligned', 'interlocked', 'rotated'] },
+    },
+  },
+  {
+    id: 'standard-pallet',
+    name: 'Standard Pallet',
+    category: 'pallets',
+    icon: SquareStack,
+    description: 'Generic standard pallet (1000×1200mm)',
+    parameters: {
+      length: { type: 'number', label: 'Length (mm)', default: 1000, min: 600, max: 2000, step: 50 },
+      width: { type: 'number', label: 'Width (mm)', default: 1200, min: 600, max: 2000, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 150, min: 100, max: 250, step: 10 },
+      deckStyle: { type: 'select', label: 'Deck Style', default: 'standard', options: ['standard', 'full-deck', 'open-deck'] },
+      maxLayers: { type: 'number', label: 'Max Layers', default: 5, min: 1, max: 15, step: 1 },
+      rows: { type: 'number', label: 'Rows', default: 3, min: 1, max: 10, step: 1 },
+      columns: { type: 'number', label: 'Columns', default: 4, min: 1, max: 10, step: 1 },
+      productSpacing: { type: 'number', label: 'Product Spacing (mm)', default: 10, min: 0, max: 50, step: 5 },
+      layerPattern: { type: 'select', label: 'Layer Pattern', default: 'aligned', options: ['aligned', 'interlocked', 'rotated'] },
+    },
+  },
+  {
+    id: 'custom-pallet',
+    name: 'Custom Pallet',
+    category: 'pallets',
+    icon: SquareStack,
+    description: 'Fully configurable pallet dimensions',
+    parameters: {
+      length: { type: 'number', label: 'Length (mm)', default: 1000, min: 400, max: 3000, step: 50 },
+      width: { type: 'number', label: 'Width (mm)', default: 1000, min: 400, max: 3000, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 150, min: 50, max: 300, step: 10 },
+      deckStyle: { type: 'select', label: 'Deck Style', default: 'standard', options: ['standard', 'full-deck', 'open-deck'] },
+      maxLayers: { type: 'number', label: 'Max Layers', default: 5, min: 1, max: 20, step: 1 },
+      rows: { type: 'number', label: 'Rows', default: 3, min: 1, max: 12, step: 1 },
+      columns: { type: 'number', label: 'Columns', default: 3, min: 1, max: 12, step: 1 },
+      productSpacing: { type: 'number', label: 'Product Spacing (mm)', default: 10, min: 0, max: 100, step: 5 },
+      layerPattern: { type: 'select', label: 'Layer Pattern', default: 'aligned', options: ['aligned', 'interlocked', 'rotated'] },
+      maxPalletHeight: { type: 'number', label: 'Max Pallet Height (mm)', default: 1800, min: 500, max: 3000, step: 100 },
+    },
+  },
 ];
 
 export function getModuleDefinition(id: string): ModuleDefinition | undefined {
   return moduleLibrary.find(module => module.id === id);
 }
 
-export function getModulesByCategory(category: 'process' | 'environment' | 'actors'): ModuleDefinition[] {
+export function getModulesByCategory(category: string): ModuleDefinition[] {
   return moduleLibrary.filter(module => module.category === category);
 }

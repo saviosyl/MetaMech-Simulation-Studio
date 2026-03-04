@@ -11,7 +11,9 @@ export interface ProcessNode {
         'transfer-bridge' | 'popup-transfer' | 'pusher-transfer' | 'merge-divert' |
         'spiral-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
         'belt-conveyor' | 'roller-conveyor' | 'fanuc-robot' | 'machine-static' |
-        'stopper' | 'pusher' | 'bend-conveyor' | 'sensor';
+        'stopper' | 'pusher' | 'bend-conveyor' | 'sensor' |
+        'cartesian-robot' | 'cobot' | 'robot-5axis' | 'robot-6axis' |
+        'eur-pallet' | 'standard-pallet' | 'custom-pallet';
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -246,8 +248,30 @@ export function getConnectionPorts(type: string, params?: Record<string, any>, a
       ];
     }
     case 'sensor': {
-      // Sensor has no transport ports, only detection
       return [];
+    }
+    case 'cartesian-robot':
+    case 'cobot':
+    case 'robot-5axis':
+    case 'robot-6axis': {
+      // Robots have a pick port and a place port
+      const rReach = (params?.reach || params?.reachX || 1400) / 1000;
+      const rBase = (params?.baseHeight || 500) / 1000;
+      const pedH = params?.pedestalEnabled ? (params?.pedestalHeight || 0) / 1000 : 0;
+      const rH = rBase + pedH;
+      return [
+        { id: 'pick', type: 'input', localPosition: [-rReach * 0.4, rH, 0] as [number, number, number] },
+        { id: 'place', type: 'output', localPosition: [rReach * 0.4, rH, 0] as [number, number, number] },
+      ];
+    }
+    case 'eur-pallet':
+    case 'standard-pallet':
+    case 'custom-pallet': {
+      const pL = (params?.length || 1200) / 1000;
+      const pH = (params?.height || 150) / 1000;
+      return [
+        { id: 'input', type: 'input', localPosition: [-pL / 2, pH, 0] as [number, number, number] },
+      ];
     }
     default:
       return [
@@ -331,7 +355,7 @@ interface EditorState {
   simulationSpeed: number;
   
   // UI state
-  activeLibraryTab: 'process' | 'environment' | 'actors';
+  activeLibraryTab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets';
   showPropertiesPanel: boolean;
   
   // Panel state
@@ -372,7 +396,7 @@ interface EditorState {
   toggleVisibility: (id: string) => void;
   
   setSceneSettings: (settings: Partial<SceneSettings>) => void;
-  setActiveLibraryTab: (tab: 'process' | 'environment' | 'actors') => void;
+  setActiveLibraryTab: (tab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets') => void;
   
   // Panel actions
   setLeftPanelWidth: (width: number) => void;
@@ -829,6 +853,17 @@ function getDefaultParameters(type: string): Record<string, any> {
     pallet: {},
     'cardboard-box': {},
     
+    // Robots
+    'cartesian-robot': { reachX: 2000, reachY: 1500, reachZ: 1000, baseHeight: 2500, cycleTime: 4, speedFactor: 1, toolType: 'vacuum', pedestalEnabled: false, pedestalHeight: 500 },
+    cobot: { reach: 850, payload: 10, baseHeight: 200, cycleTime: 3, speedFactor: 1, toolType: 'gripper', pedestalEnabled: true, pedestalHeight: 800 },
+    'robot-5axis': { reach: 1400, payload: 25, baseHeight: 400, cycleTime: 3, speedFactor: 1, toolType: 'gripper', pedestalEnabled: false, pedestalHeight: 0 },
+    'robot-6axis': { reach: 2000, payload: 60, baseHeight: 500, cycleTime: 4, speedFactor: 1, toolType: 'gripper', pedestalEnabled: true, pedestalHeight: 600 },
+
+    // Pallets
+    'eur-pallet': { length: 1200, width: 800, height: 144, deckStyle: 'standard', maxLayers: 5, rows: 4, columns: 3, productSpacing: 10, layerPattern: 'aligned' },
+    'standard-pallet': { length: 1000, width: 1200, height: 150, deckStyle: 'standard', maxLayers: 5, rows: 3, columns: 4, productSpacing: 10, layerPattern: 'aligned' },
+    'custom-pallet': { length: 1000, width: 1000, height: 150, deckStyle: 'standard', maxLayers: 5, rows: 3, columns: 3, productSpacing: 10, layerPattern: 'aligned', maxPalletHeight: 1800 },
+
     // Actors
     operator: { walkSpeed: 1.5, color: '#4f46e5' },
     engineer: { walkSpeed: 1.2, color: '#059669' },

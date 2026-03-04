@@ -10,6 +10,8 @@ import {
   GripVertical,
   LayoutGrid,
   LayoutList,
+  Cpu,
+  SquareStack,
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModulesByCategory, ModuleDefinition } from '../../lib/moduleLibrary';
@@ -31,6 +33,8 @@ const LeftPanel: React.FC = () => {
 
   const tabs = [
     { id: 'process' as const, name: 'Process', icon: Package },
+    { id: 'robots' as const, name: 'Robots', icon: Cpu },
+    { id: 'pallets' as const, name: 'Pallets', icon: SquareStack },
     { id: 'environment' as const, name: 'Environ', icon: Building },
     { id: 'actors' as const, name: 'Actors', icon: Users },
   ];
