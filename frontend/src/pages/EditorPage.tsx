@@ -196,34 +196,27 @@ const EditorPage: React.FC = () => {
   }, []);
 
   return (
-    <div style={{ 
-      position: 'fixed', 
-      top: 0, left: 0, right: 0, bottom: 0, 
-      display: 'flex', 
-      flexDirection: 'column',
-      overflow: 'hidden',
-    }}>
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <TopBar
         projectName={projectName}
         setProjectName={setProjectName}
         saveStatus={saveStatus}
         onSave={handleSave}
       />
-      <div style={{ 
-        flex: 1, 
-        display: 'flex', 
-        overflow: 'hidden',
-        minHeight: 0,
-      }}>
-        <LeftPanel />
+      <div className="flex-1 flex overflow-hidden min-h-0 border-t border-slate-700/50">
+        <div className="flex-shrink-0">
+          <LeftPanel />
+        </div>
         <div 
-          style={{ flex: 1, position: 'relative', minWidth: 0, overflow: 'hidden' }}
+          className="flex-1 relative min-w-0 overflow-hidden border-x border-slate-700/50 bg-slate-900/50"
           onContextMenu={handleContextMenu}
         >
           <Viewport />
           <StatsPanel />
         </div>
-        <RightPanel />
+        <div className="flex-shrink-0">
+          <RightPanel />
+        </div>
       </div>
 
       <ShortcutsPanel />

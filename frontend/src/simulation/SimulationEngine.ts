@@ -181,7 +181,14 @@ export class SimulationEngine {
             this.tickConveyor(node, stats, elapsed);
           }
           break;
-        case 'machine': this.tickMachine(node, stats, elapsed); break;
+        case 'machine':
+        case 'carton-erector':
+        case 'case-packer':
+        case 'checkweigher':
+        case 'metal-detector':
+        case 'labeler':
+        case 'sealing-station':
+        case 'reject-station': this.tickMachine(node, stats, elapsed); break;
         case 'buffer': this.tickBuffer(node, stats); break;
         case 'sink': this.tickSink(node, stats); break;
         case 'router': this.tickRouter(node, stats); break;

@@ -12,6 +12,12 @@ import {
   LayoutList,
   Cpu,
   SquareStack,
+  Factory,
+  Cog,
+  Truck,
+  Zap,
+  Shield,
+  Filter,
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModulesByCategory, ModuleDefinition } from '../../lib/moduleLibrary';
@@ -32,11 +38,11 @@ const LeftPanel: React.FC = () => {
   const [layout, setLayout] = useState<ViewLayout>('compact');
 
   const tabs = [
-    { id: 'process' as const, name: 'Process', icon: Package },
-    { id: 'robots' as const, name: 'Robots', icon: Cpu },
-    { id: 'pallets' as const, name: 'Pallets', icon: SquareStack },
-    { id: 'environment' as const, name: 'Environ', icon: Building },
-    { id: 'actors' as const, name: 'Actors', icon: Users },
+    { id: 'process' as const, name: 'Process', icon: Factory, color: 'cyan' },
+    { id: 'robots' as const, name: 'Robots', icon: Cpu, color: 'amber' },
+    { id: 'pallets' as const, name: 'Pallets', icon: SquareStack, color: 'emerald' },
+    { id: 'environment' as const, name: 'Environ', icon: Building, color: 'purple' },
+    { id: 'actors' as const, name: 'Actors', icon: Users, color: 'orange' },
   ];
 
   const allModules = getModulesByCategory(activeLibraryTab);
@@ -98,28 +104,31 @@ const LeftPanel: React.FC = () => {
 
   if (leftPanelCollapsed) {
     return (
-      <div style={{ flexShrink: 0, width: 40, borderRight: '1px solid #e5e7eb', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 8, gap: 4 }}>
+      <div className="flex-shrink-0 w-12 border-r border-slate-700/50 bg-slate-800/90 backdrop-blur-sm flex flex-col items-center pt-3 gap-2">
         <button
           onClick={() => setLeftPanelCollapsed(false)}
-          style={{ cursor: 'pointer', padding: 6, border: 'none', background: 'none', borderRadius: 6 }}
+          className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
           title="Expand Library"
         >
-          <ChevronRight size={16} color="#6b7280" />
+          <ChevronRight size={16} className="text-slate-400" />
         </button>
         {/* Vertical tab icons when collapsed */}
         {tabs.map(tab => {
           const Icon = tab.icon;
+          const isActive = activeLibraryTab === tab.id;
+          const colorClass = `${tab.color}-400`;
           return (
             <button
               key={tab.id}
               onClick={() => { setActiveLibraryTab(tab.id); setLeftPanelCollapsed(false); }}
-              style={{
-                cursor: 'pointer', padding: 8, border: 'none', borderRadius: 6,
-                background: activeLibraryTab === tab.id ? '#f0fdfa' : 'transparent',
-              }}
+              className={`p-2 rounded-lg transition-all duration-200 ${
+                isActive 
+                  ? `bg-${tab.color}-500/20 text-${tab.color}-400 ring-1 ring-${tab.color}-400/30 shadow-lg shadow-${tab.color}-500/10` 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+              }`}
               title={tab.name}
             >
-              <Icon size={18} color={activeLibraryTab === tab.id ? '#0d9488' : '#9ca3af'} />
+              <Icon size={18} />
             </button>
           );
         })}
@@ -128,78 +137,89 @@ const LeftPanel: React.FC = () => {
   }
 
   return (
-    <div style={{ flexShrink: 0, width: leftPanelWidth, maxWidth: 400, minWidth: 220, display: 'flex', height: '100%', overflow: 'hidden' }}>
-      <div style={{ flex: 1, background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div className="flex-shrink-0 flex h-full overflow-hidden" style={{ width: leftPanelWidth, maxWidth: 400, minWidth: 220 }}>
+      <div className="flex-1 bg-slate-800/90 backdrop-blur-sm border-r border-slate-700/50 flex flex-col overflow-hidden">
         
-        {/* Header — compact */}
-        <div style={{ padding: '8px 10px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <div style={{ display: 'flex', gap: 2 }}>
+        {/* Header — Industrial Premium */}
+        <div className="px-4 py-3 border-b border-slate-700/50 flex-shrink-0 bg-gradient-to-r from-slate-800/50 to-slate-700/50">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex gap-1">
               <button
                 onClick={() => setViewMode('library')}
-                style={{
-                  padding: '4px 10px', fontSize: 12, fontWeight: 500, border: 'none', borderRadius: 4, cursor: 'pointer',
-                  background: viewMode === 'library' ? '#ccfbf1' : 'transparent',
-                  color: viewMode === 'library' ? '#0f766e' : '#6b7280',
-                }}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 font-['Orbitron'] ${
+                  viewMode === 'library'
+                    ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-400/30 shadow-lg shadow-cyan-500/10'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
               >
-                Library
+                LIBRARY
               </button>
               <button
                 onClick={() => setViewMode('scene')}
-                style={{
-                  padding: '4px 10px', fontSize: 12, fontWeight: 500, border: 'none', borderRadius: 4, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  background: viewMode === 'scene' ? '#ccfbf1' : 'transparent',
-                  color: viewMode === 'scene' ? '#0f766e' : '#6b7280',
-                }}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 flex items-center gap-2 font-['Orbitron'] ${
+                  viewMode === 'scene'
+                    ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-400/30 shadow-lg shadow-cyan-500/10'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
               >
-                <List size={12} /> Scene
+                <List size={12} /> SCENE
               </button>
             </div>
-            <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <div className="flex gap-1 items-center">
               {viewMode === 'library' && (
                 <>
                   <button
                     onClick={() => setLayout('compact')}
-                    style={{ padding: 3, border: 'none', borderRadius: 3, cursor: 'pointer', background: layout === 'compact' ? '#e5e7eb' : 'transparent' }}
+                    className={`p-2 rounded-lg transition-colors ${
+                      layout === 'compact' 
+                        ? 'bg-slate-600/50 text-slate-200' 
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                    }`}
                     title="Compact list"
                   >
-                    <LayoutList size={14} color={layout === 'compact' ? '#374151' : '#9ca3af'} />
+                    <LayoutList size={14} />
                   </button>
                   <button
                     onClick={() => setLayout('grid')}
-                    style={{ padding: 3, border: 'none', borderRadius: 3, cursor: 'pointer', background: layout === 'grid' ? '#e5e7eb' : 'transparent' }}
+                    className={`p-2 rounded-lg transition-colors ${
+                      layout === 'grid' 
+                        ? 'bg-slate-600/50 text-slate-200' 
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                    }`}
                     title="Grid view"
                   >
-                    <LayoutGrid size={14} color={layout === 'grid' ? '#374151' : '#9ca3af'} />
+                    <LayoutGrid size={14} />
                   </button>
                 </>
               )}
               <button
                 onClick={() => setLeftPanelCollapsed(true)}
-                style={{ padding: 3, border: 'none', background: 'none', cursor: 'pointer', borderRadius: 3 }}
+                className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-lg transition-colors"
                 title="Collapse"
               >
-                <ChevronLeft size={14} color="#9ca3af" />
+                <ChevronLeft size={14} />
               </button>
             </div>
           </div>
           
           {viewMode === 'library' && (
-            <div style={{ position: 'relative' }}>
-              <Search size={14} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder="Search modules..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%', paddingLeft: 28, paddingRight: 8, paddingTop: 6, paddingBottom: 6,
-                  fontSize: 12, border: '1px solid #e5e7eb', borderRadius: 6, outline: 'none',
-                  background: '#f9fafb',
-                }}
+                className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-colors font-['Inter']"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                >
+                  ×
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -208,8 +228,8 @@ const LeftPanel: React.FC = () => {
           <SceneHierarchy />
         ) : (
           <>
-            {/* Category Tabs — compact pill style */}
-            <div style={{ display: 'flex', padding: '6px 10px', gap: 4, borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
+            {/* Category Tabs — Industrial Cards */}
+            <div className="flex gap-2 p-4 border-b border-slate-700/30 flex-shrink-0">
               {tabs.map(tab => {
                 const Icon = tab.icon;
                 const isActive = activeLibraryTab === tab.id;
@@ -217,97 +237,100 @@ const LeftPanel: React.FC = () => {
                   <button
                     key={tab.id}
                     onClick={() => setActiveLibraryTab(tab.id)}
-                    style={{
-                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                      padding: '5px 4px', fontSize: 11, fontWeight: isActive ? 600 : 400,
-                      border: isActive ? '1px solid #99f6e4' : '1px solid transparent',
-                      borderRadius: 6, cursor: 'pointer',
-                      background: isActive ? '#f0fdfa' : 'transparent',
-                      color: isActive ? '#0f766e' : '#6b7280',
-                      transition: 'all 0.15s',
-                    }}
+                    className={`flex-1 flex flex-col items-center gap-1 p-2 rounded-lg transition-all duration-200 border ${
+                      isActive
+                        ? `bg-${tab.color}-500/10 border-${tab.color}-400/30 text-${tab.color}-400 ring-1 ring-${tab.color}-400/20 shadow-lg shadow-${tab.color}-500/5`
+                        : 'border-slate-600/30 text-slate-400 hover:text-slate-200 hover:bg-slate-700/30 hover:border-slate-500/50'
+                    }`}
                   >
-                    <Icon size={13} />
-                    {tab.name}
+                    <Icon size={16} />
+                    <span className="text-xs font-medium font-['Orbitron']">{tab.name.toUpperCase()}</span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Module List — scrollable */}
-            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: layout === 'grid' ? '8px' : '4px 6px' }}>
+            {/* Module List — Premium scrollable */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-2">
               {Object.entries(groupedModules).map(([group, items]) => (
-                <div key={group} style={{ marginBottom: 8 }}>
-                  {/* Group header */}
-                  <div style={{ 
-                    fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
-                    color: '#9ca3af', padding: '4px 6px', position: 'sticky', top: 0, background: '#fff', zIndex: 1,
-                  }}>
-                    {group} ({items.length})
+                <div key={group} className="mb-6">
+                  {/* Group header with industrial styling */}
+                  <div className="flex items-center gap-2 mb-3 sticky top-0 bg-slate-800/90 backdrop-blur-sm py-2 z-10">
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600 to-transparent"></div>
+                    <div className="px-3 py-1 bg-slate-700/50 rounded-full border border-slate-600/50">
+                      <span className="text-xs font-bold text-slate-300 font-['Orbitron'] tracking-wide">
+                        {group.toUpperCase()}
+                      </span>
+                      <span className="ml-2 text-xs text-slate-500 font-['Inter']">
+                        {items.length}
+                      </span>
+                    </div>
+                    <div className="flex-1 h-px bg-gradient-to-l from-transparent via-slate-600 to-transparent"></div>
                   </div>
 
                   {layout === 'grid' ? (
-                    /* Grid View */
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+                    /* Premium Grid View */
+                    <div className="grid grid-cols-2 gap-3">
                       {items.map(module => {
                         const Icon = module.icon;
+                        const categoryTab = tabs.find(t => t.id === module.category);
+                        const cardColor = categoryTab?.color || 'slate';
                         return (
                           <div
                             key={module.id}
                             draggable
                             onDragStart={(e) => handleDragStart(e, module)}
-                            style={{
-                              padding: 8, border: '1px solid #e5e7eb', borderRadius: 8,
-                              cursor: 'grab', textAlign: 'center', transition: 'all 0.15s',
-                              background: '#fff',
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#5eead4'; e.currentTarget.style.background = '#f0fdfa'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#fff'; }}
+                            className={`group p-3 border border-slate-600/30 rounded-lg cursor-grab transition-all duration-200 bg-gradient-to-br from-slate-800/50 to-slate-700/30 hover:border-${cardColor}-400/50 hover:shadow-lg hover:shadow-${cardColor}-500/10 hover:bg-gradient-to-br hover:from-${cardColor}-900/20 hover:to-slate-700/50`}
                           >
-                            <div style={{ 
-                              width: 32, height: 32, borderRadius: 6, background: '#f3f4f6',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 4px',
-                            }}>
-                              <Icon size={16} color="#6b7280" />
+                            <div className={`w-10 h-10 rounded-lg bg-gradient-to-br from-${cardColor}-500/20 to-${cardColor}-600/10 border border-${cardColor}-500/30 flex items-center justify-center mb-2 mx-auto group-hover:shadow-lg group-hover:shadow-${cardColor}-500/20`}>
+                              <Icon size={18} className={`text-${cardColor}-400 group-hover:text-${cardColor}-300`} />
                             </div>
-                            <div style={{ fontSize: 10, fontWeight: 500, color: '#374151', lineHeight: 1.2 }}>
-                              {module.name}
+                            <div className="text-center">
+                              <div className="text-xs font-medium text-slate-200 group-hover:text-white font-['Inter'] leading-tight">
+                                {module.name}
+                              </div>
+                              <div className="flex justify-center mt-1 gap-1">
+                                {getModuleTags(module).map(tag => (
+                                  <span key={tag} className="px-1.5 py-0.5 bg-slate-700/50 text-slate-400 rounded text-xs font-['Inter']">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    /* Compact List View */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    /* Premium Compact List View */
+                    <div className="space-y-1">
                       {items.map(module => {
                         const Icon = module.icon;
+                        const categoryTab = tabs.find(t => t.id === module.category);
+                        const cardColor = categoryTab?.color || 'slate';
                         return (
                           <div
                             key={module.id}
                             draggable
                             onDragStart={(e) => handleDragStart(e, module)}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 8,
-                              padding: '6px 8px', borderRadius: 6,
-                              cursor: 'grab', transition: 'all 0.1s',
-                              border: '1px solid transparent',
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f0fdfa'; e.currentTarget.style.borderColor = '#99f6e4'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
+                            className={`group flex items-center gap-3 p-2 rounded-lg cursor-grab transition-all duration-200 border border-transparent hover:border-${cardColor}-400/30 hover:bg-gradient-to-r hover:from-${cardColor}-900/10 hover:to-slate-700/30`}
                           >
-                            <div style={{
-                              width: 28, height: 28, borderRadius: 5, background: '#f3f4f6',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                            }}>
-                              <Icon size={14} color="#6b7280" />
+                            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br from-${cardColor}-500/20 to-${cardColor}-600/10 border border-${cardColor}-500/20 flex items-center justify-center flex-shrink-0 group-hover:shadow-md group-hover:shadow-${cardColor}-500/20`}>
+                              <Icon size={14} className={`text-${cardColor}-400 group-hover:text-${cardColor}-300`} />
                             </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 12, fontWeight: 500, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-slate-200 group-hover:text-white font-['Inter'] truncate">
                                 {module.name}
                               </div>
+                              <div className="flex gap-1 mt-0.5">
+                                {getModuleTags(module).slice(0, 2).map(tag => (
+                                  <span key={tag} className="px-1 py-0.5 bg-slate-700/30 text-slate-500 rounded text-xs font-['Inter'] leading-none">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
-                            <GripVertical size={12} color="#d1d5db" style={{ flexShrink: 0 }} />
+                            <GripVertical size={12} className="text-slate-500 flex-shrink-0 group-hover:text-slate-400" />
                           </div>
                         );
                       })}
@@ -317,8 +340,12 @@ const LeftPanel: React.FC = () => {
               ))}
               
               {modules.length === 0 && (
-                <div style={{ textAlign: 'center', padding: 20, color: '#9ca3af', fontSize: 12 }}>
-                  No modules found
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 rounded-full bg-slate-700/50 border border-slate-600/50 flex items-center justify-center mx-auto mb-4">
+                    <Search size={24} className="text-slate-400" />
+                  </div>
+                  <div className="text-slate-400 font-['Inter'] text-sm">No modules found</div>
+                  <div className="text-slate-500 font-['Inter'] text-xs mt-1">Try adjusting your search query</div>
                 </div>
               )}
             </div>
@@ -355,6 +382,38 @@ function getSubcategory(module: ModuleDefinition): string {
   if (name.includes('forklift') || name.includes('agv') || name.includes('truck')) return 'Vehicles';
   
   return 'Other';
+}
+
+// Generate tags for modules based on their properties
+function getModuleTags(module: ModuleDefinition): string[] {
+  const tags: string[] = [];
+  const name = module.id.toLowerCase();
+  
+  // Simulation readiness
+  if (module.category === 'process' || module.category === 'robots') {
+    tags.push('sim-ready');
+  }
+  
+  // Industry tags
+  if (name.includes('fmcg') || name.includes('food') || name.includes('pharma')) {
+    tags.push('FMCG');
+  }
+  if (name.includes('auto') || name.includes('manufacturing')) {
+    tags.push('automotive');
+  }
+  if (name.includes('robot') || name.includes('pick') || name.includes('place')) {
+    tags.push('robotics');
+  }
+  if (name.includes('agv') || name.includes('autonomous')) {
+    tags.push('autonomous');
+  }
+  
+  // Default fallback
+  if (tags.length === 0) {
+    tags.push('standard');
+  }
+  
+  return tags.slice(0, 3); // Limit to 3 tags
 }
 
 export default LeftPanel;

@@ -121,18 +121,18 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   };
 
   return (
-    <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shadow-sm">
+    <div className="bg-slate-800/90 backdrop-blur-sm border-b border-slate-700/50 px-6 py-3 flex items-center justify-between shadow-lg">
       {/* Left Section */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-6">
         <button
           onClick={() => navigate('/dashboard')}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium"
+          className="flex items-center gap-2 text-slate-300 hover:text-cyan-400 font-medium transition-colors"
         >
           <ArrowLeft size={18} />
-          <span className="hidden sm:inline">Dashboard</span>
+          <span className="hidden sm:inline font-['Orbitron']">MetaMech</span>
         </button>
         
-        <div className="h-6 w-px bg-gray-300" />
+        <div className="h-6 w-px bg-slate-600" />
         
         {/* Project Name */}
         {isEditing ? (
@@ -142,106 +142,118 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
             onChange={(e) => setProjectName(e.target.value)}
             onBlur={() => setIsEditing(false)}
             onKeyPress={(e) => e.key === 'Enter' && setIsEditing(false)}
-            className="text-lg font-semibold text-gray-900 bg-transparent border-b border-teal-500 outline-none"
+            className="text-lg font-semibold text-white bg-transparent border-b border-cyan-400 outline-none font-['Orbitron']"
             autoFocus
           />
         ) : (
           <h1
             onClick={() => setIsEditing(true)}
-            className="text-lg font-semibold text-gray-900 cursor-pointer hover:text-teal-600"
+            className="text-lg font-semibold text-white cursor-pointer hover:text-cyan-400 transition-colors font-['Orbitron']"
           >
             {projectName}
           </h1>
         )}
 
-        <div className="h-6 w-px bg-gray-300" />
+        <div className="h-6 w-px bg-slate-600" />
 
-        {/* Undo/Redo */}
-        <button onClick={handleUndo} className="p-1.5 text-gray-500 hover:text-gray-800 disabled:opacity-30" title="Undo (Ctrl+Z)">
-          <Undo2 size={18} />
-        </button>
-        <button onClick={handleRedo} className="p-1.5 text-gray-500 hover:text-gray-800 disabled:opacity-30" title="Redo (Ctrl+Shift+Z)">
-          <Redo2 size={18} />
-        </button>
+        {/* Selection/Move Group */}
+        <div className="flex items-center gap-1 px-2 py-1 bg-slate-700/50 rounded-lg border border-slate-600/50">
+          <button onClick={handleUndo} className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-600/50 rounded transition-colors disabled:opacity-30" title="Undo (Ctrl+Z)">
+            <Undo2 size={16} />
+          </button>
+          <button onClick={handleRedo} className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-600/50 rounded transition-colors disabled:opacity-30" title="Redo (Ctrl+Shift+Z)">
+            <Redo2 size={16} />
+          </button>
+        </div>
 
-        <div className="h-6 w-px bg-gray-300" />
+        <div className="h-6 w-px bg-slate-600" />
 
-        {/* Grid Snap */}
-        <button
-          onClick={() => setGridSnap(!gridSnap)}
-          className={`p-1.5 rounded transition-colors ${gridSnap ? 'bg-teal-100 text-teal-700' : 'text-gray-500 hover:text-gray-800'}`}
-          title="Grid Snap (G)"
-        >
-          <Grid3X3 size={18} />
-        </button>
+        {/* Mate/Snap Group */}
+        <div className="flex items-center gap-1 px-2 py-1 bg-slate-700/50 rounded-lg border border-slate-600/50">
+          <button
+            onClick={() => setGridSnap(!gridSnap)}
+            className={`p-1.5 rounded transition-colors ${
+              gridSnap 
+                ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-400/30' 
+                : 'text-slate-400 hover:text-cyan-400 hover:bg-slate-600/50'
+            }`}
+            title="Grid Snap (G)"
+          >
+            <Grid3X3 size={16} />
+          </button>
 
-        {/* Measure */}
-        <button
-          onClick={() => setMeasureActive(!measureActive)}
-          className={`p-1.5 rounded transition-colors ${measureActive ? 'bg-teal-100 text-teal-700' : 'text-gray-500 hover:text-gray-800'}`}
-          title="Measure (M)"
-        >
-          <Ruler size={18} />
-        </button>
+          <button
+            onClick={() => setMeasureActive(!measureActive)}
+            className={`p-1.5 rounded transition-colors ${
+              measureActive 
+                ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-400/30' 
+                : 'text-slate-400 hover:text-cyan-400 hover:bg-slate-600/50'
+            }`}
+            title="Measure (M)"
+          >
+            <Ruler size={16} />
+          </button>
+        </div>
 
-        {/* Camera Presets */}
-        <div className="flex items-center gap-0.5 ml-1">
+        <div className="h-6 w-px bg-slate-600" />
+
+        {/* View Group */}
+        <div className="flex items-center gap-0.5 px-2 py-1 bg-slate-700/50 rounded-lg border border-slate-600/50">
           {cameraPresets.map(p => (
             <button
               key={p.name}
               onClick={() => setCameraPreset(p.name)}
-              className="px-1.5 py-1 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded"
+              className="px-2 py-1 text-xs text-slate-400 hover:text-cyan-400 hover:bg-slate-600/50 rounded transition-colors font-['Orbitron']"
               title={`${p.name} view`}
             >
               {p.name[0]}
             </button>
           ))}
+          <div className="w-px h-4 bg-slate-600 mx-1" />
+          <button
+            onClick={() => setShowShortcuts(true)}
+            className="p-1 text-slate-400 hover:text-cyan-400 hover:bg-slate-600/50 rounded transition-colors"
+            title="Shortcuts (?)"
+          >
+            <HelpCircle size={14} />
+          </button>
         </div>
-
-        {/* Shortcuts */}
-        <button
-          onClick={() => setShowShortcuts(true)}
-          className="p-1.5 text-gray-500 hover:text-gray-800"
-          title="Shortcuts (?)"
-        >
-          <HelpCircle size={18} />
-        </button>
       </div>
 
       {/* Center Section - Simulation Controls */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <button
           onClick={isPlaying ? pause : play}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all duration-200 font-['Orbitron'] ${
             isPlaying 
-              ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' 
-              : 'bg-teal-100 text-teal-700 hover:bg-teal-200'
+              ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40' 
+              : 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40'
           }`}
         >
           {isPlaying ? <Pause size={18} /> : <Play size={18} />}
           <span className="hidden sm:inline">
-            {isPlaying ? 'Pause' : 'Play'}
+            {isPlaying ? 'PAUSE' : 'PLAY'}
           </span>
         </button>
         
         <button
           onClick={reset}
-          className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 text-slate-300 hover:text-white bg-slate-700/50 hover:bg-slate-600/50 rounded-xl border border-slate-600/50 transition-colors font-['Orbitron']"
         >
           <Square size={16} />
-          <span className="hidden sm:inline">Reset</span>
+          <span className="hidden sm:inline">RESET</span>
         </button>
 
         {/* Speed Control */}
-        <div className="flex items-center gap-2 ml-4">
-          <Gauge size={16} className="text-gray-600" />
+        <div className="flex items-center gap-2 ml-2 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600/50">
+          <Gauge size={16} className="text-cyan-400" />
           <select
             value={simulationSpeed}
             onChange={(e) => setSimulationSpeed(Number(e.target.value))}
-            className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            className="text-sm bg-transparent text-slate-300 border-none outline-none font-['Orbitron']"
           >
             {speedOptions.map(option => (
-              <option key={option.value} value={option.value}>
+              <option key={option.value} value={option.value} className="bg-slate-800">
                 {option.label}
               </option>
             ))}
@@ -249,36 +261,38 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         </div>
       </div>
 
-      {/* Right Section */}
-      <div className="flex items-center gap-2">
+      {/* Right Section - Save/Export Group */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 px-2 py-1 bg-slate-700/50 rounded-lg border border-slate-600/50">
+          <button
+            onClick={handleImport}
+            className="flex items-center gap-2 px-3 py-1.5 text-slate-300 hover:text-cyan-400 hover:bg-slate-600/50 rounded-lg transition-colors"
+            title="Import .metamech-sim.json"
+          >
+            <Upload size={16} />
+            <span className="hidden sm:inline text-sm font-['Orbitron']">IMPORT</span>
+          </button>
+          
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-3 py-1.5 text-slate-300 hover:text-cyan-400 hover:bg-slate-600/50 rounded-lg transition-colors"
+          >
+            <Download size={16} />
+            <span className="hidden sm:inline text-sm font-['Orbitron']">EXPORT</span>
+          </button>
+        </div>
+
         <button
           onClick={onSave}
           disabled={saveStatus === 'saving'}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-            saveStatus === 'saved' ? 'bg-green-600 text-white' :
-            saveStatus === 'error' ? 'bg-red-600 text-white' :
-            'bg-teal-600 text-white hover:bg-teal-700'
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all duration-200 font-['Orbitron'] ${
+            saveStatus === 'saved' ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/25' :
+            saveStatus === 'error' ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/25' :
+            'bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:shadow-lg hover:shadow-amber-500/25 shadow-md shadow-amber-500/10'
           }`}
         >
           {saveIcon()}
-          <span className="hidden sm:inline">{saveLabel()}</span>
-        </button>
-
-        <button
-          onClick={handleImport}
-          className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-          title="Import .metamech-sim.json"
-        >
-          <Upload size={16} />
-          <span className="hidden sm:inline">Import</span>
-        </button>
-        
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <Download size={16} />
-          <span className="hidden sm:inline">Export</span>
+          <span className="hidden sm:inline">{saveLabel().toUpperCase()}</span>
         </button>
 
         <input
@@ -289,14 +303,14 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           className="hidden"
         />
 
-        <div className="h-6 w-px bg-gray-300 mx-2" />
+        <div className="h-6 w-px bg-slate-600 mx-2" />
 
         {/* User Info */}
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <div className="w-8 h-8 bg-teal-600 text-white rounded-full flex items-center justify-center font-medium">
+        <div className="flex items-center gap-3 text-sm">
+          <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-600 text-white rounded-full flex items-center justify-center font-bold shadow-lg shadow-cyan-500/25">
             {user?.displayName?.charAt(0).toUpperCase() || 'U'}
           </div>
-          <span className="hidden md:inline">{user?.displayName}</span>
+          <span className="hidden md:inline text-slate-300 font-['Orbitron']">{user?.displayName}</span>
         </div>
       </div>
     </div>

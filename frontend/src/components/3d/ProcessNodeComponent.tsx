@@ -18,6 +18,12 @@ import BufferModel from './models/BufferModel';
 import { CartesianRobotModel, CobotModel, Robot5AxisModel, Robot6AxisModel } from './models/RobotModels';
 import { PalletModel } from './models/PalletModels';
 import IndustrialMachineModel from './models/IndustrialMachineModel';
+import {
+  CartonErectorModel, CasePackerModel, CheckweigherModel,
+  MetalDetectorModel, LabelerModel, SealingStationModel,
+  RejectStationModel, AccumulationTableModel, StretchWrapperModel,
+  PackingStationModel, PalletConveyorModel, ForkliftModel,
+} from './models/FMCGModels';
 
 interface ProcessNodeComponentProps {
   node: ProcessNode;
@@ -273,6 +279,31 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
       case 'standard-pallet':
       case 'custom-pallet':
         return <PalletModel parameters={node.parameters} isSelected={isSelected} />;
+      // FMCG End-of-Line
+      case 'carton-erector':
+        return <CartonErectorModel params={node.parameters} />;
+      case 'case-packer':
+        return <CasePackerModel params={node.parameters} />;
+      case 'checkweigher':
+        return <CheckweigherModel params={node.parameters} />;
+      case 'metal-detector':
+        return <MetalDetectorModel params={node.parameters} />;
+      case 'labeler':
+        return <LabelerModel params={node.parameters} />;
+      case 'sealing-station':
+        return <SealingStationModel params={node.parameters} />;
+      case 'reject-station':
+        return <RejectStationModel params={node.parameters} />;
+      case 'accumulation-table':
+        return <AccumulationTableModel params={node.parameters} />;
+      case 'stretch-wrapper':
+        return <StretchWrapperModel params={node.parameters} />;
+      case 'packing-station':
+        return <PackingStationModel params={node.parameters} />;
+      case 'pallet-conveyor':
+        return <PalletConveyorModel params={node.parameters} />;
+      case 'forklift':
+        return <ForkliftModel />;
       default:
         return <GenericModel type={node.type} isSelected={isSelected} params={node.parameters} />;
     }

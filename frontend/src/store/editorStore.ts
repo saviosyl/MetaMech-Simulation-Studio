@@ -13,7 +13,10 @@ export interface ProcessNode {
         'belt-conveyor' | 'roller-conveyor' | 'fanuc-robot' | 'machine-static' |
         'stopper' | 'pusher' | 'bend-conveyor' | 'sensor' |
         'cartesian-robot' | 'cobot' | 'robot-5axis' | 'robot-6axis' |
-        'eur-pallet' | 'standard-pallet' | 'custom-pallet';
+        'eur-pallet' | 'standard-pallet' | 'custom-pallet' |
+        'carton-erector' | 'case-packer' | 'checkweigher' | 'metal-detector' |
+        'labeler' | 'sealing-station' | 'reject-station' | 'accumulation-table' |
+        'stretch-wrapper' | 'packing-station' | 'pallet-conveyor' | 'forklift';
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -328,6 +331,49 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
         { id: 'input', type: 'input', localPosition: [-pL / 2, pH, 0] as [number, number, number] },
       ];
     }
+    // FMCG equipment — inline machines with input/output
+    case 'carton-erector':
+    case 'case-packer':
+    case 'checkweigher':
+    case 'metal-detector':
+    case 'labeler':
+    case 'sealing-station':
+    case 'reject-station': {
+      const eqW = (params?.width || 800) / 1000;
+      const eqH = (params?.height || 900) / 1000;
+      return [
+        { id: 'input', type: 'input', localPosition: [-eqW / 2 - 0.15, eqH * 0.55, 0] as [number, number, number] },
+        { id: 'output', type: 'output', localPosition: [eqW / 2 + 0.15, eqH * 0.55, 0] as [number, number, number] },
+      ];
+    }
+    case 'accumulation-table': {
+      const tW = (params?.width || 2000) / 1000;
+      const tH = (params?.height || 800) / 1000;
+      return [
+        { id: 'input', type: 'input', localPosition: [-tW / 2, tH + 0.03, 0] as [number, number, number] },
+        { id: 'output', type: 'output', localPosition: [tW / 2, tH + 0.03, 0] as [number, number, number] },
+      ];
+    }
+    case 'pallet-conveyor': {
+      const pcL = (params?.length || 3000) / 1000;
+      const pcH = (params?.height || 500) / 1000;
+      return [
+        { id: 'input', type: 'input', localPosition: [-pcL / 2, pcH, 0] as [number, number, number] },
+        { id: 'output', type: 'output', localPosition: [pcL / 2, pcH, 0] as [number, number, number] },
+      ];
+    }
+    case 'stretch-wrapper':
+      return [
+        { id: 'input', type: 'input', localPosition: [-0.8, 0.1, 0] as [number, number, number] },
+        { id: 'output', type: 'output', localPosition: [0.8, 0.1, 0] as [number, number, number] },
+      ];
+    case 'packing-station':
+      return [
+        { id: 'input', type: 'input', localPosition: [-0.75, 0.9, 0.3] as [number, number, number] },
+        { id: 'output', type: 'output', localPosition: [0.75, 0.9, 0.3] as [number, number, number] },
+      ];
+    case 'forklift':
+      return []; // No connection ports — layout/decoration only
     default:
       return [
         { id: 'input', type: 'input', localPosition: [-1, 0.5, 0] },
@@ -411,7 +457,7 @@ interface EditorState {
   simulationSpeed: number;
   
   // UI state
-  activeLibraryTab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets';
+  activeLibraryTab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
   showPropertiesPanel: boolean;
   
   // Panel state

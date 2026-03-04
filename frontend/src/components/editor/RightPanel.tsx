@@ -8,7 +8,11 @@ import {
   Sliders,
   ChevronLeft,
   ChevronRight,
-  Layers
+  Layers,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModuleDefinition } from '../../lib/moduleLibrary';
@@ -16,6 +20,48 @@ import { getAssetById, ParametricAssetDef } from '../../lib/assetManifest';
 import { mToMm, mmToM, radToDeg, degToRad } from '../../utils/units';
 import BOMPanel from './BOMPanel';
 import { generateBOM } from '../../lib/bom/bomEngine';
+
+// Collapsible section component for better organization
+const CollapsibleSection: React.FC<{
+  title: string;
+  icon?: any;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  badge?: string;
+}> = ({ title, icon: Icon, children, defaultOpen = false, badge }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="border border-slate-600/30 rounded-lg bg-gradient-to-br from-slate-700/20 to-slate-800/20 backdrop-blur-sm">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-3 text-left hover:bg-slate-700/20 transition-colors rounded-t-lg"
+      >
+        <div className="flex items-center gap-2">
+          {Icon && <Icon size={16} className="text-cyan-400" />}
+          <span className="text-sm font-bold text-slate-200 font-['Orbitron'] tracking-wide">
+            {title.toUpperCase()}
+          </span>
+          {badge && (
+            <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded text-xs font-['Inter']">
+              {badge}
+            </span>
+          )}
+        </div>
+        {isOpen ? (
+          <ChevronUp size={16} className="text-slate-400" />
+        ) : (
+          <ChevronDown size={16} className="text-slate-400" />
+        )}
+      </button>
+      {isOpen && (
+        <div className="p-3 pt-0 border-t border-slate-600/20">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const RightPanel: React.FC = () => {
   const {
@@ -194,176 +240,167 @@ const RightPanel: React.FC = () => {
 
   if (rightPanelCollapsed) {
     return (
-      <div style={{ flexShrink: 0, width: 32, borderLeft: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="flex-shrink-0 w-12 border-l border-slate-700/50 bg-slate-800/90 backdrop-blur-sm flex items-center justify-center">
         <button
           onClick={() => setRightPanelCollapsed(false)}
-          style={{ cursor: 'pointer', padding: 4, border: 'none', background: 'none' }}
+          className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
           title="Expand Properties"
         >
-          <ChevronLeft size={16} color="#6b7280" />
+          <ChevronLeft size={16} className="text-slate-400" />
         </button>
       </div>
     );
   }
 
   return (
-    <div style={{ 
-      flexShrink: 0, 
-      width: rightPanelWidth, 
-      maxWidth: 400, 
-      minWidth: 240,
-      display: 'flex',
-      height: '100%',
-      overflow: 'hidden',
-    }}>
+    <div className="flex-shrink-0 flex h-full overflow-hidden" style={{ width: rightPanelWidth, maxWidth: 400, minWidth: 240 }}>
       {/* Resize Handle */}
       <div
-        style={{ width: 6, cursor: 'col-resize', flexShrink: 0, background: 'transparent', transition: 'background 0.15s' }}
+        className="w-1 cursor-col-resize flex-shrink-0 bg-transparent hover:bg-cyan-500/50 transition-colors"
         onMouseDown={handleResizeStart}
         onDoubleClick={handleDoubleClick}
-        onMouseEnter={(e) => (e.currentTarget.style.background = '#14b8a6')}
-        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
         title="Drag to resize, double-click to collapse"
       />
 
-      <div style={{ flex: 1, background: '#fff', borderLeft: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="flex-1 bg-slate-800/90 backdrop-blur-sm border-l border-slate-700/50 flex flex-col overflow-hidden">
         {/* Header */}
-        <div style={{ padding: 12, borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontSize: 14, fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
-              <Settings size={16} />
-              Properties
+        <div className="px-4 py-3 border-b border-slate-700/50 flex-shrink-0 bg-gradient-to-r from-slate-800/50 to-slate-700/50">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2 font-['Orbitron'] tracking-wide">
+              <Settings size={16} className="text-cyan-400" />
+              PROPERTIES
             </h2>
             <button
               onClick={() => setRightPanelCollapsed(true)}
-              style={{ cursor: 'pointer', padding: 4, border: 'none', background: 'none', borderRadius: 4 }}
+              className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-lg transition-colors"
               title="Collapse Panel"
             >
-              <ChevronRight size={16} color="#6b7280" />
+              <ChevronRight size={16} />
             </button>
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {selectedObject ? (
             <div className="p-4 space-y-6">
-              {/* Object Info */}
-              <div>
-                <h3 className="font-medium text-gray-900 mb-2">Object Information</h3>
-                <div className="space-y-2">
+              {/* Object Info - Collapsible */}
+              <CollapsibleSection title="Object Information" icon={Settings} defaultOpen={true}>
+                <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">NAME</label>
                     <input
                       type="text"
                       value={selectedObject.name}
                       onChange={(e) => updateObject(selectedObject.id, selectedObjectType!, { name: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                      className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-colors font-['Inter']"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Type</label>
-                    <div className="text-sm text-gray-600 capitalize">
-                      {selectedObject.type.replace('-', ' ')}
+                    <label className="block text-xs font-semibold text-slate-300 font-['Orbitron'] tracking-wide">TYPE</label>
+                    <div className="mt-1.5 px-3 py-2 bg-slate-700/30 border border-slate-600/30 rounded-lg">
+                      <div className="text-sm text-slate-300 capitalize font-['Inter']">
+                        {selectedObject.type.replace('-', ' ')}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              </CollapsibleSection>
 
-              {/* Transform Controls */}
-              <div>
-                <h3 className="font-medium text-gray-900 mb-2">Transform</h3>
-                
-                <div className="flex gap-1 mb-4">
-                  {[
-                    { mode: 'translate', icon: Move3D, label: 'Move (W)' },
-                    { mode: 'rotate', icon: RotateCw, label: 'Rotate (E)' },
-                    { mode: 'scale', icon: Maximize, label: 'Scale (R)' },
-                  ].map(({ mode, icon: Icon, label }) => (
-                    <button
-                      key={mode}
-                      onClick={() => setTransformMode(mode as any)}
-                      className={`flex-1 flex items-center justify-center gap-1 py-2 px-3 text-sm rounded-lg transition-colors ${
-                        transformMode === mode
-                          ? 'bg-teal-100 text-teal-700 border border-teal-300'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                      title={label}
-                    >
-                      <Icon size={14} />
-                    </button>
-                  ))}
+              {/* Transform Controls - Collapsible */}
+              <CollapsibleSection title="Transform" icon={Move3D} defaultOpen={true}>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      { mode: 'translate', icon: Move3D, label: 'Move', key: 'W' },
+                      { mode: 'rotate', icon: RotateCw, label: 'Rotate', key: 'E' },
+                      { mode: 'scale', icon: Maximize, label: 'Scale', key: 'R' },
+                    ].map(({ mode, icon: Icon, label, key }) => (
+                      <button
+                        key={mode}
+                        onClick={() => setTransformMode(mode as any)}
+                        className={`flex flex-col items-center gap-1 py-2 px-3 text-xs rounded-lg transition-all duration-200 font-['Orbitron'] ${
+                          transformMode === mode
+                            ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-400/30 shadow-lg shadow-cyan-500/10'
+                            : 'bg-slate-700/30 text-slate-400 hover:text-slate-200 hover:bg-slate-600/30'
+                        }`}
+                        title={`${label} (${key})`}
+                      >
+                        <Icon size={16} />
+                        <span>{label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-4 mt-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-2 font-['Orbitron'] tracking-wide">POSITION (mm)</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {['X', 'Y', 'Z'].map((axis, index) => (
+                          <div key={axis}>
+                            <label className="block text-xs text-slate-400 mb-1 font-['Inter']">{axis}</label>
+                            <input
+                              type="number"
+                              value={Math.round(mToMm(selectedObject.position[index]))}
+                              onChange={(e) => handleTransformChange('position', index, mmToM(Number(e.target.value)))}
+                              step="50"
+                              className="w-full px-2 py-1.5 text-sm bg-slate-900/50 border border-slate-600/50 rounded text-slate-200 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-2 font-['Orbitron'] tracking-wide">ROTATION (°)</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {['X', 'Y', 'Z'].map((axis, index) => (
+                          <div key={axis}>
+                            <label className="block text-xs text-slate-400 mb-1 font-['Inter']">{axis}°</label>
+                            <input
+                              type="number"
+                              value={radToDeg(selectedObject.rotation[index]).toFixed(1)}
+                              onChange={(e) => handleTransformChange('rotation', index, degToRad(Number(e.target.value)))}
+                              step="1"
+                              className="w-full px-2 py-1.5 text-sm bg-slate-900/50 border border-slate-600/50 rounded text-slate-200 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-2 font-['Orbitron'] tracking-wide">SCALE</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {['X', 'Y', 'Z'].map((axis, index) => (
+                          <div key={axis}>
+                            <label className="block text-xs text-slate-400 mb-1 font-['Inter']">{axis}</label>
+                            <input
+                              type="number"
+                              value={selectedObject.scale[index].toFixed(2)}
+                              onChange={(e) => handleTransformChange('scale', index, Number(e.target.value))}
+                              step="0.1"
+                              min="0.1"
+                              className="w-full px-2 py-1.5 text-sm bg-slate-900/50 border border-slate-600/50 rounded text-slate-200 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Position (mm)</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {['X', 'Y', 'Z'].map((axis, index) => (
-                        <div key={axis}>
-                          <label className="block text-xs text-gray-500 mb-1">{axis} (mm)</label>
-                          <input
-                            type="number"
-                            value={Math.round(mToMm(selectedObject.position[index]))}
-                            onChange={(e) => handleTransformChange('position', index, mmToM(Number(e.target.value)))}
-                            step="50"
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Rotation (°)</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {['X', 'Y', 'Z'].map((axis, index) => (
-                        <div key={axis}>
-                          <label className="block text-xs text-gray-500 mb-1">{axis}°</label>
-                          <input
-                            type="number"
-                            value={radToDeg(selectedObject.rotation[index]).toFixed(1)}
-                            onChange={(e) => handleTransformChange('rotation', index, degToRad(Number(e.target.value)))}
-                            step="1"
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Scale</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {['X', 'Y', 'Z'].map((axis, index) => (
-                        <div key={axis}>
-                          <label className="block text-xs text-gray-500 mb-1">{axis}</label>
-                          <input
-                            type="number"
-                            value={selectedObject.scale[index].toFixed(2)}
-                            onChange={(e) => handleTransformChange('scale', index, Number(e.target.value))}
-                            step="0.1"
-                            min="0.1"
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              </CollapsibleSection>
 
               {/* Parametric Asset Parameters (with units) */}
               {parametricAssetDef && (
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Parameters</h3>
-                  <div className="space-y-3">
+                <CollapsibleSection title="Parameters" icon={Sliders} defaultOpen={true}>
+                  <div className="space-y-4">
                     {Object.entries(parametricAssetDef.parameterDefs).map(([paramKey, paramDef]) => {
                       const value = selectedObject?.parameters[paramKey] ?? parametricAssetDef.defaults[paramKey];
                       const limits = parametricAssetDef.limits[paramKey];
                       return (
                         <div key={paramKey}>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            {paramDef.label}{paramDef.unit ? ` (${paramDef.unit})` : ''}
+                          <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                            {paramDef.label.toUpperCase()}{paramDef.unit ? ` (${paramDef.unit})` : ''}
                           </label>
                           {paramDef.type === 'number' && (
                             <input
@@ -373,28 +410,30 @@ const RightPanel: React.FC = () => {
                               min={limits?.[0]}
                               max={limits?.[1]}
                               step={paramDef.step || 1}
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                              className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
                             />
                           )}
                           {paramDef.type === 'boolean' && (
-                            <label className="flex items-center gap-2">
+                            <label className="flex items-center gap-3 p-2 bg-slate-700/20 rounded-lg border border-slate-600/30">
                               <input
                                 type="checkbox"
                                 checked={value ?? false}
                                 onChange={(e) => handleParameterChange(paramKey, e.target.checked)}
-                                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                                className="rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 bg-slate-800"
                               />
-                              <span className="text-sm text-gray-700">Enabled</span>
+                              <span className="text-sm text-slate-300 font-['Inter']">Enabled</span>
                             </label>
                           )}
                           {paramDef.type === 'select' && paramDef.options && (
                             <select
                               value={value}
                               onChange={(e) => handleParameterChange(paramKey, e.target.value)}
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                              className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
                             >
                               {paramDef.options.map(opt => (
-                                <option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>
+                                <option key={opt} value={opt} className="bg-slate-800">
+                                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                                </option>
                               ))}
                             </select>
                           )}
@@ -402,24 +441,23 @@ const RightPanel: React.FC = () => {
                       );
                     })}
                   </div>
-                </div>
+                </CollapsibleSection>
               )}
 
               {/* Module Parameters (legacy/non-parametric) */}
               {!parametricAssetDef && moduleDefinition && (
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Parameters</h3>
-                  <div className="space-y-3">
+                <CollapsibleSection title="Parameters" icon={Sliders} defaultOpen={true}>
+                  <div className="space-y-4">
                     {Object.entries(moduleDefinition.parameters).map(([paramKey, paramDef]) => (
                       <div key={paramKey}>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          {paramDef.label}
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                          {paramDef.label.toUpperCase()}
                         </label>
                         {renderParameterInput(paramKey, paramDef)}
                       </div>
                     ))}
                   </div>
-                </div>
+                </CollapsibleSection>
               )}
 
               {/* BOM Panel for Belt Conveyor */}

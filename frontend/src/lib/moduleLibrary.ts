@@ -19,7 +19,7 @@ import {
 export interface ModuleDefinition {
   id: string;
   name: string;
-  category: 'process' | 'environment' | 'actors' | 'robots' | 'pallets';
+  category: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
   icon: any;
   description: string;
   assetId?: string; // references AssetDef.id in manifest
@@ -914,6 +914,154 @@ export const moduleLibrary: ModuleDefinition[] = [
       layerPattern: { type: 'select', label: 'Layer Pattern', default: 'aligned', options: ['aligned', 'interlocked', 'rotated'] },
       maxPalletHeight: { type: 'number', label: 'Max Pallet Height (mm)', default: 1800, min: 500, max: 3000, step: 100 },
     },
+  },
+
+  // ─── FMCG End-of-Line Equipment ──────────────────────────────
+  {
+    id: 'carton-erector',
+    name: 'Carton Erector',
+    category: 'fmcg',
+    icon: Package,
+    description: 'Automatic carton forming and erecting machine',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 1200, min: 800, max: 2000, step: 50 },
+      depth: { type: 'number', label: 'Depth (mm)', default: 800, min: 500, max: 1500, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 1800, min: 1200, max: 2500, step: 50 },
+      cycleTime: { type: 'number', label: 'Cycle Time (s)', default: 3, min: 0.5, max: 30, step: 0.5 },
+    },
+  },
+  {
+    id: 'case-packer',
+    name: 'Case Packer',
+    category: 'fmcg',
+    icon: Package,
+    description: 'Automated case packing system for products into cases',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 1500, min: 1000, max: 2500, step: 50 },
+      depth: { type: 'number', label: 'Depth (mm)', default: 1000, min: 600, max: 2000, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 2000, min: 1500, max: 2500, step: 50 },
+      cycleTime: { type: 'number', label: 'Cycle Time (s)', default: 5, min: 1, max: 30, step: 0.5 },
+      casesPerMinute: { type: 'number', label: 'Cases/min', default: 15, min: 5, max: 60, step: 1 },
+    },
+  },
+  {
+    id: 'checkweigher',
+    name: 'Checkweigher',
+    category: 'fmcg',
+    icon: Database,
+    description: 'Inline checkweigher for product weight verification',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 800, min: 500, max: 1200, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 900, min: 600, max: 1200, step: 50 },
+      weightTolerance: { type: 'number', label: 'Tolerance (%)', default: 5, min: 0.5, max: 20, step: 0.5 },
+      rejectEnabled: { type: 'boolean', label: 'Reject Enabled', default: true },
+    },
+  },
+  {
+    id: 'metal-detector',
+    name: 'Metal Detector',
+    category: 'fmcg',
+    icon: Eye,
+    description: 'Inline metal detection for product safety compliance',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 600, min: 400, max: 1000, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 900, min: 600, max: 1200, step: 50 },
+      sensitivity: { type: 'select', label: 'Sensitivity', default: 'high', options: ['low', 'medium', 'high'] },
+    },
+  },
+  {
+    id: 'labeler',
+    name: 'Labeler / Print & Apply',
+    category: 'fmcg',
+    icon: Wrench,
+    description: 'Automatic label printer and applicator station',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 600, min: 400, max: 1000, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 1200, min: 800, max: 1600, step: 50 },
+      labelSide: { type: 'select', label: 'Label Side', default: 'front', options: ['front', 'back', 'top', 'both-sides'] },
+      labelsPerMin: { type: 'number', label: 'Labels/min', default: 40, min: 10, max: 200, step: 5 },
+    },
+  },
+  {
+    id: 'sealing-station',
+    name: 'Sealing / Taping Station',
+    category: 'fmcg',
+    icon: Wrench,
+    description: 'Carton sealing and tape application station',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 700, min: 500, max: 1000, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 1000, min: 700, max: 1500, step: 50 },
+      sealType: { type: 'select', label: 'Seal Type', default: 'tape', options: ['tape', 'glue', 'heat-seal'] },
+    },
+  },
+  {
+    id: 'reject-station',
+    name: 'Reject Station',
+    category: 'fmcg',
+    icon: ArrowRightLeft,
+    description: 'Pneumatic reject for failed product removal',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 600, min: 400, max: 1000, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 900, min: 600, max: 1200, step: 50 },
+      rejectMethod: { type: 'select', label: 'Reject Method', default: 'pusher', options: ['pusher', 'air-blast', 'diverter', 'trap-door'] },
+    },
+  },
+  {
+    id: 'accumulation-table',
+    name: 'Accumulation Table',
+    category: 'fmcg',
+    icon: SquareStack,
+    description: 'Buffer/accumulation roller table for product staging',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 2000, min: 1000, max: 4000, step: 100 },
+      depth: { type: 'number', label: 'Depth (mm)', default: 1500, min: 800, max: 3000, step: 100 },
+      height: { type: 'number', label: 'Height (mm)', default: 800, min: 500, max: 1200, step: 50 },
+    },
+  },
+  {
+    id: 'stretch-wrapper',
+    name: 'Stretch Wrapper',
+    category: 'fmcg',
+    icon: RotateCw,
+    description: 'Turntable stretch wrapper for pallet wrapping',
+    parameters: {
+      height: { type: 'number', label: 'Mast Height (mm)', default: 2500, min: 2000, max: 3500, step: 100 },
+      wrapSpeed: { type: 'number', label: 'Wraps/min', default: 12, min: 5, max: 25, step: 1 },
+      filmLayers: { type: 'number', label: 'Film Layers', default: 3, min: 1, max: 8, step: 1 },
+    },
+  },
+  {
+    id: 'packing-station',
+    name: 'Operator Packing Station',
+    category: 'fmcg',
+    icon: Columns,
+    description: 'Manual packing workstation with shelving and task light',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 1500, min: 1000, max: 2500, step: 100 },
+      depth: { type: 'number', label: 'Depth (mm)', default: 800, min: 600, max: 1200, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 900, min: 700, max: 1100, step: 50 },
+    },
+  },
+  {
+    id: 'pallet-conveyor',
+    name: 'Pallet Conveyor',
+    category: 'fmcg',
+    icon: ArrowRight,
+    description: 'Heavy-duty roller conveyor for pallet transport',
+    parameters: {
+      length: { type: 'number', label: 'Length (mm)', default: 3000, min: 1000, max: 6000, step: 500 },
+      width: { type: 'number', label: 'Width (mm)', default: 1200, min: 800, max: 1600, step: 100 },
+      height: { type: 'number', label: 'Height (mm)', default: 500, min: 300, max: 800, step: 50 },
+      speed: { type: 'number', label: 'Speed (m/min)', default: 8, min: 1, max: 20, step: 1 },
+    },
+  },
+  {
+    id: 'forklift',
+    name: 'Forklift',
+    category: 'fmcg',
+    icon: ArrowUpDown,
+    description: 'Static forklift representation for layout planning',
+    parameters: {},
   },
 ];
 
