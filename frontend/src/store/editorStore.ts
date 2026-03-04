@@ -231,21 +231,28 @@ export function getConnectionPorts(type: string, params?: Record<string, any>, a
       const platD = (params?.platformDepth || 1000) / 1000;
       const liftH = (params?.liftHeight || 3000) / 1000;
       const loadDir = params?.loadDirection || 'front';
-      // Infeed at ground level, outfeed at top
-      const infeedY = 0.15; // just above base
-      const outfeedY = liftH;
-      // Direction offsets based on loadDirection
+      const liftDir = params?.liftDirection || 'up';
+      const groundY = 0.15;
+      const topY = liftH;
       const dirMap: Record<string, [number, number]> = {
         front: [0, -platD / 2],
         back: [0, platD / 2],
         left: [-platW / 2, 0],
         right: [platW / 2, 0],
       };
-      const [inX, inZ] = dirMap[loadDir] || [0, -platD / 2];
-      return [
-        { id: 'input', type: 'input', localPosition: [inX, infeedY, inZ] as [number, number, number] },
-        { id: 'output', type: 'output', localPosition: [-inX, outfeedY, -inZ] as [number, number, number] },
-      ];
+      const [offX, offZ] = dirMap[loadDir] || [0, -platD / 2];
+      if (liftDir === 'up') {
+        return [
+          { id: 'input', type: 'input', localPosition: [offX, groundY, offZ] as [number, number, number] },
+          { id: 'output', type: 'output', localPosition: [-offX, topY, -offZ] as [number, number, number] },
+        ];
+      } else {
+        // Down: infeed at top, outfeed at ground
+        return [
+          { id: 'input', type: 'input', localPosition: [offX, topY, offZ] as [number, number, number] },
+          { id: 'output', type: 'output', localPosition: [-offX, groundY, -offZ] as [number, number, number] },
+        ];
+      }
     }
     case 'sensor': {
       return [];

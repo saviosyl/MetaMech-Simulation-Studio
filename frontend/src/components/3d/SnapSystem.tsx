@@ -1,14 +1,34 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useEditorStore, getConnectionPorts, ProcessNode, ConnectionPort } from '../../store/editorStore';
 import { getPortWorldPosition, alignNodeToPort } from '../../lib/nodeTransform';
-// Accessory snap — will be wired in Task 6
-// import { findNearestConveyorSnap, isAccessoryType, applyAccessorySnap } from '../../lib/accessorySnap';
+import { findNearestConveyorSnap, isAccessoryType, isConveyorType, applyAccessorySnap } from '../../lib/accessorySnap';
 
 const SNAP_THRESHOLD = 0.5;
 
 const SnapSystem: React.FC = () => {
   const { processNodes, edges, selectedObjectId, isDragging, mateMode, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
+  const wasDragging = useRef(false);
+
+  // Accessory auto-snap: when dragging ends, snap accessory to nearest conveyor
+  useEffect(() => {
+    if (wasDragging.current && !isDragging && selectedObjectId) {
+      const node = processNodes.find(n => n.id === selectedObjectId);
+      if (node && isAccessoryType(node.type)) {
+        const conveyors = processNodes.filter(n => isConveyorType(n.type));
+        const snap = findNearestConveyorSnap(node.position, conveyors);
+        if (snap) {
+          const applied = applyAccessorySnap(snap);
+          updateObject(node.id, 'process', {
+            position: applied.position,
+            rotation: applied.rotation,
+            parameters: { ...node.parameters, ...applied.parameters },
+          });
+        }
+      }
+    }
+    wasDragging.current = isDragging;
+  }, [isDragging]);
 
   // Show ports for all nodes when something is selected, being dragged, or mate mode
   const showPorts = selectedObjectId !== null || isDragging || mateMode.active;

@@ -17,6 +17,7 @@ import SinkModel from './models/SinkModel';
 import BufferModel from './models/BufferModel';
 import { CartesianRobotModel, CobotModel, Robot5AxisModel, Robot6AxisModel } from './models/RobotModels';
 import { PalletModel } from './models/PalletModels';
+import IndustrialMachineModel from './models/IndustrialMachineModel';
 
 interface ProcessNodeComponentProps {
   node: ProcessNode;
@@ -237,7 +238,6 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
   const glbMap: Record<string, { url: string; targetSize: number }> = {
     'conveyor': { url: '/models/conveyor.glb', targetSize: 5 },
     'pick-and-place': { url: '/models/fanuc-robot.glb', targetSize: 2 },
-    'machine': { url: '/models/machine.glb', targetSize: 2 },
     'palletizer': { url: '/models/fanuc-robot.glb', targetSize: 2 },
     'machine-static': { url: '/models/machine.glb', targetSize: 2 },
     'fanuc-robot': { url: '/models/fanuc-robot.glb', targetSize: 2 },
@@ -259,6 +259,8 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         return <SinkModel isSelected={isSelected} />;
       case 'buffer':
         return <BufferModel isSelected={isSelected} />;
+      case 'machine':
+        return <IndustrialMachineModel parameters={node.parameters} isSelected={isSelected} />;
       case 'cartesian-robot':
         return <CartesianRobotModel parameters={node.parameters} isSelected={isSelected} />;
       case 'cobot':

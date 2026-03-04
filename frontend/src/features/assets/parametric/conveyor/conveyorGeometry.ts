@@ -49,13 +49,16 @@ function buildFrame(lengthM: number, widthM: number, heightM: number): THREE.Gro
 }
 
 /** Build belt conveyor surface */
-function buildBeltSurface(lengthM: number, widthM: number, heightM: number): THREE.Group {
+function buildBeltSurface(lengthM: number, widthM: number, heightM: number, beltColor?: string): THREE.Group {
   const group = new THREE.Group();
   group.name = 'beltSurface';
 
-  // Belt top surface
+  // Belt top surface — user-configurable color
+  const beltMat = beltColor && beltColor !== '#1e1e1e'
+    ? new THREE.MeshStandardMaterial({ color: beltColor, metalness: 0.05, roughness: 0.75 })
+    : matBelt;
   const beltGeo = new THREE.BoxGeometry(lengthM - 0.02, 0.005, widthM);
-  const belt = new THREE.Mesh(beltGeo, matBelt);
+  const belt = new THREE.Mesh(beltGeo, beltMat);
   belt.position.set(0, heightM + 0.0025, 0);
   belt.receiveShadow = true;
   group.add(belt);
@@ -275,7 +278,7 @@ export function buildConveyorBody(params: ConveyorParams): THREE.Group {
   // Surface based on type
   switch (params.conveyorType) {
     case 'belt':
-      group.add(buildBeltSurface(lengthM, widthM, heightM));
+      group.add(buildBeltSurface(lengthM, widthM, heightM, params.beltColor));
       break;
     case 'roller':
       group.add(buildRollerSurface(lengthM, widthM, heightM));

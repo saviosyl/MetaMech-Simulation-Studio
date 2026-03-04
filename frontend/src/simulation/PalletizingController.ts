@@ -58,7 +58,7 @@ export function generateLayerSlots(
 ): SlotPosition[] {
   const slots: SlotPosition[] = [];
   const pL = def.lengthMm / 1000;
-  const _pW = def.widthMm / 1000; // used for future bounds check
+  // const _pW = def.widthMm / 1000; // reserved for future bounds check
   const pH = def.heightMm / 1000;
   const spacing = def.productSpacingMm / 1000;
   const [prodL, prodW, prodH] = productSizeMm.map(v => v / 1000);

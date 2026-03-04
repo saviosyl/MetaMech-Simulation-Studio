@@ -121,6 +121,7 @@ export function editorParamsToConveyorParams(editorParams: Record<string, any>):
     motorSide: editorParams.motorSide || 'right',
     showSupports: editorParams.showLegs ?? editorParams.showSupports ?? true,
     supportType: editorParams.supportType || 'floor',
+    beltColor: editorParams.beltColor || '#1e1e1e',
     cleatHeightMm: editorParams.cleatHeight || editorParams.cleatHeightMm || 25,
     cleatSpacingMm: editorParams.cleatSpacing || editorParams.cleatSpacingMm || 150,
     cleatStyle: editorParams.cleatStyle || 'straight',

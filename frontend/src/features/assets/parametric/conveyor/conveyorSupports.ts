@@ -192,15 +192,32 @@ export function buildSupportAssembly(params: ConveyorParams): THREE.Group | null
     }
 
   } else {
-    // Standard floor support
+    // Standard floor support — incline-aware
+    const angleRad = ((params.angleDeg || 0) * Math.PI) / 180;
     for (const xPos of positions) {
+      // For inclined conveyors, adjust height per position
+      // xPos is relative to center; positive x = higher end on incline
+      const inclineOffset = Math.sin(angleRad) * xPos;
+      const localH = heightM + inclineOffset;
+      // Top bracket must tilt to match frame angle
       const station = buildSupportStation(
         widthM + 0.02,
-        heightM,
+        Math.max(0.15, localH),
         params.adjustableFeetEnabled ? params.footAdjustmentMm : 0,
         params.adjustableFeetEnabled,
       );
       station.position.x = xPos;
+      // Tilt top mounting bracket to match incline
+      if (angleRad !== 0) {
+        // Add a tilted top plate
+        const topPlate = new THREE.Mesh(
+          new THREE.BoxGeometry(0.08, 0.006, widthM + 0.04),
+          matDarkSteel,
+        );
+        topPlate.position.set(xPos, localH + 0.003, 0);
+        topPlate.rotation.z = -angleRad;
+        group.add(topPlate);
+      }
       group.add(station);
     }
   }

@@ -171,6 +171,7 @@ export class SimulationEngine {
         case 'custom-pallet': /* pallets are passive — tracked via palletStates */ break;
         case 'palletizer': this.tickPalletizer(node, stats, elapsed); break;
         case 'stopper': this.tickStopper(node, stats, elapsed); break;
+        case 'pusher': this.tickPusher(node, stats, elapsed); break;
         case 'sensor': this.tickSensor(node, stats, elapsed); break;
         case 'vertical-lifter': this.tickLift(node, stats, elapsed); break;
       }
@@ -651,22 +652,18 @@ export class SimulationEngine {
 
   // ─── Stopper: blocks product flow ─────────────────────────────
   private tickStopper(node: ProcessNode, stats: NodeStats, dt: number) {
-    const engaged = node.parameters.engaged ?? true;
+    const mode = node.parameters.stopperMode || 'normally-closed';
     const enabled = node.parameters.enabled ?? true;
+    const holdTime = node.parameters.holdTime || 3;
+    const meteringInterval = node.parameters.meteringInterval || 2;
 
-    if (!enabled || !engaged) {
-      // Release any stopped products
-      const stopped = this.products.filter(p => p.stoppedBy === node.id);
-      for (const product of stopped) {
-        product.state = 'queued';
-        product.stoppedBy = null;
-        this.addFlowEvent(stats, 'released', `Product ${product.id.slice(0, 8)} released`);
-      }
+    if (!enabled) {
+      this.releaseAllStopped(node, stats);
       this.setFlowState(stats, 'idle', dt);
       return;
     }
 
-    // Stop arriving products
+    // Accept arriving products
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
       product.state = 'stopped';
@@ -675,13 +672,136 @@ export class SimulationEngine {
       this.addFlowEvent(stats, 'stopped', `Product ${product.id.slice(0, 8)} stopped`);
     }
 
-    const stoppedCount = this.products.filter(p => p.stoppedBy === node.id).length;
-    if (stoppedCount > 0) {
+    const stopped = this.products.filter(p => p.stoppedBy === node.id);
+
+    switch (mode) {
+      case 'normally-closed': {
+        // Basic: stop all, release when engaged=false
+        const engaged = node.parameters.engaged ?? true;
+        if (!engaged) this.releaseAllStopped(node, stats);
+        break;
+      }
+      case 'timed-release': {
+        // Hold for N seconds, then release all
+        for (const p of stopped) {
+          if (p.blockedSince && (this.simTime - p.blockedSince) >= holdTime) {
+            this.releaseProduct(p, node, stats);
+          }
+        }
+        break;
+      }
+      case 'release-one': {
+        // Release one per trigger (release when engaged toggles to false)
+        const engaged = node.parameters.engaged ?? true;
+        if (!engaged && stopped.length > 0) {
+          this.releaseProduct(stopped[0], node, stats);
+          // Re-engage automatically
+          node.parameters.engaged = true;
+        }
+        break;
+      }
+      case 'metering': {
+        // Release one every N seconds
+        if (stats.processEndTime === null) stats.processEndTime = this.simTime + meteringInterval;
+        if (stats.processEndTime !== null && this.simTime >= stats.processEndTime && stopped.length > 0) {
+          this.releaseProduct(stopped[0], node, stats);
+          stats.processEndTime = this.simTime + meteringInterval;
+        }
+        break;
+      }
+      case 'batch-release': {
+        // Release N items per trigger
+        const batchSize = node.parameters.batchSize || 3;
+        const engaged = node.parameters.engaged ?? true;
+        if (!engaged) {
+          const toRelease = stopped.slice(0, batchSize);
+          for (const p of toRelease) this.releaseProduct(p, node, stats);
+          node.parameters.engaged = true;
+        }
+        break;
+      }
+      default: {
+        // Fallback: basic engaged toggle
+        const engaged = node.parameters.engaged ?? true;
+        if (!engaged) this.releaseAllStopped(node, stats);
+      }
+    }
+
+    const remainingStopped = this.products.filter(p => p.stoppedBy === node.id).length;
+    if (remainingStopped > 0) {
       this.setFlowState(stats, 'stopped', dt);
       stats.stoppedTime += dt;
     } else {
       this.setFlowState(stats, 'idle', dt);
     }
+  }
+
+  private releaseProduct(product: Product, node: ProcessNode, stats: NodeStats) {
+    product.state = 'at-node';
+    product.stoppedBy = null;
+    product.blockedSince = null;
+    this.addFlowEvent(stats, 'released', `Product ${product.id.slice(0, 8)} released`);
+    // Send to next node
+    const outEdges = this.getOutEdges(node.id);
+    if (outEdges.length > 0) this.sendProductAlongEdge(product, outEdges[0]);
+  }
+
+  private releaseAllStopped(node: ProcessNode, stats: NodeStats) {
+    const stopped = this.products.filter(p => p.stoppedBy === node.id);
+    for (const p of stopped) this.releaseProduct(p, node, stats);
+  }
+
+  // ─── Pusher: diverts/rejects products to alternate path ──────
+  private tickPusher(node: ProcessNode, stats: NodeStats, dt: number) {
+    const enabled = node.parameters.enabled ?? true;
+    if (!enabled) { this.setFlowState(stats, 'idle', dt); return; }
+
+    const pusherMode = node.parameters.pusherMode || 'reject-all';
+    const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
+    const outEdges = this.getOutEdges(node.id);
+    // Primary = first edge, divert = second edge
+    const primaryEdge = outEdges[0];
+    const divertEdge = outEdges.length > 1 ? outEdges[1] : null;
+
+    for (const product of arrived) {
+      let shouldDivert = false;
+
+      switch (pusherMode) {
+        case 'reject-all':
+          shouldDivert = true;
+          break;
+        case 'divert-by-color': {
+          const targetColor = node.parameters.targetColor || 'red';
+          const colorLookup: Record<string, string> = { red: '#ef4444', blue: '#3b82f6', green: '#10b981', yellow: '#eab308', white: '#f5f5f5' };
+          const resolvedColor = targetColor.startsWith('#') ? targetColor : (colorLookup[targetColor] || targetColor);
+          shouldDivert = product.color === resolvedColor;
+          break;
+        }
+        case 'divert-by-type': {
+          const targetType = node.parameters.targetProductType || 'box';
+          shouldDivert = product.type === targetType;
+          break;
+        }
+        case 'divert-alternating': {
+          shouldDivert = stats.throughput % 2 === 0;
+          break;
+        }
+        default:
+          shouldDivert = true;
+      }
+
+      if (shouldDivert && divertEdge) {
+        this.sendProductAlongEdge(product, divertEdge);
+      } else if (primaryEdge) {
+        this.sendProductAlongEdge(product, primaryEdge);
+      } else {
+        product.state = 'completed';
+      }
+      stats.throughput++;
+    }
+
+    if (arrived.length > 0) stats.busyTime += dt;
+    this.setFlowState(stats, arrived.length > 0 ? 'running' : 'idle', dt);
   }
 
   // ─── Accumulation Conveyor: zone-based buffering on belt ─────
