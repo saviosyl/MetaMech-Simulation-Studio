@@ -149,7 +149,7 @@ export function evaluatePusher(
   config: PusherConfig,
   runState: PusherRunState,
   simTime: number,
-  dt: number,
+  _dt: number,
 ): PusherAction[] {
   const actions: PusherAction[] = [];
   const halfCycle = config.cycleTimeSec / 2;

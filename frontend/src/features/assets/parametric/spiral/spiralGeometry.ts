@@ -9,8 +9,6 @@ import { SpiralConveyorParams } from './spiralTypes';
 
 // Premium shared materials
 import {
-  matBelt,
-  matDarkSteel,
   matGuideRail,
   matGalvanized as matBracket,
   matAluminum as matColumn,
