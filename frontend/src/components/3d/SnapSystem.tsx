@@ -1,20 +1,23 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useEditorStore, getConnectionPorts, ProcessNode, ConnectionPort } from '../../store/editorStore';
-import { getPortWorldPosition, alignNodeToPort } from '../../lib/nodeTransform';
+import { getPortWorldPosition, alignNodeToPort, solveMateTransform, localDirToWorld } from '../../lib/nodeTransform';
 import { findNearestConveyorSnap, isAccessoryType, isConveyorType, applyAccessorySnap } from '../../lib/accessorySnap';
 
 const SNAP_THRESHOLD = 0.5;
 
 const SnapSystem: React.FC = () => {
-  const { processNodes, edges, selectedObjectId, isDragging, mateMode, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
+  const { processNodes, edges, selectedObjectId, isDragging, mateMode, activeTool, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
   const wasDragging = useRef(false);
 
-  // Accessory auto-snap: when dragging ends, snap accessory to nearest conveyor
+  // Auto-snap on drag end: accessory snap + snap-move port proximity snap
   useEffect(() => {
     if (wasDragging.current && !isDragging && selectedObjectId) {
       const node = processNodes.find(n => n.id === selectedObjectId);
-      if (node && isAccessoryType(node.type)) {
+      if (!node) { wasDragging.current = false; return; }
+
+      // Accessory snap (any mode)
+      if (isAccessoryType(node.type)) {
         const conveyors = processNodes.filter(n => isConveyorType(n.type));
         const snap = findNearestConveyorSnap(node.position, conveyors);
         if (snap) {
@@ -24,6 +27,54 @@ const SnapSystem: React.FC = () => {
             rotation: applied.rotation,
             parameters: { ...node.parameters, ...applied.parameters },
           });
+        }
+      }
+
+      // Snap-move mode: auto-mate to nearest compatible port within 100mm
+      if (activeTool === 'snap-move') {
+        const SNAP_DIST = 0.15; // 150mm threshold
+        const myPorts = getConnectionPorts(node.type, node.parameters);
+        let bestDist = SNAP_DIST;
+        let bestMatch: { myPort: ConnectionPort; targetNode: ProcessNode; targetPort: ConnectionPort; targetWorldPos: [number, number, number]; targetWorldDir: [number, number, number] } | null = null;
+
+        for (const other of processNodes) {
+          if (other.id === node.id) continue;
+          const otherPorts = getConnectionPorts(other.type, other.parameters);
+          for (const mp of myPorts) {
+            const mpWorld = getPortWorldPosition(mp.localPosition, node);
+            for (const op of otherPorts) {
+              // Compatible: output↔input
+              if (mp.type === op.type) continue;
+              const opWorld = getPortWorldPosition(op.localPosition, other);
+              const dx = mpWorld[0] - opWorld[0];
+              const dy = mpWorld[1] - opWorld[1];
+              const dz = mpWorld[2] - opWorld[2];
+              const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+              if (dist < bestDist) {
+                bestDist = dist;
+                const opWorldDir = localDirToWorld(op.direction, other.rotation);
+                bestMatch = { myPort: mp, targetNode: other, targetPort: op, targetWorldPos: opWorld, targetWorldDir: opWorldDir };
+              }
+            }
+          }
+        }
+
+        if (bestMatch) {
+          const mate = solveMateTransform(
+            bestMatch.targetWorldPos,
+            bestMatch.targetWorldDir,
+            bestMatch.myPort.localPosition,
+            bestMatch.myPort.direction,
+            node.scale,
+          );
+          updateObject(node.id, 'process', { position: mate.position, rotation: mate.rotation });
+
+          // Auto-create edge
+          if (bestMatch.myPort.type === 'output') {
+            addEdge(node.id, bestMatch.myPort.id, bestMatch.targetNode.id, bestMatch.targetPort.id);
+          } else {
+            addEdge(bestMatch.targetNode.id, bestMatch.targetPort.id, node.id, bestMatch.myPort.id);
+          }
         }
       }
     }
@@ -79,21 +130,32 @@ const SnapSystem: React.FC = () => {
         });
         return;
       }
-      // Auto-align: move the second-clicked object so its port aligns with the first port
+      // Full 3D mate: move AND rotate the second object so ports align face-to-face
+      const firstNode = processNodes.find(n => n.id === selectedPort.nodeId);
       const secondNode = processNodes.find(n => n.id === pv.nodeId);
-      if (secondNode) {
+      if (secondNode && firstNode) {
+        const firstPorts = getConnectionPorts(firstNode.type, firstNode.parameters);
+        const firstPort = firstPorts.find(p => p.id === selectedPort.portId);
         const secondPorts = getConnectionPorts(secondNode.type, secondNode.parameters);
         const secondPort = secondPorts.find(p => p.id === pv.portId);
-        if (secondPort) {
-          // Calculate where the second node needs to be so its port aligns with the first port
-          // Uses rotation-aware alignment
-          const newPosition = alignNodeToPort(
-            secondPort.localPosition,
+        if (firstPort && secondPort) {
+          // Get first port's world direction
+          const firstWorldDir = localDirToWorld(
+            firstPort.direction,
+            firstNode.rotation,
+          );
+          // Solve: position + rotation for second node
+          const mate = solveMateTransform(
             selectedPort.worldPosition,
-            secondNode.rotation,
+            firstWorldDir,
+            secondPort.localPosition,
+            secondPort.direction,
             secondNode.scale,
           );
-          updateObject(pv.nodeId, 'process', { position: newPosition });
+          updateObject(pv.nodeId, 'process', {
+            position: mate.position,
+            rotation: mate.rotation,
+          });
         }
       }
 

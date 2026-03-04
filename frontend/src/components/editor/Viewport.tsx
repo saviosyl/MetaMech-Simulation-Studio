@@ -159,7 +159,7 @@ const DraggableObject: React.FC<{
       >
         {children}
       </group>
-      {isSelected && (activeTool === 'move' || activeTool === 'rotate' || activeTool === 'scale') && (
+      {isSelected && (activeTool === 'move' || activeTool === 'rotate' || activeTool === 'scale' || activeTool === 'snap-move') && (
         <TransformControls
           ref={transformRef}
           object={groupRef.current || undefined}

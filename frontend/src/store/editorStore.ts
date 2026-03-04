@@ -74,6 +74,10 @@ export interface ConnectionPort {
   id: string;
   type: 'input' | 'output';
   localPosition: [number, number, number];
+  /** Outward-facing direction of this port in local space (unit vector).
+   *  Input ports face "into" the node, output ports face "out of" the node.
+   *  Used for mate alignment — the mating port's direction should oppose this. */
+  direction: [number, number, number];
 }
 
 export interface Underlay {
@@ -112,8 +116,36 @@ export interface CustomProduct {
   dimensions: [number, number, number];
 }
 
+/** Add default direction vectors to ports that don't have them.
+ *  Convention: input ports face -X (toward infeed), output ports face +X (toward outfeed).
+ *  For ports with non-standard positions, direction points outward from node center. */
+function ensureDirections(ports: Partial<ConnectionPort>[]): ConnectionPort[] {
+  return ports.map(p => {
+    if (p.direction) return p as ConnectionPort;
+    const pos = p.localPosition || [0, 0, 0];
+    // Default: input faces -X, output faces +X
+    let dir: [number, number, number];
+    if (p.type === 'input') {
+      dir = [-1, 0, 0];
+    } else {
+      dir = [1, 0, 0];
+    }
+    // Override for ports that are clearly off the X axis (e.g. router reject port)
+    const lenXZ = Math.sqrt(pos[0] * pos[0] + pos[2] * pos[2]);
+    if (lenXZ > 0.1) {
+      // Direction points outward from center in XZ plane
+      dir = [pos[0] / lenXZ, 0, pos[2] / lenXZ];
+    }
+    return { ...p, direction: dir } as ConnectionPort;
+  });
+}
+
 // Connection port definitions per object type
 export function getConnectionPorts(type: string, params?: Record<string, any>, assetId?: string): ConnectionPort[] {
+  return ensureDirections(_getConnectionPortsRaw(type, params, assetId));
+}
+
+function _getConnectionPortsRaw(type: string, params?: Record<string, any>, assetId?: string): Partial<ConnectionPort>[] {
   // Check asset manifest first
   if (assetId) {
     const assetDef = getAssetById(assetId);
@@ -329,7 +361,7 @@ interface EditorState {
   selectedObjectType: 'process' | 'environment' | 'actor' | null;
   selectedIds: string[];
   transformMode: 'translate' | 'rotate' | 'scale';
-  activeTool: 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'measure';
+  activeTool: 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure';
   
   // Mate mode
   mateMode: {
@@ -389,7 +421,7 @@ interface EditorState {
   toggleSelectId: (id: string, type: 'process' | 'environment' | 'actor') => void;
   selectAll: () => void;
   setTransformMode: (mode: 'translate' | 'rotate' | 'scale') => void;
-  setActiveTool: (tool: 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'measure') => void;
+  setActiveTool: (tool: 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure') => void;
   setMateSelectedPort: (port: { nodeId: string; portId: string; type: 'input' | 'output'; worldPosition: [number, number, number] } | null) => void;
   setGridSnap: (snap: boolean) => void;
   setGridSnapSize: (size: number) => void;
@@ -672,7 +704,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   setActiveTool: (tool) => {
     const updates: Partial<EditorState> = { activeTool: tool } as any;
-    if (tool === 'move') (updates as any).transformMode = 'translate';
+    if (tool === 'move' || tool === 'snap-move') (updates as any).transformMode = 'translate';
     else if (tool === 'rotate') (updates as any).transformMode = 'rotate';
     else if (tool === 'scale') (updates as any).transformMode = 'scale';
     

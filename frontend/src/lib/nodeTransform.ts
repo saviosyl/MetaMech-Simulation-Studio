@@ -145,3 +145,50 @@ export function alignNodeToPort(
     targetWorldPos[2] - offset[2],
   ];
 }
+
+/**
+ * Full mate solver: compute position AND rotation for object B so that:
+ *  - B's port position coincides with A's port position
+ *  - B's port direction opposes A's port direction (face-to-face)
+ *
+ * Returns { position, rotation } for node B.
+ */
+export function solveMateTransform(
+  /** The fixed port (object A) — already in world space */
+  targetPortWorldPos: Vec3,
+  targetPortWorldDir: Vec3,
+  /** The moving object B's port info in local space */
+  movingPortLocalPos: Vec3,
+  movingPortLocalDir: Vec3,
+  /** Current transform of moving object */
+  movingScale?: Vec3,
+): { position: Vec3; rotation: Vec3 } {
+  // Step 1: Compute rotation.
+  // We need movingPortLocalDir (rotated) to equal -targetPortWorldDir.
+  // Work in XZ plane (Y rotation) since conveyors are floor-mounted.
+  // Target direction for the moving port (opposing the target):
+  const desiredDir: Vec3 = [-targetPortWorldDir[0], -targetPortWorldDir[1], -targetPortWorldDir[2]];
+
+  // Compute Y rotation needed to align movingPortLocalDir to desiredDir
+  const srcAngle = Math.atan2(movingPortLocalDir[0], movingPortLocalDir[2]);
+  const dstAngle = Math.atan2(desiredDir[0], desiredDir[2]);
+  const rotY = dstAngle - srcAngle;
+
+  const newRotation: Vec3 = [0, rotY, 0];
+
+  // Step 2: Compute position.
+  // Apply the new rotation to the port's local position to get its world offset.
+  let offset: Vec3 = movingScale
+    ? [movingPortLocalPos[0] * movingScale[0], movingPortLocalPos[1] * movingScale[1], movingPortLocalPos[2] * movingScale[2]]
+    : [...movingPortLocalPos];
+
+  offset = rotateEulerXYZ(offset, newRotation);
+
+  const newPosition: Vec3 = [
+    targetPortWorldPos[0] - offset[0],
+    targetPortWorldPos[1] - offset[1],
+    targetPortWorldPos[2] - offset[2],
+  ];
+
+  return { position: newPosition, rotation: newRotation };
+}

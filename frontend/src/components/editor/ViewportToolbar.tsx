@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEditorStore } from '../../store/editorStore';
 
-type ToolType = 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'measure';
+type ToolType = 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure';
 
 interface ToolButton {
   id: ToolType;
@@ -15,6 +15,7 @@ const tools: ToolButton[] = [
   { id: 'rotate', label: 'Rotate (E)', icon: '↻' },
   { id: 'scale', label: 'Scale (R)', icon: '⤡' },
   { id: 'mate', label: 'Mate/Connect (M)', icon: '🔗' },
+  { id: 'snap-move', label: 'Snap Move — drag with auto-snap (N)', icon: '🧲' },
   { id: 'measure', label: 'Measure', icon: '📏' },
 ];
 
