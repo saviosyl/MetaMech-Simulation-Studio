@@ -30,9 +30,10 @@ const SnapSystem: React.FC = () => {
         }
       }
 
-      // Snap-move mode: auto-mate to nearest compatible port within 100mm
-      if (activeTool === 'snap-move') {
-        const SNAP_DIST = 0.15; // 150mm threshold
+      // Auto-mate: snap to nearest compatible port when close enough
+      // Works in snap-move mode (150mm) or normal move mode (100mm for any node with ports)
+      {
+        const SNAP_DIST = activeTool === 'snap-move' ? 0.15 : 0.1; // snap-move: 150mm, normal: 100mm
         const myPorts = getConnectionPorts(node.type, node.parameters);
         let bestDist = SNAP_DIST;
         let bestMatch: { myPort: ConnectionPort; targetNode: ProcessNode; targetPort: ConnectionPort; targetWorldPos: [number, number, number]; targetWorldDir: [number, number, number] } | null = null;
