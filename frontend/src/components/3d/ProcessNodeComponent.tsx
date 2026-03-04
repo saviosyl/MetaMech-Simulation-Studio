@@ -11,6 +11,7 @@ import SpiralConveyorModel from './models/SpiralConveyorModel';
 import StopperModel from './models/StopperModel';
 import PusherModel from './models/PusherModel';
 import BendConveyorModel from './models/BendConveyorModel';
+import SensorModel from './models/SensorModel';
 import SourceModel from './models/SourceModel';
 import SinkModel from './models/SinkModel';
 import BufferModel from './models/BufferModel';
@@ -135,6 +136,29 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
           <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[0.5, 0.6, 32]} />
             <meshBasicMaterial color="#ee8833" transparent opacity={0.5} side={THREE.DoubleSide} />
+          </mesh>
+        )}
+      </group>
+    );
+  }
+
+  // SENSOR
+  if (node.type === 'sensor') {
+    return (
+      <group
+        ref={groupRef}
+        position={node.position}
+        rotation={node.rotation}
+        scale={node.scale}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      >
+        <SensorModel parameters={node.parameters} isSelected={isSelected} />
+        {isSelected && (
+          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.3, 0.4, 32]} />
+            <meshBasicMaterial color="#22aa44" transparent opacity={0.5} side={THREE.DoubleSide} />
           </mesh>
         )}
       </group>

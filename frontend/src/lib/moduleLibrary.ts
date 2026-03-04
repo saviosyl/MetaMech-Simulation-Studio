@@ -13,6 +13,7 @@ import {
   Octagon,
   MoveHorizontal,
   RotateCw,
+  Eye,
 } from 'lucide-react';
 
 export interface ModuleDefinition {
@@ -224,6 +225,22 @@ export const moduleLibrary: ModuleDefinition[] = [
       plateHeight: { type: 'number', label: 'Plate Height (mm)', default: 100, min: 50, max: 200, step: 10 },
       mountHeight: { type: 'number', label: 'Mount Height (mm)', default: 800, min: 300, max: 3000, step: 50 },
       extended: { type: 'boolean', label: 'Extended', default: false },
+    },
+  },
+  {
+    id: 'sensor',
+    name: 'Sensor',
+    category: 'process',
+    icon: Eye,
+    description: 'Photoelectric sensor for product detection — through-beam, retro-reflective, or diffuse',
+    assetId: 'sensor',
+    parameters: {
+      sensorType: { type: 'select', label: 'Sensor Type', default: 'through-beam', options: ['through-beam', 'retro-reflective', 'diffuse'] },
+      triggered: { type: 'boolean', label: 'Triggered', default: false },
+      mountHeight: { type: 'number', label: 'Mount Height (mm)', default: 800, min: 300, max: 3000, step: 50 },
+      sensorHeight: { type: 'number', label: 'Height Above Belt (mm)', default: 80, min: 20, max: 300, step: 10 },
+      beltWidth: { type: 'number', label: 'Belt Width (mm)', default: 600, min: 200, max: 1200, step: 50 },
+      showBeam: { type: 'boolean', label: 'Show Beam', default: true },
     },
   },
   {

@@ -10,7 +10,7 @@ export interface ProcessNode {
         'transfer-bridge' | 'popup-transfer' | 'pusher-transfer' | 'merge-divert' |
         'spiral-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
         'belt-conveyor' | 'roller-conveyor' | 'fanuc-robot' | 'machine-static' |
-        'stopper' | 'pusher' | 'bend-conveyor';
+        'stopper' | 'pusher' | 'bend-conveyor' | 'sensor';
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -761,6 +761,7 @@ function getDefaultParameters(type: string): Record<string, any> {
     'pusher-transfer': { width: 600, length: 2000, height: 800, pushAngle: 90, pushForce: 1, pushSide: 'left' },
     'merge-divert': { width: 600, mainLength: 3000, branchLength: 2000, branchAngle: 30, height: 800, mode: 'divert' },
     'bend-conveyor': { bendAngle: '90', bendDirection: 'right', surfaceType: 'belt', width: 600, radius: 1000, height: 800, speed: 20, sideGuides: true, guideHeight: 60, showLegs: true, supportSpacing: 45, adjustableFeetEnabled: true },
+    sensor: { sensorType: 'through-beam', triggered: false, mountHeight: 800, sensorHeight: 80, beltWidth: 600, showBeam: true },
     'spiral-conveyor': { diameter: 2000, totalHeight: 5000, beltWidth: 500, direction: 'up', speed: 1 },
     'vertical-lifter': { platformWidth: 1000, platformDepth: 1000, liftHeight: 3000, speed: 1, loadDirection: 'front', capacity: 4 },
     'pick-and-place': { reach: 3, speed: 1.0 },
