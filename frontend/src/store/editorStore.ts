@@ -9,7 +9,8 @@ export interface ProcessNode {
   type: 'source' | 'sink' | 'conveyor' | 'buffer' | 'machine' | 'router' | 
         'transfer-bridge' | 'popup-transfer' | 'pusher-transfer' | 'merge-divert' |
         'spiral-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
-        'belt-conveyor' | 'roller-conveyor' | 'fanuc-robot' | 'machine-static';
+        'belt-conveyor' | 'roller-conveyor' | 'fanuc-robot' | 'machine-static' |
+        'stopper' | 'pusher';
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -185,6 +186,34 @@ export function getConnectionPorts(type: string, params?: Record<string, any>, a
         { id: 'output1', type: 'output', localPosition: [1, 0.25, 0] },
         { id: 'output2', type: 'output', localPosition: [0, 0.25, 1] },
       ];
+    case 'spiral-conveyor': {
+      const sR = (params?.diameter || 1800) / 2000;
+      const sH = (params?.totalHeight || 3000) / 1000;
+      const startA = ((params?.infeedAngle || 0) * Math.PI) / 180;
+      const endA = startA + (params?.turns || 3) * Math.PI * 2;
+      const infY = params?.direction === 'down' ? sH : 0;
+      const outY = params?.direction === 'down' ? 0 : sH;
+      return [
+        { id: 'input', type: 'input', localPosition: [Math.cos(startA) * sR, infY, Math.sin(startA) * sR] },
+        { id: 'output', type: 'output', localPosition: [Math.cos(endA) * sR, outY, Math.sin(endA) * sR] },
+      ];
+    }
+    case 'stopper': {
+      const sW = (params?.width || 400) / 1000;
+      const sMH = (params?.mountHeight || params?.height || 800) / 1000;
+      return [
+        { id: 'input', type: 'input', localPosition: [-sW / 2, sMH, 0] },
+        { id: 'output', type: 'output', localPosition: [sW / 2, sMH, 0] },
+      ];
+    }
+    case 'pusher': {
+      const pMH = (params?.mountHeight || params?.height || 800) / 1000;
+      return [
+        { id: 'input', type: 'input', localPosition: [-0.2, pMH, 0] },
+        { id: 'output', type: 'output', localPosition: [0.2, pMH, 0] },
+        { id: 'reject', type: 'output', localPosition: [0, pMH, params?.side === 'left' ? -0.5 : 0.5] },
+      ];
+    }
     default:
       return [
         { id: 'input', type: 'input', localPosition: [-1, 0.5, 0] },

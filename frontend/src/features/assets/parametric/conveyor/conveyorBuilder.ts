@@ -120,5 +120,10 @@ export function editorParamsToConveyorParams(editorParams: Record<string, any>):
     direction: editorParams.direction || 'forward',
     motorSide: editorParams.motorSide || 'right',
     showSupports: editorParams.showLegs ?? editorParams.showSupports ?? true,
+    cleatHeightMm: editorParams.cleatHeight || editorParams.cleatHeightMm || 25,
+    cleatSpacingMm: editorParams.cleatSpacing || editorParams.cleatSpacingMm || 150,
+    cleatStyle: editorParams.cleatStyle || 'straight',
+    sidewallEnabled: editorParams.sidewallEnabled ?? false,
+    sidewallHeightMm: editorParams.sidewallHeight || editorParams.sidewallHeightMm || 80,
   };
 }

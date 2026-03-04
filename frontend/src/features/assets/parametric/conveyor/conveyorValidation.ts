@@ -50,5 +50,13 @@ export function validateConveyorParams(params: ConveyorParams): ValidationResult
     warnings.push('Roller conveyors above 20° may cause product slipping');
   }
 
+  if (params.conveyorType === 'cleated' && params.angleDeg === 0) {
+    warnings.push('Cleated conveyors are typically used on inclines — consider setting an angle');
+  }
+
+  if (params.conveyorType === 'cleated' && params.angleDeg > 30 && !params.sidewallEnabled) {
+    warnings.push('Steep inclines (>30°) benefit from sidewalls to prevent spillage');
+  }
+
   return { valid: errors.length === 0, errors, warnings };
 }

@@ -2,7 +2,7 @@
  * Conveyor Type Definitions — MetaMech Simulation Studio
  */
 
-export type ConveyorType = 'belt' | 'roller' | 'modular';
+export type ConveyorType = 'belt' | 'roller' | 'modular' | 'cleated';
 export type DriveType = 'end' | 'center';
 
 export interface ConveyorParams {
@@ -21,6 +21,12 @@ export interface ConveyorParams {
   direction: 'forward' | 'reverse';
   motorSide: 'left' | 'right';
   showSupports: boolean;
+  // Cleated belt specific
+  cleatHeightMm: number;
+  cleatSpacingMm: number;
+  cleatStyle: 'straight' | 'chevron' | 'angled';
+  sidewallEnabled: boolean;
+  sidewallHeightMm: number;
 }
 
 export interface ConveyorSimulationMetadata {
@@ -61,6 +67,11 @@ export const CONVEYOR_DEFAULTS: ConveyorParams = {
   direction: 'forward',
   motorSide: 'right',
   showSupports: true,
+  cleatHeightMm: 25,
+  cleatSpacingMm: 150,
+  cleatStyle: 'straight',
+  sidewallEnabled: false,
+  sidewallHeightMm: 80,
 };
 
 export const CONVEYOR_LIMITS: Record<string, { min: number; max: number; step?: number }> = {
@@ -72,6 +83,9 @@ export const CONVEYOR_LIMITS: Record<string, { min: number; max: number; step?: 
   footAdjustmentMm: { min: 0, max: 100, step: 5 },
   supportSpacingMm: { min: 500, max: 4000, step: 100 },
   speedMpm: { min: 1, max: 120, step: 1 },
+  cleatHeightMm: { min: 10, max: 80, step: 5 },
+  cleatSpacingMm: { min: 50, max: 500, step: 25 },
+  sidewallHeightMm: { min: 30, max: 200, step: 10 },
 };
 
 import * as THREE from 'three';

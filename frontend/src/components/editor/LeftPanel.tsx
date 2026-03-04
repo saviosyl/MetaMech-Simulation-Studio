@@ -339,6 +339,7 @@ function getSubcategory(module: ModuleDefinition): string {
   const name = module.id.toLowerCase();
   
   if (name.includes('conveyor') || name.includes('belt') || name.includes('roller') || name.includes('modular')) return 'Conveyors';
+  if (name.includes('stopper') || name.includes('pusher-module')) return 'Accessories';
   if (name.includes('transfer') || name.includes('merge') || name.includes('divert') || name.includes('pusher') || name.includes('popup')) return 'Transfers';
   if (name.includes('spiral') || name.includes('lifter') || name.includes('vertical')) return 'Vertical Transport';
   if (name.includes('source') || name.includes('sink')) return 'Flow Control';

@@ -14,6 +14,8 @@ const matRoller = new THREE.MeshStandardMaterial({ color: 0x999999, metalness: 0
 const matModular = new THREE.MeshStandardMaterial({ color: 0x4488aa, metalness: 0.3, roughness: 0.5 });
 const matDrive = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6, roughness: 0.4 });
 const matMotor = new THREE.MeshStandardMaterial({ color: 0x336699, metalness: 0.7, roughness: 0.3 });
+const matCleat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.15, roughness: 0.85 });
+const matSidewall = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.1, roughness: 0.9 });
 
 /** Build frame side rails */
 function buildFrame(lengthM: number, widthM: number, heightM: number): THREE.Group {
@@ -110,6 +112,102 @@ function buildModularSurface(lengthM: number, widthM: number, heightM: number): 
   return group;
 }
 
+/** Build cleated belt surface — belt with raised cleats for incline transport */
+function buildCleatedSurface(lengthM: number, widthM: number, heightM: number, params: ConveyorParams): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'cleatedSurface';
+
+  // Base belt (same as standard belt but darker)
+  const beltGeo = new THREE.BoxGeometry(lengthM - 0.02, 0.006, widthM);
+  const belt = new THREE.Mesh(beltGeo, matBelt);
+  belt.position.set(0, heightM + 0.003, 0);
+  belt.receiveShadow = true;
+  group.add(belt);
+
+  // Slider bed
+  const bedGeo = new THREE.BoxGeometry(lengthM - 0.04, 0.003, widthM - 0.01);
+  const bed = new THREE.Mesh(bedGeo, matFrame);
+  bed.position.set(0, heightM - 0.0015, 0);
+  group.add(bed);
+
+  // Cleats
+  const cleatH = params.cleatHeightMm / 1000;
+  const cleatSpacing = params.cleatSpacingMm / 1000;
+  const numCleats = Math.max(1, Math.floor((lengthM - 0.06) / cleatSpacing));
+  const cleatThickness = 0.006; // 6mm thick rubber/plastic cleat
+
+  for (let i = 0; i < numCleats; i++) {
+    const x = -lengthM / 2 + 0.03 + cleatSpacing / 2 + i * cleatSpacing;
+    if (x > lengthM / 2 - 0.03) break;
+
+    let cleatMesh: THREE.Mesh;
+
+    switch (params.cleatStyle) {
+      case 'chevron': {
+        // V-shaped cleat: two angled strips forming a chevron pointing forward
+        const chevronGroup = new THREE.Group();
+        const stripLen = widthM * 0.45;
+        for (const side of [-1, 1]) {
+          const stripGeo = new THREE.BoxGeometry(stripLen, cleatH, cleatThickness);
+          const strip = new THREE.Mesh(stripGeo, matCleat);
+          strip.position.set(0, cleatH / 2, side * widthM * 0.15);
+          strip.rotation.y = side * 0.4; // ~23° angle
+          strip.castShadow = true;
+          chevronGroup.add(strip);
+        }
+        chevronGroup.position.set(x, heightM + 0.006, 0);
+        group.add(chevronGroup);
+        continue; // skip the single-mesh path below
+      }
+      case 'angled': {
+        // Angled cleat: single strip rotated ~15° from perpendicular
+        const cleatGeo = new THREE.BoxGeometry(cleatThickness, cleatH, widthM - 0.02);
+        cleatMesh = new THREE.Mesh(cleatGeo, matCleat);
+        cleatMesh.position.set(x, heightM + 0.006 + cleatH / 2, 0);
+        cleatMesh.rotation.y = 0.26; // ~15°
+        break;
+      }
+      default: {
+        // Straight cleat: perpendicular to belt direction
+        const cleatGeo = new THREE.BoxGeometry(cleatThickness, cleatH, widthM - 0.02);
+        cleatMesh = new THREE.Mesh(cleatGeo, matCleat);
+        cleatMesh.position.set(x, heightM + 0.006 + cleatH / 2, 0);
+        break;
+      }
+    }
+
+    cleatMesh.castShadow = true;
+    group.add(cleatMesh);
+  }
+
+  // Corrugated sidewalls (optional — keeps product from sliding off inclines)
+  if (params.sidewallEnabled) {
+    const wallH = params.sidewallHeightMm / 1000;
+    const wallThickness = 0.004;
+    for (const side of [-1, 1]) {
+      // Main sidewall panel
+      const wallGeo = new THREE.BoxGeometry(lengthM - 0.04, wallH, wallThickness);
+      const wall = new THREE.Mesh(wallGeo, matSidewall);
+      wall.position.set(0, heightM + 0.006 + wallH / 2, side * (widthM / 2 - wallThickness / 2));
+      wall.castShadow = true;
+      group.add(wall);
+
+      // Corrugation ribs (vertical stiffeners every ~100mm)
+      const ribSpacing = 0.1;
+      const numRibs = Math.max(2, Math.floor(lengthM / ribSpacing));
+      for (let r = 0; r < numRibs; r++) {
+        const rx = -lengthM / 2 + 0.04 + (lengthM - 0.08) * (r / (numRibs - 1));
+        const ribGeo = new THREE.BoxGeometry(0.003, wallH - 0.005, 0.008);
+        const rib = new THREE.Mesh(ribGeo, matSidewall);
+        rib.position.set(rx, heightM + 0.006 + wallH / 2, side * (widthM / 2 + 0.002));
+        group.add(rib);
+      }
+    }
+  }
+
+  return group;
+}
+
 /** Build drive assembly (end or center) */
 function buildDriveAssembly(params: ConveyorParams): THREE.Group {
   const group = new THREE.Group();
@@ -182,6 +280,9 @@ export function buildConveyorBody(params: ConveyorParams): THREE.Group {
       break;
     case 'modular':
       group.add(buildModularSurface(lengthM, widthM, heightM));
+      break;
+    case 'cleated':
+      group.add(buildCleatedSurface(lengthM, widthM, heightM, params));
       break;
   }
 

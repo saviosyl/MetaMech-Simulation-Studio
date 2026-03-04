@@ -7,6 +7,9 @@ import ParametricModel from './ParametricModel';
 import StaticModel from './StaticModel';
 import GLBModel from './GLBModel';
 import BeltConveyorGLB from './models/BeltConveyorGLB';
+import SpiralConveyorModel from './models/SpiralConveyorModel';
+import StopperModel from './models/StopperModel';
+import PusherModel from './models/PusherModel';
 import SourceModel from './models/SourceModel';
 import SinkModel from './models/SinkModel';
 import BufferModel from './models/BufferModel';
@@ -58,6 +61,79 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
           <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[1.5, 1.7, 32]} />
             <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
+          </mesh>
+        )}
+      </group>
+    );
+  }
+
+  // SPIRAL CONVEYOR
+  if (node.type === 'spiral-conveyor') {
+    return (
+      <group
+        ref={groupRef}
+        position={node.position}
+        rotation={node.rotation}
+        scale={node.scale}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      >
+        <Suspense fallback={
+          <mesh castShadow><cylinderGeometry args={[0.8, 0.8, 3, 16]} /><meshStandardMaterial color="#666" wireframe /></mesh>
+        }>
+          <SpiralConveyorModel parameters={node.parameters} isSelected={isSelected} />
+        </Suspense>
+        {isSelected && (
+          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[1.5, 1.7, 32]} />
+            <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
+          </mesh>
+        )}
+      </group>
+    );
+  }
+
+  // STOPPER
+  if (node.type === 'stopper') {
+    return (
+      <group
+        ref={groupRef}
+        position={node.position}
+        rotation={node.rotation}
+        scale={node.scale}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      >
+        <StopperModel parameters={node.parameters} isSelected={isSelected} />
+        {isSelected && (
+          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.4, 0.5, 32]} />
+            <meshBasicMaterial color="#ef4444" transparent opacity={0.5} side={THREE.DoubleSide} />
+          </mesh>
+        )}
+      </group>
+    );
+  }
+
+  // PUSHER
+  if (node.type === 'pusher') {
+    return (
+      <group
+        ref={groupRef}
+        position={node.position}
+        rotation={node.rotation}
+        scale={node.scale}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      >
+        <PusherModel parameters={node.parameters} isSelected={isSelected} />
+        {isSelected && (
+          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.5, 0.6, 32]} />
+            <meshBasicMaterial color="#ee8833" transparent opacity={0.5} side={THREE.DoubleSide} />
           </mesh>
         )}
       </group>
