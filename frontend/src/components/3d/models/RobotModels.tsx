@@ -808,36 +808,17 @@ export const Robot6AxisModel: React.FC<RobotProps> = ({ parameters, isSelected, 
 
   useFrame(({ clock }) => {
     if (simState) {
-      // Simulation-driven animation
-      const p = simState.phaseProgress;
-      const ease = p * p * (3 - 2 * p); // smoothstep
-
-      let j1y = 0, j2z = 0.15, j3z = -0.25;
-      switch (simState.phase) {
-        case 'idle':
-          j1y = 0; j2z = 0.15; j3z = -0.25; break;
-        case 'approach-pick':
-          j1y = -0.6 * ease; j2z = 0.15 + 0.35 * ease; j3z = -0.25 - 0.3 * ease; break;
-        case 'pick':
-          j1y = -0.6; j2z = 0.5; j3z = -0.55; break;
-        case 'retract-pick':
-          j1y = -0.6; j2z = 0.5 - 0.2 * ease; j3z = -0.55 + 0.15 * ease; break;
-        case 'move-to-place':
-          j1y = -0.6 + 1.2 * ease; j2z = 0.3; j3z = -0.4; break;
-        case 'approach-place':
-          j1y = 0.6; j2z = 0.3 + 0.2 * ease; j3z = -0.4 - 0.15 * ease; break;
-        case 'place':
-          j1y = 0.6; j2z = 0.5; j3z = -0.55; break;
-        case 'retract-place':
-          j1y = 0.6; j2z = 0.5 - 0.2 * ease; j3z = -0.55 + 0.15 * ease; break;
-        case 'return':
-          j1y = 0.6 * (1 - ease); j2z = 0.3 * (1 - ease) + 0.15; j3z = -0.4 * (1 - ease) - 0.25 * ease; break;
-      }
-      if (j1Ref.current) j1Ref.current.rotation.y += (j1y - j1Ref.current.rotation.y) * 0.12;
-      if (j2Ref.current) j2Ref.current.rotation.z += (j2z - j2Ref.current.rotation.z) * 0.12;
-      if (j3Ref.current) j3Ref.current.rotation.z += (j3z - j3Ref.current.rotation.z) * 0.12;
+      // Simulation-driven: read IK joint angles directly from state
+      const targetJ1 = simState.j1 || 0;
+      const targetJ2 = simState.j2 || 0.15;
+      const targetJ3 = simState.j3 || -0.25;
+      // Smooth interpolation for natural motion (higher = snappier)
+      const smooth = 0.15;
+      if (j1Ref.current) j1Ref.current.rotation.y += (targetJ1 - j1Ref.current.rotation.y) * smooth;
+      if (j2Ref.current) j2Ref.current.rotation.z += (targetJ2 - j2Ref.current.rotation.z) * smooth;
+      if (j3Ref.current) j3Ref.current.rotation.z += (targetJ3 - j3Ref.current.rotation.z) * smooth;
     } else {
-      // Demo idle animation
+      // Demo idle animation — slow sweeping motion
       const t = clock.getElapsedTime();
       if (j1Ref.current) j1Ref.current.rotation.y = Math.sin(t * 0.3) * 0.85;
       if (j2Ref.current) j2Ref.current.rotation.z = Math.sin(t * 0.45 + 0.3) * 0.4 + 0.15;

@@ -940,61 +940,63 @@ export class SimulationEngine {
       homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
     };
 
-    // Find available product at pick source — accept arriving products into queue
+    // ─── Accept arriving products into queue ───
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
       if (!stats.queue.includes(product.id)) {
         product.state = 'queued';
+        // Park product at pick position so it's visible there
+        product.currentPosition = [...rState.pickPosition];
         stats.queue.push(product.id);
         console.log(`[ROBOT] ${node.name} queued product ${product.id.slice(0,8)}, queue=${stats.queue.length}`);
       }
     }
 
-    // Only offer a product to the state machine when idle (ready for next cycle)
+    // ─── Also accept products that landed on conveyor near pick zone ───
+    // (Some products might be 'queued' on an upstream conveyor near the robot pick point)
+
+    // ─── Offer product to state machine ───
     let availableProductId: string | null = null;
     if (stats.queue.length > 0 && rState.phase === 'idle') {
       availableProductId = stats.queue[0];
-      console.log(`[ROBOT] ${node.name} idle, offering product ${availableProductId?.slice(0,8)}, pickPos=${JSON.stringify(rState.pickPosition)}`);
     }
-    // Also pass the in-flight target so pick phase can confirm it
+    // Pass in-flight target during active cycle
     const targetId = (rState as any)._targetProductId as string | undefined;
     if (targetId && !availableProductId) {
       availableProductId = targetId;
     }
 
-    // Log robot phase every ~1 second
-    if (Math.floor(this.simTime * 2) !== Math.floor((this.simTime - dt) * 2)) {
-      console.log(`[ROBOT-STATE] ${node.name} t=${this.simTime.toFixed(1)} phase=${rState.phase} prog=${rState.phaseProgress.toFixed(2)} held=${rState.heldProductId?.slice(0,8)||'none'} queue=${stats.queue.length} pick=${JSON.stringify(rState.pickPosition)} place=${JSON.stringify(rState.placePosition)}`);
-    }
-
     // Tick the motion controller
     const placedId = tickRobot(rState, config, this.simTime, availableProductId);
 
-    // If robot just gripped a product (entering retract-pick), take ownership
-    if (rState.heldProductId && rState.phase === 'retract-pick' && rState.phaseProgress < 0.15) {
-      const held = this.products.find(p => p.id === rState.heldProductId && p.state !== 'processing');
-      if (held) {
-        held.state = 'processing';
-        held.currentNodeId = node.id;    // Now owned by robot
-        held.currentEdgeId = null;
-        held.stoppedBy = null;
-        held.conveyorEntryTime = null;
-        held.pathPosition = 0;
-        // Remove from ALL queues
-        stats.queue = stats.queue.filter(id => id !== rState.heldProductId);
-        for (const [, ns] of this.nodeStats) {
-          ns.queue = ns.queue.filter(id => id !== rState.heldProductId);
-        }
-      }
-    }
-
-    // Move held product to TCP position — only AFTER pick phase (physically gripping)
-    // During approach-pick and pick, product stays at conveyor/queue position
-    const GRIP_PHASES: string[] = ['retract-pick', 'move-to-place', 'approach-place', 'place', 'retract-place', 'return'];
-    if (rState.heldProductId && GRIP_PHASES.includes(rState.phase)) {
+    // ─── Take ownership of product when gripped ───
+    // Robot holds product from retract-pick onward until place
+    const CARRY_PHASES = new Set(['retract-pick', 'move-to-place', 'approach-place', 'place']);
+    if (rState.heldProductId) {
       const held = this.products.find(p => p.id === rState.heldProductId);
       if (held) {
-        held.currentPosition = [...rState.toolCenterPoint];
+        // First time gripping: take ownership
+        if (held.state !== 'processing') {
+          held.state = 'processing';
+          held.currentNodeId = node.id;
+          held.currentEdgeId = null;
+          held.stoppedBy = null;
+          held.conveyorEntryTime = null;
+          held.pathPosition = 0;
+          // Remove from ALL queues
+          stats.queue = stats.queue.filter(id => id !== rState.heldProductId);
+          for (const [, ns] of this.nodeStats) {
+            ns.queue = ns.queue.filter(id => id !== rState.heldProductId);
+          }
+        }
+        // Move product with TCP (product visually follows the robot arm)
+        if (CARRY_PHASES.has(rState.phase) || rState.phase === 'retract-place') {
+          held.currentPosition = [
+            rState.toolCenterPoint[0],
+            rState.toolCenterPoint[1] - 0.05, // slightly below TCP (hanging from gripper)
+            rState.toolCenterPoint[2],
+          ];
+        }
       }
     }
 

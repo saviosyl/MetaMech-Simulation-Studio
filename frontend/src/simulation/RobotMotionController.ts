@@ -1,19 +1,8 @@
 /**
  * Robot Motion Controller — MetaMech Simulation Studio
- *
- * Manages the pick-and-place cycle for all robot types:
- *   1. IDLE → wait for product at pick source
- *   2. APPROACH_PICK → move toward pick point
- *   3. PICK → grab product
- *   4. RETRACT → lift up from pick
- *   5. MOVE_TO_PLACE → travel to place target
- *   6. APPROACH_PLACE → lower to place point
- *   7. PLACE → release product
- *   8. RETRACT_PLACE → lift up from place
- *   9. RETURN → return to home, then IDLE
- *
- * The controller outputs a normalized phase (0-1) for each motion stage,
- * which the 3D model can use to drive joint animations.
+ * 
+ * Robust pick-and-place state machine.
+ * Drives TCP position and joint hints for 3D animation.
  */
 
 export type RobotPhase =
@@ -29,35 +18,43 @@ export type RobotPhase =
 
 export interface RobotState {
   phase: RobotPhase;
-  phaseProgress: number;    // 0-1 within current phase
+  phaseProgress: number;      // 0→1 within current phase
   phaseStartTime: number;
   cycleCount: number;
   heldProductId: string | null;
-  pickPosition: [number, number, number] | null;
-  placePosition: [number, number, number] | null;
-  toolCenterPoint: [number, number, number]; // current TCP world position
+  pickPosition: [number, number, number];
+  placePosition: [number, number, number];
+  toolCenterPoint: [number, number, number];
+  // Joint angles for 3D model (radians)
+  j1: number; // base rotation
+  j2: number; // shoulder
+  j3: number; // elbow
+  j4: number; // wrist pitch
+  j5: number; // wrist yaw
+  j6: number; // wrist roll
+  gripperOpen: boolean;
 }
 
 export interface RobotConfig {
-  cycleTime: number;         // total cycle time in seconds
+  cycleTime: number;
   speedFactor: number;
-  approachHeight: number;    // meters above pick/place for approach
-  pickHeight: number;        // pick surface height
-  placeHeight: number;       // place surface height
+  approachHeight: number;
+  pickHeight: number;
+  placeHeight: number;
   homePosition: [number, number, number];
 }
 
-// Phase timing as fraction of total cycle time
-const PHASE_FRACTIONS: Record<RobotPhase, number> = {
+// Phase durations as fractions of total cycle
+const PHASE_FRAC: Record<RobotPhase, number> = {
   'idle': 0,
-  'approach-pick': 0.12,
-  'pick': 0.05,
-  'retract-pick': 0.08,
-  'move-to-place': 0.25,
+  'approach-pick': 0.15,
+  'pick': 0.06,
+  'retract-pick': 0.10,
+  'move-to-place': 0.22,
   'approach-place': 0.12,
-  'place': 0.05,
-  'retract-place': 0.08,
-  'return': 0.25,
+  'place': 0.06,
+  'retract-place': 0.10,
+  'return': 0.19,
 };
 
 const PHASE_ORDER: RobotPhase[] = [
@@ -72,155 +69,192 @@ export function createRobotState(config: RobotConfig): RobotState {
     phaseStartTime: 0,
     cycleCount: 0,
     heldProductId: null,
-    pickPosition: null,
-    placePosition: null,
+    pickPosition: [...config.homePosition],
+    placePosition: [...config.homePosition],
     toolCenterPoint: [...config.homePosition],
+    j1: 0, j2: 0.2, j3: -0.3, j4: 0, j5: 0, j6: 0,
+    gripperOpen: true,
   };
 }
 
+/** Smooth ease in-out */
+function ease(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+function lerp3(a: [number,number,number], b: [number,number,number], t: number): [number,number,number] {
+  const s = ease(t);
+  return [a[0]+(b[0]-a[0])*s, a[1]+(b[1]-a[1])*s, a[2]+(b[2]-a[2])*s];
+}
+
 /**
- * Tick the robot state machine.
- * Returns the product ID if a product was just placed (for handoff).
+ * Tick the robot. Returns product ID when placed (handoff to next node).
  */
 export function tickRobot(
   state: RobotState,
   config: RobotConfig,
   simTime: number,
-  availableProductId: string | null, // product waiting at pick
+  availableProductId: string | null,
 ): string | null {
   const totalCycle = config.cycleTime / config.speedFactor;
-  let placedProductId: string | null = null;
+  let placedId: string | null = null;
 
+  // ─── IDLE: wait for product ───
   if (state.phase === 'idle') {
-    if (availableProductId && state.pickPosition) {
-      // Start a new pick cycle
+    state.toolCenterPoint = [...config.homePosition];
+    state.gripperOpen = true;
+    updateJoints(state, config, 'home');
+
+    if (availableProductId) {
+      // Start cycle
       state.phase = 'approach-pick';
       state.phaseStartTime = simTime;
-      state.heldProductId = null; // Not yet holding anything
-      // Store target in a temporary way — we'll pick it up at the 'pick' phase
+      state.phaseProgress = 0;
+      state.heldProductId = null;
       (state as any)._targetProductId = availableProductId;
+      console.log(`[ROBOT-CYCLE] Starting pick cycle for ${availableProductId.slice(0,8)}`);
     }
     return null;
   }
 
-  // Calculate phase duration
-  const phaseDuration = PHASE_FRACTIONS[state.phase] * totalCycle;
+  // ─── Phase timing ───
+  const dur = PHASE_FRAC[state.phase] * totalCycle;
   const elapsed = simTime - state.phaseStartTime;
-  state.phaseProgress = phaseDuration > 0 ? Math.min(1, elapsed / phaseDuration) : 1;
+  state.phaseProgress = dur > 0 ? Math.min(1, elapsed / dur) : 1;
 
-  // Compute TCP position based on phase
-  updateTCP(state, config);
+  // ─── Compute TCP + joints for current phase ───
+  const pick = state.pickPosition;
+  const place = state.placePosition;
+  const home = config.homePosition;
+  const aH = config.approachHeight;
+  const t = state.phaseProgress;
 
-  // Phase transition
+  const pickAbove: [number,number,number] = [pick[0], pick[1] + aH, pick[2]];
+  const placeAbove: [number,number,number] = [place[0], place[1] + aH, place[2]];
+
+  switch (state.phase) {
+    case 'approach-pick':
+      state.toolCenterPoint = lerp3(home, pickAbove, t);
+      state.gripperOpen = true;
+      updateJoints(state, config, 'approach-pick');
+      break;
+    case 'pick':
+      state.toolCenterPoint = lerp3(pickAbove, pick, t);
+      state.gripperOpen = t < 0.7; // close gripper at 70%
+      updateJoints(state, config, 'pick');
+      break;
+    case 'retract-pick':
+      state.toolCenterPoint = lerp3(pick, pickAbove, t);
+      state.gripperOpen = false;
+      updateJoints(state, config, 'retract-pick');
+      break;
+    case 'move-to-place':
+      state.toolCenterPoint = lerp3(pickAbove, placeAbove, t);
+      state.gripperOpen = false;
+      updateJoints(state, config, 'move-to-place');
+      break;
+    case 'approach-place':
+      state.toolCenterPoint = lerp3(placeAbove, place, t);
+      state.gripperOpen = false;
+      updateJoints(state, config, 'approach-place');
+      break;
+    case 'place':
+      state.toolCenterPoint = [...place];
+      state.gripperOpen = t > 0.5; // open at 50%
+      updateJoints(state, config, 'place');
+      break;
+    case 'retract-place':
+      state.toolCenterPoint = lerp3(place, placeAbove, t);
+      state.gripperOpen = true;
+      updateJoints(state, config, 'retract-place');
+      break;
+    case 'return':
+      state.toolCenterPoint = lerp3(placeAbove, home, t);
+      state.gripperOpen = true;
+      updateJoints(state, config, 'return');
+      break;
+  }
+
+  // ─── Phase transition ───
   if (state.phaseProgress >= 1) {
-    const currentIdx = PHASE_ORDER.indexOf(state.phase);
-
-    // Special actions at phase completion
+    // Actions at phase completion
     if (state.phase === 'pick') {
-      // Grip the product — transfer ownership
       state.heldProductId = (state as any)._targetProductId || availableProductId;
       (state as any)._targetProductId = null;
+      console.log(`[ROBOT-GRIP] Gripped product ${state.heldProductId?.slice(0,8)}`);
     } else if (state.phase === 'place') {
-      placedProductId = state.heldProductId;
+      placedId = state.heldProductId;
       state.heldProductId = null;
+      console.log(`[ROBOT-RELEASE] Released product ${placedId?.slice(0,8)}`);
     } else if (state.phase === 'return') {
       state.cycleCount++;
       state.phase = 'idle';
       state.phaseProgress = 0;
-      return placedProductId;
+      console.log(`[ROBOT-CYCLE] Cycle ${state.cycleCount} complete`);
+      return placedId;
     }
 
     // Advance to next phase
-    const nextIdx = currentIdx + 1;
-    if (nextIdx < PHASE_ORDER.length) {
-      state.phase = PHASE_ORDER[nextIdx];
+    const idx = PHASE_ORDER.indexOf(state.phase);
+    if (idx >= 0 && idx + 1 < PHASE_ORDER.length) {
+      state.phase = PHASE_ORDER[idx + 1];
       state.phaseStartTime = simTime;
       state.phaseProgress = 0;
     }
   }
 
-  return placedProductId;
-}
-
-/** Smooth easing for natural robot motion */
-function easeInOut(t: number): number {
-  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-}
-
-function lerp3(a: [number, number, number], b: [number, number, number], t: number): [number, number, number] {
-  const s = easeInOut(t);
-  return [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, a[2] + (b[2] - a[2]) * s];
-}
-
-/** Update tool center point position based on current phase */
-function updateTCP(state: RobotState, config: RobotConfig) {
-  const pick = state.pickPosition || config.homePosition;
-  const place = state.placePosition || config.homePosition;
-  const home = config.homePosition;
-  const t = state.phaseProgress;
-  const aH = config.approachHeight;
-
-  const pickAbove: [number, number, number] = [pick[0], pick[1] + aH, pick[2]];
-  const placeAbove: [number, number, number] = [place[0], place[1] + aH, place[2]];
-
-  switch (state.phase) {
-    case 'idle':
-      state.toolCenterPoint = [...home];
-      break;
-    case 'approach-pick':
-      state.toolCenterPoint = lerp3(home, pickAbove, t);
-      break;
-    case 'pick':
-      state.toolCenterPoint = lerp3(pickAbove, pick, t);
-      break;
-    case 'retract-pick':
-      state.toolCenterPoint = lerp3(pick, pickAbove, t);
-      break;
-    case 'move-to-place':
-      state.toolCenterPoint = lerp3(pickAbove, placeAbove, t);
-      break;
-    case 'approach-place':
-      state.toolCenterPoint = lerp3(placeAbove, place, t);
-      break;
-    case 'place':
-      state.toolCenterPoint = [...place];
-      break;
-    case 'retract-place':
-      state.toolCenterPoint = lerp3(place, placeAbove, t);
-      break;
-    case 'return':
-      state.toolCenterPoint = lerp3(placeAbove, home, t);
-      break;
-  }
+  return placedId;
 }
 
 /**
- * Get the robot's current arm "pose hint" for 3D animation.
- * Returns normalized values that the 3D model can use for joint angles.
+ * Compute approximate joint angles from TCP position (simplified IK).
+ * This gives the 3D model believable joint motion.
+ */
+function updateJoints(state: RobotState, config: RobotConfig, hint: string) {
+  const tcp = state.toolCenterPoint;
+  const base = config.homePosition;
+  
+  // Relative position from robot base
+  const dx = tcp[0] - base[0];
+  const dy = tcp[1] - base[1];
+  const dz = tcp[2] - base[2];
+  
+  // J1: base rotation — atan2 toward target
+  state.j1 = Math.atan2(dx, dz);
+  
+  // Horizontal distance from base
+  const hDist = Math.sqrt(dx * dx + dz * dz);
+  
+  // J2: shoulder — lifts arm based on height + reach
+  state.j2 = Math.atan2(Math.max(0, dy + 0.3), Math.max(0.1, hDist)) * 0.8 + 0.15;
+  
+  // J3: elbow — bends more when reaching far or low
+  const reach = Math.sqrt(hDist * hDist + dy * dy);
+  state.j3 = -(0.3 + reach * 0.4);
+  
+  // J4: wrist pitch — keeps tool pointing down
+  state.j4 = -(state.j2 + state.j3) * 0.3;
+  
+  // J5: slight wrist adjustment during pick/place
+  state.j5 = hint.includes('pick') ? -0.1 : hint.includes('place') ? 0.1 : 0;
+  
+  // J6: gripper rotation
+  state.j6 = state.gripperOpen ? 0 : 0.2;
+}
+
+/**
+ * Get robot joint state for 3D model rendering.
  */
 export function getRobotPoseHint(state: RobotState, config: RobotConfig): {
-  j1Angle: number;  // base rotation
-  j2Angle: number;  // shoulder
-  j3Angle: number;  // elbow
-  gripOpen: boolean; // gripper open/closed
+  j1Angle: number;
+  j2Angle: number;
+  j3Angle: number;
+  gripOpen: boolean;
 } {
-  const tcp = state.toolCenterPoint;
-  const home = config.homePosition;
-
-  // J1: base rotation toward TCP
-  const j1Angle = Math.atan2(tcp[0] - home[0], tcp[2] - home[2]);
-
-  // J2: shoulder based on height + distance
-  const dist = Math.sqrt((tcp[0] - home[0]) ** 2 + (tcp[2] - home[2]) ** 2);
-  const j2Angle = Math.atan2(tcp[1] - home[1], dist) * 0.5;
-
-  // J3: elbow based on reach extension
-  const maxReach = 2; // approximate
-  const reachFraction = Math.min(1, dist / maxReach);
-  const j3Angle = -(1 - reachFraction) * 0.8;
-
-  // Gripper: open during approach-pick and place, closed while holding
-  const gripOpen = state.heldProductId === null;
-
-  return { j1Angle, j2Angle, j3Angle, gripOpen };
+  return {
+    j1Angle: state.j1,
+    j2Angle: state.j2,
+    j3Angle: state.j3,
+    gripOpen: state.gripperOpen,
+  };
 }
