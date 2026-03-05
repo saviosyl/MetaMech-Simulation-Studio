@@ -29,6 +29,13 @@ import {
   PassThroughHatchModel, CleanroomCartModel, GuardPartitionModel,
   LightCurtainModel, InspectionStationModel, MachineEnclosureModel,
 } from './models/MedicalModels';
+import {
+  WallModel, WindowModel, FenceModel, FenceGateModel, PalletRackModel as EnvPalletRackModel,
+  BollardModel, OperatorStationModel, ElectricalCabinetModel, TowerLightModel,
+  PalletStackModel, FloorZoneModel, MachineEnclosureModel as EnvMachineEnclosure,
+  HMIStandModel, PalletTruckModel, ForkliftModel as EnvForkliftModel,
+  CardboardBoxModel,
+} from './models/EnvironmentModels';
 import FlowDirectionArrow from './overlays/FlowDirectionArrow';
 import SensorZoneOverlay from './overlays/SensorZoneOverlay';
 import StopperZoneOverlay from './overlays/StopperZoneOverlay';
@@ -345,6 +352,23 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         return <InspectionStationModel params={node.parameters} />;
       case 'machine-enclosure':
         return <MachineEnclosureModel params={node.parameters} />;
+      // ── Environment models ──
+      case 'wall': return <WallModel params={node.parameters} isSelected={isSelected} />;
+      case 'window': return <WindowModel params={node.parameters} isSelected={isSelected} />;
+      case 'safety-rail':
+      case 'fence': return <FenceModel params={node.parameters} isSelected={isSelected} />;
+      case 'fence-gate':
+      case 'door': return <FenceGateModel params={node.parameters} isSelected={isSelected} />;
+      case 'pallet-rack': return <EnvPalletRackModel params={node.parameters} isSelected={isSelected} />;
+      case 'bollard': return <BollardModel isSelected={isSelected} />;
+      case 'operator-station': return <OperatorStationModel params={node.parameters} isSelected={isSelected} />;
+      case 'electrical-cabinet': return <ElectricalCabinetModel params={node.parameters} isSelected={isSelected} />;
+      case 'tower-light': return <TowerLightModel isSelected={isSelected} />;
+      case 'pallet-stack': return <PalletStackModel params={node.parameters} isSelected={isSelected} />;
+      case 'floor-zone': return <FloorZoneModel params={node.parameters} isSelected={isSelected} />;
+      case 'hmi-stand': return <HMIStandModel isSelected={isSelected} />;
+      case 'pallet-truck': return <PalletTruckModel isSelected={isSelected} />;
+      case 'cardboard-box': return <CardboardBoxModel params={node.parameters} isSelected={isSelected} />;
       default:
         return <GenericModel type={node.type} isSelected={isSelected} params={node.parameters} />;
     }

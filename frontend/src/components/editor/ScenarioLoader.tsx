@@ -19,6 +19,11 @@ import {
   createBacklogControlScenario,
   Scenario,
 } from '../../simulation/scenarios';
+import {
+  createFMCGEndOfLine,
+  createRobotCellFactory,
+  createGeneralFactoryDemo,
+} from '../../simulation/factoryScenarios';
 
 interface ScenarioOption {
   id: string;
@@ -91,6 +96,27 @@ const SCENARIOS: ScenarioOption[] = [
     description: 'End-of-line: SE001→ST001 stop, SE002 dwell releases + resumes source. 0-gap accumulation.',
     icon: <Factory size={16} className="text-red-400" />,
     create: createBacklogControlScenario,
+  },
+  {
+    id: 'fmcg-eol',
+    name: 'FMCG End-of-Line',
+    description: 'Case packer → palletizer → stretch wrapper. Fenced zone, pallet staging, operator station.',
+    icon: <Factory size={16} className="text-orange-400" />,
+    create: createFMCGEndOfLine,
+  },
+  {
+    id: 'robot-cell',
+    name: 'Robot Cell Factory',
+    description: 'Fenced 6-axis robot cell with conveyors, HMI, controller, pallet area.',
+    icon: <Factory size={16} className="text-blue-400" />,
+    create: createRobotCellFactory,
+  },
+  {
+    id: 'factory-line',
+    name: 'Factory Conveyor Line',
+    description: 'Checkweigher + labeler line with factory walls, windows, floor zones, pallet rack.',
+    icon: <Factory size={16} className="text-green-400" />,
+    create: createGeneralFactoryDemo,
   },
 ];
 
