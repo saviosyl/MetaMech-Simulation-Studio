@@ -1063,6 +1063,116 @@ export const moduleLibrary: ModuleDefinition[] = [
     description: 'Static forklift representation for layout planning',
     parameters: {},
   },
+
+  // ─── Medical / Cleanroom Equipment ────────────────────────────
+  {
+    id: 'stainless-conveyor',
+    name: 'Stainless Conveyor',
+    category: 'medical',
+    icon: ArrowRight,
+    description: 'Cleanroom-grade stainless steel belt conveyor',
+    parameters: {
+      length: { type: 'number', label: 'Length (mm)', default: 2000, min: 500, max: 5000, step: 100 },
+      width: { type: 'number', label: 'Width (mm)', default: 400, min: 200, max: 800, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 800, min: 300, max: 1200, step: 50 },
+      speed: { type: 'number', label: 'Speed (m/min)', default: 10, min: 1, max: 40, step: 1 },
+    },
+  },
+  {
+    id: 'laminar-flow-hood',
+    name: 'Laminar Flow Hood',
+    category: 'medical',
+    icon: ArrowUp,
+    description: 'ISO Class 5 laminar flow workstation with HEPA filtration',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 1200, min: 900, max: 1800, step: 100 },
+      depth: { type: 'number', label: 'Depth (mm)', default: 800, min: 600, max: 1000, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 2200, min: 1800, max: 2500, step: 50 },
+      isoClass: { type: 'select', label: 'ISO Class', default: '5', options: ['5', '6', '7'] },
+    },
+  },
+  {
+    id: 'clean-bench',
+    name: 'Clean Bench / Worktable',
+    category: 'medical',
+    icon: Columns,
+    description: 'Stainless steel cleanroom workbench with upstand',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 1500, min: 800, max: 2500, step: 100 },
+      depth: { type: 'number', label: 'Depth (mm)', default: 750, min: 500, max: 1000, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 850, min: 700, max: 1000, step: 50 },
+    },
+  },
+  {
+    id: 'pass-through-hatch',
+    name: 'Pass-Through Hatch',
+    category: 'medical',
+    icon: ArrowRightLeft,
+    description: 'Interlocked pass box for material transfer between zones',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 600, min: 400, max: 1000, step: 50 },
+      depth: { type: 'number', label: 'Depth (mm)', default: 600, min: 400, max: 800, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 600, min: 400, max: 800, step: 50 },
+    },
+  },
+  {
+    id: 'cleanroom-cart',
+    name: 'Cleanroom Cart',
+    category: 'medical',
+    icon: ArrowUpDown,
+    description: 'Stainless steel trolley with shelves and casters',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 600, min: 400, max: 1000, step: 50 },
+      depth: { type: 'number', label: 'Depth (mm)', default: 400, min: 300, max: 700, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 900, min: 700, max: 1200, step: 50 },
+      shelves: { type: 'number', label: 'Shelves', default: 3, min: 2, max: 5, step: 1 },
+    },
+  },
+  {
+    id: 'guard-partition',
+    name: 'Guard Partition Panel',
+    category: 'medical',
+    icon: Columns,
+    description: 'Cleanroom partition with solid lower + glass upper panel',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 1200, min: 600, max: 2400, step: 100 },
+      height: { type: 'number', label: 'Height (mm)', default: 2100, min: 1800, max: 2500, step: 50 },
+    },
+  },
+  {
+    id: 'light-curtain',
+    name: 'Light Curtain',
+    category: 'medical',
+    icon: Eye,
+    description: 'Safety light curtain / scanner for zone protection',
+    parameters: {
+      height: { type: 'number', label: 'Height (mm)', default: 1500, min: 600, max: 2000, step: 50 },
+      gap: { type: 'number', label: 'Gap (mm)', default: 1200, min: 500, max: 3000, step: 100 },
+    },
+  },
+  {
+    id: 'inspection-station',
+    name: 'Inspection Station',
+    category: 'medical',
+    icon: Eye,
+    description: 'Vision inspection system with camera + ring light',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 800, min: 500, max: 1200, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 1200, min: 900, max: 1500, step: 50 },
+    },
+  },
+  {
+    id: 'machine-enclosure',
+    name: 'Machine Enclosure',
+    category: 'medical',
+    icon: SquareStack,
+    description: 'Cleanroom-grade machine guard enclosure with polycarbonate panels',
+    parameters: {
+      width: { type: 'number', label: 'Width (mm)', default: 1500, min: 800, max: 3000, step: 100 },
+      depth: { type: 'number', label: 'Depth (mm)', default: 1200, min: 600, max: 2500, step: 100 },
+      height: { type: 'number', label: 'Height (mm)', default: 2000, min: 1500, max: 2500, step: 50 },
+    },
+  },
 ];
 
 export function getModuleDefinition(id: string): ModuleDefinition | undefined {

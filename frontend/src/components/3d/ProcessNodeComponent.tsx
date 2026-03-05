@@ -24,6 +24,11 @@ import {
   RejectStationModel, AccumulationTableModel, StretchWrapperModel,
   PackingStationModel, PalletConveyorModel, ForkliftModel,
 } from './models/FMCGModels';
+import {
+  StainlessConveyorModel, LaminarFlowHoodModel, CleanBenchModel,
+  PassThroughHatchModel, CleanroomCartModel, GuardPartitionModel,
+  LightCurtainModel, InspectionStationModel, MachineEnclosureModel,
+} from './models/MedicalModels';
 
 interface ProcessNodeComponentProps {
   node: ProcessNode;
@@ -304,6 +309,25 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         return <PalletConveyorModel params={node.parameters} />;
       case 'forklift':
         return <ForkliftModel />;
+      // Medical / Cleanroom
+      case 'stainless-conveyor':
+        return <StainlessConveyorModel params={node.parameters} />;
+      case 'laminar-flow-hood':
+        return <LaminarFlowHoodModel params={node.parameters} />;
+      case 'clean-bench':
+        return <CleanBenchModel params={node.parameters} />;
+      case 'pass-through-hatch':
+        return <PassThroughHatchModel params={node.parameters} />;
+      case 'cleanroom-cart':
+        return <CleanroomCartModel params={node.parameters} />;
+      case 'guard-partition':
+        return <GuardPartitionModel params={node.parameters} />;
+      case 'light-curtain':
+        return <LightCurtainModel params={node.parameters} />;
+      case 'inspection-station':
+        return <InspectionStationModel params={node.parameters} />;
+      case 'machine-enclosure':
+        return <MachineEnclosureModel params={node.parameters} />;
       default:
         return <GenericModel type={node.type} isSelected={isSelected} params={node.parameters} />;
     }

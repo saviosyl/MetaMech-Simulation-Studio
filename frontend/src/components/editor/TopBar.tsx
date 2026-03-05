@@ -22,6 +22,7 @@ import { useEditorStore } from '../../store/editorStore';
 import { useAuth } from '../../contexts/AuthContext';
 import { undo, redo } from '../../store/historyMiddleware';
 import { SaveStatus } from '../../pages/EditorPage';
+import ScenarioLoader from './ScenarioLoader';
 
 interface TopBarProps {
   projectName: string;
@@ -165,6 +166,11 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
             <Redo2 size={16} />
           </button>
         </div>
+
+        <div className="h-6 w-px bg-slate-600" />
+
+        {/* Scenario Loader */}
+        <ScenarioLoader />
 
         <div className="h-6 w-px bg-slate-600" />
 

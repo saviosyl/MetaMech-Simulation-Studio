@@ -27,11 +27,16 @@ export default defineConfig({
             './src/features/assets/parametric/bend/bendGeometry.ts',
             './src/features/assets/parametric/spiral/spiralGeometry.ts',
           ],
-          // App: Simulation engine
+          // App: Simulation engine + logic modules
           'simulation': [
             './src/simulation/SimulationEngine.ts',
             './src/simulation/RobotMotionController.ts',
             './src/simulation/PalletizingController.ts',
+            './src/simulation/SensorLogic.ts',
+            './src/simulation/StopperLogic.ts',
+            './src/simulation/PusherLogic.ts',
+            './src/simulation/RuleEngine.ts',
+            './src/simulation/scenarios.ts',
           ],
           // App: Robot 3D models
           'robots': ['./src/components/3d/models/RobotModels.tsx'],

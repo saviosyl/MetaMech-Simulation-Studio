@@ -173,14 +173,19 @@ const KpiTab: React.FC<{ stats: any }> = ({ stats }) => {
   const worstBlocked = flowStates.length > 0 ? flowStates.reduce((a: any, b: any) => a.blockedPct > b.blockedPct ? a : b) : null;
   const worstStarved = flowStates.length > 0 ? flowStates.reduce((a: any, b: any) => a.starvedPct > b.starvedPct ? a : b) : null;
 
-  // OEE-like metric (simplified: throughput efficiency)
-  const targetThroughput = stats.simTime > 0 ? stats.productCount : 1;
-  const efficiency = targetThroughput > 0 ? Math.min(100, (stats.totalThroughput / Math.max(1, targetThroughput)) * 100) : 0;
+  const oee = stats.oee ?? 0;
+  const availability = stats.avgAvailability ?? 100;
+  const utilization = stats.avgUtilization ?? 0;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-      <KpiCard label="System Throughput" value={stats.throughputPerMin.toFixed(1)} unit="prod/min" color="teal" sub={`${stats.totalThroughput} total in ${formatTime(stats.simTime)}`} />
-      <KpiCard label="Avg Cycle Time" value={stats.avgCycleTime.toFixed(2)} unit="sec" color="blue" sub={`${stats.productCount} products active`} />
+      {/* Row 1: Core KPIs */}
+      <KpiCard label="OEE" value={oee.toFixed(1)} unit="%" color={oee > 85 ? 'green' : oee > 60 ? 'yellow' : 'red'} sub={`A: ${availability.toFixed(0)}% × P: ${utilization.toFixed(0)}% × Q: 100%`} />
+      <KpiCard label="System Throughput" value={stats.throughputPerMin.toFixed(1)} unit="prod/min" color="teal" sub={`${stats.totalThroughput} completed in ${formatTime(stats.simTime)}`} />
+      <KpiCard label="Avg Cycle Time" value={stats.avgCycleTime.toFixed(2)} unit="sec" color="blue" sub={`${stats.completedCount || 0} products completed`} />
+      <KpiCard label="Active Products" value={`${stats.productCount}`} unit="in system" color="gray" sub={`${stats.sensorCount} sensors, ${stats.stopperCount} stoppers, ${stats.pusherCount} pushers`} />
+
+      {/* Row 2: Flow health */}
       <KpiCard
         label="Avg Blocked Time"
         value={avgBlocked.toFixed(1)}
@@ -195,14 +200,12 @@ const KpiTab: React.FC<{ stats: any }> = ({ stats }) => {
         color={avgStarved > 20 ? 'red' : avgStarved > 10 ? 'yellow' : 'green'}
         sub={worstStarved && worstStarved.starvedPct > 0 ? `Worst: ${worstStarved.name.split('_')[0]} (${worstStarved.starvedPct.toFixed(0)}%)` : 'No starvation'}
       />
-      <KpiCard label="Line Efficiency" value={efficiency.toFixed(0)} unit="%" color={efficiency > 80 ? 'green' : efficiency > 50 ? 'yellow' : 'red'} />
-      <KpiCard label="Active Products" value={`${stats.productCount}`} unit="" color="gray" />
 
-      {/* Conveyor queue lengths */}
+      {/* Queue lengths */}
       <div className="bg-gray-800 rounded-lg p-3 col-span-2">
         <div className="text-xs text-gray-400 mb-2 flex items-center gap-1">
           <Activity size={12} />
-          Queue Lengths
+          Queue Lengths {stats.activeRules > 0 && <span className="text-teal-400 ml-1">({stats.activeRules} rules active)</span>}
         </div>
         <div className="flex flex-wrap gap-2">
           {flowStates.slice(0, 8).map((fs: any) => {

@@ -13,6 +13,10 @@ import { getPortWorldPosition } from '../lib/nodeTransform';
 import { createTransportPath } from '../lib/transportPath';
 import { createRobotState, tickRobot, RobotState, RobotConfig } from './RobotMotionController';
 import { createPalletState, getNextSlotPosition, fillSlot, paramsToPalletDef, PalletState } from './PalletizingController';
+import { SensorState, createSensorState, evaluateSensor, editorParamsToSensorConfig, SensorEvent } from './SensorLogic';
+import { StopperRunState, createStopperState, evaluateStopper, editorParamsToStopperConfig } from './StopperLogic';
+import { PusherRunState, createPusherState, evaluatePusher, editorParamsToPusherConfig } from './PusherLogic';
+import { RuleEngineState, createRuleEngineState, evaluateRules, RuleContext, ActionCommand, Rule } from './RuleEngine';
 
 const COLOR_MAP: Record<string, string> = {
   brown: '#8B4513',
@@ -32,6 +36,12 @@ export class SimulationEngine {
   nodeStats: Map<string, NodeStats> = new Map();
   robotStates: Map<string, RobotState> = new Map();
   palletStates: Map<string, PalletState> = new Map();
+  sensorStates: Map<string, SensorState> = new Map();
+  stopperStates: Map<string, StopperRunState> = new Map();
+  pusherStates: Map<string, PusherRunState> = new Map();
+  ruleEngineState: RuleEngineState = createRuleEngineState();
+  rules: Rule[] = [];
+  private pendingSensorEvents: SensorEvent[] = [];
   simTime: number = 0;
   nodes: ProcessNode[] = [];
   edges: ProcessEdge[] = [];
@@ -124,7 +134,26 @@ export class SimulationEngine {
         const def = paramsToPalletDef(node.parameters);
         this.palletStates.set(node.id, createPalletState(def));
       }
+
+      // Init sensor states
+      if (node.type === 'sensor') {
+        this.sensorStates.set(node.id, createSensorState());
+      }
+
+      // Init stopper states
+      if (node.type === 'stopper') {
+        this.stopperStates.set(node.id, createStopperState());
+      }
+
+      // Init pusher states
+      if (node.type === 'pusher') {
+        this.pusherStates.set(node.id, createPusherState());
+      }
     }
+
+    // Reset rule engine
+    this.ruleEngineState = createRuleEngineState();
+    this.pendingSensorEvents = [];
   }
 
   reset() {
@@ -132,6 +161,11 @@ export class SimulationEngine {
     this.simTime = 0;
     this.robotStates.clear();
     this.palletStates.clear();
+    this.sensorStates.clear();
+    this.stopperStates.clear();
+    this.pusherStates.clear();
+    this.ruleEngineState = createRuleEngineState();
+    this.pendingSensorEvents = [];
     this.nodeStats.forEach(s => {
       s.throughput = 0;
       s.utilization = 0;
@@ -229,8 +263,102 @@ export class SimulationEngine {
 
     this.tickMovingProducts(elapsed);
 
+    // ─── Rule Engine: evaluate trigger→action rules ────────────
+    this.tickRuleEngine(elapsed);
+
     // Cleanup completed products that left the system
     this.products = this.products.filter(p => p.state !== 'completed' || (this.simTime - (p.completedAt || 0)) < 2);
+  }
+
+  // ─── Rule Engine tick ────────────────────────────────────────
+  private tickRuleEngine(_dt: number) {
+    if (this.rules.length === 0) return;
+
+    // Build queue lengths map
+    const queueLengths = new Map<string, number>();
+    for (const [id, stats] of this.nodeStats) {
+      queueLengths.set(id, stats.queue.length);
+    }
+
+    // Track stopper releases and pusher completions
+    const stopperReleased = new Set<string>();
+    const pusherComplete = new Set<string>();
+    const downstreamClear = new Set<string>();
+
+    // Check sensors that are clear (zone clear = downstream ready)
+    for (const node of this.nodes) {
+      if (node.type === 'sensor') {
+        const stats = this.nodeStats.get(node.id);
+        if (stats && !stats.processing) {
+          downstreamClear.add(node.id);
+        }
+      }
+    }
+
+    const context: RuleContext = {
+      simTime: this.simTime,
+      sensorEvents: this.pendingSensorEvents,
+      queueLengths,
+      stopperReleased,
+      pusherComplete,
+      downstreamClear,
+    };
+
+    const commands = evaluateRules(this.rules, this.ruleEngineState, context);
+
+    // Execute action commands
+    for (const cmd of commands) {
+      this.executeRuleAction(cmd);
+    }
+
+    // Clear pending sensor events after rule evaluation
+    this.pendingSensorEvents = [];
+  }
+
+  private executeRuleAction(cmd: ActionCommand) {
+    const act = cmd.action;
+    const node = this.nodes.find(n => n.id === act.targetNodeId);
+    if (!node) return;
+
+    switch (act.type) {
+      case 'engage-stopper':
+        node.parameters.engaged = true;
+        break;
+      case 'release-stopper':
+        node.parameters.engaged = false;
+        break;
+      case 'fire-pusher': {
+        const pState = this.pusherStates.get(act.targetNodeId);
+        if (pState && pState.state === 'idle') {
+          pState.state = 'extending';
+          pState.cycleStartTime = this.simTime;
+        }
+        break;
+      }
+      case 'stop-conveyor':
+        node.parameters.enabled = false;
+        break;
+      case 'start-conveyor':
+        node.parameters.enabled = true;
+        break;
+      case 'change-speed':
+        if (act.speedValue) node.parameters.beltSpeed = act.speedValue;
+        break;
+      case 'count-item': {
+        const stats = this.nodeStats.get(act.targetNodeId);
+        if (stats) stats.throughput++;
+        break;
+      }
+      case 'route-item':
+        // Route handled by pusher logic
+        break;
+    }
+  }
+
+  /** Load rules for rule engine (called externally, e.g. from scenario loader) */
+  loadRules(rules: Rule[]) {
+    this.rules = rules;
+    this.ruleEngineState = createRuleEngineState();
   }
 
   // ─── Source: spawn products ──────────────────────────────────
@@ -1055,18 +1183,32 @@ export class SimulationEngine {
     this.evaluateConveyorFlowState(node, stats, dt);
   }
 
-  // ─── Sensor: detects product presence ────────────────────────
+  // ─── Sensor: detects product presence (uses SensorLogic state machine) ───
   private tickSensor(node: ProcessNode, stats: NodeStats, dt: number) {
-    // Check if any product is near the sensor position
     const sensorPos = node.position;
-    const detectionRange = 0.3; // 300mm detection zone
-    const nearbyProduct = this.products.find(p => {
+    const config = editorParamsToSensorConfig(node.parameters);
+    const detectionRange = config.detectionRangeMm / 1000;
+
+    // Find products in detection zone
+    const nearbyProducts = this.products.filter(p => {
       if (p.state === 'completed') return false;
       const dx = p.currentPosition[0] - sensorPos[0];
       const dz = p.currentPosition[2] - sensorPos[2];
       return Math.sqrt(dx * dx + dz * dz) < detectionRange;
     });
 
+    // Use SensorLogic state machine if available
+    let sState = this.sensorStates.get(node.id);
+    if (sState) {
+      const events = evaluateSensor(config, sState, nearbyProducts, this.simTime);
+      // Push events to rule engine
+      for (const evt of events) {
+        this.pendingSensorEvents.push(evt);
+        this.addFlowEvent(stats, 'sensor-trigger', `${evt.type}: ${evt.productId?.slice(0, 8) || 'zone'}`);
+      }
+    }
+
+    const nearbyProduct = nearbyProducts[0] || null;
     const wasTrigger = stats.processing;
     if (nearbyProduct) {
       stats.processing = true;
@@ -1275,6 +1417,30 @@ export class SimulationEngine {
       }
     }
 
+    // OEE calculation (simplified)
+    // Availability = time NOT blocked/stopped / total time
+    // Performance = actual throughput / theoretical max throughput
+    // Quality = 100% (no rejection tracking yet)
+    let totalAvailability = 0;
+    let machineCount = 0;
+    for (const node of this.nodes) {
+      const stats = this.nodeStats.get(node.id)!;
+      if (node.type === 'machine' || node.type === 'pick-and-place') {
+        const avail = stats.totalTime > 0 ? 1 - (stats.blockedTime + stats.stoppedTime) / stats.totalTime : 1;
+        totalAvailability += avail;
+        machineCount++;
+      }
+    }
+    const avgAvailability = machineCount > 0 ? totalAvailability / machineCount : 1;
+    const avgUtilization = machineUtils.length > 0 ? machineUtils.reduce((s, m) => s + m.utilization, 0) / machineUtils.length : 0;
+    const oee = avgAvailability * avgUtilization * 1; // quality = 1 for now
+
+    // Sensor/Stopper/Pusher counts
+    const sensorCount = this.nodes.filter(n => n.type === 'sensor').length;
+    const stopperCount = this.nodes.filter(n => n.type === 'stopper').length;
+    const pusherCount = this.nodes.filter(n => n.type === 'pusher').length;
+    const activeRules = this.rules.length;
+
     return {
       totalThroughput,
       throughputPerMin: this.simTime > 0 ? (totalThroughput / this.simTime) * 60 : 0,
@@ -1284,7 +1450,15 @@ export class SimulationEngine {
       bottleneck,
       simTime: this.simTime,
       productCount: this.products.length,
+      completedCount,
       flowStates,
+      oee: oee * 100,
+      avgAvailability: avgAvailability * 100,
+      avgUtilization: avgUtilization * 100,
+      sensorCount,
+      stopperCount,
+      pusherCount,
+      activeRules,
     };
   }
 }

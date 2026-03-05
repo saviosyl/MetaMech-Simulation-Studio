@@ -218,7 +218,7 @@ export function createSpiralScenario(): Scenario {
 }
 
 // ─── End-of-Line Palletizing Demo ──────────────────────────────
-function createEndOfLineScenario(): Scenario {
+export function createEndOfLineScenario(): Scenario {
   const sourceId = uuidv4();
   const conv1Id = uuidv4();
   const stopperId = uuidv4();
