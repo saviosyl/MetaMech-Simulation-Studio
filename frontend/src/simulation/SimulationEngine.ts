@@ -384,8 +384,8 @@ export class SimulationEngine {
     let allowFeed = true;
     if (runMode === 'signal-controlled' && blockedByTag) {
       const signal = this.sensorSignals.get(blockedByTag);
-      if (signal?.active) {
-        const dwellSec = this.simTime - (signal.activeSince || this.simTime);
+      if (signal?.active && signal.activeSince > 0) {
+        const dwellSec = this.simTime - signal.activeSince;
         if (dwellSec >= dwellBlock) {
           allowFeed = false;
           // Store blocked state for UI
@@ -1111,10 +1111,11 @@ export class SimulationEngine {
         const secTag = node.parameters?.secondarySensorTag || '';
         if (secTag) {
           const secSignal = this.sensorSignals.get(secTag);
-          if (secSignal?.active) {
+          if (secSignal?.active && secSignal.activeSince > 0) {
             const secNode = this.nodes.find(n => n.type === 'sensor' && n.parameters?.sensorTag === secTag);
             const secDwellThreshold = secNode?.parameters?.dwellTimeThreshold || 3;
-            const secDwellSec = this.simTime - (secSignal.activeSince || this.simTime);
+            const secDwellSec = this.simTime - secSignal.activeSince;
+            console.log(`[STOPPER sensor-dwell] secTag=${secTag} dwell=${secDwellSec.toFixed(1)}s threshold=${secDwellThreshold}s`);
             if (secDwellSec >= secDwellThreshold) return true;
           }
         }
@@ -1304,32 +1305,51 @@ export class SimulationEngine {
 
   // ─── Sensor: DETECTION ONLY — publishes signals, never stops products ───
   private tickSensor(node: ProcessNode, stats: NodeStats, dt: number) {
-    const sensorPos = node.position;
     const sensorTag = node.parameters?.sensorTag || '';
     const config = editorParamsToSensorConfig(node.parameters);
     const detectionRange = config.detectionRangeMm / 1000;
     const parentConveyorId = node.parameters?.parentConveyorId;
-    const effectiveRange = parentConveyorId ? Math.max(detectionRange, 0.6) : detectionRange;
+    const mountPosition = node.parameters?.mountPosition ?? 0.5;
 
-    // Find products in detection zone
-    const nearbyProducts = this.products.filter(p => {
-      if (p.state === 'completed') return false;
-      // Products on parent conveyor
-      if (parentConveyorId && p.currentNodeId === parentConveyorId) {
-        const dx = p.currentPosition[0] - sensorPos[0];
-        const dz = p.currentPosition[2] - sensorPos[2];
-        return Math.sqrt(dx * dx + dz * dz) < effectiveRange;
-      }
-      // Products on edges to/from parent conveyor
-      if (parentConveyorId && p.currentEdgeId) {
-        const edge = this.edges.find(e => e.id === p.currentEdgeId);
-        if (edge && (edge.from === parentConveyorId || edge.to === parentConveyorId)) {
-          const dx = p.currentPosition[0] - sensorPos[0];
-          const dz = p.currentPosition[2] - sensorPos[2];
-          return Math.sqrt(dx * dx + dz * dz) < effectiveRange;
+    // Compute sensor world position from conveyor mount if mounted
+    let sensorPos = node.position;
+    if (parentConveyorId) {
+      const convNode = this.nodes.find(n => n.id === parentConveyorId);
+      if (convNode) {
+        const path = createTransportPath(convNode.type, convNode.parameters);
+        if (path) {
+          const pt = path.getPointAt(mountPosition);
+          // Transform to world coords (conveyor local → world)
+          sensorPos = [
+            convNode.position[0] + pt.x,
+            convNode.position[1] + pt.y,
+            convNode.position[2] + pt.z,
+          ];
         }
       }
-      // Standard proximity
+    }
+
+    // For mounted sensors: use path position comparison (more reliable than world distance)
+    const nearbyProducts = this.products.filter(p => {
+      if (p.state === 'completed') return false;
+
+      // Mounted sensor: compare pathPosition on parent conveyor
+      if (parentConveyorId && p.currentNodeId === parentConveyorId && p.pathPosition !== undefined) {
+        const convNode = this.nodes.find(n => n.id === parentConveyorId);
+        if (convNode) {
+          const pathLen = createTransportPath(convNode.type, convNode.parameters)?.length
+            || ((convNode.parameters.length || 3000) / 1000);
+          const halfProductT = ((p.productLength || 0.3) / 2) / pathLen;
+          const sensorT = mountPosition;
+          // Product front edge is pathPosition + halfProductT, rear is pathPosition - halfProductT
+          // Sensor detects if product overlaps the sensor's path position
+          const detectionT = Math.max(0.05, (detectionRange / 2) / pathLen); // detection zone in path coords
+          return Math.abs(p.pathPosition - sensorT) < (halfProductT + detectionT);
+        }
+      }
+
+      // Fallback: world-space proximity
+      const effectiveRange = parentConveyorId ? Math.max(detectionRange, 0.6) : detectionRange;
       const dx = p.currentPosition[0] - sensorPos[0];
       const dz = p.currentPosition[2] - sensorPos[2];
       return Math.sqrt(dx * dx + dz * dz) < effectiveRange;
@@ -1362,7 +1382,7 @@ export class SimulationEngine {
           productId: nearbyProduct.id,
           productColor: (nearbyProduct as any).color || null,
           productType: (nearbyProduct as any).productType || null,
-          activeSince: prevSignal?.active ? (prevSignal.activeSince || this.simTime) : this.simTime,
+          activeSince: (prevSignal?.active && prevSignal.activeSince > 0) ? prevSignal.activeSince : this.simTime,
         });
       } else {
         this.sensorSignals.set(sensorTag, {
@@ -1391,24 +1411,27 @@ export class SimulationEngine {
     const onDwellEvent = node.parameters?.onDwellEvent || 'none';
     if (dwellThreshold > 0 && onDwellEvent !== 'none' && sensorTag) {
       const signal = this.sensorSignals.get(sensorTag);
-      if (signal?.active) {
-        const dwellSec = this.simTime - (signal.activeSince || this.simTime);
+      if (signal?.active && signal.activeSince > 0) {
+        const dwellSec = this.simTime - signal.activeSince;
         if (dwellSec >= dwellThreshold) {
           // Fire dwell event — find target stoppers and sources
           if (onDwellEvent === 'release-stopper' || onDwellEvent === 'stop-source-and-release') {
-            // Release all stoppers that reference this sensor as secondary
+            // Release ALL products on stoppers that reference this sensor as secondary OR trigger
             for (const n of this.nodes) {
-              if (n.type === 'stopper' && n.parameters?.secondarySensorTag === sensorTag) {
+              if (n.type === 'stopper' && (n.parameters?.secondarySensorTag === sensorTag || n.parameters?.triggerSensorTag === sensorTag)) {
                 const stopped = this.products.filter(p => p.stoppedBy === n.id);
                 const nStats = this.nodeStats.get(n.id);
-                if (nStats) {
+                if (nStats && stopped.length > 0) {
+                  console.log(`[DWELL] ${sensorTag} dwell=${dwellSec.toFixed(1)}s → releasing ${stopped.length} products from stopper ${n.parameters?.stopperTag}`);
                   for (const p of stopped) this.releaseProduct(p, n, nStats);
                 }
               }
             }
           }
-          // Source control is handled in tickSource via blockedBySensorTag + dwell
-          // The source reads this sensor's signal directly
+          if (onDwellEvent === 'stop-source' || onDwellEvent === 'stop-source-and-release') {
+            // Mark source state — tickSource reads this via blockedBySensorTag
+            console.log(`[DWELL] ${sensorTag} dwell=${dwellSec.toFixed(1)}s → source control event`);
+          }
         }
       }
     }
