@@ -156,6 +156,91 @@ export function buildSupportAssembly(params: ConveyorParams): THREE.Group | null
       group.add(post);
     }
 
+  } else if (supportType === 'ceiling-hanger') {
+    // Ceiling hanger: rods drop from ceiling plate down to conveyor frame
+    const ceilingH = (params.ceilingHeightMm || 3000) / 1000;
+    const isTwin = (params.hangerStyle || 'twin-rod') === 'twin-rod';
+    const showCrossbar = params.hangerCrossbar ?? true;
+    const rodRadius = 0.01; // 20mm diameter threaded rod
+    const bracketW = 0.06;
+    const twinSpacing = 0.06; // 60mm between twin rods along X
+
+    for (const xPos of positions) {
+      // Ceiling mounting plate
+      const ceilingPlate = new THREE.Mesh(
+        new THREE.BoxGeometry(isTwin ? 0.18 : 0.1, 0.008, widthM + 0.08),
+        matDarkSteel,
+      );
+      ceilingPlate.position.set(xPos, ceilingH, 0);
+      ceilingPlate.castShadow = true;
+      group.add(ceilingPlate);
+
+      // Rods per side (left/right of conveyor)
+      for (const side of [-1, 1]) {
+        const sideZ = side * (widthM / 2 + 0.02);
+        const rodH = ceilingH - heightM;
+
+        if (isTwin) {
+          // Twin rods with crossbar
+          for (const offset of [-twinSpacing / 2, twinSpacing / 2]) {
+            const rod = new THREE.Mesh(
+              new THREE.CylinderGeometry(rodRadius, rodRadius, rodH, 8),
+              matDarkSteel,
+            );
+            rod.position.set(xPos + offset, heightM + rodH / 2, sideZ);
+            rod.castShadow = true;
+            group.add(rod);
+          }
+
+          // Crossbar between twin rods (upper region)
+          if (showCrossbar) {
+            const crossbar = new THREE.Mesh(
+              new THREE.BoxGeometry(twinSpacing + rodRadius * 2, 0.02, 0.02),
+              matAluminum,
+            );
+            crossbar.position.set(xPos, ceilingH - rodH * 0.3, sideZ);
+            group.add(crossbar);
+          }
+        } else {
+          // Single rod
+          const rod = new THREE.Mesh(
+            new THREE.CylinderGeometry(rodRadius, rodRadius, rodH, 8),
+            matDarkSteel,
+          );
+          rod.position.set(xPos, heightM + rodH / 2, sideZ);
+          rod.castShadow = true;
+          group.add(rod);
+        }
+
+        // Bottom bracket connecting rod to conveyor frame
+        const bracket = new THREE.Mesh(
+          new THREE.BoxGeometry(bracketW, 0.025, bracketW),
+          matDarkSteel,
+        );
+        bracket.position.set(xPos, heightM + 0.012, sideZ);
+        group.add(bracket);
+
+        // Top collar at ceiling plate
+        const collar = new THREE.Mesh(
+          new THREE.CylinderGeometry(rodRadius * 2, rodRadius * 2, 0.015, 8),
+          matAluminum,
+        );
+        collar.position.set(xPos, ceilingH - 0.004, sideZ);
+        group.add(collar);
+      }
+
+      // Optional crossbar spanning width between the two sides (structural)
+      if (showCrossbar) {
+        const spanBar = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.04, widthM + 0.1),
+          matAluminum,
+        );
+        spanBar.position.set(xPos, ceilingH - (ceilingH - heightM) * 0.5, 0);
+        spanBar.castShadow = true;
+        group.add(spanBar);
+      }
+    }
+
   } else if (supportType === 'cantilever') {
     // Cantilever: wall-mount brackets from one side
     for (const xPos of positions) {

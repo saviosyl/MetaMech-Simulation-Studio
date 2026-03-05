@@ -21,7 +21,13 @@ export interface ConveyorParams {
   direction: 'forward' | 'reverse';
   motorSide: 'left' | 'right';
   showSupports: boolean;
-  supportType: 'floor' | 'overhang' | 'cantilever';
+  supportType: 'floor' | 'overhang' | 'cantilever' | 'ceiling-hanger';
+  /** Ceiling height in mm for ceiling-hanger supports */
+  ceilingHeightMm: number;
+  /** Hanger rod style: single or twin */
+  hangerStyle: 'single-rod' | 'twin-rod';
+  /** Whether to show crossbar between hanger rods */
+  hangerCrossbar: boolean;
   beltColor: string;
   // Cleated belt specific
   cleatHeightMm: number;
@@ -70,6 +76,9 @@ export const CONVEYOR_DEFAULTS: ConveyorParams = {
   motorSide: 'right',
   showSupports: true,
   supportType: 'floor',
+  ceilingHeightMm: 3000,
+  hangerStyle: 'twin-rod',
+  hangerCrossbar: true,
   beltColor: '#1e1e1e',
   cleatHeightMm: 25,
   cleatSpacingMm: 150,
