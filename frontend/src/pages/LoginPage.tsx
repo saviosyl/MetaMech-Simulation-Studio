@@ -87,8 +87,8 @@ const LoginPage: React.FC = () => {
             src="/metamech-logo.png"
             alt="MetaMech"
             style={{
+              display: 'block', margin: '0 auto 14px auto',
               height: 54, maxWidth: 280, objectFit: 'contain',
-              marginBottom: 14,
               animation: 'mm-float 5s ease-in-out infinite',
               filter: 'drop-shadow(0 4px 16px rgba(6,182,212,0.15))',
             }}

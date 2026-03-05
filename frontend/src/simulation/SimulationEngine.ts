@@ -394,7 +394,7 @@ export class SimulationEngine {
     const path = createTransportPath(node.type, node.parameters);
     const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
     const pathLen = path ? path.length : ((node.parameters.length || 3000) / 1000);
-    const MIN_GAP_M = 0.005; // 5mm gap — products touch each other when accumulated
+    const MIN_GAP_M = 0.001; // ~1mm gap — products touch each other when accumulated
 
     // Accept new arrivals at path start
     for (const product of arrived) {
@@ -437,13 +437,29 @@ export class SimulationEngine {
       }
     }
 
-    // Find mounted stoppers on this conveyor (engaged = product barrier)
-    const mountedStoppers = this.nodes.filter(n =>
-      n.type === 'stopper' &&
-      n.parameters?.parentConveyorId === node.id &&
-      (n.parameters?.enabled ?? true) &&
-      (n.parameters?.engaged ?? true)
-    );
+    // Find mounted stoppers on this conveyor that are currently ENGAGED (blocking)
+    const mountedStoppers = this.nodes.filter(n => {
+      if (n.type !== 'stopper') return false;
+      if (n.parameters?.parentConveyorId !== node.id) return false;
+      if (!(n.parameters?.enabled ?? true)) return false;
+      
+      // Check if this stopper should be engaged based on its mode
+      const mode = n.parameters.stopperMode || 'always-stop';
+      const triggerTag = n.parameters.triggerSensorTag || '';
+      
+      if (mode === 'sensor-triggered' && triggerTag) {
+        // In sensor-triggered mode: stopper is OPEN (not blocking) until sensor goes TRUE
+        // and stays closed until release condition is met
+        const signal = this.sensorSignals.get(triggerTag);
+        const sensorActive = signal?.active ?? false;
+        const hasStopped = this.products.some(p => p.stoppedBy === n.id);
+        // Engage if sensor is active OR if we already have stopped products (hold until release)
+        return sensorActive || hasStopped;
+      }
+      
+      // For all other modes: use the engaged parameter
+      return n.parameters?.engaged ?? true;
+    });
     const stopperPositions = mountedStoppers.map(s => s.parameters.mountPosition ?? 0.5).sort((a, b) => b - a);
 
     const toRelease: string[] = [];
