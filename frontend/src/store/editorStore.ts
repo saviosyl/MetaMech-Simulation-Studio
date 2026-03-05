@@ -624,6 +624,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       defaultParams.sensorTag = `SE${String(tagNum).padStart(3, '0')}`;
     }
 
+    // Auto-generate unique stopper tag
+    if (type === 'stopper' && !defaultParams.stopperTag) {
+      const existing = get().processNodes.filter(n => n.type === 'stopper');
+      const usedTags = new Set(existing.map(n => n.parameters.stopperTag || ''));
+      let tagNum = existing.length + 1;
+      while (usedTags.has(`ST${String(tagNum).padStart(3, '0')}`)) tagNum++;
+      defaultParams.stopperTag = `ST${String(tagNum).padStart(3, '0')}`;
+    }
+
     const newNode: ProcessNode = {
       id: uuidv4(),
       type,
@@ -946,7 +955,7 @@ function getDefaultParameters(type: string): Record<string, any> {
     'pusher-transfer': { width: 600, length: 2000, height: 800, pushAngle: 90, pushForce: 1, pushSide: 'left' },
     'merge-divert': { width: 600, mainLength: 3000, branchLength: 2000, branchAngle: 30, height: 800, mode: 'divert' },
     'bend-conveyor': { bendAngle: '90', bendDirection: 'right', surfaceType: 'belt', width: 600, radius: 1000, height: 800, speed: 20, sideGuides: true, guideHeight: 60, showLegs: true, supportSpacing: 45, adjustableFeetEnabled: true },
-    stopper: { enabled: true, engaged: true, width: 400, bladeHeight: 80, mountHeight: 800, mountPosition: 0.5, mountSide: 'center' },
+    stopper: { enabled: true, engaged: true, width: 400, bladeHeight: 80, mountHeight: 800, mountPosition: 0.5, mountSide: 'center', stopperMode: 'sensor-triggered', triggerSensorTag: '', stopCondition: 'any-product', releaseCondition: 'timed', holdTime: 3, releaseCount: 1, releaseDelay: 0, stopCount: 0 },
     pusher: { enabled: true, side: 'right', stroke: 300, plateWidth: 250, plateHeight: 100, mountHeight: 800, extended: false, mountPosition: 0.5 },
     sensor: { sensorType: 'through-beam', triggered: false, mountHeight: 800, sensorHeight: 80, beltWidth: 600, showBeam: true, mountPosition: 0.5, mountSide: 'center' },
     'spiral-conveyor': { diameter: 2000, totalHeight: 5000, beltWidth: 500, direction: 'up', speed: 1 },

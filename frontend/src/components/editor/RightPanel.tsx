@@ -36,7 +36,7 @@ function groupParams(params: [string, any][]) {
   const geo: [string, any][] = [], sim: [string, any][] = [], logic: [string, any][] = [], appear: [string, any][] = [], adv: [string, any][] = [];
   const geoK = ['length','width','height','radius','angle','angleDeg','bendAngle','pitch','turns','drumDiameter','supportSpacing','conveyorType','driveType','showSupports','showSideGuides','sideGuideHeight','adjustableFeetEnabled','footAdjustmentMm','supportType','legCount','ceilingHeight','hangerStyle','hangerCrossbar'];
   const simK = ['beltSpeed','speed','spawnRate','ppm','processTime','capacity','cycleTime','maxItems','productColor','productType','productLength','productWidth','productHeight','speedFactor','pickHeight','placeHeight','approachHeight','pickDelay','placeDelay','accumulationMode','accumulationZones'];
-  const logK = ['stopperMode','pusherMode','holdTime','releaseCount','openDuration','sensorTag','sensorType','detectColor','showBeam','mountPosition','mountSide','mountHeight','parentConveyorId','lateralOffset','engaged','enabled','targetColor','targetProductType','routeBy','routeValues','stroke','side'];
+  const logK = ['stopperMode','stopperTag','triggerSensorTag','stopCondition','releaseCondition','releaseDelay','stopCount','pusherMode','holdTime','releaseCount','openDuration','sensorTag','sensorType','detectColor','detectType','detectSize','colorFilter','typeFilter','cooldown','debounce','showBeam','mountPosition','mountSide','mountHeight','parentConveyorId','lateralOffset','engaged','enabled','targetColor','targetProductType','routeBy','routeValues','stroke','side'];
   const appK = ['beltColor','color','materialColor','finish'];
   for (const [k, d] of params) {
     const kl = k.toLowerCase();

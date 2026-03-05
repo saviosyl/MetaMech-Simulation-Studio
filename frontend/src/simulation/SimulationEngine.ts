@@ -42,6 +42,8 @@ export class SimulationEngine {
   ruleEngineState: RuleEngineState = createRuleEngineState();
   rules: Rule[] = [];
   private pendingSensorEvents: SensorEvent[] = [];
+  /** Sensor signal registry — updated each tick. Key = sensorTag, Value = signal state */
+  sensorSignals: Map<string, { active: boolean; productId: string | null; productColor: string | null; productType: string | null; activeSince: number }> = new Map();
   simTime: number = 0;
   nodes: ProcessNode[] = [];
   edges: ProcessEdge[] = [];
@@ -162,6 +164,7 @@ export class SimulationEngine {
     this.robotStates.clear();
     this.palletStates.clear();
     this.sensorStates.clear();
+    this.sensorSignals.clear();
     this.stopperStates.clear();
     this.pusherStates.clear();
     this.ruleEngineState = createRuleEngineState();
@@ -391,7 +394,7 @@ export class SimulationEngine {
     const path = createTransportPath(node.type, node.parameters);
     const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
     const pathLen = path ? path.length : ((node.parameters.length || 3000) / 1000);
-    const MIN_GAP_M = 0.03; // 30mm minimum gap between products
+    const MIN_GAP_M = 0.005; // 5mm gap — products touch each other when accumulated
 
     // Accept new arrivals at path start
     for (const product of arrived) {
@@ -909,13 +912,16 @@ export class SimulationEngine {
     if (rState.phase !== 'idle') stats.busyTime += dt;
   }
 
-  // ─── Stopper: blocks product flow ─────────────────────────────
+  // ─── Stopper: physically blocks products — reads sensor signals for triggers ───
   private tickStopper(node: ProcessNode, stats: NodeStats, dt: number) {
-    const mode = node.parameters.stopperMode || 'timed-auto';
+    const mode = node.parameters.stopperMode || 'always-stop';
     const enabled = node.parameters.enabled ?? true;
+    const triggerTag = node.parameters.triggerSensorTag || node.parameters.sensorTag || '';
     const holdTime = node.parameters.holdTime || 3;
     const releaseCount = node.parameters.releaseCount || 1;
-    const openDuration = node.parameters.openDuration || 2;
+    const releaseDelay = node.parameters.releaseDelay || 0;
+    const releaseCondition = node.parameters.releaseCondition || 'timed';
+    const isMounted = !!node.parameters.parentConveyorId;
 
     if (!enabled) {
       this.releaseAllStopped(node, stats);
@@ -923,114 +929,93 @@ export class SimulationEngine {
       return;
     }
 
-    // Accept arriving products
-    const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
-    for (const product of arrived) {
-      product.state = 'stopped';
-      product.stoppedBy = node.id;
-      product.blockedSince = this.simTime;
-      this.addFlowEvent(stats, 'stopped', `Product ${product.id.slice(0, 8)} stopped`);
+    // ── Accept arriving products (edge-connected stoppers) ──
+    if (!isMounted) {
+      const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
+      for (const product of arrived) {
+        product.state = 'stopped';
+        product.stoppedBy = node.id;
+        product.blockedSince = this.simTime;
+        this.addFlowEvent(stats, 'stopped', `Product ${product.id.slice(0, 8)} stopped`);
+      }
     }
+    // Note: mounted stoppers block products via the conveyor tick (path barrier)
+    // Products on the conveyor get stoppedBy set in tickConveyor
 
+    // Read trigger sensor signal
+    const sensorSignal = triggerTag ? this.sensorSignals.get(triggerTag) : null;
+    const sensorActive = sensorSignal?.active ?? false;
+    const sensorActiveDuration = sensorActive ? (this.simTime - (sensorSignal?.activeSince || this.simTime)) : 0;
+
+    // Collect all products stopped by this stopper
     const stopped = this.products.filter(p => p.stoppedBy === node.id);
 
+    // ── Determine if stopper should be ENGAGED (blocking) or RELEASED ──
+    let shouldRelease = false;
+
     switch (mode) {
-      case 'timed-auto': {
-        // Mode A: Stop → hold X seconds → release all → repeat
-        for (const p of stopped) {
-          if (p.blockedSince && (this.simTime - p.blockedSince) >= holdTime) {
-            this.releaseProduct(p, node, stats);
-          }
+      case 'always-stop': {
+        // Stop every product. Release based on releaseCondition.
+        shouldRelease = this.checkReleaseCondition(releaseCondition, stopped, holdTime, releaseDelay, sensorActive, sensorActiveDuration, node);
+        break;
+      }
+      case 'sensor-triggered': {
+        // Stopper engages when trigger sensor goes TRUE.
+        // Release based on releaseCondition.
+        if (!triggerTag) {
+          // No sensor linked — act as always-stop
+          shouldRelease = this.checkReleaseCondition(releaseCondition, stopped, holdTime, releaseDelay, false, 0, node);
+        } else {
+          // Stopper is engaged while sensor is active (product detected)
+          // Release when releaseCondition is met
+          shouldRelease = this.checkReleaseCondition(releaseCondition, stopped, holdTime, releaseDelay, sensorActive, sensorActiveDuration, node);
         }
         break;
       }
-      case 'timed-release-n':
+      case 'timed-release': {
+        // Stop all, release after holdTime seconds
+        shouldRelease = this.checkReleaseCondition('timed', stopped, holdTime, releaseDelay, sensorActive, sensorActiveDuration, node);
+        break;
+      }
       case 'timed-batch': {
-        // Mode B: Stop → hold X seconds → release N products → stop again
-        if (stats.processEndTime === null && stopped.length > 0) {
-          // Start hold timer from first product arrival
+        // Stop all, release N at a time after holdTime
+        if (stopped.length > 0) {
           const earliest = stopped.reduce((min, p) => Math.min(min, p.blockedSince || Infinity), Infinity);
-          if (earliest < Infinity) stats.processEndTime = earliest + holdTime;
-        }
-        if (stats.processEndTime !== null && this.simTime >= stats.processEndTime) {
-          const toRelease = stopped.slice(0, releaseCount);
-          for (const p of toRelease) this.releaseProduct(p, node, stats);
-          stats.processEndTime = null; // Reset timer for next batch
-        }
-        break;
-      }
-      case 'sensor-triggered':
-      case 'sensor-release': {
-        // Mode C: Accumulate → sensor tag goes TRUE → release all
-        const sensorTag = node.parameters.sensorTag || '';
-        if (sensorTag) {
-          // Find the sensor node by tag
-          const sensorNode = this.nodes.find(n =>
-            n.type === 'sensor' && n.parameters.sensorTag === sensorTag
-          );
-          if (sensorNode) {
-            const sensorStats = this.nodeStats.get(sensorNode.id);
-            // Sensor is "triggered" if a product is within its detection zone
-            const triggered = sensorStats && sensorStats.processing;
-            if (triggered) {
-              this.releaseAllStopped(node, stats);
-            }
-          }
-        }
-        break;
-      }
-      case 'external-trigger': {
-        // Mode D: Stay closed until engaged=false (toggled by user/rule)
-        const engaged = node.parameters.engaged ?? true;
-        if (!engaged) {
-          this.releaseAllStopped(node, stats);
-          node.parameters.engaged = true; // Re-engage after release
-        }
-        break;
-      }
-      case 'pulse-open': {
-        // Mode E: Open for X seconds, then close again
-        if (stats.processEndTime === null && stopped.length > 0) {
-          const earliest = stopped.reduce((min, p) => Math.min(min, p.blockedSince || Infinity), Infinity);
-          if (earliest < Infinity) stats.processEndTime = earliest + holdTime;
-        }
-        if (stats.processEndTime !== null && this.simTime >= stats.processEndTime) {
-          // Open window: release products for openDuration seconds
-          const windowEnd = stats.processEndTime + openDuration;
-          if (this.simTime < windowEnd) {
-            // Window is open — release as they arrive
-            for (const p of stopped) this.releaseProduct(p, node, stats);
-          } else {
-            // Window closed — reset timer
-            stats.processEndTime = null;
+          if (earliest < Infinity && (this.simTime - earliest) >= holdTime + releaseDelay) {
+            const toRelease = stopped.slice(0, releaseCount);
+            for (const p of toRelease) this.releaseProduct(p, node, stats);
           }
         }
         break;
       }
       case 'downstream-clear': {
-        // Mode F: Release only when downstream conveyor/node has space
+        // Release when downstream has space
         const outEdges = this.getOutEdges(node.id);
-        let downstreamClear = true;
+        let clear = true;
         if (outEdges.length > 0) {
-          const nextNodeId = outEdges[0].to;
-          const nextStats = this.nodeStats.get(nextNodeId);
-          if (nextStats && nextStats.queue.length > 0) {
-            downstreamClear = false;
+          const nextStats = this.nodeStats.get(outEdges[0].to);
+          if (nextStats && nextStats.queue.length > 0) clear = false;
+        }
+        // Also check parent conveyor's output
+        if (isMounted && node.parameters.parentConveyorId) {
+          const convOutEdges = this.getOutEdges(node.parameters.parentConveyorId);
+          if (convOutEdges.length > 0) {
+            const downStats = this.nodeStats.get(convOutEdges[0].to);
+            if (downStats && downStats.queue.length > 0) clear = false;
           }
         }
-        if (downstreamClear && stopped.length > 0) {
-          this.releaseProduct(stopped[0], node, stats);
+        if (clear && stopped.length > 0) {
+          const toRelease = stopped.slice(0, releaseCount);
+          for (const p of toRelease) this.releaseProduct(p, node, stats);
         }
         break;
       }
-      default: {
-        // Fallback: timed auto
-        for (const p of stopped) {
-          if (p.blockedSince && (this.simTime - p.blockedSince) >= holdTime) {
-            this.releaseProduct(p, node, stats);
-          }
-        }
-      }
+    }
+
+    // Execute release
+    if (shouldRelease && stopped.length > 0 && mode !== 'timed-batch') {
+      const toRelease = stopped.slice(0, releaseCount);
+      for (const p of toRelease) this.releaseProduct(p, node, stats);
     }
 
     const remainingStopped = this.products.filter(p => p.stoppedBy === node.id).length;
@@ -1043,14 +1028,55 @@ export class SimulationEngine {
   }
 
 
+  /** Check if release condition is met for a stopper */
+  private checkReleaseCondition(
+    condition: string, stopped: Product[], holdTime: number, releaseDelay: number,
+    sensorActive: boolean, sensorActiveDuration: number, node: ProcessNode,
+  ): boolean {
+    if (stopped.length === 0) return false;
+    const earliest = stopped.reduce((min, p) => Math.min(min, p.blockedSince || Infinity), Infinity);
+    const heldDuration = earliest < Infinity ? (this.simTime - earliest) : 0;
+
+    switch (condition) {
+      case 'timed':
+        return heldDuration >= (holdTime + releaseDelay);
+      case 'count':
+        return stopped.length >= (node.parameters.stopCount || 1) && heldDuration >= releaseDelay;
+      case 'downstream-clear': {
+        const parentConvId = node.parameters.parentConveyorId;
+        if (parentConvId) {
+          const convOutEdges = this.getOutEdges(parentConvId);
+          if (convOutEdges.length > 0) {
+            const downStats = this.nodeStats.get(convOutEdges[0].to);
+            if (downStats && downStats.queue.length > 0) return false;
+          }
+        }
+        return heldDuration >= releaseDelay;
+      }
+      case 'sensor-clear':
+        // Release when the trigger sensor is NO LONGER active
+        return !sensorActive && heldDuration >= releaseDelay;
+      default:
+        return heldDuration >= holdTime;
+    }
+  }
+
   private releaseProduct(product: Product, node: ProcessNode, stats: NodeStats) {
-    product.state = 'at-node';
+    const isMounted = !!node.parameters?.parentConveyorId;
     product.stoppedBy = null;
     product.blockedSince = null;
     this.addFlowEvent(stats, 'released', `Product ${product.id.slice(0, 8)} released`);
-    // Send to next node
-    const outEdges = this.getOutEdges(node.id);
-    if (outEdges.length > 0) this.sendProductAlongEdge(product, outEdges[0]);
+
+    if (isMounted) {
+      // Mounted stopper: product stays on the conveyor, just unflagged
+      // The conveyor tick will continue advancing it
+      // Product state stays 'queued' — it's still on the conveyor
+    } else {
+      // Edge-connected stopper: route to next node
+      product.state = 'at-node';
+      const outEdges = this.getOutEdges(node.id);
+      if (outEdges.length > 0) this.sendProductAlongEdge(product, outEdges[0]);
+    }
   }
 
   private releaseAllStopped(node: ProcessNode, stats: NodeStats) {
@@ -1212,30 +1238,25 @@ export class SimulationEngine {
     this.evaluateConveyorFlowState(node, stats, dt);
   }
 
-  // ─── Sensor: detects product presence (uses SensorLogic state machine) ───
+  // ─── Sensor: DETECTION ONLY — publishes signals, never stops products ───
   private tickSensor(node: ProcessNode, stats: NodeStats, dt: number) {
     const sensorPos = node.position;
+    const sensorTag = node.parameters?.sensorTag || '';
     const config = editorParamsToSensorConfig(node.parameters);
     const detectionRange = config.detectionRangeMm / 1000;
-
-    // If sensor is mounted on a conveyor, detect products on that conveyor
     const parentConveyorId = node.parameters?.parentConveyorId;
-    
-    // Mounted sensors get a wider effective range (belt width + margin)
     const effectiveRange = parentConveyorId ? Math.max(detectionRange, 0.6) : detectionRange;
-    
+
+    // Find products in detection zone
     const nearbyProducts = this.products.filter(p => {
       if (p.state === 'completed') return false;
-      
-      // For mounted sensors: check products on the parent conveyor
+      // Products on parent conveyor
       if (parentConveyorId && p.currentNodeId === parentConveyorId) {
-        // Product is on the parent conveyor (queued/moving/at-node)
         const dx = p.currentPosition[0] - sensorPos[0];
         const dz = p.currentPosition[2] - sensorPos[2];
         return Math.sqrt(dx * dx + dz * dz) < effectiveRange;
       }
-      
-      // Also check products moving along an edge that passes near the sensor
+      // Products on edges to/from parent conveyor
       if (parentConveyorId && p.currentEdgeId) {
         const edge = this.edges.find(e => e.id === p.currentEdgeId);
         if (edge && (edge.from === parentConveyorId || edge.to === parentConveyorId)) {
@@ -1244,19 +1265,17 @@ export class SimulationEngine {
           return Math.sqrt(dx * dx + dz * dz) < effectiveRange;
         }
       }
-      
-      // Standard proximity check for unmounted sensors
+      // Standard proximity
       const dx = p.currentPosition[0] - sensorPos[0];
       const dz = p.currentPosition[2] - sensorPos[2];
       return Math.sqrt(dx * dx + dz * dz) < effectiveRange;
     });
 
-    // Use SensorLogic state machine if available
+    // Evaluate sensor logic
     let sState = this.sensorStates.get(node.id);
     if (sState) {
       try {
         const events = evaluateSensor(node.id, sensorPos, config, sState, nearbyProducts, this.simTime);
-        // Push events to rule engine
         for (const evt of events) {
           this.pendingSensorEvents.push(evt);
           this.addFlowEvent(stats, 'sensor-trigger', `${evt.type}: ${evt.productId?.slice(0, 8) || 'zone'}`);
@@ -1267,21 +1286,39 @@ export class SimulationEngine {
     }
 
     const nearbyProduct = nearbyProducts[0] || null;
-    const wasTrigger = stats.processing;
+    const wasActive = stats.processing;
+
+    // Publish sensor signal to the signal registry (by tag)
+    if (sensorTag) {
+      const prevSignal = this.sensorSignals.get(sensorTag);
+      const isActive = nearbyProduct !== null;
+      if (isActive) {
+        this.sensorSignals.set(sensorTag, {
+          active: true,
+          productId: nearbyProduct.id,
+          productColor: (nearbyProduct as any).color || null,
+          productType: (nearbyProduct as any).productType || null,
+          activeSince: prevSignal?.active ? (prevSignal.activeSince || this.simTime) : this.simTime,
+        });
+      } else {
+        this.sensorSignals.set(sensorTag, {
+          active: false, productId: null, productColor: null, productType: null,
+          activeSince: 0,
+        });
+      }
+    }
+
+    // Update stats (sensor is detection-only — no physical effect on products)
     if (nearbyProduct) {
       stats.processing = true;
       stats.currentProductId = nearbyProduct.id;
-      if (!wasTrigger) {
-        this.addFlowEvent(stats, 'sensor-trigger', `Detected product ${nearbyProduct.id.slice(0, 8)}`);
-      }
+      if (!wasActive) this.addFlowEvent(stats, 'sensor-trigger', `Detected ${nearbyProduct.id.slice(0, 8)}`);
       this.setFlowState(stats, 'running', dt);
       stats.busyTime += dt;
     } else {
       stats.processing = false;
       stats.currentProductId = null;
-      if (wasTrigger) {
-        this.addFlowEvent(stats, 'sensor-clear', 'Detection zone clear');
-      }
+      if (wasActive) this.addFlowEvent(stats, 'sensor-clear', 'Zone clear');
       this.setFlowState(stats, 'idle', dt);
     }
   }
@@ -1424,6 +1461,10 @@ export class SimulationEngine {
 
   getPalletStates(): Map<string, PalletState> {
     return this.palletStates;
+  }
+
+  getSensorSignals(): Map<string, { active: boolean; productId: string | null }> {
+    return this.sensorSignals;
   }
 
   getNodeStats(): Map<string, NodeStats> {

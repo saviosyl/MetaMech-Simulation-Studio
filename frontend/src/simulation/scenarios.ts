@@ -256,6 +256,61 @@ export function createEndOfLineScenario(): Scenario {
   };
 }
 
+// ─── Scenario 8: Sensor → Stopper Logic Demo ──────────────────
+export function createSensorStopperScenario(): Scenario {
+  const sourceId = uuidv4();
+  const conveyorId = uuidv4();
+  const sensor1Id = uuidv4();
+  const sensor2Id = uuidv4();
+  const stopperId = uuidv4();
+  const conv2Id = uuidv4();
+  const sinkId = uuidv4();
+
+  return {
+    name: 'Sensor → Stopper Logic',
+    description: 'Sensor SE001 triggers Stopper ST001. Products accumulate back-to-back. Sensor SE002 monitors queue backup.',
+    nodes: [
+      { id: sourceId, type: 'source', position: [-6, 0, 0], rotation: [0, 0, 0],
+        parameters: { spawnRate: 20, productType: 'box', productColor: 'blue' }, name: 'Product Source' },
+      { id: conveyorId, type: 'belt-conveyor', position: [-2, 0, 0], rotation: [0, 0, 0],
+        parameters: { length: 5000, width: 600, height: 800, beltSpeed: 15 }, name: 'Main Conveyor' },
+      // Sensor 1: Near end of conveyor (mountPosition 0.85) — triggers stopper
+      { id: sensor1Id, type: 'sensor', position: [0.25, 0, 0], rotation: [0, Math.PI / 2, 0],
+        parameters: {
+          sensorTag: 'SE001', sensorType: 'through-beam', showBeam: true,
+          beltWidthMm: 600, mountHeight: 800, detectionRange: 300,
+          parentConveyorId: conveyorId, mountPosition: 0.85, mountSide: 'center',
+        }, name: 'Sensor 1 (Trigger)' },
+      // Sensor 2: Near start of conveyor (mountPosition 0.25) — monitors queue backup
+      { id: sensor2Id, type: 'sensor', position: [-3.5, 0, 0], rotation: [0, Math.PI / 2, 0],
+        parameters: {
+          sensorTag: 'SE002', sensorType: 'through-beam', showBeam: true,
+          beltWidthMm: 600, mountHeight: 800, detectionRange: 300,
+          parentConveyorId: conveyorId, mountPosition: 0.25, mountSide: 'center',
+        }, name: 'Sensor 2 (Queue Monitor)' },
+      // Stopper: Near end of conveyor (mountPosition 0.9) — triggered by SE001
+      { id: stopperId, type: 'stopper', position: [0.5, 0, 0], rotation: [0, 0, 0],
+        parameters: {
+          stopperTag: 'ST001', engaged: true, enabled: true, width: 600, mountHeight: 800,
+          stopperMode: 'sensor-triggered', triggerSensorTag: 'SE001',
+          stopCondition: 'sensor-true', releaseCondition: 'timed',
+          holdTime: 4, releaseCount: 1, releaseDelay: 0,
+          parentConveyorId: conveyorId, mountPosition: 0.9, mountSide: 'center',
+        }, name: 'Stopper (SE001 trigger)' },
+      // Output conveyor after main
+      { id: conv2Id, type: 'belt-conveyor', position: [3, 0, 0], rotation: [0, 0, 0],
+        parameters: { length: 2000, width: 600, height: 800, beltSpeed: 20 }, name: 'Output Conveyor' },
+      { id: sinkId, type: 'sink', position: [5.5, 0, 0], rotation: [0, 0, 0], parameters: {}, name: 'Exit' },
+    ],
+    edges: [
+      { id: uuidv4(), from: sourceId, to: conveyorId, fromPort: 'output', toPort: 'input' },
+      { id: uuidv4(), from: conveyorId, to: conv2Id, fromPort: 'output', toPort: 'input' },
+      { id: uuidv4(), from: conv2Id, to: sinkId, fromPort: 'output', toPort: 'input' },
+    ],
+    rules: [],
+  };
+}
+
 // ─── All scenarios ─────────────────────────────────────────────
 export function getAllScenarios(): { id: string; create: () => Scenario }[] {
   return [
@@ -266,5 +321,6 @@ export function getAllScenarios(): { id: string; create: () => Scenario }[] {
     { id: 'bend-routing', create: createBendRoutingScenario },
     { id: 'spiral-transport', create: createSpiralScenario },
     { id: 'end-of-line', create: createEndOfLineScenario },
+    { id: 'sensor-stopper', create: createSensorStopperScenario },
   ];
 }

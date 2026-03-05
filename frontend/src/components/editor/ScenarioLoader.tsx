@@ -15,6 +15,7 @@ import {
   createBendRoutingScenario,
   createSpiralScenario,
   createEndOfLineScenario,
+  createSensorStopperScenario,
   Scenario,
 } from '../../simulation/scenarios';
 
@@ -75,6 +76,13 @@ const SCENARIOS: ScenarioOption[] = [
     description: 'Complete palletizing line: source → conveyor → stopper → sensor → robot → pallet → outfeed',
     icon: <Layers size={16} className="text-orange-400" />,
     create: createEndOfLineScenario,
+  },
+  {
+    id: 'sensor-stopper',
+    name: 'Sensor → Stopper Logic',
+    description: 'SE001 triggers ST001. Products accumulate back-to-back. SE002 monitors queue backup.',
+    icon: <Play size={16} className="text-green-400" />,
+    create: createSensorStopperScenario,
   },
 ];
 
