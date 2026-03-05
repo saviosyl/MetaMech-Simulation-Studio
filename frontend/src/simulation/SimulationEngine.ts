@@ -430,6 +430,15 @@ export class SimulationEngine {
       }
     }
 
+    // Find mounted stoppers on this conveyor (engaged = product barrier)
+    const mountedStoppers = this.nodes.filter(n =>
+      n.type === 'stopper' &&
+      n.parameters?.parentConveyorId === node.id &&
+      (n.parameters?.enabled ?? true) &&
+      (n.parameters?.engaged ?? true)
+    );
+    const stopperPositions = mountedStoppers.map(s => s.parameters.mountPosition ?? 0.5).sort((a, b) => b - a);
+
     const toRelease: string[] = [];
     // prevFrontEdge: the rear boundary of the product ahead (in normalized path coords)
     // For the frontmost product, this is either 1.0 (exit blocked) or Infinity (free exit)
@@ -448,6 +457,22 @@ export class SimulationEngine {
         const maxAllowed = prevFrontEdge - gapT - halfLenT;
         if (targetPos > maxAllowed) {
           targetPos = maxAllowed;
+        }
+      }
+
+      // Clamp: can't advance past an engaged stopper mounted on this conveyor
+      for (const stopT of stopperPositions) {
+        if (product.pathPosition < stopT && targetPos >= stopT - halfLenT) {
+          targetPos = stopT - halfLenT;
+          // Mark product as stopped by the mounted stopper
+          if (!product.stoppedBy) {
+            const stopper = mountedStoppers.find(s => (s.parameters.mountPosition ?? 0.5) === stopT);
+            if (stopper) {
+              product.stoppedBy = stopper.id;
+              product.blockedSince = this.simTime;
+            }
+          }
+          break;
         }
       }
 
@@ -1189,12 +1214,37 @@ export class SimulationEngine {
     const config = editorParamsToSensorConfig(node.parameters);
     const detectionRange = config.detectionRangeMm / 1000;
 
-    // Find products in detection zone
+    // If sensor is mounted on a conveyor, detect products on that conveyor
+    const parentConveyorId = node.parameters?.parentConveyorId;
+    
+    // Mounted sensors get a wider effective range (belt width + margin)
+    const effectiveRange = parentConveyorId ? Math.max(detectionRange, 0.6) : detectionRange;
+    
     const nearbyProducts = this.products.filter(p => {
       if (p.state === 'completed') return false;
+      
+      // For mounted sensors: check products on the parent conveyor
+      if (parentConveyorId && p.currentNodeId === parentConveyorId) {
+        // Product is on the parent conveyor (queued/moving/at-node)
+        const dx = p.currentPosition[0] - sensorPos[0];
+        const dz = p.currentPosition[2] - sensorPos[2];
+        return Math.sqrt(dx * dx + dz * dz) < effectiveRange;
+      }
+      
+      // Also check products moving along an edge that passes near the sensor
+      if (parentConveyorId && p.currentEdgeId) {
+        const edge = this.edges.find(e => e.id === p.currentEdgeId);
+        if (edge && (edge.from === parentConveyorId || edge.to === parentConveyorId)) {
+          const dx = p.currentPosition[0] - sensorPos[0];
+          const dz = p.currentPosition[2] - sensorPos[2];
+          return Math.sqrt(dx * dx + dz * dz) < effectiveRange;
+        }
+      }
+      
+      // Standard proximity check for unmounted sensors
       const dx = p.currentPosition[0] - sensorPos[0];
       const dz = p.currentPosition[2] - sensorPos[2];
-      return Math.sqrt(dx * dx + dz * dz) < detectionRange;
+      return Math.sqrt(dx * dx + dz * dz) < effectiveRange;
     });
 
     // Use SensorLogic state machine if available

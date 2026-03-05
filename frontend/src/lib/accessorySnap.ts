@@ -25,7 +25,7 @@ export type MountSide = 'left' | 'right' | 'center' | 'top';
 
 /** What each accessory type supports */
 const ACCESSORY_MOUNT_CONFIG: Record<string, { sides: MountSide[]; defaultSide: MountSide; lateralOffset: number }> = {
-  sensor:  { sides: ['left', 'right', 'top'],      defaultSide: 'left',   lateralOffset: 0.35 },
+  sensor:  { sides: ['center'],                      defaultSide: 'center', lateralOffset: 0 },  // sensor straddles conveyor (heads on both sides)
   stopper: { sides: ['center'],                      defaultSide: 'center', lateralOffset: 0 },
   pusher:  { sides: ['left', 'right'],               defaultSide: 'right',  lateralOffset: 0.35 },
 };
@@ -132,17 +132,26 @@ function computeMountPosition(
  * Compute the rotation for the accessory based on mount side and tangent.
  */
 function computeMountRotation(tangent: Vec3, mountSide: MountSide, accessoryType: string): number {
+  // baseRotY: aligns model's local -Z with conveyor tangent direction
   const baseRotY = Math.atan2(tangent[0], tangent[2]);
+
+  if (accessoryType === 'sensor') {
+    // Sensor beam runs along Z axis in local space.
+    // We want the beam to cross the conveyor (perpendicular to flow).
+    // So rotate the sensor's X axis to align with conveyor tangent,
+    // which puts Z axis perpendicular = across the belt.
+    // atan2(tx, tz) aligns -Z with tangent; add π/2 to rotate 90° so Z crosses.
+    return baseRotY + Math.PI / 2;
+  }
 
   // Pushers face inward (perpendicular to conveyor)
   if (accessoryType === 'pusher') {
     return mountSide === 'left' ? baseRotY - Math.PI / 2 : baseRotY + Math.PI / 2;
   }
 
-  // Sensors align along conveyor direction  
   // Stoppers face across conveyor (perpendicular)
   if (accessoryType === 'stopper') {
-    return baseRotY + Math.PI / 2; // across the path
+    return baseRotY + Math.PI / 2;
   }
 
   return baseRotY;
@@ -257,6 +266,7 @@ export function applyAccessorySnap(
       mountPosition: snap.pathT,
       mountSide: snap.mountSide,
       lateralOffset: snap.mountSide === 'center' ? 0 : (snap.conveyorWidthM / 2 + 0.05),
+      beltWidthMm: snap.conveyorWidthM * 1000, // pass conveyor width to sensor for correct beam span
       _snappedToConveyor: snap.conveyorNodeId, // backwards compat
     },
   };

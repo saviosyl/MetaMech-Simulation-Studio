@@ -35,7 +35,19 @@ const StopperModel: React.FC<Props> = ({ parameters, isSelected }) => {
     });
   }, [isSelected, built]);
 
-  return <primitive object={built} />;
+  const isMounted = !!parameters.parentConveyorId;
+
+  return (
+    <group>
+      <primitive object={built} />
+      {isMounted && (
+        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.06, 0.1, 16]} />
+          <meshBasicMaterial color="#f59e0b" transparent opacity={0.35} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+    </group>
+  );
 };
 
 export default StopperModel;
