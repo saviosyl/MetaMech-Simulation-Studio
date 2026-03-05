@@ -28,16 +28,16 @@ const StatsPanel: React.FC = () => {
   ];
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur text-white border-t border-gray-700 z-20">
+    <div className="absolute bottom-0 left-0 right-0 bg-[var(--mm-bg-panel)] backdrop-blur text-white border-t border-[var(--mm-border)] z-20">
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-800 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-2 hover:bg-[var(--mm-bg-surface)] transition-colors"
       >
         <div className="flex items-center gap-2">
           <BarChart3 size={16} className="text-teal-400" />
           <span className="text-sm font-medium">Simulation Statistics</span>
           {stats && (
-            <span className="text-xs text-gray-400 ml-2">
+            <span className="text-xs text-[var(--mm-text-secondary)] ml-2">
               Time: {formatTime(stats.simTime)} | Products: {stats.productCount} | TPM: {stats.throughputPerMin.toFixed(1)}
             </span>
           )}
@@ -48,15 +48,15 @@ const StatsPanel: React.FC = () => {
       {!collapsed && stats && (
         <div className="px-4 pb-3">
           {/* Tab bar */}
-          <div className="flex gap-1 mb-3 border-b border-gray-700 pb-2">
+          <div className="flex gap-1 mb-3 border-b border-[var(--mm-border)] pb-2">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-3 py-1 text-xs rounded-t font-medium transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-gray-800 text-teal-400 border-b-2 border-teal-400'
-                    : 'text-gray-400 hover:text-gray-200'
+                    ? 'bg-[var(--mm-bg-surface)] text-teal-400 border-b-2 border-teal-400'
+                    : 'text-[var(--mm-text-secondary)] hover:text-gray-200'
                 }`}
               >
                 {tab.label}
@@ -80,10 +80,10 @@ const OverviewTab: React.FC<{ stats: any }> = ({ stats }) => (
     <KpiCard label="Avg Cycle Time" value={stats.avgCycleTime.toFixed(2)} unit="sec" color="blue" />
 
     {/* Machine Utilization */}
-    <div className="bg-gray-800 rounded-lg p-3">
-      <div className="text-xs text-gray-400 mb-1">Machine Utilization</div>
+    <div className="bg-[var(--mm-bg-surface)] rounded-lg p-3">
+      <div className="text-xs text-[var(--mm-text-secondary)] mb-1">Machine Utilization</div>
       <div className="space-y-1">
-        {stats.machineUtils.length === 0 && <div className="text-xs text-gray-500">No machines</div>}
+        {stats.machineUtils.length === 0 && <div className="text-xs text-[var(--mm-text-tertiary)]">No machines</div>}
         {stats.machineUtils.slice(0, 4).map((m: any) => (
           <div key={m.nodeId} className="flex items-center gap-2">
             <div className="flex-1 text-xs truncate">{m.name.split('_')[0]}</div>
@@ -95,20 +95,20 @@ const OverviewTab: React.FC<{ stats: any }> = ({ stats }) => (
     </div>
 
     {/* Bottleneck + Buffers */}
-    <div className="bg-gray-800 rounded-lg p-3">
-      <div className="text-xs text-gray-400 mb-1">Bottleneck</div>
+    <div className="bg-[var(--mm-bg-surface)] rounded-lg p-3">
+      <div className="text-xs text-[var(--mm-text-secondary)] mb-1">Bottleneck</div>
       {stats.bottleneck ? (
         <div className="flex items-center gap-1">
           <AlertTriangle size={12} className="text-red-400" />
           <span className="text-sm font-medium text-red-400">{stats.bottleneck.name.split('_')[0]}</span>
-          <span className="text-xs text-gray-500 ml-auto">{Math.round(stats.bottleneck.utilization * 100)}%</span>
+          <span className="text-xs text-[var(--mm-text-tertiary)] ml-auto">{Math.round(stats.bottleneck.utilization * 100)}%</span>
         </div>
       ) : (
-        <div className="text-xs text-gray-500">None detected</div>
+        <div className="text-xs text-[var(--mm-text-tertiary)]">None detected</div>
       )}
       {stats.bufferLevels.length > 0 && (
         <div className="mt-2 space-y-1">
-          <div className="text-xs text-gray-400">Buffers</div>
+          <div className="text-xs text-[var(--mm-text-secondary)]">Buffers</div>
           {stats.bufferLevels.map((b: any) => (
             <div key={b.nodeId} className="flex items-center gap-2">
               <span className="text-xs truncate flex-1">{b.name.split('_')[0]}</span>
@@ -127,12 +127,12 @@ const FlowTab: React.FC<{ stats: any }> = ({ stats }) => {
   const flowStates = stats.flowStates || [];
 
   if (flowStates.length === 0) {
-    return <div className="text-xs text-gray-500 p-2">No flow data — add conveyors/machines to see flow states.</div>;
+    return <div className="text-xs text-[var(--mm-text-tertiary)] p-2">No flow data — add conveyors/machines to see flow states.</div>;
   }
 
   return (
     <div className="space-y-1 max-h-48 overflow-y-auto">
-      <div className="grid grid-cols-[1fr_80px_80px_80px_60px] gap-2 text-xs text-gray-400 font-medium px-2 pb-1 border-b border-gray-700 sticky top-0 bg-gray-900">
+      <div className="grid grid-cols-[1fr_80px_80px_80px_60px] gap-2 text-xs text-[var(--mm-text-secondary)] font-medium px-2 pb-1 border-b border-[var(--mm-border)] sticky top-0 bg-[var(--mm-bg-panel)]">
         <span>Node</span>
         <span>State</span>
         <span>Blocked %</span>
@@ -142,7 +142,7 @@ const FlowTab: React.FC<{ stats: any }> = ({ stats }) => {
       {flowStates.map((fs: any) => {
         const nodeStats = simulationEngine.getNodeStats().get(fs.nodeId);
         return (
-          <div key={fs.nodeId} className="grid grid-cols-[1fr_80px_80px_80px_60px] gap-2 text-xs px-2 py-1 hover:bg-gray-800 rounded">
+          <div key={fs.nodeId} className="grid grid-cols-[1fr_80px_80px_80px_60px] gap-2 text-xs px-2 py-1 hover:bg-[var(--mm-bg-surface)] rounded">
             <span className="truncate text-gray-200">{fs.name.split('_')[0]}</span>
             <FlowStateBadge state={fs.state} />
             <div className="flex items-center gap-1">
@@ -153,7 +153,7 @@ const FlowTab: React.FC<{ stats: any }> = ({ stats }) => {
               <UtilBar value={fs.starvedPct / 100} color="#f59e0b" />
               <span className="w-8 text-right">{fs.starvedPct.toFixed(0)}%</span>
             </div>
-            <span className="text-right text-gray-300">{nodeStats?.queueLength ?? 0}</span>
+            <span className="text-right text-[var(--mm-text-primary)]">{nodeStats?.queueLength ?? 0}</span>
           </div>
         );
       })}
@@ -202,8 +202,8 @@ const KpiTab: React.FC<{ stats: any }> = ({ stats }) => {
       />
 
       {/* Queue lengths */}
-      <div className="bg-gray-800 rounded-lg p-3 col-span-2">
-        <div className="text-xs text-gray-400 mb-2 flex items-center gap-1">
+      <div className="bg-[var(--mm-bg-surface)] rounded-lg p-3 col-span-2">
+        <div className="text-xs text-[var(--mm-text-secondary)] mb-2 flex items-center gap-1">
           <Activity size={12} />
           Queue Lengths {stats.activeRules > 0 && <span className="text-teal-400 ml-1">({stats.activeRules} rules active)</span>}
         </div>
@@ -214,12 +214,12 @@ const KpiTab: React.FC<{ stats: any }> = ({ stats }) => {
             const peak = ns?.peakQueueLength ?? 0;
             return (
               <div key={fs.nodeId} className="bg-gray-700 rounded px-2 py-1">
-                <div className="text-xs text-gray-300 truncate max-w-[80px]">{fs.name.split('_')[0]}</div>
-                <div className="text-sm font-bold text-white">{q} <span className="text-xs font-normal text-gray-500">/ peak {peak}</span></div>
+                <div className="text-xs text-[var(--mm-text-primary)] truncate max-w-[80px]">{fs.name.split('_')[0]}</div>
+                <div className="text-sm font-bold text-white">{q} <span className="text-xs font-normal text-[var(--mm-text-tertiary)]">/ peak {peak}</span></div>
               </div>
             );
           })}
-          {flowStates.length === 0 && <div className="text-xs text-gray-500">No queue data</div>}
+          {flowStates.length === 0 && <div className="text-xs text-[var(--mm-text-tertiary)]">No queue data</div>}
         </div>
       </div>
     </div>
@@ -233,16 +233,16 @@ const colorMap: Record<string, string> = {
   red: 'text-red-400',
   yellow: 'text-yellow-400',
   green: 'text-green-400',
-  gray: 'text-gray-300',
+  gray: 'text-[var(--mm-text-primary)]',
 };
 
 const KpiCard: React.FC<{ label: string; value: string; unit: string; color: string; sub?: string }> = ({ label, value, unit, color, sub }) => (
-  <div className="bg-gray-800 rounded-lg p-3">
-    <div className="text-xs text-gray-400 mb-1">{label}</div>
+  <div className="bg-[var(--mm-bg-surface)] rounded-lg p-3">
+    <div className="text-xs text-[var(--mm-text-secondary)] mb-1">{label}</div>
     <div className={`text-lg font-bold ${colorMap[color] || 'text-white'}`}>
       {value} <span className="text-xs font-normal">{unit}</span>
     </div>
-    {sub && <div className="text-xs text-gray-500 mt-0.5">{sub}</div>}
+    {sub && <div className="text-xs text-[var(--mm-text-tertiary)] mt-0.5">{sub}</div>}
   </div>
 );
 
@@ -263,7 +263,7 @@ const flowStateColors: Record<string, { bg: string; text: string }> = {
   blocked: { bg: 'bg-red-900/50', text: 'text-red-400' },
   starved: { bg: 'bg-yellow-900/50', text: 'text-yellow-400' },
   stopped: { bg: 'bg-orange-900/50', text: 'text-orange-400' },
-  idle: { bg: 'bg-gray-800', text: 'text-gray-400' },
+  idle: { bg: 'bg-[var(--mm-bg-surface)]', text: 'text-[var(--mm-text-secondary)]' },
   faulted: { bg: 'bg-red-900/70', text: 'text-red-300' },
 };
 

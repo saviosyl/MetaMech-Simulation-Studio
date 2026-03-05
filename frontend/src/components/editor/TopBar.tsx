@@ -1,22 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Play, 
-  Pause, 
-  Square, 
-  Save, 
-  Download,
-  Upload,
-  ArrowLeft,
-  Gauge,
-  Undo2,
-  Redo2,
-  Check,
-  AlertCircle,
-  Loader2,
-  Grid3X3,
-  Ruler,
-  HelpCircle,
+  Play, Pause, Square, Save, Download, Upload,
+  ArrowLeft, Gauge, Undo2, Redo2, Check, AlertCircle,
+  Loader2, Grid3X3, Ruler, HelpCircle,
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuth } from '../../contexts/AuthContext';
@@ -31,6 +18,40 @@ interface TopBarProps {
   onSave: () => void;
 }
 
+/* ─── Toolbar Group wrapper ─── */
+const ToolGroup: React.FC<{ label?: string; children: React.ReactNode }> = ({ label, children }) => (
+  <div className="flex flex-col items-center gap-0.5">
+    <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-[var(--mm-bg-surface)] rounded-md border border-[var(--mm-border-subtle)]">
+      {children}
+    </div>
+    {label && <span className="text-[9px] font-medium text-[var(--mm-text-tertiary)] tracking-wider uppercase">{label}</span>}
+  </div>
+);
+
+/* ─── Small toolbar button ─── */
+const ToolBtn: React.FC<{ 
+  onClick: () => void; 
+  active?: boolean; 
+  title: string; 
+  disabled?: boolean;
+  accent?: string;
+  children: React.ReactNode 
+}> = ({ onClick, active, title, disabled, accent, children }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={title}
+    className={`p-1.5 rounded transition-all duration-150 ${
+      active
+        ? `bg-[var(--mm-accent-primary-muted)] text-[var(--mm-accent-primary)] ring-1 ring-[var(--mm-accent-primary)]/30`
+        : `text-[var(--mm-text-secondary)] hover:text-[var(--mm-text-primary)] hover:bg-[var(--mm-bg-panel-hover)]`
+    } ${disabled ? 'opacity-30' : ''}`}
+    style={accent ? { color: active ? accent : undefined } : undefined}
+  >
+    {children}
+  </button>
+);
+
 const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus, onSave }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -38,30 +59,21 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const {
-    isPlaying,
-    isPaused,
-    simulationSpeed,
-    play,
-    pause,
-    reset,
-    setSimulationSpeed,
-    getSceneData,
-    loadScene,
-    gridSnap,
-    setGridSnap,
-    measureActive,
-    setMeasureActive,
-    cameraPresets,
-    setCameraPreset,
+    isPlaying, isPaused, simulationSpeed,
+    play, pause, reset, setSimulationSpeed,
+    getSceneData, loadScene,
+    gridSnap, setGridSnap,
+    measureActive, setMeasureActive,
+    cameraPresets, setCameraPreset,
     setShowShortcuts,
   } = useEditorStore();
 
   const speedOptions = [
-    { value: 0.25, label: '0.25x' },
-    { value: 0.5, label: '0.5x' },
-    { value: 1, label: '1x' },
-    { value: 2, label: '2x' },
-    { value: 4, label: '4x' },
+    { value: 0.25, label: '0.25×' },
+    { value: 0.5, label: '0.5×' },
+    { value: 1, label: '1×' },
+    { value: 2, label: '2×' },
+    { value: 4, label: '4×' },
   ];
 
   const handleExport = () => {
@@ -78,9 +90,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     URL.revokeObjectURL(url);
   };
 
-  const handleImport = () => {
-    fileInputRef.current?.click();
-  };
+  const handleImport = () => fileInputRef.current?.click();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -96,7 +106,6 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
       }
     };
     reader.readAsText(file);
-    // Reset input
     event.target.value = '';
   };
 
@@ -105,37 +114,35 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
 
   const saveIcon = () => {
     switch (saveStatus) {
-      case 'saving': return <Loader2 size={16} className="animate-spin" />;
-      case 'saved': return <Check size={16} />;
-      case 'error': return <AlertCircle size={16} />;
-      default: return <Save size={16} />;
-    }
-  };
-
-  const saveLabel = () => {
-    switch (saveStatus) {
-      case 'saving': return 'Saving...';
-      case 'saved': return 'Saved';
-      case 'error': return 'Error';
-      default: return 'Save';
+      case 'saving': return <Loader2 size={14} className="animate-spin" />;
+      case 'saved': return <Check size={14} />;
+      case 'error': return <AlertCircle size={14} />;
+      default: return <Save size={14} />;
     }
   };
 
   return (
-    <div className="bg-slate-800/90 backdrop-blur-sm border-b border-slate-700/50 px-6 py-3 flex items-center justify-between shadow-lg">
-      {/* Left Section */}
-      <div className="flex items-center gap-6">
+    <div 
+      className="flex items-center justify-between px-3 py-1.5 border-b shadow-md"
+      style={{ 
+        background: 'var(--mm-bg-panel)', 
+        borderColor: 'var(--mm-border)',
+        minHeight: 'var(--mm-toolbar-height)',
+      }}
+    >
+      {/* ─── Left: Project ─── */}
+      <div className="flex items-center gap-3">
         <button
           onClick={() => navigate('/dashboard')}
-          className="flex items-center gap-2 text-slate-300 hover:text-cyan-400 font-medium transition-colors"
+          className="flex items-center gap-1.5 text-[var(--mm-text-secondary)] hover:text-[var(--mm-accent-primary)] transition-colors"
+          title="Back to Dashboard"
         >
-          <ArrowLeft size={18} />
-          <span className="hidden sm:inline font-['Orbitron']">MetaMech</span>
+          <ArrowLeft size={14} />
+          <span className="hidden sm:inline text-xs font-semibold font-['Orbitron'] tracking-wide">MetaMech</span>
         </button>
         
-        <div className="h-6 w-px bg-slate-600" />
+        <div className="h-5 w-px bg-[var(--mm-border-subtle)]" />
         
-        {/* Project Name */}
         {isEditing ? (
           <input
             type="text"
@@ -143,180 +150,141 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
             onChange={(e) => setProjectName(e.target.value)}
             onBlur={() => setIsEditing(false)}
             onKeyPress={(e) => e.key === 'Enter' && setIsEditing(false)}
-            className="text-lg font-semibold text-white bg-transparent border-b border-cyan-400 outline-none font-['Orbitron']"
+            className="text-sm font-semibold bg-transparent border-b border-[var(--mm-accent-primary)] outline-none font-['Orbitron']"
+            style={{ color: 'var(--mm-text-primary)' }}
             autoFocus
           />
         ) : (
-          <h1
+          <span
             onClick={() => setIsEditing(true)}
-            className="text-lg font-semibold text-white cursor-pointer hover:text-cyan-400 transition-colors font-['Orbitron']"
+            className="text-sm font-semibold cursor-pointer hover:text-[var(--mm-accent-primary)] transition-colors font-['Orbitron']"
+            style={{ color: 'var(--mm-text-primary)' }}
           >
             {projectName}
-          </h1>
+          </span>
         )}
 
-        <div className="h-6 w-px bg-slate-600" />
+        <div className="h-5 w-px bg-[var(--mm-border-subtle)]" />
 
-        {/* Selection/Move Group */}
-        <div className="flex items-center gap-1 px-2 py-1 bg-slate-700/50 rounded-lg border border-slate-600/50">
-          <button onClick={handleUndo} className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-600/50 rounded transition-colors disabled:opacity-30" title="Undo (Ctrl+Z)">
-            <Undo2 size={16} />
-          </button>
-          <button onClick={handleRedo} className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-600/50 rounded transition-colors disabled:opacity-30" title="Redo (Ctrl+Shift+Z)">
-            <Redo2 size={16} />
-          </button>
-        </div>
+        {/* ─── Group: Edit ─── */}
+        <ToolGroup label="Edit">
+          <ToolBtn onClick={handleUndo} title="Undo (Ctrl+Z)"><Undo2 size={14} /></ToolBtn>
+          <ToolBtn onClick={handleRedo} title="Redo (Ctrl+Shift+Z)"><Redo2 size={14} /></ToolBtn>
+        </ToolGroup>
 
-        <div className="h-6 w-px bg-slate-600" />
-
-        {/* Scenario Loader */}
+        {/* ─── Group: Scenarios ─── */}
         <ScenarioLoader />
 
-        <div className="h-6 w-px bg-slate-600" />
+        {/* ─── Group: Tools ─── */}
+        <ToolGroup label="Tools">
+          <ToolBtn onClick={() => setGridSnap(!gridSnap)} active={gridSnap} title="Grid Snap (G)">
+            <Grid3X3 size={14} />
+          </ToolBtn>
+          <ToolBtn onClick={() => setMeasureActive(!measureActive)} active={measureActive} title="Measure (M)" accent="var(--mm-accent-warning)">
+            <Ruler size={14} />
+          </ToolBtn>
+        </ToolGroup>
 
-        {/* Mate/Snap Group */}
-        <div className="flex items-center gap-1 px-2 py-1 bg-slate-700/50 rounded-lg border border-slate-600/50">
-          <button
-            onClick={() => setGridSnap(!gridSnap)}
-            className={`p-1.5 rounded transition-colors ${
-              gridSnap 
-                ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-400/30' 
-                : 'text-slate-400 hover:text-cyan-400 hover:bg-slate-600/50'
-            }`}
-            title="Grid Snap (G)"
-          >
-            <Grid3X3 size={16} />
-          </button>
-
-          <button
-            onClick={() => setMeasureActive(!measureActive)}
-            className={`p-1.5 rounded transition-colors ${
-              measureActive 
-                ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-400/30' 
-                : 'text-slate-400 hover:text-cyan-400 hover:bg-slate-600/50'
-            }`}
-            title="Measure (M)"
-          >
-            <Ruler size={16} />
-          </button>
-        </div>
-
-        <div className="h-6 w-px bg-slate-600" />
-
-        {/* View Group */}
-        <div className="flex items-center gap-0.5 px-2 py-1 bg-slate-700/50 rounded-lg border border-slate-600/50">
+        {/* ─── Group: View ─── */}
+        <ToolGroup label="View">
           {cameraPresets.map(p => (
             <button
               key={p.name}
               onClick={() => setCameraPreset(p.name)}
-              className="px-2 py-1 text-xs text-slate-400 hover:text-cyan-400 hover:bg-slate-600/50 rounded transition-colors font-['Orbitron']"
+              className="px-1.5 py-1 text-[10px] font-semibold text-[var(--mm-text-tertiary)] hover:text-[var(--mm-text-primary)] hover:bg-[var(--mm-bg-panel-hover)] rounded transition-colors font-['Orbitron']"
               title={`${p.name} view`}
             >
               {p.name[0]}
             </button>
           ))}
-          <div className="w-px h-4 bg-slate-600 mx-1" />
-          <button
-            onClick={() => setShowShortcuts(true)}
-            className="p-1 text-slate-400 hover:text-cyan-400 hover:bg-slate-600/50 rounded transition-colors"
-            title="Shortcuts (?)"
-          >
-            <HelpCircle size={14} />
-          </button>
-        </div>
+          <ToolBtn onClick={() => setShowShortcuts(true)} title="Keyboard Shortcuts (?)">
+            <HelpCircle size={13} />
+          </ToolBtn>
+        </ToolGroup>
       </div>
 
-      {/* Center Section - Simulation Controls */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={isPlaying ? pause : play}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all duration-200 font-['Orbitron'] ${
-            isPlaying 
-              ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40' 
-              : 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40'
-          }`}
-        >
-          {isPlaying ? <Pause size={18} /> : <Play size={18} />}
-          <span className="hidden sm:inline">
+      {/* ─── Center: Simulation ─── */}
+      <div className="flex items-center gap-2">
+        <ToolGroup label="Simulation">
+          <button
+            onClick={isPlaying ? pause : play}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md font-semibold text-xs transition-all font-['Orbitron'] tracking-wide ${
+              isPlaying 
+                ? 'bg-amber-500/90 text-white shadow-sm shadow-amber-500/30 hover:bg-amber-500' 
+                : 'bg-cyan-500/90 text-white shadow-sm shadow-cyan-500/30 hover:bg-cyan-500'
+            }`}
+            title={isPlaying ? 'Pause Simulation' : 'Play Simulation'}
+          >
+            {isPlaying ? <Pause size={13} /> : <Play size={13} />}
             {isPlaying ? 'PAUSE' : 'PLAY'}
-          </span>
-        </button>
-        
-        <button
-          onClick={reset}
-          className="flex items-center gap-2 px-4 py-2.5 text-slate-300 hover:text-white bg-slate-700/50 hover:bg-slate-600/50 rounded-xl border border-slate-600/50 transition-colors font-['Orbitron']"
-        >
-          <Square size={16} />
-          <span className="hidden sm:inline">RESET</span>
-        </button>
-
-        {/* Speed Control */}
-        <div className="flex items-center gap-2 ml-2 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600/50">
-          <Gauge size={16} className="text-cyan-400" />
-          <select
-            value={simulationSpeed}
-            onChange={(e) => setSimulationSpeed(Number(e.target.value))}
-            className="text-sm bg-transparent text-slate-300 border-none outline-none font-['Orbitron']"
-          >
-            {speedOptions.map(option => (
-              <option key={option.value} value={option.value} className="bg-slate-800">
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Right Section - Save/Export Group */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1 px-2 py-1 bg-slate-700/50 rounded-lg border border-slate-600/50">
-          <button
-            onClick={handleImport}
-            className="flex items-center gap-2 px-3 py-1.5 text-slate-300 hover:text-cyan-400 hover:bg-slate-600/50 rounded-lg transition-colors"
-            title="Import .metamech-sim.json"
-          >
-            <Upload size={16} />
-            <span className="hidden sm:inline text-sm font-['Orbitron']">IMPORT</span>
           </button>
           
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-3 py-1.5 text-slate-300 hover:text-cyan-400 hover:bg-slate-600/50 rounded-lg transition-colors"
-          >
-            <Download size={16} />
-            <span className="hidden sm:inline text-sm font-['Orbitron']">EXPORT</span>
-          </button>
-        </div>
+          <ToolBtn onClick={reset} title="Reset Simulation">
+            <Square size={13} />
+          </ToolBtn>
+
+          <div className="w-px h-4 bg-[var(--mm-border-subtle)] mx-0.5" />
+
+          {/* Speed — labeled */}
+          <div className="flex items-center gap-1 px-1">
+            <Gauge size={12} className="text-[var(--mm-text-tertiary)]" />
+            <select
+              value={simulationSpeed}
+              onChange={(e) => setSimulationSpeed(Number(e.target.value))}
+              className="text-[11px] bg-transparent border-none outline-none font-semibold cursor-pointer font-['Orbitron']"
+              style={{ color: 'var(--mm-text-secondary)' }}
+              title="Simulation Speed"
+            >
+              {speedOptions.map(o => (
+                <option key={o.value} value={o.value} style={{ background: 'var(--mm-bg-panel)', color: 'var(--mm-text-primary)' }}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </ToolGroup>
+      </div>
+
+      {/* ─── Right: File + User ─── */}
+      <div className="flex items-center gap-3">
+        <ToolGroup label="File">
+          <ToolBtn onClick={handleImport} title="Import Project">
+            <Upload size={14} />
+          </ToolBtn>
+          <ToolBtn onClick={handleExport} title="Export Project">
+            <Download size={14} />
+          </ToolBtn>
+        </ToolGroup>
 
         <button
           onClick={onSave}
           disabled={saveStatus === 'saving'}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all duration-200 font-['Orbitron'] ${
-            saveStatus === 'saved' ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/25' :
-            saveStatus === 'error' ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/25' :
-            'bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:shadow-lg hover:shadow-amber-500/25 shadow-md shadow-amber-500/10'
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md font-semibold text-xs transition-all font-['Orbitron'] tracking-wide ${
+            saveStatus === 'saved' ? 'bg-emerald-500/90 text-white' :
+            saveStatus === 'error' ? 'bg-red-500/90 text-white' :
+            'bg-amber-500/90 text-white hover:bg-amber-500'
           }`}
+          title="Save Project"
         >
           {saveIcon()}
-          <span className="hidden sm:inline">{saveLabel().toUpperCase()}</span>
+          {saveStatus === 'saving' ? 'SAVING' : saveStatus === 'saved' ? 'SAVED' : 'SAVE'}
         </button>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json,.metamech-sim.json"
-          onChange={handleFileChange}
-          className="hidden"
-        />
+        <input ref={fileInputRef} type="file" accept=".json,.metamech-sim.json" onChange={handleFileChange} className="hidden" />
 
-        <div className="h-6 w-px bg-slate-600 mx-2" />
+        <div className="h-5 w-px bg-[var(--mm-border-subtle)]" />
 
-        {/* User Info */}
-        <div className="flex items-center gap-3 text-sm">
-          <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-600 text-white rounded-full flex items-center justify-center font-bold shadow-lg shadow-cyan-500/25">
+        {/* User avatar */}
+        <div className="flex items-center gap-2">
+          <div 
+            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
+            style={{ background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }}
+          >
             {user?.displayName?.charAt(0).toUpperCase() || 'U'}
           </div>
-          <span className="hidden md:inline text-slate-300 font-['Orbitron']">{user?.displayName}</span>
+          <span className="hidden md:inline text-xs font-['Orbitron']" style={{ color: 'var(--mm-text-secondary)' }}>
+            {user?.displayName}
+          </span>
         </div>
       </div>
     </div>

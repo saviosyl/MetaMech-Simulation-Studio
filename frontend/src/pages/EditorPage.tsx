@@ -197,19 +197,20 @@ const EditorPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="fixed inset-0 flex flex-col overflow-hidden" style={{ background: 'var(--mm-bg-app)' }}>
       <TopBar
         projectName={projectName}
         setProjectName={setProjectName}
         saveStatus={saveStatus}
         onSave={handleSave}
       />
-      <div className="flex-1 flex overflow-hidden min-h-0 border-t border-slate-700/50">
+      <div className="flex-1 flex overflow-hidden min-h-0" style={{ borderTop: '1px solid var(--mm-border-subtle)' }}>
         <div className="flex-shrink-0">
           <LeftPanel />
         </div>
         <div 
-          className="flex-1 relative min-w-0 overflow-hidden border-x border-slate-700/50 bg-slate-900/50"
+          className="flex-1 relative min-w-0 overflow-hidden"
+          style={{ borderLeft: '1px solid var(--mm-border-subtle)', borderRight: '1px solid var(--mm-border-subtle)', background: 'var(--mm-bg-viewport)' }}
           onContextMenu={handleContextMenu}
         >
           <Viewport />

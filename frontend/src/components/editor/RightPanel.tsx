@@ -33,14 +33,14 @@ const CollapsibleSection: React.FC<{
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border border-slate-600/30 rounded-lg bg-gradient-to-br from-slate-700/20 to-slate-800/20 backdrop-blur-sm">
+    <div className="border border-[var(--mm-border-subtle)] rounded-lg bg-gradient-to-br from-slate-700/20 to-slate-800/20 backdrop-blur-sm">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-3 text-left hover:bg-slate-700/20 transition-colors rounded-t-lg"
+        className="w-full flex items-center justify-between p-3 text-left hover:bg-[var(--mm-bg-surface)] transition-colors rounded-t-lg"
       >
         <div className="flex items-center gap-2">
           {Icon && <Icon size={16} className="text-cyan-400" />}
-          <span className="text-sm font-bold text-slate-200 font-['Orbitron'] tracking-wide">
+          <span className="text-sm font-bold text-[var(--mm-text-primary)] font-['Orbitron'] tracking-wide">
             {title.toUpperCase()}
           </span>
           {badge && (
@@ -50,9 +50,9 @@ const CollapsibleSection: React.FC<{
           )}
         </div>
         {isOpen ? (
-          <ChevronUp size={16} className="text-slate-400" />
+          <ChevronUp size={16} className="text-[var(--mm-text-secondary)]" />
         ) : (
-          <ChevronDown size={16} className="text-slate-400" />
+          <ChevronDown size={16} className="text-[var(--mm-text-secondary)]" />
         )}
       </button>
       {isOpen && (
@@ -198,7 +198,7 @@ const RightPanel: React.FC = () => {
             min={paramDef.min}
             max={paramDef.max}
             step={paramDef.step}
-            className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+            className="w-full px-3 py-2 text-sm bg-[var(--mm-bg-input)] border border-[var(--mm-border)] rounded-lg text-[var(--mm-text-primary)] focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
           />
         );
       
@@ -208,7 +208,7 @@ const RightPanel: React.FC = () => {
             type="text"
             value={value || paramDef.default}
             onChange={(e) => handleParameterChange(paramKey, e.target.value)}
-            className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+            className="w-full px-3 py-2 text-sm bg-[var(--mm-bg-input)] border border-[var(--mm-border)] rounded-lg text-[var(--mm-text-primary)] focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
           />
         );
       
@@ -217,7 +217,7 @@ const RightPanel: React.FC = () => {
           <select
             value={value || paramDef.default}
             onChange={(e) => handleParameterChange(paramKey, e.target.value)}
-            className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+            className="w-full px-3 py-2 text-sm bg-[var(--mm-bg-input)] border border-[var(--mm-border)] rounded-lg text-[var(--mm-text-primary)] focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
           >
             {paramDef.options.map((option: string) => (
               <option key={option} value={option} className="bg-slate-800">
@@ -229,14 +229,14 @@ const RightPanel: React.FC = () => {
       
       case 'boolean':
         return (
-          <label className="flex items-center gap-3 p-2 bg-slate-700/20 rounded-lg border border-slate-600/30">
+          <label className="flex items-center gap-3 p-2 bg-[var(--mm-bg-surface)] rounded-lg border border-[var(--mm-border-subtle)]">
             <input
               type="checkbox"
               checked={value ?? paramDef.default}
               onChange={(e) => handleParameterChange(paramKey, e.target.checked)}
               className="rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 bg-slate-800"
             />
-            <span className="text-sm text-slate-300 font-['Inter']">Enabled</span>
+            <span className="text-sm text-[var(--mm-text-primary)] font-['Inter']">Enabled</span>
           </label>
         );
       
@@ -247,13 +247,13 @@ const RightPanel: React.FC = () => {
               type="color"
               value={value || paramDef.default}
               onChange={(e) => handleParameterChange(paramKey, e.target.value)}
-              className="w-12 h-9 border border-slate-600/50 rounded-lg bg-slate-800 cursor-pointer"
+              className="w-12 h-9 border border-[var(--mm-border)] rounded-lg bg-slate-800 cursor-pointer"
             />
             <input
               type="text"
               value={value || paramDef.default}
               onChange={(e) => handleParameterChange(paramKey, e.target.value)}
-              className="flex-1 px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+              className="flex-1 px-3 py-2 text-sm bg-[var(--mm-bg-input)] border border-[var(--mm-border)] rounded-lg text-[var(--mm-text-primary)] focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
             />
           </div>
         );
@@ -265,13 +265,13 @@ const RightPanel: React.FC = () => {
 
   if (rightPanelCollapsed) {
     return (
-      <div className="flex-shrink-0 w-12 border-l border-slate-700/50 bg-slate-800/90 backdrop-blur-sm flex items-center justify-center">
+      <div className="flex-shrink-0 w-12 border-l border-[var(--mm-border)] bg-[var(--mm-bg-panel)] backdrop-blur-sm flex items-center justify-center">
         <button
           onClick={() => setRightPanelCollapsed(false)}
-          className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
+          className="p-2 hover:bg-[var(--mm-bg-surface)] rounded-lg transition-colors"
           title="Expand Properties"
         >
-          <ChevronLeft size={16} className="text-slate-400" />
+          <ChevronLeft size={16} className="text-[var(--mm-text-secondary)]" />
         </button>
       </div>
     );
@@ -287,17 +287,17 @@ const RightPanel: React.FC = () => {
         title="Drag to resize, double-click to collapse"
       />
 
-      <div className="flex-1 bg-slate-800/90 backdrop-blur-sm border-l border-slate-700/50 flex flex-col overflow-hidden">
+      <div className="flex-1 bg-[var(--mm-bg-panel)] backdrop-blur-sm border-l border-[var(--mm-border)] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-4 py-3 border-b border-slate-700/50 flex-shrink-0 bg-gradient-to-r from-slate-800/50 to-slate-700/50">
+        <div className="px-4 py-3 border-b border-[var(--mm-border)] flex-shrink-0 bg-gradient-to-r from-slate-800/50 to-slate-700/50">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2 font-['Orbitron'] tracking-wide">
+            <h2 className="text-sm font-bold text-[var(--mm-text-primary)] flex items-center gap-2 font-['Orbitron'] tracking-wide">
               <Settings size={16} className="text-cyan-400" />
               PROPERTIES
             </h2>
             <button
               onClick={() => setRightPanelCollapsed(true)}
-              className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-lg transition-colors"
+              className="p-2 text-[var(--mm-text-secondary)] hover:text-[var(--mm-text-primary)] hover:bg-[var(--mm-bg-surface)] rounded-lg transition-colors"
               title="Collapse Panel"
             >
               <ChevronRight size={16} />
@@ -312,18 +312,18 @@ const RightPanel: React.FC = () => {
               <CollapsibleSection title="Object Information" icon={Settings} defaultOpen={true}>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">NAME</label>
+                    <label className="block text-xs font-semibold text-[var(--mm-text-primary)] mb-1.5 font-['Orbitron'] tracking-wide">NAME</label>
                     <input
                       type="text"
                       value={selectedObject.name}
                       onChange={(e) => updateObject(selectedObject.id, selectedObjectType!, { name: e.target.value })}
-                      className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-colors font-['Inter']"
+                      className="w-full px-3 py-2 text-sm bg-[var(--mm-bg-input)] border border-[var(--mm-border)] rounded-lg text-[var(--mm-text-primary)] placeholder-slate-400 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-colors font-['Inter']"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 font-['Orbitron'] tracking-wide">TYPE</label>
-                    <div className="mt-1.5 px-3 py-2 bg-slate-700/30 border border-slate-600/30 rounded-lg">
-                      <div className="text-sm text-slate-300 capitalize font-['Inter']">
+                    <label className="block text-xs font-semibold text-[var(--mm-text-primary)] font-['Orbitron'] tracking-wide">TYPE</label>
+                    <div className="mt-1.5 px-3 py-2 bg-[var(--mm-bg-surface)] border border-[var(--mm-border-subtle)] rounded-lg">
+                      <div className="text-sm text-[var(--mm-text-primary)] capitalize font-['Inter']">
                         {selectedObject.type.replace('-', ' ')}
                       </div>
                     </div>
@@ -346,7 +346,7 @@ const RightPanel: React.FC = () => {
                         className={`flex flex-col items-center gap-1 py-2 px-3 text-xs rounded-lg transition-all duration-200 font-['Orbitron'] ${
                           transformMode === mode
                             ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-400/30 shadow-lg shadow-cyan-500/10'
-                            : 'bg-slate-700/30 text-slate-400 hover:text-slate-200 hover:bg-slate-600/30'
+                            : 'bg-[var(--mm-bg-surface)] text-[var(--mm-text-secondary)] hover:text-[var(--mm-text-primary)] hover:bg-slate-600/30'
                         }`}
                         title={`${label} (${key})`}
                       >
@@ -358,17 +358,17 @@ const RightPanel: React.FC = () => {
 
                   <div className="space-y-4 mt-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-2 font-['Orbitron'] tracking-wide">POSITION (mm)</label>
+                      <label className="block text-xs font-semibold text-[var(--mm-text-primary)] mb-2 font-['Orbitron'] tracking-wide">POSITION (mm)</label>
                       <div className="grid grid-cols-3 gap-2">
                         {['X', 'Y', 'Z'].map((axis, index) => (
                           <div key={axis}>
-                            <label className="block text-xs text-slate-400 mb-1 font-['Inter']">{axis}</label>
+                            <label className="block text-xs text-[var(--mm-text-secondary)] mb-1 font-['Inter']">{axis}</label>
                             <input
                               type="number"
                               value={Math.round(mToMm(selectedObject.position[index]))}
                               onChange={(e) => handleTransformChange('position', index, mmToM(Number(e.target.value)))}
                               step="50"
-                              className="w-full px-2 py-1.5 text-sm bg-slate-900/50 border border-slate-600/50 rounded text-slate-200 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--mm-bg-input)] border border-[var(--mm-border)] rounded text-[var(--mm-text-primary)] focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
                             />
                           </div>
                         ))}
@@ -376,17 +376,17 @@ const RightPanel: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-2 font-['Orbitron'] tracking-wide">ROTATION (°)</label>
+                      <label className="block text-xs font-semibold text-[var(--mm-text-primary)] mb-2 font-['Orbitron'] tracking-wide">ROTATION (°)</label>
                       <div className="grid grid-cols-3 gap-2">
                         {['X', 'Y', 'Z'].map((axis, index) => (
                           <div key={axis}>
-                            <label className="block text-xs text-slate-400 mb-1 font-['Inter']">{axis}°</label>
+                            <label className="block text-xs text-[var(--mm-text-secondary)] mb-1 font-['Inter']">{axis}°</label>
                             <input
                               type="number"
                               value={radToDeg(selectedObject.rotation[index]).toFixed(1)}
                               onChange={(e) => handleTransformChange('rotation', index, degToRad(Number(e.target.value)))}
                               step="1"
-                              className="w-full px-2 py-1.5 text-sm bg-slate-900/50 border border-slate-600/50 rounded text-slate-200 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--mm-bg-input)] border border-[var(--mm-border)] rounded text-[var(--mm-text-primary)] focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
                             />
                           </div>
                         ))}
@@ -394,18 +394,18 @@ const RightPanel: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-2 font-['Orbitron'] tracking-wide">SCALE</label>
+                      <label className="block text-xs font-semibold text-[var(--mm-text-primary)] mb-2 font-['Orbitron'] tracking-wide">SCALE</label>
                       <div className="grid grid-cols-3 gap-2">
                         {['X', 'Y', 'Z'].map((axis, index) => (
                           <div key={axis}>
-                            <label className="block text-xs text-slate-400 mb-1 font-['Inter']">{axis}</label>
+                            <label className="block text-xs text-[var(--mm-text-secondary)] mb-1 font-['Inter']">{axis}</label>
                             <input
                               type="number"
                               value={selectedObject.scale[index].toFixed(2)}
                               onChange={(e) => handleTransformChange('scale', index, Number(e.target.value))}
                               step="0.1"
                               min="0.1"
-                              className="w-full px-2 py-1.5 text-sm bg-slate-900/50 border border-slate-600/50 rounded text-slate-200 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--mm-bg-input)] border border-[var(--mm-border)] rounded text-[var(--mm-text-primary)] focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
                             />
                           </div>
                         ))}
@@ -424,7 +424,7 @@ const RightPanel: React.FC = () => {
                       const limits = parametricAssetDef.limits[paramKey];
                       return (
                         <div key={paramKey}>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                          <label className="block text-xs font-semibold text-[var(--mm-text-primary)] mb-1.5 font-['Orbitron'] tracking-wide">
                             {paramDef.label.toUpperCase()}{paramDef.unit ? ` (${paramDef.unit})` : ''}
                           </label>
                           {paramDef.type === 'number' && (
@@ -435,25 +435,25 @@ const RightPanel: React.FC = () => {
                               min={limits?.[0]}
                               max={limits?.[1]}
                               step={paramDef.step || 1}
-                              className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+                              className="w-full px-3 py-2 text-sm bg-[var(--mm-bg-input)] border border-[var(--mm-border)] rounded-lg text-[var(--mm-text-primary)] focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
                             />
                           )}
                           {paramDef.type === 'boolean' && (
-                            <label className="flex items-center gap-3 p-2 bg-slate-700/20 rounded-lg border border-slate-600/30">
+                            <label className="flex items-center gap-3 p-2 bg-[var(--mm-bg-surface)] rounded-lg border border-[var(--mm-border-subtle)]">
                               <input
                                 type="checkbox"
                                 checked={value ?? false}
                                 onChange={(e) => handleParameterChange(paramKey, e.target.checked)}
                                 className="rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 bg-slate-800"
                               />
-                              <span className="text-sm text-slate-300 font-['Inter']">Enabled</span>
+                              <span className="text-sm text-[var(--mm-text-primary)] font-['Inter']">Enabled</span>
                             </label>
                           )}
                           {paramDef.type === 'select' && paramDef.options && (
                             <select
                               value={value}
                               onChange={(e) => handleParameterChange(paramKey, e.target.value)}
-                              className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+                              className="w-full px-3 py-2 text-sm bg-[var(--mm-bg-input)] border border-[var(--mm-border)] rounded-lg text-[var(--mm-text-primary)] focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
                             >
                               {paramDef.options.map(opt => (
                                 <option key={opt} value={opt} className="bg-slate-800">
@@ -480,7 +480,7 @@ const RightPanel: React.FC = () => {
                         <div className="space-y-4">
                           {groups.geometry.map(([paramKey, paramDef]) => (
                             <div key={paramKey}>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                              <label className="block text-xs font-semibold text-[var(--mm-text-primary)] mb-1.5 font-['Orbitron'] tracking-wide">
                                 {paramDef.label.toUpperCase()}
                               </label>
                               {renderParameterInput(paramKey, paramDef)}
@@ -494,7 +494,7 @@ const RightPanel: React.FC = () => {
                         <div className="space-y-4">
                           {groups.simulation.map(([paramKey, paramDef]) => (
                             <div key={paramKey}>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                              <label className="block text-xs font-semibold text-[var(--mm-text-primary)] mb-1.5 font-['Orbitron'] tracking-wide">
                                 {paramDef.label.toUpperCase()}
                               </label>
                               {renderParameterInput(paramKey, paramDef)}
@@ -508,7 +508,7 @@ const RightPanel: React.FC = () => {
                         <div className="space-y-4">
                           {groups.logic.map(([paramKey, paramDef]) => (
                             <div key={paramKey}>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                              <label className="block text-xs font-semibold text-[var(--mm-text-primary)] mb-1.5 font-['Orbitron'] tracking-wide">
                                 {paramDef.label.toUpperCase()}
                               </label>
                               {renderParameterInput(paramKey, paramDef)}
@@ -522,7 +522,7 @@ const RightPanel: React.FC = () => {
                         <div className="space-y-4">
                           {groups.appearance.map(([paramKey, paramDef]) => (
                             <div key={paramKey}>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                              <label className="block text-xs font-semibold text-[var(--mm-text-primary)] mb-1.5 font-['Orbitron'] tracking-wide">
                                 {paramDef.label.toUpperCase()}
                               </label>
                               {renderParameterInput(paramKey, paramDef)}
@@ -536,7 +536,7 @@ const RightPanel: React.FC = () => {
                         <div className="space-y-4">
                           {groups.advanced.map(([paramKey, paramDef]) => (
                             <div key={paramKey}>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                              <label className="block text-xs font-semibold text-[var(--mm-text-primary)] mb-1.5 font-['Orbitron'] tracking-wide">
                                 {paramDef.label.toUpperCase()}
                               </label>
                               {renderParameterInput(paramKey, paramDef)}
@@ -575,13 +575,13 @@ const RightPanel: React.FC = () => {
               <CollapsibleSection title="Scene Settings" icon={Palette} defaultOpen={true}>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">ENVIRONMENT</label>
+                    <label className="block text-xs font-semibold text-[var(--mm-text-primary)] mb-1.5 font-['Orbitron'] tracking-wide">ENVIRONMENT</label>
                     <select
                       value={sceneSettings.environment}
                       onChange={(e) => setSceneSettings({ 
                         environment: e.target.value as any 
                       })}
-                      className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
+                      className="w-full px-3 py-2 text-sm bg-[var(--mm-bg-input)] border border-[var(--mm-border)] rounded-lg text-[var(--mm-text-primary)] focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
                     >
                       <option value="factory" className="bg-slate-800">Factory</option>
                       <option value="studio-white" className="bg-slate-800">Studio White</option>
@@ -591,9 +591,9 @@ const RightPanel: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-2 font-['Orbitron'] tracking-wide">DISPLAY</label>
+                    <label className="block text-xs font-semibold text-[var(--mm-text-primary)] mb-2 font-['Orbitron'] tracking-wide">DISPLAY</label>
                     <div className="space-y-2">
-                      <label className="flex items-center gap-3 p-2 bg-slate-700/20 rounded-lg border border-slate-600/30 cursor-pointer hover:bg-slate-700/30 transition-colors">
+                      <label className="flex items-center gap-3 p-2 bg-[var(--mm-bg-surface)] rounded-lg border border-[var(--mm-border-subtle)] cursor-pointer hover:bg-[var(--mm-bg-surface)] transition-colors">
                         <input
                           type="checkbox"
                           checked={sceneSettings.grid.visible}
@@ -603,11 +603,11 @@ const RightPanel: React.FC = () => {
                           className="rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 bg-slate-800"
                         />
                         <div className="flex items-center gap-2">
-                          {sceneSettings.grid.visible ? <Eye size={14} className="text-cyan-400" /> : <EyeOff size={14} className="text-slate-500" />}
-                          <span className="text-sm text-slate-300 font-['Inter']">Grid</span>
+                          {sceneSettings.grid.visible ? <Eye size={14} className="text-cyan-400" /> : <EyeOff size={14} className="text-[var(--mm-text-tertiary)]" />}
+                          <span className="text-sm text-[var(--mm-text-primary)] font-['Inter']">Grid</span>
                         </div>
                       </label>
-                      <label className="flex items-center gap-3 p-2 bg-slate-700/20 rounded-lg border border-slate-600/30 cursor-pointer hover:bg-slate-700/30 transition-colors">
+                      <label className="flex items-center gap-3 p-2 bg-[var(--mm-bg-surface)] rounded-lg border border-[var(--mm-border-subtle)] cursor-pointer hover:bg-[var(--mm-bg-surface)] transition-colors">
                         <input
                           type="checkbox"
                           checked={sceneSettings.axes.visible}
@@ -617,8 +617,8 @@ const RightPanel: React.FC = () => {
                           className="rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 bg-slate-800"
                         />
                         <div className="flex items-center gap-2">
-                          {sceneSettings.axes.visible ? <Eye size={14} className="text-cyan-400" /> : <EyeOff size={14} className="text-slate-500" />}
-                          <span className="text-sm text-slate-300 font-['Inter']">Axes Helper</span>
+                          {sceneSettings.axes.visible ? <Eye size={14} className="text-cyan-400" /> : <EyeOff size={14} className="text-[var(--mm-text-tertiary)]" />}
+                          <span className="text-sm text-[var(--mm-text-primary)] font-['Inter']">Axes Helper</span>
                         </div>
                       </label>
                     </div>
@@ -628,11 +628,11 @@ const RightPanel: React.FC = () => {
 
               {/* No Selection Message — Premium */}
               <div className="text-center py-12">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-slate-700/50 to-slate-800/50 border border-slate-600/50 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                  <Sliders size={24} className="text-slate-400" />
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-slate-700/50 to-slate-800/50 border border-[var(--mm-border)] flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Sliders size={24} className="text-[var(--mm-text-secondary)]" />
                 </div>
-                <h3 className="text-sm font-semibold text-slate-200 mb-1 font-['Orbitron']">NO OBJECT SELECTED</h3>
-                <p className="text-xs text-slate-400 font-['Inter']">
+                <h3 className="text-sm font-semibold text-[var(--mm-text-primary)] mb-1 font-['Orbitron']">NO OBJECT SELECTED</h3>
+                <p className="text-xs text-[var(--mm-text-secondary)] font-['Inter']">
                   Select an object in the scene to view and edit its properties.
                 </p>
               </div>

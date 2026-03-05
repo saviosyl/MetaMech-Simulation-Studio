@@ -106,13 +106,13 @@ const LeftPanel: React.FC = () => {
 
   if (leftPanelCollapsed) {
     return (
-      <div className="flex-shrink-0 w-12 border-r border-slate-700/50 bg-slate-800/90 backdrop-blur-sm flex flex-col items-center pt-3 gap-2">
+      <div className="flex-shrink-0 w-12 border-r border-[var(--mm-border)] bg-[var(--mm-bg-panel)] backdrop-blur-sm flex flex-col items-center pt-3 gap-2">
         <button
           onClick={() => setLeftPanelCollapsed(false)}
-          className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
+          className="p-2 hover:bg-[var(--mm-bg-surface)] rounded-lg transition-colors"
           title="Expand Library"
         >
-          <ChevronRight size={16} className="text-slate-400" />
+          <ChevronRight size={16} className="text-[var(--mm-text-secondary)]" />
         </button>
         {/* Vertical tab icons when collapsed */}
         {tabs.map(tab => {
@@ -126,7 +126,7 @@ const LeftPanel: React.FC = () => {
               className={`p-2 rounded-lg transition-all duration-200 ${
                 isActive 
                   ? `bg-${tab.color}-500/20 text-${tab.color}-400 ring-1 ring-${tab.color}-400/30 shadow-lg shadow-${tab.color}-500/10` 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                  : 'text-[var(--mm-text-secondary)] hover:text-[var(--mm-text-primary)] hover:bg-[var(--mm-bg-surface)]'
               }`}
               title={tab.name}
             >
@@ -140,10 +140,10 @@ const LeftPanel: React.FC = () => {
 
   return (
     <div className="flex-shrink-0 flex h-full overflow-hidden" style={{ width: leftPanelWidth, maxWidth: 400, minWidth: 220 }}>
-      <div className="flex-1 bg-slate-800/90 backdrop-blur-sm border-r border-slate-700/50 flex flex-col overflow-hidden">
+      <div className="flex-1 bg-[var(--mm-bg-panel)] backdrop-blur-sm border-r border-[var(--mm-border)] flex flex-col overflow-hidden">
         
         {/* Header — Industrial Premium */}
-        <div className="px-4 py-3 border-b border-slate-700/50 flex-shrink-0 bg-gradient-to-r from-slate-800/50 to-slate-700/50">
+        <div className="px-4 py-3 border-b border-[var(--mm-border)] flex-shrink-0 bg-gradient-to-r from-slate-800/50 to-slate-700/50">
           <div className="flex items-center justify-between mb-3">
             <div className="flex gap-1">
               <button
@@ -151,7 +151,7 @@ const LeftPanel: React.FC = () => {
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 font-['Orbitron'] ${
                   viewMode === 'library'
                     ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-400/30 shadow-lg shadow-cyan-500/10'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                    : 'text-[var(--mm-text-secondary)] hover:text-[var(--mm-text-primary)] hover:bg-[var(--mm-bg-surface)]'
                 }`}
               >
                 LIBRARY
@@ -161,7 +161,7 @@ const LeftPanel: React.FC = () => {
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 flex items-center gap-2 font-['Orbitron'] ${
                   viewMode === 'scene'
                     ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-400/30 shadow-lg shadow-cyan-500/10'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                    : 'text-[var(--mm-text-secondary)] hover:text-[var(--mm-text-primary)] hover:bg-[var(--mm-bg-surface)]'
                 }`}
               >
                 <List size={12} /> SCENE
@@ -174,8 +174,8 @@ const LeftPanel: React.FC = () => {
                     onClick={() => setLayout('compact')}
                     className={`p-2 rounded-lg transition-colors ${
                       layout === 'compact' 
-                        ? 'bg-slate-600/50 text-slate-200' 
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                        ? 'bg-slate-600/50 text-[var(--mm-text-primary)]' 
+                        : 'text-[var(--mm-text-secondary)] hover:text-[var(--mm-text-primary)] hover:bg-[var(--mm-bg-surface)]'
                     }`}
                     title="Compact list"
                   >
@@ -185,8 +185,8 @@ const LeftPanel: React.FC = () => {
                     onClick={() => setLayout('grid')}
                     className={`p-2 rounded-lg transition-colors ${
                       layout === 'grid' 
-                        ? 'bg-slate-600/50 text-slate-200' 
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                        ? 'bg-slate-600/50 text-[var(--mm-text-primary)]' 
+                        : 'text-[var(--mm-text-secondary)] hover:text-[var(--mm-text-primary)] hover:bg-[var(--mm-bg-surface)]'
                     }`}
                     title="Grid view"
                   >
@@ -196,7 +196,7 @@ const LeftPanel: React.FC = () => {
               )}
               <button
                 onClick={() => setLeftPanelCollapsed(true)}
-                className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-lg transition-colors"
+                className="p-2 text-[var(--mm-text-secondary)] hover:text-[var(--mm-text-primary)] hover:bg-[var(--mm-bg-surface)] rounded-lg transition-colors"
                 title="Collapse"
               >
                 <ChevronLeft size={14} />
@@ -206,18 +206,18 @@ const LeftPanel: React.FC = () => {
           
           {viewMode === 'library' && (
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+              <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--mm-text-secondary)]" />
               <input
                 type="text"
                 placeholder="Search modules..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-colors font-['Inter']"
+                className="w-full pl-9 pr-4 py-2.5 text-sm bg-[var(--mm-bg-input)] border border-[var(--mm-border)] rounded-lg text-[var(--mm-text-primary)] placeholder-slate-400 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-colors font-['Inter']"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[var(--mm-text-secondary)] hover:text-[var(--mm-text-primary)]"
                 >
                   ×
                 </button>
@@ -231,7 +231,7 @@ const LeftPanel: React.FC = () => {
         ) : (
           <>
             {/* Category Tabs — Scrollable Pills */}
-            <div className="flex gap-1.5 px-4 py-3 border-b border-slate-700/30 flex-shrink-0 overflow-x-auto scrollbar-none">
+            <div className="flex gap-1.5 px-4 py-3 border-b border-[var(--mm-border-subtle)] flex-shrink-0 overflow-x-auto scrollbar-none">
               {tabs.map(tab => {
                 const Icon = tab.icon;
                 const isActive = activeLibraryTab === tab.id;
@@ -243,12 +243,12 @@ const LeftPanel: React.FC = () => {
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all duration-200 border whitespace-nowrap flex-shrink-0 ${
                       isActive
                         ? 'bg-cyan-500/15 border-cyan-400/40 text-cyan-400 shadow-lg shadow-cyan-500/10'
-                        : 'border-slate-600/30 text-slate-400 hover:text-slate-200 hover:bg-slate-700/30 hover:border-slate-500/50'
+                        : 'border-[var(--mm-border-subtle)] text-[var(--mm-text-secondary)] hover:text-[var(--mm-text-primary)] hover:bg-[var(--mm-bg-surface)] hover:border-slate-500/50'
                     }`}
                   >
                     <Icon size={13} />
                     <span className="text-xs font-semibold font-['Orbitron']">{tab.name.toUpperCase()}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-700/50 text-slate-500'}`}>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? 'bg-cyan-500/20 text-cyan-300' : 'bg-[var(--mm-bg-surface)] text-[var(--mm-text-tertiary)]'}`}>
                       {count}
                     </span>
                   </button>
@@ -261,13 +261,13 @@ const LeftPanel: React.FC = () => {
               {Object.entries(groupedModules).map(([group, items]) => (
                 <div key={group} className="mb-6">
                   {/* Group header with industrial styling */}
-                  <div className="flex items-center gap-2 mb-3 sticky top-0 bg-slate-800/90 backdrop-blur-sm py-2 z-10">
+                  <div className="flex items-center gap-2 mb-3 sticky top-0 bg-[var(--mm-bg-panel)] backdrop-blur-sm py-2 z-10">
                     <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600 to-transparent"></div>
-                    <div className="px-3 py-1 bg-slate-700/50 rounded-full border border-slate-600/50">
-                      <span className="text-xs font-bold text-slate-300 font-['Orbitron'] tracking-wide">
+                    <div className="px-3 py-1 bg-[var(--mm-bg-surface)] rounded-full border border-[var(--mm-border)]">
+                      <span className="text-xs font-bold text-[var(--mm-text-primary)] font-['Orbitron'] tracking-wide">
                         {group.toUpperCase()}
                       </span>
-                      <span className="ml-2 text-xs text-slate-500 font-['Inter']">
+                      <span className="ml-2 text-xs text-[var(--mm-text-tertiary)] font-['Inter']">
                         {items.length}
                       </span>
                     </div>
@@ -286,18 +286,18 @@ const LeftPanel: React.FC = () => {
                             key={module.id}
                             draggable
                             onDragStart={(e) => handleDragStart(e, module)}
-                            className={`group p-3 border border-slate-600/30 rounded-lg cursor-grab transition-all duration-200 bg-gradient-to-br from-slate-800/50 to-slate-700/30 hover:border-${cardColor}-400/50 hover:shadow-lg hover:shadow-${cardColor}-500/10 hover:bg-gradient-to-br hover:from-${cardColor}-900/20 hover:to-slate-700/50`}
+                            className={`group p-3 border border-[var(--mm-border-subtle)] rounded-lg cursor-grab transition-all duration-200 bg-gradient-to-br from-slate-800/50 to-slate-700/30 hover:border-${cardColor}-400/50 hover:shadow-lg hover:shadow-${cardColor}-500/10 hover:bg-gradient-to-br hover:from-${cardColor}-900/20 hover:to-slate-700/50`}
                           >
                             <div className={`w-10 h-10 rounded-lg bg-gradient-to-br from-${cardColor}-500/20 to-${cardColor}-600/10 border border-${cardColor}-500/30 flex items-center justify-center mb-2 mx-auto group-hover:shadow-lg group-hover:shadow-${cardColor}-500/20`}>
                               <Icon size={18} className={`text-${cardColor}-400 group-hover:text-${cardColor}-300`} />
                             </div>
                             <div className="text-center">
-                              <div className="text-xs font-medium text-slate-200 group-hover:text-white font-['Inter'] leading-tight">
+                              <div className="text-xs font-medium text-[var(--mm-text-primary)] group-hover:text-white font-['Inter'] leading-tight">
                                 {module.name}
                               </div>
                               <div className="flex justify-center mt-1 gap-1">
                                 {getModuleTags(module).map(tag => (
-                                  <span key={tag} className="px-1.5 py-0.5 bg-slate-700/50 text-slate-400 rounded text-xs font-['Inter']">
+                                  <span key={tag} className="px-1.5 py-0.5 bg-[var(--mm-bg-surface)] text-[var(--mm-text-secondary)] rounded text-xs font-['Inter']">
                                     {tag}
                                   </span>
                                 ))}
@@ -325,18 +325,18 @@ const LeftPanel: React.FC = () => {
                               <Icon size={14} className={`text-${cardColor}-400 group-hover:text-${cardColor}-300`} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-slate-200 group-hover:text-white font-['Inter'] truncate">
+                              <div className="text-sm font-medium text-[var(--mm-text-primary)] group-hover:text-white font-['Inter'] truncate">
                                 {module.name}
                               </div>
                               <div className="flex gap-1 mt-0.5">
                                 {getModuleTags(module).slice(0, 2).map(tag => (
-                                  <span key={tag} className="px-1 py-0.5 bg-slate-700/30 text-slate-500 rounded text-xs font-['Inter'] leading-none">
+                                  <span key={tag} className="px-1 py-0.5 bg-[var(--mm-bg-surface)] text-[var(--mm-text-tertiary)] rounded text-xs font-['Inter'] leading-none">
                                     {tag}
                                   </span>
                                 ))}
                               </div>
                             </div>
-                            <GripVertical size={12} className="text-slate-500 flex-shrink-0 group-hover:text-slate-400" />
+                            <GripVertical size={12} className="text-[var(--mm-text-tertiary)] flex-shrink-0 group-hover:text-[var(--mm-text-secondary)]" />
                           </div>
                         );
                       })}
@@ -347,11 +347,11 @@ const LeftPanel: React.FC = () => {
               
               {modules.length === 0 && (
                 <div className="text-center py-12">
-                  <div className="w-16 h-16 rounded-full bg-slate-700/50 border border-slate-600/50 flex items-center justify-center mx-auto mb-4">
-                    <Search size={24} className="text-slate-400" />
+                  <div className="w-16 h-16 rounded-full bg-[var(--mm-bg-surface)] border border-[var(--mm-border)] flex items-center justify-center mx-auto mb-4">
+                    <Search size={24} className="text-[var(--mm-text-secondary)]" />
                   </div>
-                  <div className="text-slate-400 font-['Inter'] text-sm">No modules found</div>
-                  <div className="text-slate-500 font-['Inter'] text-xs mt-1">Try adjusting your search query</div>
+                  <div className="text-[var(--mm-text-secondary)] font-['Inter'] text-sm">No modules found</div>
+                  <div className="text-[var(--mm-text-tertiary)] font-['Inter'] text-xs mt-1">Try adjusting your search query</div>
                 </div>
               )}
             </div>
