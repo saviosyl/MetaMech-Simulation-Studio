@@ -1,5 +1,5 @@
 import React, { Suspense, useRef, useCallback, useEffect } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
 import { 
   OrbitControls, 
   Grid, 
@@ -12,6 +12,32 @@ import {
 } from '@react-three/drei';
 // EffectComposer removed — ToneMapping+SMAA can cause blank screens on some devices
 import * as THREE from 'three';
+
+// Module-level camera ref for drop raycast (accessible outside Canvas)
+let _threeCamera: THREE.Camera | null = null;
+let _canvasSize: { width: number; height: number } = { width: 1, height: 1 };
+
+/** Tiny component inside Canvas that captures the camera */
+const CameraCapture: React.FC = () => {
+  const { camera, size } = useThree();
+  _threeCamera = camera;
+  _canvasSize = size;
+  return null;
+};
+
+/** Raycast from screen coordinates to ground plane (y=0) */
+function raycastToGround(clientX: number, clientY: number, canvasRect: DOMRect): [number, number, number] | null {
+  if (!_threeCamera) return null;
+  const ndcX = ((clientX - canvasRect.left) / canvasRect.width) * 2 - 1;
+  const ndcY = -((clientY - canvasRect.top) / canvasRect.height) * 2 + 1;
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), _threeCamera);
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // y=0 plane
+  const intersection = new THREE.Vector3();
+  const hit = raycaster.ray.intersectPlane(groundPlane, intersection);
+  if (!hit) return null;
+  return [intersection.x, 0, intersection.z];
+}
 import { useEditorStore, getConnectionPorts } from '../../store/editorStore';
 import ProcessNodeComponent from '../3d/ProcessNodeComponent';
 import EnvironmentAssetComponent from '../3d/EnvironmentAssetComponent';
@@ -439,19 +465,15 @@ const Viewport: React.FC = () => {
       const data = JSON.parse(event.dataTransfer.getData('application/json'));
       
       if (data.type === 'module') {
-        // Raycast from mouse to ground plane (y=0)
-        const rect = (event.target as HTMLElement).getBoundingClientRect();
-        const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-        // Use a simple ground plane intersection
-        // Camera is at roughly [10,10,10] looking at origin
-        // For a proper solution we'd need the Three.js camera, but we can approximate
-        // by placing at a reasonable position based on normalized coords
-        const position: [number, number, number] = [
-          x * 8,
+        // Proper raycast from mouse to ground plane (y=0) using Three.js camera
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+        const rayHit = raycastToGround(event.clientX, event.clientY, rect);
+        
+        // Fallback to simple approximation if camera not ready
+        const position: [number, number, number] = rayHit || [
+          (((event.clientX - rect.left) / rect.width) * 2 - 1) * 8,
           0,
-          -y * 8,
+          -(((event.clientY - rect.top) / rect.height) * 2 + 1) * 8,
         ];
         
         switch (data.category) {
@@ -510,6 +532,7 @@ const Viewport: React.FC = () => {
           alpha: true,
         }}
       >
+        <CameraCapture />
         <Suspense fallback={null}>
           <SceneContent orbitRef={orbitRef} />
         </Suspense>

@@ -227,7 +227,7 @@ const ValidationPanel: React.FC = () => {
           <div className="px-3 py-2 border-b border-slate-700 flex items-center gap-2">
             <Zap size={14} className="text-cyan-400" />
             <span className="text-xs font-bold text-slate-200 font-['Orbitron']">LAYOUT VALIDATION</span>
-            <span className="text-xs text-slate-500 ml-auto font-['Inter']">{issues.length} issue{issues.length !== 1 ? 's' : ''}</span>
+            <span className="text-xs text-slate-500 ml-auto font-['Inter']">{hasIssues ? `${errorCount + warnCount} issue${(errorCount + warnCount) !== 1 ? 's' : ''}` : 'No issues'}</span>
           </div>
           <div className="max-h-64 overflow-y-auto">
             {issues.map(issue => {

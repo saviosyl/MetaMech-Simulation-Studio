@@ -8,8 +8,7 @@ import LeftPanel from '../components/editor/LeftPanel';
 import RightPanel from '../components/editor/RightPanel';
 import Viewport from '../components/editor/Viewport';
 import ContextMenu from '../components/editor/ContextMenu';
-import StatsPanel from '../components/editor/StatsPanel';
-import ValidationPanel from '../components/editor/ValidationPanel';
+import BottomPanel from '../components/editor/BottomPanel';
 import ShortcutsPanel from '../components/editor/ShortcutsPanel';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -219,8 +218,7 @@ const EditorPage: React.FC = () => {
           onContextMenu={handleContextMenu}
         >
           <Viewport />
-          <StatsPanel />
-          <ValidationPanel />
+          <BottomPanel />
         </div>
         <div className="flex-shrink-0">
           <RightPanel />
