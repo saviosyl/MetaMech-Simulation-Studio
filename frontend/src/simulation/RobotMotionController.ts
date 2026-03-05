@@ -1,9 +1,10 @@
 /**
  * Robot Motion Controller — MetaMech Simulation Studio
  * 
- * Robust pick-and-place state machine.
- * Drives TCP position and joint hints for 3D animation.
+ * State machine for pick-and-place with IK-driven joint solving.
+ * Uses approach→pick→retract→move→approach→place→retract→return cycle.
  */
+import { solveIK, getDimensions, sCurveEase, JointAngles, RobotDimensions } from './RobotIK';
 
 export type RobotPhase =
   | 'idle'
@@ -18,21 +19,18 @@ export type RobotPhase =
 
 export interface RobotState {
   phase: RobotPhase;
-  phaseProgress: number;      // 0→1 within current phase
+  phaseProgress: number;
   phaseStartTime: number;
   cycleCount: number;
   heldProductId: string | null;
   pickPosition: [number, number, number];
   placePosition: [number, number, number];
   toolCenterPoint: [number, number, number];
-  // Joint angles for 3D model (radians)
-  j1: number; // base rotation
-  j2: number; // shoulder
-  j3: number; // elbow
-  j4: number; // wrist pitch
-  j5: number; // wrist yaw
-  j6: number; // wrist roll
+  // IK-solved joint angles (radians)
+  j1: number; j2: number; j3: number;
+  j4: number; j5: number; j6: number;
   gripperOpen: boolean;
+  dims: RobotDimensions;
 }
 
 export interface RobotConfig {
@@ -47,14 +45,14 @@ export interface RobotConfig {
 // Phase durations as fractions of total cycle
 const PHASE_FRAC: Record<RobotPhase, number> = {
   'idle': 0,
-  'approach-pick': 0.15,
+  'approach-pick': 0.14,
   'pick': 0.06,
   'retract-pick': 0.10,
-  'move-to-place': 0.22,
+  'move-to-place': 0.24,
   'approach-place': 0.12,
   'place': 0.06,
   'retract-place': 0.10,
-  'return': 0.19,
+  'return': 0.18,
 };
 
 const PHASE_ORDER: RobotPhase[] = [
@@ -62,7 +60,8 @@ const PHASE_ORDER: RobotPhase[] = [
   'move-to-place', 'approach-place', 'place', 'retract-place', 'return',
 ];
 
-export function createRobotState(config: RobotConfig): RobotState {
+export function createRobotState(config: RobotConfig, reachMm?: number, baseHeightMm?: number): RobotState {
+  const dims = getDimensions(reachMm || 2000, baseHeightMm || 500);
   return {
     phase: 'idle',
     phaseProgress: 0,
@@ -72,23 +71,19 @@ export function createRobotState(config: RobotConfig): RobotState {
     pickPosition: [...config.homePosition],
     placePosition: [...config.homePosition],
     toolCenterPoint: [...config.homePosition],
-    j1: 0, j2: 0.2, j3: -0.3, j4: 0, j5: 0, j6: 0,
+    j1: 0, j2: 0.4, j3: -0.8, j4: 0, j5: 0, j6: 0,
     gripperOpen: true,
+    dims,
   };
 }
 
-/** Smooth ease in-out */
-function ease(t: number): number {
-  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-}
-
 function lerp3(a: [number,number,number], b: [number,number,number], t: number): [number,number,number] {
-  const s = ease(t);
-  return [a[0]+(b[0]-a[0])*s, a[1]+(b[1]-a[1])*s, a[2]+(b[2]-a[2])*s];
+  return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
 }
 
 /**
- * Tick the robot. Returns product ID when placed (handoff to next node).
+ * Tick the robot state machine.
+ * Returns product ID when placed (handoff signal).
  */
 export function tickRobot(
   state: RobotState,
@@ -98,103 +93,100 @@ export function tickRobot(
 ): string | null {
   const totalCycle = config.cycleTime / config.speedFactor;
   let placedId: string | null = null;
+  const base = config.homePosition;
 
-  // ─── IDLE: wait for product ───
+  // ─── IDLE ───
   if (state.phase === 'idle') {
-    state.toolCenterPoint = [...config.homePosition];
+    state.toolCenterPoint = [...base];
     state.gripperOpen = true;
-    updateJoints(state, config, 'home');
+    // Solve IK for home position
+    const ik = solveIK(base, base, state.dims);
+    applyIK(state, ik);
 
     if (availableProductId) {
-      // Start cycle
       state.phase = 'approach-pick';
       state.phaseStartTime = simTime;
       state.phaseProgress = 0;
       state.heldProductId = null;
       (state as any)._targetProductId = availableProductId;
-      console.log(`[ROBOT-CYCLE] Starting pick cycle for ${availableProductId.slice(0,8)}`);
     }
     return null;
   }
 
-  // ─── Phase timing ───
+  // ─── Phase timing with S-curve easing ───
   const dur = PHASE_FRAC[state.phase] * totalCycle;
   const elapsed = simTime - state.phaseStartTime;
-  state.phaseProgress = dur > 0 ? Math.min(1, elapsed / dur) : 1;
+  const rawT = dur > 0 ? Math.min(1, elapsed / dur) : 1;
+  state.phaseProgress = rawT;
+  const t = sCurveEase(rawT); // smooth industrial motion profile
 
-  // ─── Compute TCP + joints for current phase ───
+  // ─── Compute waypoints ───
   const pick = state.pickPosition;
   const place = state.placePosition;
-  const home = config.homePosition;
   const aH = config.approachHeight;
-  const t = state.phaseProgress;
+  const pickApproach: [number,number,number] = [pick[0], pick[1] + aH, pick[2]];
+  const placeApproach: [number,number,number] = [place[0], place[1] + aH, place[2]];
 
-  const pickAbove: [number,number,number] = [pick[0], pick[1] + aH, pick[2]];
-  const placeAbove: [number,number,number] = [place[0], place[1] + aH, place[2]];
-
+  // ─── TCP interpolation per phase ───
+  let tcp: [number,number,number];
   switch (state.phase) {
     case 'approach-pick':
-      state.toolCenterPoint = lerp3(home, pickAbove, t);
+      tcp = lerp3(base, pickApproach, t);
       state.gripperOpen = true;
-      updateJoints(state, config, 'approach-pick');
       break;
     case 'pick':
-      state.toolCenterPoint = lerp3(pickAbove, pick, t);
-      state.gripperOpen = t < 0.7; // close gripper at 70%
-      updateJoints(state, config, 'pick');
+      tcp = lerp3(pickApproach, pick, t);
+      state.gripperOpen = t < 0.65; // gripper closes at 65%
       break;
     case 'retract-pick':
-      state.toolCenterPoint = lerp3(pick, pickAbove, t);
+      tcp = lerp3(pick, pickApproach, t);
       state.gripperOpen = false;
-      updateJoints(state, config, 'retract-pick');
       break;
     case 'move-to-place':
-      state.toolCenterPoint = lerp3(pickAbove, placeAbove, t);
+      tcp = lerp3(pickApproach, placeApproach, t);
       state.gripperOpen = false;
-      updateJoints(state, config, 'move-to-place');
       break;
     case 'approach-place':
-      state.toolCenterPoint = lerp3(placeAbove, place, t);
+      tcp = lerp3(placeApproach, place, t);
       state.gripperOpen = false;
-      updateJoints(state, config, 'approach-place');
       break;
     case 'place':
-      state.toolCenterPoint = [...place];
-      state.gripperOpen = t > 0.5; // open at 50%
-      updateJoints(state, config, 'place');
+      tcp = [...place];
+      state.gripperOpen = t > 0.5; // gripper opens at 50%
       break;
     case 'retract-place':
-      state.toolCenterPoint = lerp3(place, placeAbove, t);
+      tcp = lerp3(place, placeApproach, t);
       state.gripperOpen = true;
-      updateJoints(state, config, 'retract-place');
       break;
     case 'return':
-      state.toolCenterPoint = lerp3(placeAbove, home, t);
+      tcp = lerp3(placeApproach, base, t);
       state.gripperOpen = true;
-      updateJoints(state, config, 'return');
       break;
+    default:
+      tcp = [...base];
   }
 
-  // ─── Phase transition ───
-  if (state.phaseProgress >= 1) {
-    // Actions at phase completion
+  state.toolCenterPoint = tcp;
+
+  // ─── Solve IK for current TCP ───
+  const ik = solveIK(tcp, base, state.dims);
+  applyIK(state, ik);
+
+  // ─── Phase transitions ───
+  if (rawT >= 1) {
     if (state.phase === 'pick') {
       state.heldProductId = (state as any)._targetProductId || availableProductId;
       (state as any)._targetProductId = null;
-      console.log(`[ROBOT-GRIP] Gripped product ${state.heldProductId?.slice(0,8)}`);
     } else if (state.phase === 'place') {
       placedId = state.heldProductId;
       state.heldProductId = null;
-      console.log(`[ROBOT-RELEASE] Released product ${placedId?.slice(0,8)}`);
     } else if (state.phase === 'return') {
       state.cycleCount++;
       state.phase = 'idle';
       state.phaseProgress = 0;
-      console.log(`[ROBOT-CYCLE] Cycle ${state.cycleCount} complete`);
       return placedId;
     }
 
-    // Advance to next phase
     const idx = PHASE_ORDER.indexOf(state.phase);
     if (idx >= 0 && idx + 1 < PHASE_ORDER.length) {
       state.phase = PHASE_ORDER[idx + 1];
@@ -206,51 +198,17 @@ export function tickRobot(
   return placedId;
 }
 
-/**
- * Compute approximate joint angles from TCP position (simplified IK).
- * This gives the 3D model believable joint motion.
- */
-function updateJoints(state: RobotState, config: RobotConfig, hint: string) {
-  const tcp = state.toolCenterPoint;
-  const base = config.homePosition;
-  
-  // Relative position from robot base
-  const dx = tcp[0] - base[0];
-  const dy = tcp[1] - base[1];
-  const dz = tcp[2] - base[2];
-  
-  // J1: base rotation — atan2 toward target
-  state.j1 = Math.atan2(dx, dz);
-  
-  // Horizontal distance from base
-  const hDist = Math.sqrt(dx * dx + dz * dz);
-  
-  // J2: shoulder — lifts arm based on height + reach
-  state.j2 = Math.atan2(Math.max(0, dy + 0.3), Math.max(0.1, hDist)) * 0.8 + 0.15;
-  
-  // J3: elbow — bends more when reaching far or low
-  const reach = Math.sqrt(hDist * hDist + dy * dy);
-  state.j3 = -(0.3 + reach * 0.4);
-  
-  // J4: wrist pitch — keeps tool pointing down
-  state.j4 = -(state.j2 + state.j3) * 0.3;
-  
-  // J5: slight wrist adjustment during pick/place
-  state.j5 = hint.includes('pick') ? -0.1 : hint.includes('place') ? 0.1 : 0;
-  
-  // J6: gripper rotation
-  state.j6 = state.gripperOpen ? 0 : 0.2;
+function applyIK(state: RobotState, ik: JointAngles) {
+  state.j1 = ik.j1;
+  state.j2 = ik.j2;
+  state.j3 = ik.j3;
+  state.j4 = ik.j4;
+  state.j5 = ik.j5;
+  state.j6 = ik.j6;
 }
 
-/**
- * Get robot joint state for 3D model rendering.
- */
-export function getRobotPoseHint(state: RobotState, config: RobotConfig): {
-  j1Angle: number;
-  j2Angle: number;
-  j3Angle: number;
-  gripOpen: boolean;
-} {
+/** Compat export */
+export function getRobotPoseHint(state: RobotState, config: RobotConfig) {
   return {
     j1Angle: state.j1,
     j2Angle: state.j2,

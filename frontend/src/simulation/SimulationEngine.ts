@@ -102,8 +102,9 @@ export class SimulationEngine {
           placeHeight: bH + pedH,
           homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
         };
-        const rState = createRobotState(config);
-        const reach = (node.parameters.reach || node.parameters.reachX || 1400) / 1000;
+        const reachMm = node.parameters.reach || node.parameters.reachX || 1400;
+        const rState = createRobotState(config, reachMm, node.parameters.baseHeight || 500);
+        const reach = reachMm / 1000;
         const pickH = (node.parameters.pickHeight || 800) / 1000;
         const placeH = (node.parameters.placeHeight || 800) / 1000;
 

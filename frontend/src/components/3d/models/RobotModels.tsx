@@ -786,200 +786,173 @@ export const Robot5AxisModel: React.FC<RobotProps> = ({ parameters, isSelected, 
 // ═══════════════════════════════════════════════════════════════
 
 export const Robot6AxisModel: React.FC<RobotProps> = ({ parameters, isSelected, nodeId }) => {
-  const j1Ref = useRef<THREE.Group>(null);
-  const j2Ref = useRef<THREE.Group>(null);
-  const j3Ref = useRef<THREE.Group>(null);
+  // Refs for each joint in the kinematic chain
+  const j1Ref = useRef<THREE.Group>(null); // Base yaw
+  const j2Ref = useRef<THREE.Group>(null); // Shoulder pitch
+  const j3Ref = useRef<THREE.Group>(null); // Elbow pitch
+  const j4Ref = useRef<THREE.Group>(null); // Wrist roll
+  const j5Ref = useRef<THREE.Group>(null); // Wrist pitch
+  const gripLRef = useRef<THREE.Mesh>(null);
+  const gripRRef = useRef<THREE.Mesh>(null);
 
   const reach = (parameters.reach || 2000) / 1000;
   const bH = (parameters.baseHeight || 500) / 1000;
   const pedH = parameters.pedestalEnabled ? (parameters.pedestalHeight || 600) / 1000 : 0;
   const em = isSelected ? new THREE.Color('#222') : new THREE.Color('#000');
 
-  const seg1 = reach * 0.38;
-  const seg2 = reach * 0.33;
-  const seg3 = reach * 0.16;
-  const baseR = 0.2;
-  const upperArmW = 0.13;
-  const upperArmD = 0.12;
-  const forearmW = 0.095;
-  const forearmD = 0.09;
+  // Link dimensions (proportional to reach)
+  const upperArmLen = reach * 0.42;
+  const forearmLen = reach * 0.38;
+  const wristLen = reach * 0.12;
+  const baseR = Math.max(0.15, reach * 0.12);
+  const armW = Math.max(0.08, reach * 0.07);
+  const foreW = Math.max(0.06, reach * 0.055);
 
   const simState = useSimulationPose(nodeId);
 
   useFrame(({ clock }) => {
-    if (simState) {
-      // Simulation-driven: read IK joint angles directly from state
-      const targetJ1 = simState.j1 || 0;
-      const targetJ2 = simState.j2 || 0.15;
-      const targetJ3 = simState.j3 || -0.25;
-      // Smooth interpolation for natural motion (higher = snappier)
-      const smooth = 0.15;
-      if (j1Ref.current) j1Ref.current.rotation.y += (targetJ1 - j1Ref.current.rotation.y) * smooth;
-      if (j2Ref.current) j2Ref.current.rotation.z += (targetJ2 - j2Ref.current.rotation.z) * smooth;
-      if (j3Ref.current) j3Ref.current.rotation.z += (targetJ3 - j3Ref.current.rotation.z) * smooth;
+    if (simState && simState.phase !== 'idle') {
+      // ─── Simulation-driven: IK joint angles from state ───
+      const sm = 0.18; // smoothing factor (higher = snappier)
+      if (j1Ref.current) j1Ref.current.rotation.y += ((simState.j1 || 0) - j1Ref.current.rotation.y) * sm;
+      if (j2Ref.current) j2Ref.current.rotation.z += ((simState.j2 || 0.3) - j2Ref.current.rotation.z) * sm;
+      if (j3Ref.current) j3Ref.current.rotation.z += ((simState.j3 || -0.6) - j3Ref.current.rotation.z) * sm;
+      if (j4Ref.current) j4Ref.current.rotation.x += ((simState.j4 || 0) - j4Ref.current.rotation.x) * sm;
+      if (j5Ref.current) j5Ref.current.rotation.z += ((simState.j5 || 0) - j5Ref.current.rotation.z) * sm;
+      // Gripper open/close
+      const gripAngle = simState.gripperOpen ? 0.15 : 0;
+      if (gripLRef.current) gripLRef.current.position.x += ((-0.02 - gripAngle) - gripLRef.current.position.x) * 0.2;
+      if (gripRRef.current) gripRRef.current.position.x += ((0.02 + gripAngle) - gripRRef.current.position.x) * 0.2;
+    } else if (simState && simState.phase === 'idle') {
+      // Idle during simulation — hold home pose with slight breathing
+      const breath = Math.sin(clock.getElapsedTime() * 1.5) * 0.02;
+      if (j1Ref.current) j1Ref.current.rotation.y *= 0.95;
+      if (j2Ref.current) j2Ref.current.rotation.z += (0.3 + breath - j2Ref.current.rotation.z) * 0.1;
+      if (j3Ref.current) j3Ref.current.rotation.z += (-0.6 - j3Ref.current.rotation.z) * 0.1;
+      if (j4Ref.current) j4Ref.current.rotation.x *= 0.95;
+      if (j5Ref.current) j5Ref.current.rotation.z += (0 - j5Ref.current.rotation.z) * 0.1;
+      if (gripLRef.current) gripLRef.current.position.x += (-0.02 - 0.15 - gripLRef.current.position.x) * 0.1;
+      if (gripRRef.current) gripRRef.current.position.x += (0.02 + 0.15 - gripRRef.current.position.x) * 0.1;
     } else {
-      // Demo idle animation — slow sweeping motion
+      // ─── Demo mode: elegant sweep animation ───
       const t = clock.getElapsedTime();
-      if (j1Ref.current) j1Ref.current.rotation.y = Math.sin(t * 0.3) * 0.85;
-      if (j2Ref.current) j2Ref.current.rotation.z = Math.sin(t * 0.45 + 0.3) * 0.4 + 0.15;
-      if (j3Ref.current) j3Ref.current.rotation.z = Math.sin(t * 0.6 + 1.0) * 0.35 - 0.25;
+      if (j1Ref.current) j1Ref.current.rotation.y = Math.sin(t * 0.4) * 0.7;
+      if (j2Ref.current) j2Ref.current.rotation.z = Math.sin(t * 0.5 + 0.5) * 0.3 + 0.35;
+      if (j3Ref.current) j3Ref.current.rotation.z = Math.sin(t * 0.65 + 1.2) * 0.25 - 0.5;
+      if (j4Ref.current) j4Ref.current.rotation.x = Math.sin(t * 0.3) * 0.2;
+      if (j5Ref.current) j5Ref.current.rotation.z = Math.sin(t * 0.8) * 0.15;
+      const gOpen = (Math.sin(t * 0.7) + 1) * 0.07;
+      if (gripLRef.current) gripLRef.current.position.x = -0.02 - gOpen;
+      if (gripRRef.current) gripRRef.current.position.x = 0.02 + gOpen;
     }
   });
 
   return (
     <group>
-      {/* Pedestal */}
-      {pedH > 0 && <Pedestal height={pedH} width={0.38} em={em} />}
+      {/* ── Pedestal ── */}
+      {pedH > 0 && <Pedestal height={pedH} width={baseR * 2} em={em} />}
 
+      {/* ── Robot assembly starts at pedestal top ── */}
       <group position={[0, pedH, 0]}>
-        {/* ── Base assembly ── */}
-        <BaseFlange radius={baseR + 0.08} height={0.03} em={em} />
 
-        {/* Base lower section — heavy cast look */}
-        <mesh position={[0, bH * 0.2 + 0.03, 0]} castShadow>
-          <cylinderGeometry args={[baseR + 0.02, baseR + 0.05, bH * 0.4, 32]} />
+        {/* ── Base plate ── */}
+        <BaseFlange radius={baseR + 0.04} height={0.03} em={em} />
+
+        {/* ── Base body (fixed) ── */}
+        <mesh position={[0, bH * 0.25 + 0.03, 0]} castShadow>
+          <cylinderGeometry args={[baseR, baseR + 0.03, bH * 0.5, 24]} />
           <meshStandardMaterial {...matBodyOrange} emissive={em} />
         </mesh>
-        {/* Base mechanical band */}
-        <mesh position={[0, bH * 0.1 + 0.03, 0]}>
-          <cylinderGeometry args={[baseR + 0.052, baseR + 0.052, bH * 0.04, 32]} />
+        {/* Base ring detail */}
+        <mesh position={[0, bH * 0.12 + 0.03, 0]}>
+          <cylinderGeometry args={[baseR + 0.035, baseR + 0.035, bH * 0.04, 24]} />
           <meshStandardMaterial {...matMechanical} emissive={em} />
         </mesh>
-        {/* Base upper section — tapered */}
-        <mesh position={[0, bH * 0.6 + 0.03, 0]} castShadow>
-          <cylinderGeometry args={[baseR * 0.9, baseR + 0.02, bH * 0.4, 32]} />
-          <meshStandardMaterial {...matBodyOrange} emissive={em} />
-        </mesh>
-        {/* Top cap */}
-        <mesh position={[0, bH * 0.82 + 0.03, 0]} castShadow>
-          <cylinderGeometry args={[baseR * 0.85, baseR * 0.9, bH * 0.16, 32]} />
-          <meshStandardMaterial {...matBodyOrange} emissive={em} />
-        </mesh>
-        {/* Top bearing ring */}
-        <mesh position={[0, bH + 0.03, 0]}>
-          <cylinderGeometry args={[baseR * 0.87, baseR * 0.85, 0.015, 32]} />
-          <meshStandardMaterial {...matMechanical} emissive={em} />
-        </mesh>
-        {/* Brand badge area */}
-        <mesh position={[0, bH * 0.45 + 0.03, baseR + 0.02 + 0.002]} rotation={[0, 0, 0]}>
-          <boxGeometry args={[baseR * 0.6, bH * 0.18, 0.003]} />
-          <meshStandardMaterial color={0x111111} metalness={0.5} roughness={0.5} />
-        </mesh>
 
-        {/* ── J1: Base rotation / turret ── */}
-        <group ref={j1Ref} position={[0, bH + 0.035, 0]}>
-          {/* Shoulder housing block — industrial wedge */}
-          <mesh position={[0, 0.07, 0]} castShadow>
-            <boxGeometry args={[baseR * 1.6, 0.2, baseR * 1.2]} />
+        {/* ═══ J1: Base Yaw — rotates everything above ═══ */}
+        <group ref={j1Ref} position={[0, bH * 0.5 + 0.03, 0]}>
+          {/* Shoulder turret */}
+          <mesh position={[0, bH * 0.15, 0]} castShadow>
+            <cylinderGeometry args={[baseR * 0.85, baseR, bH * 0.3, 24]} />
             <meshStandardMaterial {...matBodyOrange} emissive={em} />
           </mesh>
-          {/* Shoulder top plate */}
-          <mesh position={[0, 0.17 + 0.005, 0]}>
-            <boxGeometry args={[baseR * 1.6 + 0.005, 0.01, baseR * 1.2 + 0.005]} />
+          {/* Shoulder joint cover */}
+          <mesh position={[0, bH * 0.32, 0]} castShadow>
+            <sphereGeometry args={[baseR * 0.7, 16, 12]} />
             <meshStandardMaterial {...matMechanical} emissive={em} />
           </mesh>
-          {/* Shoulder ear covers */}
-          {[-1, 1].map(s => (
-            <mesh key={`ear-${s}`} position={[s * (baseR * 0.8 + 0.01), 0.07, 0]} castShadow>
-              <boxGeometry args={[0.01, 0.16, baseR * 0.95]} />
+
+          {/* ═══ J2: Shoulder Pitch — tilts upper arm ═══ */}
+          <group ref={j2Ref} position={[0, bH * 0.35, 0]}>
+            {/* Upper arm */}
+            <mesh position={[0, upperArmLen / 2, 0]} castShadow>
+              <boxGeometry args={[armW, upperArmLen, armW * 0.9]} />
+              <meshStandardMaterial {...matBodyOrange} emissive={em} />
+            </mesh>
+            {/* Upper arm detail strips */}
+            <mesh position={[armW / 2 + 0.002, upperArmLen / 2, 0]}>
+              <boxGeometry args={[0.004, upperArmLen * 0.8, armW * 0.5]} />
               <meshStandardMaterial {...matMechanical} emissive={em} />
             </mesh>
-          ))}
+            {/* Elbow joint cover */}
+            <mesh position={[0, upperArmLen, 0]} castShadow>
+              <sphereGeometry args={[armW * 0.6, 12, 10]} />
+              <meshStandardMaterial {...matMechanical} emissive={em} />
+            </mesh>
 
-          {/* ── J2: Shoulder pivot ── */}
-          <group ref={j2Ref} position={[0, 0.17, 0]}>
-            {/* J2 housing */}
-            <JointHousing radius={0.075} width={baseR * 1.3} em={em} axis="z" />
-
-            {/* ── Upper arm (S-arm) ── */}
-            <ArmLink width={upperArmW} depth={upperArmD} length={seg1} bodyMat={matBodyOrange} em={em} cableChannel />
-            {/* Upper arm reinforcement ribs */}
-            {[0.25, 0.5, 0.75].map((frac, i) => (
-              <mesh key={`rib-${i}`} position={[0, seg1 * frac, upperArmD / 2 + 0.002]}>
-                <boxGeometry args={[upperArmW + 0.005, 0.008, 0.004]} />
-                <meshStandardMaterial {...matMechanical} />
+            {/* ═══ J3: Elbow Pitch — tilts forearm ═══ */}
+            <group ref={j3Ref} position={[0, upperArmLen, 0]}>
+              {/* Forearm */}
+              <mesh position={[0, forearmLen / 2, 0]} castShadow>
+                <boxGeometry args={[foreW, forearmLen, foreW * 0.85]} />
+                <meshStandardMaterial {...matBodyOrange} emissive={em} />
               </mesh>
-            ))}
+              {/* Forearm cable conduit */}
+              <mesh position={[foreW / 2 + 0.005, forearmLen / 2, 0]}>
+                <cylinderGeometry args={[0.008, 0.008, forearmLen * 0.7, 6]} />
+                <meshStandardMaterial color="#222" metalness={0.3} roughness={0.8} />
+              </mesh>
+              {/* Wrist joint cover */}
+              <mesh position={[0, forearmLen, 0]} castShadow>
+                <cylinderGeometry args={[foreW * 0.45, foreW * 0.45, foreW * 0.5, 12]} />
+                <meshStandardMaterial {...matMechanical} emissive={em} />
+              </mesh>
 
-            {/* ── J3: Elbow ── */}
-            <group ref={j3Ref} position={[0, seg1, 0]}>
-              <JointHousing radius={0.065} width={upperArmD * 1.1} em={em} axis="z" />
+              {/* ═══ J4: Wrist Roll ═══ */}
+              <group ref={j4Ref} position={[0, forearmLen, 0]}>
 
-              {/* ── Forearm ── */}
-              <ArmLink width={forearmW} depth={forearmD} length={seg2} bodyMat={matBodyOrange} em={em} cableChannel />
-
-              {/* ── Wrist cluster (J4/J5/J6) ── */}
-              <group position={[0, seg2, 0]}>
-                {/* J4: Wrist roll housing */}
-                <mesh castShadow>
-                  <cylinderGeometry args={[0.045, 0.048, 0.06, 20]} />
-                  <meshStandardMaterial {...matMechanical} emissive={em} />
-                </mesh>
-                {/* J4 flange ring */}
-                <mesh position={[0, 0.033, 0]}>
-                  <cylinderGeometry args={[0.05, 0.05, 0.006, 20]} />
-                  <meshStandardMaterial {...matMechanical} emissive={em} />
-                </mesh>
-
-                {/* J5: Wrist pitch */}
-                <group position={[0, 0.05, 0]}>
-                  <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-                    <cylinderGeometry args={[0.038, 0.038, 0.05, 16]} />
+                {/* ═══ J5: Wrist Pitch ═══ */}
+                <group ref={j5Ref}>
+                  {/* Wrist body */}
+                  <mesh position={[0, wristLen * 0.4, 0]} castShadow>
+                    <cylinderGeometry args={[foreW * 0.35, foreW * 0.4, wristLen * 0.6, 12]} />
                     <meshStandardMaterial {...matMechanical} emissive={em} />
                   </mesh>
-                  {/* J5 side caps */}
-                  {[-1, 1].map(s => (
-                    <mesh key={`j5c-${s}`} position={[0, 0, s * 0.028]} rotation={[Math.PI / 2, 0, 0]}>
-                      <cylinderGeometry args={[0.04, 0.04, 0.004, 16]} />
+
+                  {/* ═══ Tool Flange + Gripper ═══ */}
+                  <group position={[0, wristLen, 0]}>
+                    {/* Tool flange disc */}
+                    <mesh castShadow>
+                      <cylinderGeometry args={[foreW * 0.32, foreW * 0.32, 0.015, 12]} />
+                      <meshStandardMaterial {...matBasePlate} emissive={em} />
+                    </mesh>
+
+                    {/* Gripper body */}
+                    <mesh position={[0, -0.03, 0]} castShadow>
+                      <boxGeometry args={[foreW * 0.5, 0.04, foreW * 0.4]} />
                       <meshStandardMaterial {...matMechanical} emissive={em} />
                     </mesh>
-                  ))}
 
-                  {/* J6: Tool rotation + wrist extension */}
-                  <group position={[0, 0.02, 0]}>
-                    <mesh position={[0, seg3 / 2, 0]} castShadow>
-                      <boxGeometry args={[forearmW * 0.65, seg3, forearmD * 0.65]} />
-                      <meshStandardMaterial {...matBodyOrange} emissive={em} />
+                    {/* Gripper finger LEFT */}
+                    <mesh ref={gripLRef} position={[-0.02 - 0.15, -0.06, 0]} castShadow>
+                      <boxGeometry args={[0.008, 0.05, foreW * 0.3]} />
+                      <meshStandardMaterial color="#555" metalness={0.7} roughness={0.3} emissive={em} />
                     </mesh>
-                    {/* Wrist cover panels */}
-                    {[-1, 1].map(s => (
-                      <mesh key={`wp-${s}`} position={[s * (forearmW * 0.65 / 2 + 0.002), seg3 / 2, 0]}>
-                        <boxGeometry args={[0.003, seg3 * 0.8, forearmD * 0.5]} />
-                        <meshStandardMaterial {...matMechanical} />
-                      </mesh>
-                    ))}
-
-                    {/* Tool flange */}
-                    <ToolFlange y={seg3 + 0.008} radius={0.04} em={em} />
-
-                    {/* Default end effector — mechanical gripper */}
-                    <group position={[0, seg3 + 0.025, 0]}>
-                      {/* Gripper body */}
-                      <mesh castShadow>
-                        <boxGeometry args={[0.09, 0.03, 0.045]} />
-                        <meshStandardMaterial {...matFlange} emissive={em} />
-                      </mesh>
-                      {/* Actuator housing */}
-                      <mesh position={[0, 0, -0.028]}>
-                        <boxGeometry args={[0.05, 0.025, 0.012]} />
-                        <meshStandardMaterial {...matMechanical} emissive={em} />
-                      </mesh>
-                      {/* Gripper fingers */}
-                      {[-1, 1].map(s => (
-                        <group key={`gf-${s}`} position={[s * 0.035, 0.03, 0]}>
-                          {/* Finger base */}
-                          <mesh castShadow>
-                            <boxGeometry args={[0.015, 0.025, 0.035]} />
-                            <meshStandardMaterial {...matMechanical} emissive={em} />
-                          </mesh>
-                          {/* Finger tip */}
-                          <mesh position={[0, 0.02, 0]} castShadow>
-                            <boxGeometry args={[0.012, 0.02, 0.025]} />
-                            <meshStandardMaterial {...matAluminum} emissive={em} />
-                          </mesh>
-                        </group>
-                      ))}
-                    </group>
+                    {/* Gripper finger RIGHT */}
+                    <mesh ref={gripRRef} position={[0.02 + 0.15, -0.06, 0]} castShadow>
+                      <boxGeometry args={[0.008, 0.05, foreW * 0.3]} />
+                      <meshStandardMaterial color="#555" metalness={0.7} roughness={0.3} emissive={em} />
+                    </mesh>
                   </group>
                 </group>
               </group>
@@ -987,12 +960,6 @@ export const Robot6AxisModel: React.FC<RobotProps> = ({ parameters, isSelected, 
           </group>
         </group>
       </group>
-
-      {/* Safety zone ring — floor indicator */}
-      <mesh position={[0, 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[reach * 0.88, reach, 48]} />
-        <primitive object={matSafetyZone} attach="material" />
-      </mesh>
     </group>
   );
 };
