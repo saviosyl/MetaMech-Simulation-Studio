@@ -44,6 +44,11 @@ export class SimulationEngine {
   private pendingSensorEvents: SensorEvent[] = [];
   /** Sensor signal registry — updated each tick. Key = sensorTag, Value = signal state */
   sensorSignals: Map<string, { active: boolean; productId: string | null; productColor: string | null; productType: string | null; activeSince: number }> = new Map();
+  
+  // Stopper state (by stopper node id) — avoids node parameter reference issues
+  private stopperState: Map<string, { latched: boolean; lastReleaseTime: number; cooldownSec: number }> = new Map();
+  // Sensor dwell state (by sensor node id)
+  private sensorDwellFired: Map<string, boolean> = new Map();
   simTime: number = 0;
   nodes: ProcessNode[] = [];
   edges: ProcessEdge[] = [];
@@ -165,6 +170,8 @@ export class SimulationEngine {
     this.palletStates.clear();
     this.sensorStates.clear();
     this.sensorSignals.clear();
+    this.stopperState.clear();
+    this.sensorDwellFired.clear();
     this.stopperStates.clear();
     this.pusherStates.clear();
     this.ruleEngineState = createRuleEngineState();
@@ -494,23 +501,29 @@ export class SimulationEngine {
       const triggerTag = n.parameters.triggerSensorTag || '';
       
       if (mode === 'sensor-triggered' && triggerTag) {
-        const lastRelease = (n.parameters as any)._lastReleaseTime || 0;
-        const releaseCooldown = (n.parameters as any).releaseDelay || 2;
-        if (lastRelease > 0 && (this.simTime - lastRelease) < releaseCooldown) {
-          (n.parameters as any)._latched = false;
-          return false;
+        // Get/init stopper state from engine map (NOT node params)
+        let ss = this.stopperState.get(n.id);
+        if (!ss) {
+          ss = { latched: false, lastReleaseTime: 0, cooldownSec: n.parameters.releaseDelay || 3 };
+          this.stopperState.set(n.id, ss);
         }
         
+        // Cooldown: barrier stays OPEN for cooldownSec after release
+        if (ss.lastReleaseTime > 0 && (this.simTime - ss.lastReleaseTime) < ss.cooldownSec) {
+          ss.latched = false;
+          return false; // barrier OPEN during cooldown
+        }
+        
+        // Latch: sensor triggers → stopper latches closed
         const signal = this.sensorSignals.get(triggerTag);
         const sensorActive = signal?.active ?? false;
-        const isLatched = (n.parameters as any)._latched ?? false;
         
-        if (sensorActive && !isLatched) {
-          (n.parameters as any)._latched = true;
-          console.log(`[LATCH] Stopper ${n.parameters?.stopperTag} LATCHED by ${triggerTag}`);
+        if (sensorActive && !ss.latched) {
+          ss.latched = true;
+          console.log(`[LATCH] ${n.parameters?.stopperTag} LATCHED by ${triggerTag}`);
         }
         
-        return (n.parameters as any)._latched ?? false;
+        return ss.latched;
       }
       
       return n.parameters?.engaged ?? true;
@@ -1152,10 +1165,12 @@ export class SimulationEngine {
     const isMounted = !!node.parameters?.parentConveyorId;
     product.stoppedBy = null;
     product.blockedSince = null;
-    // Stamp release time so conveyor barrier stays open during cooldown
-    (node.parameters as any)._lastReleaseTime = this.simTime;
-    // Clear latch — stopper opens after release
-    (node.parameters as any)._latched = false;
+    // Update stopper state in engine map — clear latch + start cooldown
+    const ss = this.stopperState.get(node.id);
+    if (ss) {
+      ss.latched = false;
+      ss.lastReleaseTime = this.simTime;
+    }
     this.addFlowEvent(stats, 'released', `Product ${product.id.slice(0, 8)} released`);
 
     if (isMounted) {
@@ -1439,11 +1454,11 @@ export class SimulationEngine {
       const signal = this.sensorSignals.get(sensorTag);
       if (signal?.active && signal.activeSince > 0) {
         const dwellSec = this.simTime - signal.activeSince;
-        const alreadyFired = (node.parameters as any)._dwellFired ?? false;
+        const alreadyFired = this.sensorDwellFired.get(node.id) ?? false;
         
         if (dwellSec >= dwellThreshold && !alreadyFired) {
           // Fire dwell event ONCE
-          (node.parameters as any)._dwellFired = true;
+          this.sensorDwellFired.set(node.id, true);
           console.log(`[DWELL-FIRE] ${sensorTag} dwell=${dwellSec.toFixed(1)}s → EVENT: ${onDwellEvent}`);
           
           if (onDwellEvent === 'release-stopper' || onDwellEvent === 'stop-source-and-release') {
@@ -1455,9 +1470,9 @@ export class SimulationEngine {
                 if (nStats) {
                   for (const p of stopped) this.releaseProduct(p, n, nStats);
                 }
-                // Clear the latch and set cooldown
-                (n.parameters as any)._latched = false;
-                (n.parameters as any)._lastReleaseTime = this.simTime;
+                // Clear the latch and set cooldown via engine state
+                const sss = this.stopperState.get(n.id);
+                if (sss) { sss.latched = false; sss.lastReleaseTime = this.simTime; }
                 console.log(`[DWELL-FIRE] Released ${stopped.length} from ${n.parameters?.stopperTag}, latch=false, cooldown started`);
               }
             }
@@ -1465,9 +1480,9 @@ export class SimulationEngine {
         }
       } else {
         // Sensor went FALSE — reset dwell fired flag for next cycle
-        if ((node.parameters as any)._dwellFired) {
+        if (this.sensorDwellFired.get(node.id)) {
           console.log(`[DWELL-RESET] ${sensorTag} sensor cleared, ready for next cycle`);
-          (node.parameters as any)._dwellFired = false;
+          this.sensorDwellFired.set(node.id, false);
         }
       }
     }
