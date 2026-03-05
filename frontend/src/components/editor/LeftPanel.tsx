@@ -39,6 +39,8 @@ const LeftPanel: React.FC = () => {
 
   const tabs = [
     { id: 'process' as const, name: 'Process', icon: Factory, color: 'cyan' },
+    { id: 'fmcg' as const, name: 'FMCG', icon: Package, color: 'orange' },
+    { id: 'medical' as const, name: 'Medical', icon: Shield, color: 'emerald' },
     { id: 'robots' as const, name: 'Robots', icon: Cpu, color: 'amber' },
     { id: 'pallets' as const, name: 'Pallets', icon: SquareStack, color: 'emerald' },
     { id: 'environment' as const, name: 'Environ', icon: Building, color: 'purple' },
@@ -228,23 +230,27 @@ const LeftPanel: React.FC = () => {
           <SceneHierarchy />
         ) : (
           <>
-            {/* Category Tabs — Industrial Cards */}
-            <div className="flex gap-2 p-4 border-b border-slate-700/30 flex-shrink-0">
+            {/* Category Tabs — Scrollable Pills */}
+            <div className="flex gap-1.5 px-4 py-3 border-b border-slate-700/30 flex-shrink-0 overflow-x-auto scrollbar-none">
               {tabs.map(tab => {
                 const Icon = tab.icon;
                 const isActive = activeLibraryTab === tab.id;
+                const count = getModulesByCategory(tab.id).length;
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveLibraryTab(tab.id)}
-                    className={`flex-1 flex flex-col items-center gap-1 p-2 rounded-lg transition-all duration-200 border ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all duration-200 border whitespace-nowrap flex-shrink-0 ${
                       isActive
-                        ? `bg-${tab.color}-500/10 border-${tab.color}-400/30 text-${tab.color}-400 ring-1 ring-${tab.color}-400/20 shadow-lg shadow-${tab.color}-500/5`
+                        ? 'bg-cyan-500/15 border-cyan-400/40 text-cyan-400 shadow-lg shadow-cyan-500/10'
                         : 'border-slate-600/30 text-slate-400 hover:text-slate-200 hover:bg-slate-700/30 hover:border-slate-500/50'
                     }`}
                   >
-                    <Icon size={16} />
-                    <span className="text-xs font-medium font-['Orbitron']">{tab.name.toUpperCase()}</span>
+                    <Icon size={13} />
+                    <span className="text-xs font-semibold font-['Orbitron']">{tab.name.toUpperCase()}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-700/50 text-slate-500'}`}>
+                      {count}
+                    </span>
                   </button>
                 );
               })}

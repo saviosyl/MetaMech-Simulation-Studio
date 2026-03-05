@@ -431,6 +431,8 @@ const Viewport: React.FC = () => {
           case 'process':
           case 'robots':
           case 'pallets':
+          case 'fmcg':
+          case 'medical':
             addProcessNode(data.moduleId, position);
             break;
           case 'environment':
