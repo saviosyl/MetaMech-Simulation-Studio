@@ -197,7 +197,20 @@ export class SimulationEngine {
     const elapsed = dt * speed;
     this.simTime += elapsed;
 
+    // ── PASS 1: Tick ALL sensors first so signals are fresh for conveyors/stoppers ──
     for (const node of this.nodes) {
+      if (node.type === 'sensor') {
+        const stats = this.nodeStats.get(node.id)!;
+        stats.totalTime = this.simTime;
+        try { this.tickSensor(node, stats, elapsed); } catch (e) {
+          console.warn(`SimEngine sensor tick error on ${node.id}:`, e);
+        }
+      }
+    }
+
+    // ── PASS 2: Tick everything else (conveyors, stoppers, sources, etc.) ──
+    for (const node of this.nodes) {
+      if (node.type === 'sensor') continue; // already ticked in pass 1
       const stats = this.nodeStats.get(node.id)!;
       stats.totalTime = this.simTime;
       try {
@@ -241,7 +254,7 @@ export class SimulationEngine {
         case 'palletizer': this.tickPalletizer(node, stats, elapsed); break;
         case 'stopper': this.tickStopper(node, stats, elapsed); break;
         case 'pusher': this.tickPusher(node, stats, elapsed); break;
-        case 'sensor': this.tickSensor(node, stats, elapsed); break;
+        case 'sensor': /* handled in pass 1 */ break;
         case 'vertical-lifter': this.tickLift(node, stats, elapsed); break;
         default: {
           // Unknown node type: pass products through to output
