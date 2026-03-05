@@ -497,16 +497,22 @@ export class SimulationEngine {
       if (mode === 'sensor-triggered' && triggerTag) {
         // Check if stopper recently released — keep open for cooldown
         const lastRelease = (n.parameters as any)._lastReleaseTime || 0;
-        const releaseCooldown = (n.parameters as any).releaseDelay || 2; // seconds to stay open after release
+        const releaseCooldown = (n.parameters as any).releaseDelay || 2;
         if (lastRelease > 0 && (this.simTime - lastRelease) < releaseCooldown) {
+          (n.parameters as any)._latched = false; // clear latch during cooldown
           return false; // barrier is OPEN during cooldown
         }
         
-        // Stopper is OPEN until sensor goes TRUE AND there are no already-stopped products
         const signal = this.sensorSignals.get(triggerTag);
         const sensorActive = signal?.active ?? false;
-        const hasStopped = this.products.some(p => p.stoppedBy === n.id);
-        return sensorActive || hasStopped;
+        const isLatched = (n.parameters as any)._latched ?? false;
+        
+        // LATCH: once sensor triggers, stopper stays closed until released
+        if (sensorActive && !isLatched) {
+          (n.parameters as any)._latched = true; // latch ON
+        }
+        
+        return (n.parameters as any)._latched ?? false;
       }
       
       // For all other modes: use the engaged parameter
@@ -1150,6 +1156,8 @@ export class SimulationEngine {
     product.blockedSince = null;
     // Stamp release time so conveyor barrier stays open during cooldown
     (node.parameters as any)._lastReleaseTime = this.simTime;
+    // Clear latch — stopper opens after release
+    (node.parameters as any)._latched = false;
     this.addFlowEvent(stats, 'released', `Product ${product.id.slice(0, 8)} released`);
 
     if (isMounted) {
