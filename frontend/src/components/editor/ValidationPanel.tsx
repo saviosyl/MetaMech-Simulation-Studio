@@ -177,8 +177,16 @@ const severityConfig: Record<Severity, { icon: any; color: string; bg: string; b
 };
 
 const ValidationPanel: React.FC = () => {
-  const { processNodes, edges } = useEditorStore();
+  const { processNodes, edges, selectObject } = useEditorStore();
   const [isOpen, setIsOpen] = useState(false);
+
+  const handleIssueClick = (issue: ValidationIssue) => {
+    if (!issue.nodeId) return;
+    // Select the problem node to highlight it
+    selectObject(issue.nodeId, 'process');
+    // Dispatch a custom event so the viewport can zoom to it
+    window.dispatchEvent(new CustomEvent('metamech:focus-node', { detail: { nodeId: issue.nodeId } }));
+  };
 
   const issues = useMemo(() => validateScene(processNodes, edges), [processNodes, edges]);
 
@@ -228,7 +236,9 @@ const ValidationPanel: React.FC = () => {
               return (
                 <div
                   key={issue.id}
-                  className={`px-3 py-2.5 border-b border-slate-800 last:border-0 ${cfg.bg} hover:bg-slate-800/50 transition-colors cursor-default`}
+                  onClick={() => handleIssueClick(issue)}
+                  className={`px-3 py-2.5 border-b border-slate-800 last:border-0 ${cfg.bg} hover:bg-slate-800/50 transition-colors ${issue.nodeId ? 'cursor-pointer' : 'cursor-default'}`}
+                  title={issue.nodeId ? 'Click to highlight this node' : undefined}
                 >
                   <div className="flex items-start gap-2">
                     <Icon size={14} className={`${cfg.color} mt-0.5 flex-shrink-0`} />

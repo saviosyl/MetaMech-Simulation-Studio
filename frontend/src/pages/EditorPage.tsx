@@ -152,29 +152,34 @@ const EditorPage: React.FC = () => {
         // Backend save (when connected to API)
         await updateProject(id, { name: projectName, data: getSceneData() });
       } else {
-        // Local save — download project file
+        // Local save — overwrite existing project in localStorage
         const sceneData = getSceneData();
         const projectData = {
           version: '1.0',
           projectName,
-          projectNumber: `MM-${Date.now().toString(36).toUpperCase()}`,
           savedAt: new Date().toISOString(),
           scene: sceneData,
         };
         const dataStr = JSON.stringify(projectData, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, '_');
-        link.download = `${projectData.projectNumber}_${safeName}.metamech.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        // Also save to localStorage for quick recovery
+
+        // Save to autosave slot
         localStorage.setItem('metamech_autosave', dataStr);
         localStorage.setItem('metamech_autosave_name', projectName);
+
+        // Update the project in local projects list (overwrite, don't create new)
+        const activeId = localStorage.getItem('metamech_active_project_id');
+        if (activeId) {
+          try {
+            const projects = JSON.parse(localStorage.getItem('metamech_projects') || '[]');
+            const idx = projects.findIndex((p: any) => String(p.id) === activeId);
+            if (idx >= 0) {
+              projects[idx].data = sceneData;
+              projects[idx].name = projectName;
+              projects[idx].updated_at = new Date().toISOString();
+              localStorage.setItem('metamech_projects', JSON.stringify(projects));
+            }
+          } catch { /* ignore parse errors */ }
+        }
       }
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
