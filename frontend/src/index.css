@@ -8,37 +8,37 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ─── Base surfaces ─── */
-  --mm-bg-app: #1a1e2e;          /* App background — deep navy */
-  --mm-bg-panel: #232838;        /* Panel surfaces — slightly lifted */
-  --mm-bg-panel-hover: #2a3040;  /* Panel hover state */
-  --mm-bg-surface: #2d3348;      /* Cards, sections — lifted further */
-  --mm-bg-input: #1e2235;        /* Input fields */
-  --mm-bg-viewport: #151925;     /* 3D viewport background */
+  /* ─── Base surfaces (brighter, more contrast between levels) ─── */
+  --mm-bg-app: #1e2330;          /* App background — charcoal navy */
+  --mm-bg-panel: #283040;        /* Panel surfaces — clearly lifted */
+  --mm-bg-panel-hover: #303848;  /* Panel hover state */
+  --mm-bg-surface: #354050;      /* Cards, sections — obviously different */
+  --mm-bg-input: #1c2230;        /* Input fields — recessed */
+  --mm-bg-viewport: #181d28;     /* 3D viewport background */
   
-  /* ─── Borders ─── */
-  --mm-border: #3a4060;          /* Standard borders */
-  --mm-border-subtle: #2e3450;   /* Subtle dividers */
-  --mm-border-strong: #4a5070;   /* Emphasized borders */
+  /* ─── Borders (more visible) ─── */
+  --mm-border: #445068;          /* Standard borders — visible */
+  --mm-border-subtle: #384558;   /* Subtle dividers */
+  --mm-border-strong: #556580;   /* Emphasized borders */
   
-  /* ─── Text ─── */
-  --mm-text-primary: #e8eaf0;    /* Primary text — bright, readable */
-  --mm-text-secondary: #a0a8c0;  /* Secondary text — muted but visible */
-  --mm-text-tertiary: #6b7394;   /* Helper text — subdued */
-  --mm-text-disabled: #4a5068;   /* Disabled state */
-  --mm-text-inverse: #1a1e2e;    /* Text on light/accent backgrounds */
+  /* ─── Text (brighter, more readable) ─── */
+  --mm-text-primary: #f0f2f6;    /* Primary text — near white */
+  --mm-text-secondary: #b0b8d0;  /* Secondary text — clearly readable */
+  --mm-text-tertiary: #8090a8;   /* Helper text — lighter than before */
+  --mm-text-disabled: #5a6478;   /* Disabled state — still visible */
+  --mm-text-inverse: #1e2330;    /* Text on light/accent backgrounds */
   
   /* ─── Accent colors (meaningful only) ─── */
   --mm-accent-primary: #22d3ee;  /* Cyan — selection, active */
-  --mm-accent-primary-muted: rgba(34, 211, 238, 0.15);
+  --mm-accent-primary-muted: rgba(34, 211, 238, 0.18);
   --mm-accent-mate: #a855f7;     /* Purple — mate/snap mode */
-  --mm-accent-mate-muted: rgba(168, 85, 247, 0.15);
+  --mm-accent-mate-muted: rgba(168, 85, 247, 0.18);
   --mm-accent-success: #34d399;  /* Green — valid, running */
-  --mm-accent-success-muted: rgba(52, 211, 153, 0.15);
+  --mm-accent-success-muted: rgba(52, 211, 153, 0.18);
   --mm-accent-warning: #fbbf24;  /* Amber — warning, pending */
-  --mm-accent-warning-muted: rgba(251, 191, 36, 0.15);
+  --mm-accent-warning-muted: rgba(251, 191, 36, 0.18);
   --mm-accent-danger: #f87171;   /* Red — error, blocked */
-  --mm-accent-danger-muted: rgba(248, 113, 113, 0.15);
+  --mm-accent-danger-muted: rgba(248, 113, 113, 0.18);
   
   /* ─── Shadows ─── */
   --mm-shadow-sm: 0 1px 3px rgba(0,0,0,0.3);

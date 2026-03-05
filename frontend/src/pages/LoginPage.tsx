@@ -85,9 +85,9 @@ const LoginPage: React.FC = () => {
         <div style={{
           background: 'var(--mm-bg-panel)',
           border: '1px solid var(--mm-border)',
-          borderRadius: 12,
-          padding: '32px 28px',
-          boxShadow: 'var(--mm-shadow-lg)',
+          borderRadius: 14,
+          padding: '36px 32px',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.2)',
         }}>
           <h2 style={{
             fontSize: 16,
@@ -127,6 +127,7 @@ const LoginPage: React.FC = () => {
               </label>
               <input
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
@@ -160,6 +161,7 @@ const LoginPage: React.FC = () => {
               </label>
               <input
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
