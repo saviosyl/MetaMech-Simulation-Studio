@@ -19,7 +19,7 @@ const SnapSystem: React.FC = () => {
       // Accessory snap (any mode)
       if (isAccessoryType(node.type)) {
         const conveyors = processNodes.filter(n => isConveyorType(n.type));
-        const snap = findNearestConveyorSnap(node.position, conveyors);
+        const snap = findNearestConveyorSnap(node.position, conveyors, node.type);
         if (snap) {
           const applied = applyAccessorySnap(snap);
           updateObject(node.id, 'process', {

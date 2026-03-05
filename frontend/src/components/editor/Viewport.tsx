@@ -17,6 +17,8 @@ import ProcessNodeComponent from '../3d/ProcessNodeComponent';
 import EnvironmentAssetComponent from '../3d/EnvironmentAssetComponent';
 import ActorComponent from '../3d/ActorComponent';
 import SnapSystem, { checkSnap } from '../3d/SnapSystem';
+import AccessorySnapPreview from '../3d/AccessorySnapPreview';
+import { isConveyorType, isAccessoryType, remountAccessory } from '../../lib/accessorySnap';
 import ConnectionLines from '../3d/ConnectionLine';
 import SimulationOverlay from '../3d/SimulationOverlay';
 import MeasurementTool from '../editor/MeasurementTool';
@@ -129,6 +131,30 @@ const DraggableObject: React.FC<{
       rotation: [rot.x, rot.y, rot.z] as [number, number, number],
       scale: [scl.x, scl.y, scl.z] as [number, number, number],
     });
+
+    // Conveyor-follow: when a conveyor moves, update mounted accessories
+    if (objectType === 'process') {
+      const state = useEditorStore.getState();
+      const node = state.processNodes.find(n => n.id === id);
+      if (node && isConveyorType(node.type)) {
+        const updatedConveyor = { ...node, position: [px, 0, pz] as [number, number, number], rotation: [rot.x, rot.y, rot.z] as [number, number, number] };
+        // Find all accessories mounted on this conveyor
+        for (const acc of state.processNodes) {
+          if (acc.parameters?.parentConveyorId === id && isAccessoryType(acc.type)) {
+            const mountData = {
+              parentConveyorId: id,
+              mountPosition: acc.parameters.mountPosition ?? 0.5,
+              mountSide: acc.parameters.mountSide ?? 'center',
+              lateralOffset: acc.parameters.lateralOffset ?? 0,
+            };
+            const result = remountAccessory(mountData, updatedConveyor, acc.type);
+            if (result) {
+              updateObject(acc.id, 'process', { position: result.position, rotation: result.rotation });
+            }
+          }
+        }
+      }
+    }
 
     // Check snap during drag for process nodes
     if (objectType === 'process') {
@@ -337,6 +363,7 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
 
       {/* Snap System - shows connection ports */}
       <SnapSystem />
+      <AccessorySnapPreview />
 
       {/* Snap target highlight */}
       {snapTarget && (
