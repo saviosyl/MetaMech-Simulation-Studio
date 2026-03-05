@@ -25,7 +25,7 @@ export interface ModuleDefinition {
   assetId?: string; // references AssetDef.id in manifest
   parameters: {
     [key: string]: {
-      type: 'number' | 'string' | 'select' | 'boolean' | 'color';
+      type: 'number' | 'string' | 'text' | 'select' | 'boolean' | 'color';
       label: string;
       default: any;
       options?: string[];

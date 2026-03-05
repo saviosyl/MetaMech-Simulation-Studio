@@ -1357,12 +1357,12 @@ export class SimulationEngine {
       if (convNode) {
         const path = createTransportPath(convNode.type, convNode.parameters);
         if (path) {
-          const pt = path.getPointAt(mountPosition);
+          const pt = path.getLocalPosition(mountPosition);
           // Transform to world coords (conveyor local → world)
           sensorPos = [
-            convNode.position[0] + pt.x,
-            convNode.position[1] + pt.y,
-            convNode.position[2] + pt.z,
+            convNode.position[0] + pt[0],
+            convNode.position[1] + pt[1],
+            convNode.position[2] + pt[2],
           ];
         }
       }
