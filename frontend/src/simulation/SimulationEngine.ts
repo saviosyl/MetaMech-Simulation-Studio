@@ -485,37 +485,48 @@ export class SimulationEngine {
     }
 
     // Find mounted stoppers on this conveyor that are currently ENGAGED (blocking)
+    const _convId = node.id.slice(0, 6);
+    const allStoppersOnConv = this.nodes.filter(n => n.type === 'stopper' && n.parameters?.parentConveyorId === node.id);
+    if (allStoppersOnConv.length > 0 && Math.floor(this.simTime * 2) % 2 === 0) {
+      // Log every 0.5s
+      for (const s of allStoppersOnConv) {
+        const tag = s.parameters?.stopperTag || '?';
+        const mode = s.parameters?.stopperMode || 'always-stop';
+        const trig = s.parameters?.triggerSensorTag || 'none';
+        const signal = this.sensorSignals.get(trig);
+        const latched = (s.parameters as any)?._latched;
+        console.log(`[CONV ${_convId}] stopper=${tag} mode=${mode} trigger=${trig} signal=${signal?.active} latched=${latched} mountPos=${s.parameters?.mountPosition}`);
+      }
+    }
+
     const mountedStoppers = this.nodes.filter(n => {
       if (n.type !== 'stopper') return false;
       if (n.parameters?.parentConveyorId !== node.id) return false;
       if (!(n.parameters?.enabled ?? true)) return false;
       
-      // Check if this stopper should be engaged based on its mode
       const mode = n.parameters.stopperMode || 'always-stop';
       const triggerTag = n.parameters.triggerSensorTag || '';
       
       if (mode === 'sensor-triggered' && triggerTag) {
-        // Check if stopper recently released — keep open for cooldown
         const lastRelease = (n.parameters as any)._lastReleaseTime || 0;
         const releaseCooldown = (n.parameters as any).releaseDelay || 2;
         if (lastRelease > 0 && (this.simTime - lastRelease) < releaseCooldown) {
-          (n.parameters as any)._latched = false; // clear latch during cooldown
-          return false; // barrier is OPEN during cooldown
+          (n.parameters as any)._latched = false;
+          return false;
         }
         
         const signal = this.sensorSignals.get(triggerTag);
         const sensorActive = signal?.active ?? false;
         const isLatched = (n.parameters as any)._latched ?? false;
         
-        // LATCH: once sensor triggers, stopper stays closed until released
         if (sensorActive && !isLatched) {
-          (n.parameters as any)._latched = true; // latch ON
+          (n.parameters as any)._latched = true;
+          console.log(`[LATCH] Stopper ${n.parameters?.stopperTag} LATCHED by ${triggerTag}`);
         }
         
         return (n.parameters as any)._latched ?? false;
       }
       
-      // For all other modes: use the engaged parameter
       return n.parameters?.engaged ?? true;
     });
     const stopperPositions = mountedStoppers.map(s => s.parameters.mountPosition ?? 0.5).sort((a, b) => b - a);
@@ -1398,6 +1409,19 @@ export class SimulationEngine {
     }
 
     const nearbyProduct = nearbyProducts[0] || null;
+    // Debug: log sensor detection
+    if (sensorTag && nearbyProduct && Math.floor(this.simTime * 2) % 2 === 0) {
+      console.log(`[SENSOR ${sensorTag}] DETECTED product at pathPos=${nearbyProduct.pathPosition?.toFixed(3)} on conv=${parentConveyorId?.slice(0,6)} mountPos=${mountPosition}`);
+    }
+    if (sensorTag && !nearbyProduct && parentConveyorId) {
+      // Log product positions on the conveyor for debugging (every 2s)
+      if (Math.floor(this.simTime) % 2 === 0 && Math.floor(this.simTime * 10) % 10 === 0) {
+        const prodsOnConv = this.products.filter(p => p.currentNodeId === parentConveyorId && p.state === 'queued');
+        if (prodsOnConv.length > 0) {
+          console.log(`[SENSOR ${sensorTag}] NO detect. mountPos=${mountPosition} products on conv: ${prodsOnConv.map(p => p.pathPosition?.toFixed(3)).join(', ')}`);
+        }
+      }
+    }
     const wasActive = stats.processing;
 
     // Publish sensor signal to the signal registry (by tag)
