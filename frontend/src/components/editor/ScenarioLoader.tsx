@@ -16,6 +16,7 @@ import {
   createSpiralScenario,
   createEndOfLineScenario,
   createSensorStopperScenario,
+  createBacklogControlScenario,
   Scenario,
 } from '../../simulation/scenarios';
 
@@ -83,6 +84,13 @@ const SCENARIOS: ScenarioOption[] = [
     description: 'SE001 triggers ST001. Products accumulate back-to-back. SE002 monitors queue backup.',
     icon: <Play size={16} className="text-green-400" />,
     create: createSensorStopperScenario,
+  },
+  {
+    id: 'backlog-control',
+    name: 'Backlog Control (Dwell)',
+    description: 'End-of-line: SE001→ST001 stop, SE002 dwell releases + resumes source. 0-gap accumulation.',
+    icon: <Factory size={16} className="text-red-400" />,
+    create: createBacklogControlScenario,
   },
 ];
 

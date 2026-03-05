@@ -37,7 +37,7 @@ function groupParams(params: [string, any][]) {
   const geo: [string, any][] = [], sim: [string, any][] = [], logic: [string, any][] = [], appear: [string, any][] = [], adv: [string, any][] = [];
   const geoK = ['length','width','height','radius','angle','angleDeg','bendAngle','pitch','turns','drumDiameter','supportSpacing','conveyorType','driveType','showSupports','showSideGuides','sideGuideHeight','adjustableFeetEnabled','footAdjustmentMm','supportType','legCount','ceilingHeight','hangerStyle','hangerCrossbar'];
   const simK = ['beltSpeed','speed','spawnRate','ppm','processTime','capacity','cycleTime','maxItems','productColor','productType','productLength','productWidth','productHeight','speedFactor','pickHeight','placeHeight','approachHeight','pickDelay','placeDelay','accumulationMode','accumulationZones'];
-  const logK = ['stopperMode','stopperTag','triggerSensorTag','stopCondition','releaseCondition','releaseDelay','stopCount','pusherMode','holdTime','releaseCount','openDuration','sensorTag','sensorType','detectColor','detectType','detectSize','colorFilter','typeFilter','cooldown','debounce','showBeam','mountPosition','mountSide','mountHeight','parentConveyorId','lateralOffset','engaged','enabled','targetColor','targetProductType','routeBy','routeValues','stroke','side'];
+  const logK = ['stopperMode','stopperTag','triggerSensorTag','secondarySensorTag','stopCondition','releaseCondition','releaseDelay','stopCount','pusherMode','holdTime','releaseCount','openDuration','sensorTag','sensorType','detectColor','detectType','detectSize','colorFilter','typeFilter','cooldown','debounce','dwellTimeThreshold','onDwellEvent','showBeam','mountPosition','mountSide','mountHeight','parentConveyorId','lateralOffset','engaged','enabled','targetColor','targetProductType','routeBy','routeValues','stroke','side','runMode','blockedBySensorTag','dwellBlockThreshold','resumeDelay'];
   const appK = ['beltColor','color','materialColor','finish'];
   for (const [k, d] of params) {
     const kl = k.toLowerCase();
@@ -108,8 +108,8 @@ const RightPanel: React.FC = () => {
   const renderInput = (key: string, def: any) => {
     const val = selectedObject?.parameters[key];
 
-    // Special: triggerSensorTag → dropdown of available sensor tags
-    if (key === 'triggerSensorTag') {
+    // Special: sensor tag dropdowns → populated with available sensor tags
+    if (key === 'triggerSensorTag' || key === 'secondarySensorTag' || key === 'blockedBySensorTag') {
       return (
         <select value={val ?? ''} onChange={e => handleParam(key, e.target.value)} style={inputStyle}>
           <option value="" style={{ background: 'var(--mm-bg-panel)' }}>— None —</option>
@@ -189,6 +189,23 @@ const RightPanel: React.FC = () => {
                 </div>
               </Section>
 
+              {/* Live Source State */}
+              {selectedObject.type === 'source' && (() => {
+                const state = (selectedObject.parameters as any)?._sourceState || 'RUNNING';
+                const colors: Record<string, string> = { RUNNING: '#10b981', BLOCKED: '#ef4444', RESUMING: '#f59e0b', PAUSED: '#64748b' };
+                const color = colors[state] || '#64748b';
+                return (
+                  <div style={{
+                    margin: '0 0 8px 0', padding: '8px 12px', borderRadius: 8,
+                    background: `${color}15`, border: `1px solid ${color}30`,
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, boxShadow: state === 'RUNNING' ? `0 0 8px ${color}80` : 'none' }} />
+                    <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Orbitron', monospace", color }}>{state}</span>
+                  </div>
+                );
+              })()}
+
               {/* Live Sensor Signal — shown for sensors and stoppers */}
               {selectedObject.type === 'sensor' && selectedObject.parameters?.sensorTag && (() => {
                 const tag = selectedObject.parameters.sensorTag;
@@ -215,6 +232,25 @@ const RightPanel: React.FC = () => {
                       background: isActive ? '#10b981' : '#475569',
                       boxShadow: isActive ? '0 0 8px rgba(16,185,129,0.5)' : 'none',
                     }} />
+                  </div>
+                );
+              })()}
+
+              {selectedObject.type === 'stopper' && (() => {
+                const stoppedCount = processNodes.length > 0 ? 0 : 0; // placeholder
+                const hasStopped = simulationEngine.getProducts().some(p => p.stoppedBy === selectedObject.id);
+                const state = hasStopped ? 'CLOSED' : 'OPEN';
+                const color = hasStopped ? '#ef4444' : '#10b981';
+                return (
+                  <div style={{
+                    margin: '0 0 8px 0', padding: '8px 12px', borderRadius: 8,
+                    background: `${color}15`, border: `1px solid ${color}30`,
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
+                    <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Orbitron', monospace", color }}>
+                      {selectedObject.parameters?.stopperTag || 'ST???'}: {state}
+                    </span>
                   </div>
                 );
               })()}
@@ -290,7 +326,7 @@ const RightPanel: React.FC = () => {
                 return (<>
                   {g.geo.length > 0 && <Section title="Geometry" icon={Maximize} defaultOpen={true}>{g.geo.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                   {g.sim.length > 0 && <Section title="Simulation" icon={Sliders} defaultOpen={true} badge="SIM">{g.sim.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
-                  {g.logic.length > 0 && <Section title="Logic" icon={Zap} defaultOpen={['sensor','stopper','pusher'].includes(selectedObject.type)} badge="LOGIC">{g.logic.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
+                  {g.logic.length > 0 && <Section title="Logic" icon={Zap} defaultOpen={['sensor','stopper','pusher','source'].includes(selectedObject.type)} badge="LOGIC">{g.logic.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                   {g.appear.length > 0 && <Section title="Appearance" icon={Palette} defaultOpen={false}>{g.appear.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                   {g.adv.length > 0 && <Section title="Advanced" icon={Settings} defaultOpen={false}>{g.adv.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                 </>);

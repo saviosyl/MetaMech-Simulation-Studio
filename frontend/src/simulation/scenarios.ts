@@ -311,6 +311,78 @@ export function createSensorStopperScenario(): Scenario {
   };
 }
 
+// ─── Scenario 9: Backlog Control with Dwell Release ────────────
+export function createBacklogControlScenario(): Scenario {
+  const sourceId = uuidv4();
+  const conveyorId = uuidv4();
+  const sensor1Id = uuidv4();
+  const stopperId = uuidv4();
+  const sensor2Id = uuidv4();
+  const conv2Id = uuidv4();
+  const sinkId = uuidv4();
+
+  return {
+    name: 'Backlog Control (Dwell Release)',
+    description: 'SE001 triggers ST001. Products accumulate 0-gap. SE002 dwell releases stopper & resumes source.',
+    nodes: [
+      // Source: signal-controlled, blocked by SE002 dwell
+      { id: sourceId, type: 'source', position: [-7, 0, 0], rotation: [0, 0, 0],
+        parameters: {
+          spawnRate: 25, productType: 'box', productColor: 'blue',
+          productLength: 300, productWidth: 200, productHeight: 150,
+          runMode: 'signal-controlled', blockedBySensorTag: 'SE002',
+          dwellBlockThreshold: 5, resumeDelay: 0.5,
+        }, name: 'Product Source' },
+
+      // Main conveyor (6m long)
+      { id: conveyorId, type: 'belt-conveyor', position: [-2.5, 0, 0], rotation: [0, 0, 0],
+        parameters: { length: 6000, width: 600, height: 800, beltSpeed: 15 }, name: 'Main Conveyor' },
+
+      // Sensor 1 at mountPosition 0.80 — arrival trigger for stopper
+      { id: sensor1Id, type: 'sensor', position: [0.1, 0, 0], rotation: [0, Math.PI / 2, 0],
+        parameters: {
+          sensorTag: 'SE001', sensorType: 'through-beam', showBeam: true,
+          beltWidthMm: 600, mountHeight: 800, detectionRange: 300,
+          parentConveyorId: conveyorId, mountPosition: 0.80, mountSide: 'center',
+          dwellTimeThreshold: 0, onDwellEvent: 'none',
+        }, name: 'SE001 (Stopper Trigger)' },
+
+      // Stopper at mountPosition 0.90 — triggered by SE001, released by SE002 dwell
+      { id: stopperId, type: 'stopper', position: [0.7, 0, 0], rotation: [0, 0, 0],
+        parameters: {
+          stopperTag: 'ST001', engaged: true, enabled: true, width: 600, mountHeight: 800,
+          stopperMode: 'sensor-triggered', triggerSensorTag: 'SE001',
+          stopCondition: 'any-product', releaseCondition: 'sensor-dwell',
+          secondarySensorTag: 'SE002',
+          holdTime: 3, releaseCount: 1, releaseDelay: 0, stopCount: 0,
+          parentConveyorId: conveyorId, mountPosition: 0.90, mountSide: 'center',
+        }, name: 'ST001 (Sensor-Triggered)' },
+
+      // Sensor 2 at mountPosition 0.30 — backlog / queue-full detector
+      { id: sensor2Id, type: 'sensor', position: [-4, 0, 0], rotation: [0, Math.PI / 2, 0],
+        parameters: {
+          sensorTag: 'SE002', sensorType: 'through-beam', showBeam: true,
+          beltWidthMm: 600, mountHeight: 800, detectionRange: 300,
+          parentConveyorId: conveyorId, mountPosition: 0.30, mountSide: 'center',
+          dwellTimeThreshold: 3, onDwellEvent: 'stop-source-and-release',
+        }, name: 'SE002 (Backlog Monitor)' },
+
+      // Output conveyor
+      { id: conv2Id, type: 'belt-conveyor', position: [3, 0, 0], rotation: [0, 0, 0],
+        parameters: { length: 2000, width: 600, height: 800, beltSpeed: 20 }, name: 'Exit Conveyor' },
+
+      // Sink
+      { id: sinkId, type: 'sink', position: [5.5, 0, 0], rotation: [0, 0, 0], parameters: {}, name: 'Exit' },
+    ],
+    edges: [
+      { id: uuidv4(), from: sourceId, to: conveyorId, fromPort: 'output', toPort: 'input' },
+      { id: uuidv4(), from: conveyorId, to: conv2Id, fromPort: 'output', toPort: 'input' },
+      { id: uuidv4(), from: conv2Id, to: sinkId, fromPort: 'output', toPort: 'input' },
+    ],
+    rules: [],
+  };
+}
+
 // ─── All scenarios ─────────────────────────────────────────────
 export function getAllScenarios(): { id: string; create: () => Scenario }[] {
   return [
@@ -322,5 +394,6 @@ export function getAllScenarios(): { id: string; create: () => Scenario }[] {
     { id: 'spiral-transport', create: createSpiralScenario },
     { id: 'end-of-line', create: createEndOfLineScenario },
     { id: 'sensor-stopper', create: createSensorStopperScenario },
+    { id: 'backlog-control', create: createBacklogControlScenario },
   ];
 }

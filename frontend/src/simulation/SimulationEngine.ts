@@ -373,8 +373,42 @@ export class SimulationEngine {
     const ppm = node.parameters.spawnRate || node.parameters.ppm || 30;
     const interval = 60 / ppm;
     const maxItems = node.parameters.maxItems || 0;
+    const runMode = node.parameters.runMode || 'continuous';
+    const blockedByTag = node.parameters.blockedBySensorTag || '';
+    const dwellBlock = node.parameters.dwellBlockThreshold || 3;
+    const resumeDelay = node.parameters.resumeDelay || 0.5;
 
     if (maxItems > 0 && stats.throughput >= maxItems) return;
+
+    // Signal-controlled mode: check if source should be blocked
+    let allowFeed = true;
+    if (runMode === 'signal-controlled' && blockedByTag) {
+      const signal = this.sensorSignals.get(blockedByTag);
+      if (signal?.active) {
+        const dwellSec = this.simTime - (signal.activeSince || this.simTime);
+        if (dwellSec >= dwellBlock) {
+          allowFeed = false;
+          // Store blocked state for UI
+          (node.parameters as any)._sourceState = 'BLOCKED';
+        }
+      }
+    }
+
+    // Check if source was recently unblocked — apply resume delay
+    if (!allowFeed) {
+      (stats as any)._blockedSince = (stats as any)._blockedSince || this.simTime;
+      return;
+    } else if ((stats as any)._blockedSince) {
+      // Was blocked, now clear — check resume delay
+      const clearTime = (stats as any)._blockedSince;
+      if (this.simTime - clearTime < resumeDelay) {
+        (node.parameters as any)._sourceState = 'RESUMING';
+        return;
+      }
+      (stats as any)._blockedSince = null;
+    }
+
+    (node.parameters as any)._sourceState = 'RUNNING';
 
     if (this.simTime - stats.lastSpawnTime >= interval) {
       const outEdges = this.getOutEdges(node.id);
@@ -1072,6 +1106,20 @@ export class SimulationEngine {
       case 'sensor-clear':
         // Release when the trigger sensor is NO LONGER active
         return !sensorActive && heldDuration >= releaseDelay;
+      case 'sensor-dwell': {
+        // Release when secondary sensor dwell threshold is met
+        const secTag = node.parameters?.secondarySensorTag || '';
+        if (secTag) {
+          const secSignal = this.sensorSignals.get(secTag);
+          if (secSignal?.active) {
+            const secNode = this.nodes.find(n => n.type === 'sensor' && n.parameters?.sensorTag === secTag);
+            const secDwellThreshold = secNode?.parameters?.dwellTimeThreshold || 3;
+            const secDwellSec = this.simTime - (secSignal.activeSince || this.simTime);
+            if (secDwellSec >= secDwellThreshold) return true;
+          }
+        }
+        return false;
+      }
       default:
         return heldDuration >= holdTime;
     }
@@ -1336,6 +1384,33 @@ export class SimulationEngine {
       stats.currentProductId = null;
       if (wasActive) this.addFlowEvent(stats, 'sensor-clear', 'Zone clear');
       this.setFlowState(stats, 'idle', dt);
+    }
+
+    // ── Dwell event logic ──
+    const dwellThreshold = node.parameters?.dwellTimeThreshold || 0;
+    const onDwellEvent = node.parameters?.onDwellEvent || 'none';
+    if (dwellThreshold > 0 && onDwellEvent !== 'none' && sensorTag) {
+      const signal = this.sensorSignals.get(sensorTag);
+      if (signal?.active) {
+        const dwellSec = this.simTime - (signal.activeSince || this.simTime);
+        if (dwellSec >= dwellThreshold) {
+          // Fire dwell event — find target stoppers and sources
+          if (onDwellEvent === 'release-stopper' || onDwellEvent === 'stop-source-and-release') {
+            // Release all stoppers that reference this sensor as secondary
+            for (const n of this.nodes) {
+              if (n.type === 'stopper' && n.parameters?.secondarySensorTag === sensorTag) {
+                const stopped = this.products.filter(p => p.stoppedBy === n.id);
+                const nStats = this.nodeStats.get(n.id);
+                if (nStats) {
+                  for (const p of stopped) this.releaseProduct(p, n, nStats);
+                }
+              }
+            }
+          }
+          // Source control is handled in tickSource via blockedBySensorTag + dwell
+          // The source reads this sensor's signal directly
+        }
+      }
     }
   }
 
