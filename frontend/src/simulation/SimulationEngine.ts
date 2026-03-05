@@ -74,6 +74,7 @@ export class SimulationEngine {
         currentProductId: null,
         queue: [],
         processEndTime: null,
+        processStartTime: undefined as number | undefined,
         lastSpawnTime: -Infinity,
         routerIndex: 0,
         palletCount: 0,
@@ -627,11 +628,21 @@ export class SimulationEngine {
   }
   // ─── Machine: process with cycle time ────────────────────────
   private tickMachine(node: ProcessNode, stats: NodeStats, dt: number) {
-    const processingTime = node.parameters.processingTime || 2;
+    const processingTime = node.parameters.processingTime || node.parameters.cycleTime || 2;
 
+    // Compute infeed/outfeed world positions for internal transport
+    const ports = getConnectionPorts(node.type, node.parameters);
+    const inPort = ports.find(p => p.type === 'input');
+    const outPort = ports.find(p => p.type === 'output');
+    const infeedPos = inPort ? getPortWorldPosition(inPort.localPosition, node) : [node.position[0], node.position[1] + 0.85, node.position[2]] as [number,number,number];
+    const outfeedPos = outPort ? getPortWorldPosition(outPort.localPosition, node) : [node.position[0], node.position[1] + 0.85, node.position[2]] as [number,number,number];
+
+    // ─ Release finished product ─
     if (stats.processing && stats.processEndTime !== null && this.simTime >= stats.processEndTime) {
       const product = this.products.find(p => p.id === stats.currentProductId);
       if (product) {
+        // Snap to outfeed position before handing off
+        product.currentPosition = [...outfeedPos];
         const outEdges = this.getOutEdges(node.id);
         if (outEdges.length > 0) {
           this.sendProductAlongEdge(product, outEdges[0]);
@@ -643,30 +654,51 @@ export class SimulationEngine {
       stats.processing = false;
       stats.currentProductId = null;
       stats.processEndTime = null;
+      stats.processStartTime = undefined;
       stats.throughput++;
     }
 
+    // ─ Start processing next queued product ─
     if (!stats.processing && stats.queue.length > 0) {
       const pid = stats.queue.shift()!;
       const product = this.products.find(p => p.id === pid);
       if (product) {
         product.state = 'processing';
-        product.currentPosition = [...node.position];
+        product.currentPosition = [...infeedPos]; // Start at infeed, not floor
         stats.processing = true;
         stats.currentProductId = pid;
+        stats.processStartTime = this.simTime;
         stats.processEndTime = this.simTime + processingTime;
+      }
+    }
+
+    // ─ Animate product along internal transport path (infeed → outfeed) ─
+    if (stats.processing && stats.currentProductId && stats.processStartTime !== undefined) {
+      const product = this.products.find(p => p.id === stats.currentProductId);
+      if (product) {
+        const elapsed = this.simTime - stats.processStartTime;
+        const t = Math.min(1, elapsed / processingTime);
+        // Smooth easing
+        const s = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        product.currentPosition = [
+          infeedPos[0] + (outfeedPos[0] - infeedPos[0]) * s,
+          infeedPos[1] + (outfeedPos[1] - infeedPos[1]) * s,
+          infeedPos[2] + (outfeedPos[2] - infeedPos[2]) * s,
+        ];
       }
     }
 
     if (stats.processing) stats.busyTime += dt;
 
+    // ─ Accept arriving products ─
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
       product.state = 'queued';
+      product.currentPosition = [...infeedPos]; // Park at infeed while queued
       stats.queue.push(product.id);
     }
 
-    // Flow state: blocked if queue is building up, starved if empty and waiting
+    // ─ Flow state ─
     if (stats.processing) {
       this.setFlowState(stats, 'running', dt);
     } else if (stats.queue.length === 0) {
@@ -777,8 +809,11 @@ export class SimulationEngine {
 
       const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters);
       const toPorts = getConnectionPorts(toNode.type, toNode.parameters);
-      const fp = fromPorts.find(p => p.id === edge.fromPort);
-      const tp = toPorts.find(p => p.id === edge.toPort);
+      // Match port by id, or fall back to first port of matching type
+      const fp = fromPorts.find(p => p.id === edge.fromPort)
+        || fromPorts.find(p => p.type === 'output');
+      const tp = toPorts.find(p => p.id === edge.toPort)
+        || toPorts.find(p => p.type === 'input');
       if (!fp || !tp) continue;
 
       const start = getPortWorldPosition(fp.localPosition, fromNode);
@@ -907,6 +942,7 @@ export class SimulationEngine {
       if (!stats.queue.includes(product.id)) {
         product.state = 'queued';
         stats.queue.push(product.id);
+        console.log(`[ROBOT] ${node.name} queued product ${product.id.slice(0,8)}, queue=${stats.queue.length}`);
       }
     }
 
@@ -914,6 +950,7 @@ export class SimulationEngine {
     let availableProductId: string | null = null;
     if (stats.queue.length > 0 && rState.phase === 'idle') {
       availableProductId = stats.queue[0];
+      console.log(`[ROBOT] ${node.name} idle, offering product ${availableProductId?.slice(0,8)}, pickPos=${JSON.stringify(rState.pickPosition)}`);
     }
     // Also pass the in-flight target so pick phase can confirm it
     const targetId = (rState as any)._targetProductId as string | undefined;

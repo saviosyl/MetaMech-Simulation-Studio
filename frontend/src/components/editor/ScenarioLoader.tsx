@@ -23,6 +23,8 @@ import {
   createFMCGEndOfLine,
   createRobotCellFactory,
   createGeneralFactoryDemo,
+  createRobotVerification,
+  createMachineVerification,
 } from '../../simulation/factoryScenarios';
 
 interface ScenarioOption {
@@ -117,6 +119,20 @@ const SCENARIOS: ScenarioOption[] = [
     description: 'Checkweigher + labeler line with factory walls, windows, floor zones, pallet rack.',
     icon: <Factory size={16} className="text-green-400" />,
     create: createGeneralFactoryDemo,
+  },
+  {
+    id: 'robot-verify',
+    name: 'Robot Pick & Place Test',
+    description: 'Source → Conveyor → Robot picks → places to Outfeed → Sink. Verify robot animation.',
+    icon: <Play size={16} className="text-purple-400" />,
+    create: createRobotVerification,
+  },
+  {
+    id: 'machine-verify',
+    name: 'Machine Pass-Through Test',
+    description: 'Products flow through checkweigher + labeler without falling off.',
+    icon: <Play size={16} className="text-cyan-400" />,
+    create: createMachineVerification,
   },
 ];
 

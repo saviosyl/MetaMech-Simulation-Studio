@@ -5,6 +5,56 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Scenario } from './scenarios';
 
+// ═══════════════════════════════════════════════════════════════
+// VERIFICATION SCENARIOS (Robot + Machine pass-through)
+// ═══════════════════════════════════════════════════════════════
+
+export function createRobotVerifyScenario(): Scenario {
+  const source = n('source', [-4, 0, 0], { spawnRate: 10, productType: 'box', productColor: 'blue', productLength: 200, productWidth: 150, productHeight: 100 }, 'Source');
+  const infeed = n('belt-conveyor', [-2, 0, 0], { length: 2000, width: 500, height: 800, beltSpeed: 12 }, 'Infeed');
+  const robot = n('robot-6axis', [0.5, 0, 0], { reachMm: 2000, reach: 2000, cycleTime: 4, speedFactor: 1, baseHeight: 500, pedestalEnabled: true, pedestalHeight: 600, pickHeight: 800, placeHeight: 800 }, 'Robot');
+  const outfeed = n('belt-conveyor', [3, 0, 0], { length: 2000, width: 500, height: 800, beltSpeed: 12 }, 'Outfeed');
+  const sink = n('sink', [5, 0, 0], {}, 'Sink');
+
+  return {
+    name: 'Robot Pick & Place (Verify)',
+    description: 'Verification: 6-axis robot picks from infeed conveyor and places to outfeed conveyor.',
+    nodes: [source, infeed, robot, outfeed, sink],
+    edges: [
+      edge(source.id, infeed.id),
+      edge(infeed.id, robot.id),
+      edge(robot.id, outfeed.id),
+      edge(outfeed.id, sink.id),
+    ],
+    rules: [],
+  };
+}
+
+export function createMachineVerifyScenario(): Scenario {
+  const source = n('source', [-5, 0, 0], { spawnRate: 15, productType: 'box', productColor: 'green', productLength: 200, productWidth: 150, productHeight: 100 }, 'Source');
+  const conv1 = n('belt-conveyor', [-3, 0, 0], { length: 2000, width: 500, height: 800, beltSpeed: 15 }, 'Infeed Conv');
+  const machine = n('checkweigher', [-0.5, 0, 0], { processingTime: 2, cycleTime: 2, width: 800, height: 900 }, 'Checkweigher');
+  const conv2 = n('belt-conveyor', [1.5, 0, 0], { length: 2000, width: 500, height: 800, beltSpeed: 15 }, 'Mid Conv');
+  const labeler = n('labeler', [3.5, 0, 0], { processingTime: 1.5, cycleTime: 1.5, width: 800, height: 900 }, 'Labeler');
+  const conv3 = n('belt-conveyor', [5.5, 0, 0], { length: 2000, width: 500, height: 800, beltSpeed: 15 }, 'Outfeed Conv');
+  const sink = n('sink', [7.5, 0, 0], {}, 'Sink');
+
+  return {
+    name: 'Machine Pass-Through (Verify)',
+    description: 'Verification: products travel through checkweigher and labeler without falling off.',
+    nodes: [source, conv1, machine, conv2, labeler, conv3, sink],
+    edges: [
+      edge(source.id, conv1.id),
+      edge(conv1.id, machine.id),
+      edge(machine.id, conv2.id),
+      edge(conv2.id, labeler.id),
+      edge(labeler.id, conv3.id),
+      edge(conv3.id, sink.id),
+    ],
+    rules: [],
+  };
+}
+
 // Helper: create a node with defaults
 function n(type: string, pos: [number, number, number], params: Record<string, any> = {}, name?: string, rot?: [number, number, number]): any {
   return { id: uuidv4(), type, position: pos, rotation: rot || [0, 0, 0], parameters: params, name: name || type };
@@ -208,6 +258,58 @@ export function createGeneralFactoryDemo(): Scenario {
       edge(source.id, conv1.id),
       edge(conv1.id, machine1.id),
       edge(machine1.id, conv2.id),
+      edge(conv2.id, labeler.id),
+      edge(labeler.id, conv3.id),
+      edge(conv3.id, sink.id),
+    ],
+    rules: [],
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCENARIO V1: Robot Pick & Place Verification
+// ═══════════════════════════════════════════════════════════════
+export function createRobotVerification(): Scenario {
+  const source = n('source', [-4, 0, 0], { spawnRate: 8, productType: 'box', productColor: 'blue', productLength: 200, productWidth: 150, productHeight: 100 }, 'Source');
+  const infeed = n('belt-conveyor', [-2, 0, 0], { length: 2000, width: 500, height: 800, beltSpeed: 12 }, 'Infeed');
+  const robot = n('robot-6axis', [0, 0, 0], { reach: 2000, baseHeight: 500, cycleTime: 4, speedFactor: 1, pedestalEnabled: true, pedestalHeight: 600, pickHeight: 800, placeHeight: 800 }, 'Robot');
+  const outfeed = n('belt-conveyor', [2, 0, 0], { length: 2000, width: 500, height: 800, beltSpeed: 12 }, 'Outfeed');
+  const sink = n('sink', [4, 0, 0], {}, 'Sink');
+
+  return {
+    name: 'Robot Pick & Place Test',
+    description: 'Verification: Source → Conveyor → Robot picks → places to Outfeed → Sink. Watch the robot animate.',
+    nodes: [source, infeed, robot, outfeed, sink],
+    edges: [
+      edge(source.id, infeed.id),
+      edge(infeed.id, robot.id),
+      edge(robot.id, outfeed.id),
+      edge(outfeed.id, sink.id),
+    ],
+    rules: [],
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCENARIO V2: Machine Pass-Through Verification
+// ═══════════════════════════════════════════════════════════════
+export function createMachineVerification(): Scenario {
+  const source = n('source', [-5, 0, 0], { spawnRate: 15, productType: 'box', productColor: 'green', productLength: 200, productWidth: 150, productHeight: 100 }, 'Source');
+  const conv1 = n('belt-conveyor', [-3, 0, 0], { length: 2000, width: 500, height: 800, beltSpeed: 18 }, 'Conv 1');
+  const machine = n('checkweigher', [-1, 0, 0], { processingTime: 2, width: 800, height: 900 }, 'Checkweigher');
+  const conv2 = n('belt-conveyor', [1, 0, 0], { length: 2000, width: 500, height: 800, beltSpeed: 18 }, 'Conv 2');
+  const labeler = n('labeler', [3, 0, 0], { processingTime: 1.5, width: 800, height: 900 }, 'Labeler');
+  const conv3 = n('belt-conveyor', [5, 0, 0], { length: 2000, width: 500, height: 800, beltSpeed: 18 }, 'Conv 3');
+  const sink = n('sink', [7, 0, 0], {}, 'Sink');
+
+  return {
+    name: 'Machine Pass-Through Test',
+    description: 'Verification: Products flow through checkweigher + labeler without falling. Watch products travel inside machines.',
+    nodes: [source, conv1, machine, conv2, labeler, conv3, sink],
+    edges: [
+      edge(source.id, conv1.id),
+      edge(conv1.id, machine.id),
+      edge(machine.id, conv2.id),
       edge(conv2.id, labeler.id),
       edge(labeler.id, conv3.id),
       edge(conv3.id, sink.id),

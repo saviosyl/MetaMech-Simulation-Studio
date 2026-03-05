@@ -35,6 +35,7 @@ export interface NodeStats {
   currentProductId: string | null;
   queue: string[];
   processEndTime: number | null;
+  processStartTime?: number;
   lastSpawnTime: number;
   routerIndex: number;
   palletCount: number;
