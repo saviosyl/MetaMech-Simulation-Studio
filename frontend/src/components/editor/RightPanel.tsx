@@ -12,7 +12,8 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
-  EyeOff
+  EyeOff,
+  Zap,
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModuleDefinition } from '../../lib/moduleLibrary';
@@ -62,6 +63,30 @@ const CollapsibleSection: React.FC<{
     </div>
   );
 };
+
+// Group parameters into logical sections for progressive disclosure
+function groupParameters(params: [string, any][]) {
+  const geometry: [string, any][] = [];
+  const simulation: [string, any][] = [];
+  const logic: [string, any][] = [];
+  const appearance: [string, any][] = [];
+  const advanced: [string, any][] = [];
+
+  const geoKeys = ['length', 'width', 'height', 'radius', 'angle', 'angleDeg', 'bendAngle', 'pitch', 'turns', 'drumDiameter', 'supportSpacing', 'conveyorType', 'driveType', 'showSupports', 'showSideGuides', 'sideGuideHeight', 'adjustableFeetEnabled', 'footAdjustmentMm', 'supportType', 'legCount'];
+  const simKeys = ['beltSpeed', 'speed', 'spawnRate', 'ppm', 'processTime', 'capacity', 'cycleTime', 'maxItems', 'productColor', 'productType', 'productLength', 'productWidth', 'productHeight', 'speedFactor', 'pickHeight', 'placeHeight', 'approachHeight', 'pickDelay', 'placeDelay', 'accumulationMode', 'accumulationZones'];
+  const logicKeys = ['stopperMode', 'pusherMode', 'holdTime', 'releaseCount', 'openDuration', 'sensorTag', 'sensorType', 'detectColor', 'showBeam', 'mountPosition', 'mountHeight', 'engaged', 'enabled', 'targetColor', 'targetProductType', 'routeBy', 'routeValues', 'stroke', 'side'];
+  const appearanceKeys = ['beltColor', 'color', 'materialColor', 'finish', 'showLegs', 'showBeam'];
+
+  for (const [key, def] of params) {
+    if (geoKeys.some(g => key.toLowerCase().includes(g.toLowerCase()))) geometry.push([key, def]);
+    else if (simKeys.some(s => key.toLowerCase().includes(s.toLowerCase()))) simulation.push([key, def]);
+    else if (logicKeys.some(l => key.toLowerCase().includes(l.toLowerCase()))) logic.push([key, def]);
+    else if (appearanceKeys.some(a => key.toLowerCase().includes(a.toLowerCase()))) appearance.push([key, def]);
+    else advanced.push([key, def]);
+  }
+
+  return { geometry, simulation, logic, appearance, advanced };
+}
 
 const RightPanel: React.FC = () => {
   const {
@@ -445,20 +470,84 @@ const RightPanel: React.FC = () => {
               )}
 
               {/* Module Parameters (legacy/non-parametric) */}
-              {!parametricAssetDef && moduleDefinition && (
-                <CollapsibleSection title="Parameters" icon={Sliders} defaultOpen={true}>
-                  <div className="space-y-4">
-                    {Object.entries(moduleDefinition.parameters).map(([paramKey, paramDef]) => (
-                      <div key={paramKey}>
-                        <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
-                          {paramDef.label.toUpperCase()}
-                        </label>
-                        {renderParameterInput(paramKey, paramDef)}
-                      </div>
-                    ))}
-                  </div>
-                </CollapsibleSection>
-              )}
+              {!parametricAssetDef && moduleDefinition && (() => {
+                const params = Object.entries(moduleDefinition.parameters);
+                const groups = groupParameters(params);
+                return (
+                  <>
+                    {groups.geometry.length > 0 && (
+                      <CollapsibleSection title="Geometry" icon={Maximize} defaultOpen={true}>
+                        <div className="space-y-4">
+                          {groups.geometry.map(([paramKey, paramDef]) => (
+                            <div key={paramKey}>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                                {paramDef.label.toUpperCase()}
+                              </label>
+                              {renderParameterInput(paramKey, paramDef)}
+                            </div>
+                          ))}
+                        </div>
+                      </CollapsibleSection>
+                    )}
+                    {groups.simulation.length > 0 && (
+                      <CollapsibleSection title="Simulation" icon={Sliders} defaultOpen={true} badge="SIM">
+                        <div className="space-y-4">
+                          {groups.simulation.map(([paramKey, paramDef]) => (
+                            <div key={paramKey}>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                                {paramDef.label.toUpperCase()}
+                              </label>
+                              {renderParameterInput(paramKey, paramDef)}
+                            </div>
+                          ))}
+                        </div>
+                      </CollapsibleSection>
+                    )}
+                    {groups.logic.length > 0 && (
+                      <CollapsibleSection title="Logic" icon={Zap} defaultOpen={false} badge="LOGIC">
+                        <div className="space-y-4">
+                          {groups.logic.map(([paramKey, paramDef]) => (
+                            <div key={paramKey}>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                                {paramDef.label.toUpperCase()}
+                              </label>
+                              {renderParameterInput(paramKey, paramDef)}
+                            </div>
+                          ))}
+                        </div>
+                      </CollapsibleSection>
+                    )}
+                    {groups.appearance.length > 0 && (
+                      <CollapsibleSection title="Appearance" icon={Palette} defaultOpen={false}>
+                        <div className="space-y-4">
+                          {groups.appearance.map(([paramKey, paramDef]) => (
+                            <div key={paramKey}>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                                {paramDef.label.toUpperCase()}
+                              </label>
+                              {renderParameterInput(paramKey, paramDef)}
+                            </div>
+                          ))}
+                        </div>
+                      </CollapsibleSection>
+                    )}
+                    {groups.advanced.length > 0 && (
+                      <CollapsibleSection title="Advanced" icon={Settings} defaultOpen={false}>
+                        <div className="space-y-4">
+                          {groups.advanced.map(([paramKey, paramDef]) => (
+                            <div key={paramKey}>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">
+                                {paramDef.label.toUpperCase()}
+                              </label>
+                              {renderParameterInput(paramKey, paramDef)}
+                            </div>
+                          ))}
+                        </div>
+                      </CollapsibleSection>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* BOM Panel for Belt Conveyor */}
               {selectedObject.type === 'belt-conveyor' && (
