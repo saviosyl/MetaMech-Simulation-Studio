@@ -9,6 +9,7 @@ import RightPanel from '../components/editor/RightPanel';
 import Viewport from '../components/editor/Viewport';
 import ContextMenu from '../components/editor/ContextMenu';
 import StatsPanel from '../components/editor/StatsPanel';
+import ValidationPanel from '../components/editor/ValidationPanel';
 import ShortcutsPanel from '../components/editor/ShortcutsPanel';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -213,6 +214,7 @@ const EditorPage: React.FC = () => {
         >
           <Viewport />
           <StatsPanel />
+          <ValidationPanel />
         </div>
         <div className="flex-shrink-0">
           <RightPanel />
