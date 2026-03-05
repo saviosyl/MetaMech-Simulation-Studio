@@ -173,7 +173,7 @@ const RightPanel: React.FC = () => {
             min={paramDef.min}
             max={paramDef.max}
             step={paramDef.step}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
           />
         );
       
@@ -183,7 +183,7 @@ const RightPanel: React.FC = () => {
             type="text"
             value={value || paramDef.default}
             onChange={(e) => handleParameterChange(paramKey, e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
           />
         );
       
@@ -192,10 +192,10 @@ const RightPanel: React.FC = () => {
           <select
             value={value || paramDef.default}
             onChange={(e) => handleParameterChange(paramKey, e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
           >
             {paramDef.options.map((option: string) => (
-              <option key={option} value={option}>
+              <option key={option} value={option} className="bg-slate-800">
                 {option.charAt(0).toUpperCase() + option.slice(1)}
               </option>
             ))}
@@ -204,14 +204,14 @@ const RightPanel: React.FC = () => {
       
       case 'boolean':
         return (
-          <label className="flex items-center gap-2">
+          <label className="flex items-center gap-3 p-2 bg-slate-700/20 rounded-lg border border-slate-600/30">
             <input
               type="checkbox"
               checked={value ?? paramDef.default}
               onChange={(e) => handleParameterChange(paramKey, e.target.checked)}
-              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              className="rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 bg-slate-800"
             />
-            <span className="text-sm text-gray-700">Enabled</span>
+            <span className="text-sm text-slate-300 font-['Inter']">Enabled</span>
           </label>
         );
       
@@ -222,13 +222,13 @@ const RightPanel: React.FC = () => {
               type="color"
               value={value || paramDef.default}
               onChange={(e) => handleParameterChange(paramKey, e.target.value)}
-              className="w-12 h-9 border border-gray-300 rounded-lg"
+              className="w-12 h-9 border border-slate-600/50 rounded-lg bg-slate-800 cursor-pointer"
             />
             <input
               type="text"
               value={value || paramDef.default}
               onChange={(e) => handleParameterChange(paramKey, e.target.value)}
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              className="flex-1 px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
             />
           </div>
         );
@@ -462,104 +462,88 @@ const RightPanel: React.FC = () => {
 
               {/* BOM Panel for Belt Conveyor */}
               {selectedObject.type === 'belt-conveyor' && (
-                <div>
-                  <button
-                    onClick={() => setShowBOM(!showBOM)}
-                    className="w-full flex items-center justify-between py-2 text-sm font-medium text-gray-900 hover:text-teal-600 transition-colors"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Layers size={16} />
-                      Bill of Materials
-                    </span>
-                    <span className="text-xs text-gray-500">{showBOM ? '▼' : '▶'}</span>
-                  </button>
-                  {showBOM && (
-                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-900 text-white -mx-1">
-                      <BOMPanel
-                        parameters={selectedObject.parameters}
-                        moduleType={selectedObject.type}
-                        onExportGLB={() => {
-                          // TODO: wire to actual 3D scene ref for export
-                          const bom = generateBOM(selectedObject.parameters);
-                          alert(`GLB export: ${bom.config.length}×${bom.config.width}mm — Connect scene ref to enable 3D export`);
-                        }}
-                        onExportSTL={() => {
-                          const bom = generateBOM(selectedObject.parameters);
-                          alert(`STL export: ${bom.config.length}×${bom.config.width}mm — Connect scene ref to enable 3D export`);
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
+                <CollapsibleSection title="Bill of Materials" icon={Layers} defaultOpen={false} badge="BOM">
+                  <div className="rounded-lg overflow-hidden">
+                    <BOMPanel
+                      parameters={selectedObject.parameters}
+                      moduleType={selectedObject.type}
+                      onExportGLB={() => {
+                        const bom = generateBOM(selectedObject.parameters);
+                        alert(`GLB export: ${bom.config.length}×${bom.config.width}mm — Connect scene ref to enable 3D export`);
+                      }}
+                      onExportSTL={() => {
+                        const bom = generateBOM(selectedObject.parameters);
+                        alert(`STL export: ${bom.config.length}×${bom.config.width}mm — Connect scene ref to enable 3D export`);
+                      }}
+                    />
+                  </div>
+                </CollapsibleSection>
               )}
             </div>
           ) : (
-            <div className="p-4">
-              {/* Scene Settings */}
-              <div className="mb-6">
-                <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                  <Palette size={16} />
-                  Scene Settings
-                </h3>
-                
+            <div className="p-4 space-y-6">
+              {/* Scene Settings — Premium Dark */}
+              <CollapsibleSection title="Scene Settings" icon={Palette} defaultOpen={true}>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Environment</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 font-['Orbitron'] tracking-wide">ENVIRONMENT</label>
                     <select
                       value={sceneSettings.environment}
                       onChange={(e) => setSceneSettings({ 
                         environment: e.target.value as any 
                       })}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                      className="w-full px-3 py-2 text-sm bg-slate-900/50 border border-slate-600/50 rounded-lg text-slate-200 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 font-['Inter']"
                     >
-                      <option value="factory">Factory</option>
-                      <option value="studio-white">Studio White</option>
-                      <option value="dark-showroom">Dark Showroom</option>
-                      <option value="transparent">Transparent</option>
+                      <option value="factory" className="bg-slate-800">Factory</option>
+                      <option value="studio-white" className="bg-slate-800">Studio White</option>
+                      <option value="dark-showroom" className="bg-slate-800">Dark Showroom</option>
+                      <option value="transparent" className="bg-slate-800">Transparent</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Grid</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-2 font-['Orbitron'] tracking-wide">DISPLAY</label>
                     <div className="space-y-2">
-                      <label className="flex items-center gap-2">
+                      <label className="flex items-center gap-3 p-2 bg-slate-700/20 rounded-lg border border-slate-600/30 cursor-pointer hover:bg-slate-700/30 transition-colors">
                         <input
                           type="checkbox"
                           checked={sceneSettings.grid.visible}
                           onChange={(e) => setSceneSettings({
                             grid: { ...sceneSettings.grid, visible: e.target.checked }
                           })}
-                          className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                          className="rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 bg-slate-800"
                         />
-                        <span className="text-sm text-gray-700">Visible</span>
+                        <div className="flex items-center gap-2">
+                          {sceneSettings.grid.visible ? <Eye size={14} className="text-cyan-400" /> : <EyeOff size={14} className="text-slate-500" />}
+                          <span className="text-sm text-slate-300 font-['Inter']">Grid</span>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 p-2 bg-slate-700/20 rounded-lg border border-slate-600/30 cursor-pointer hover:bg-slate-700/30 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={sceneSettings.axes.visible}
+                          onChange={(e) => setSceneSettings({
+                            axes: { ...sceneSettings.axes, visible: e.target.checked }
+                          })}
+                          className="rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 bg-slate-800"
+                        />
+                        <div className="flex items-center gap-2">
+                          {sceneSettings.axes.visible ? <Eye size={14} className="text-cyan-400" /> : <EyeOff size={14} className="text-slate-500" />}
+                          <span className="text-sm text-slate-300 font-['Inter']">Axes Helper</span>
+                        </div>
                       </label>
                     </div>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Axes Helper</label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={sceneSettings.axes.visible}
-                        onChange={(e) => setSceneSettings({
-                          axes: { ...sceneSettings.axes, visible: e.target.checked }
-                        })}
-                        className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                      />
-                      <span className="text-sm text-gray-700">Visible</span>
-                    </label>
-                  </div>
                 </div>
-              </div>
+              </CollapsibleSection>
 
-              {/* No Selection Message */}
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Sliders size={24} className="text-gray-400" />
+              {/* No Selection Message — Premium */}
+              <div className="text-center py-12">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-slate-700/50 to-slate-800/50 border border-slate-600/50 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Sliders size={24} className="text-slate-400" />
                 </div>
-                <h3 className="text-sm font-medium text-gray-900 mb-1">No Object Selected</h3>
-                <p className="text-sm text-gray-500">
+                <h3 className="text-sm font-semibold text-slate-200 mb-1 font-['Orbitron']">NO OBJECT SELECTED</h3>
+                <p className="text-xs text-slate-400 font-['Inter']">
                   Select an object in the scene to view and edit its properties.
                 </p>
               </div>
