@@ -20,10 +20,8 @@ const LoginPage: React.FC = () => {
       setError('Please fill in all fields');
       return;
     }
-
     setIsLoading(true);
     setError('');
-
     try {
       await login(email, password);
       navigate(from, { replace: true });
@@ -35,100 +33,234 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-6">
-      <div className="container mx-auto max-w-md">
-        {/* Logo/Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            <span className="text-teal-600">MetaMech</span> Studio
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--mm-bg-app)',
+        fontFamily: "'Inter', sans-serif",
+        padding: '24px',
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: 420 }}>
+        {/* ─── Brand ─── */}
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
+          {/* Logo mark */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 56,
+            height: 56,
+            borderRadius: 14,
+            background: 'linear-gradient(135deg, #0891b2, #06b6d4)',
+            marginBottom: 16,
+            boxShadow: '0 4px 24px rgba(6, 182, 212, 0.2)',
+          }}>
+            <span style={{ fontSize: 24, fontWeight: 800, color: '#fff', fontFamily: "'Orbitron', monospace" }}>M</span>
+          </div>
+          <h1 style={{
+            fontSize: 22,
+            fontWeight: 700,
+            color: 'var(--mm-text-primary)',
+            fontFamily: "'Orbitron', monospace",
+            letterSpacing: '0.05em',
+            margin: '0 0 6px 0',
+          }}>
+            MetaMech Studio
           </h1>
-          <p className="text-gray-600">Industrial Simulation Platform</p>
+          <p style={{
+            fontSize: 13,
+            color: 'var(--mm-text-tertiary)',
+            margin: 0,
+            lineHeight: 1.5,
+          }}>
+            Industrial layout, simulation &amp; automation planning
+          </p>
         </div>
 
-        {/* Login Form */}
-        <div className="bg-white shadow-lg rounded-xl p-8">
-          <h2 className="text-2xl font-semibold text-gray-900 text-center mb-6">
-            Sign In
+        {/* ─── Login Card ─── */}
+        <div style={{
+          background: 'var(--mm-bg-panel)',
+          border: '1px solid var(--mm-border)',
+          borderRadius: 12,
+          padding: '32px 28px',
+          boxShadow: 'var(--mm-shadow-lg)',
+        }}>
+          <h2 style={{
+            fontSize: 16,
+            fontWeight: 600,
+            color: 'var(--mm-text-primary)',
+            textAlign: 'center',
+            margin: '0 0 24px 0',
+          }}>
+            Sign in to your account
           </h2>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+            <div style={{
+              background: 'var(--mm-accent-danger-muted)',
+              border: '1px solid rgba(248, 113, 113, 0.3)',
+              color: 'var(--mm-accent-danger)',
+              padding: '10px 14px',
+              borderRadius: 8,
+              fontSize: 13,
+              marginBottom: 20,
+            }}>
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: 18 }}>
+              <label style={{
+                display: 'block',
+                fontSize: 12,
+                fontWeight: 600,
+                color: 'var(--mm-text-secondary)',
+                marginBottom: 6,
+                letterSpacing: '0.03em',
+              }}>
                 Email Address
               </label>
               <input
-                id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@company.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                placeholder="you@company.com"
                 disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  fontSize: 14,
+                  background: 'var(--mm-bg-input)',
+                  border: '1px solid var(--mm-border)',
+                  borderRadius: 8,
+                  color: 'var(--mm-text-primary)',
+                  outline: 'none',
+                  transition: 'border-color 0.15s',
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--mm-accent-primary)'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--mm-border)'}
               />
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            <div style={{ marginBottom: 12 }}>
+              <label style={{
+                display: 'block',
+                fontSize: 12,
+                fontWeight: 600,
+                color: 'var(--mm-text-secondary)',
+                marginBottom: 6,
+                letterSpacing: '0.03em',
+              }}>
                 Password
               </label>
               <input
-                id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                 disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  fontSize: 14,
+                  background: 'var(--mm-bg-input)',
+                  border: '1px solid var(--mm-border)',
+                  borderRadius: 8,
+                  color: 'var(--mm-text-primary)',
+                  outline: 'none',
+                  transition: 'border-color 0.15s',
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--mm-accent-primary)'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--mm-border)'}
               />
             </div>
 
-            <div className="text-right">
-              <Link 
-                to="/forgot-password" 
-                className="text-sm text-teal-600 hover:text-teal-700"
+            <div style={{ textAlign: 'right', marginBottom: 24 }}>
+              <Link
+                to="/forgot-password"
+                style={{ fontSize: 12, color: 'var(--mm-accent-primary)', textDecoration: 'none' }}
               >
-                Forgot your password?
+                Forgot password?
               </Link>
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-teal-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-teal-700 focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              style={{
+                width: '100%',
+                padding: '11px 20px',
+                fontSize: 14,
+                fontWeight: 600,
+                color: '#fff',
+                background: 'linear-gradient(135deg, #0891b2, #06b6d4)',
+                border: 'none',
+                borderRadius: 8,
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.6 : 1,
+                transition: 'all 0.15s',
+                boxShadow: '0 2px 12px rgba(6, 182, 212, 0.25)',
+                fontFamily: "'Inter', sans-serif",
+              }}
             >
-              {isLoading ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Signing In...
-                </div>
-              ) : (
-                'Sign In'
-              )}
+              {isLoading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
 
-          <div className="mt-8 text-center">
-            <p className="text-gray-600">
+          <div style={{
+            textAlign: 'center',
+            marginTop: 24,
+            paddingTop: 20,
+            borderTop: '1px solid var(--mm-border-subtle)',
+          }}>
+            <span style={{ fontSize: 13, color: 'var(--mm-text-tertiary)' }}>
               Don't have an account?{' '}
-              <Link to="/register" className="text-teal-600 hover:text-teal-700 font-medium">
+              <Link to="/register" style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none' }}>
                 Create Account
               </Link>
-            </p>
+            </span>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="text-center mt-8">
-          <p className="text-sm text-gray-500">
-            © 2024 MetaMech Solutions. Premium industrial simulation platform.
-          </p>
+        {/* ─── Feature pills ─── */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: 8,
+          marginTop: 24,
+          flexWrap: 'wrap',
+        }}>
+          {['Conveyor Layout', 'Simulation', 'Robot Planning', 'Palletizing'].map(tag => (
+            <span
+              key={tag}
+              style={{
+                fontSize: 11,
+                color: 'var(--mm-text-tertiary)',
+                padding: '4px 10px',
+                borderRadius: 20,
+                border: '1px solid var(--mm-border-subtle)',
+                background: 'var(--mm-bg-panel)',
+              }}
+            >
+              {tag}
+            </span>
+          ))}
         </div>
+
+        {/* ─── Footer ─── */}
+        <p style={{
+          textAlign: 'center',
+          fontSize: 11,
+          color: 'var(--mm-text-disabled)',
+          marginTop: 32,
+        }}>
+          © 2025 MetaMech Solutions · metamechsolutions.com
+        </p>
       </div>
     </div>
   );
