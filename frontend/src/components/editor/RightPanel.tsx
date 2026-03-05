@@ -1,8 +1,9 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { Settings, Move3D, RotateCw, Maximize, Palette, Sliders, ChevronLeft, ChevronRight, Layers, ChevronDown, ChevronUp, Eye, EyeOff, Zap } from 'lucide-react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
+import { Settings, Move3D, RotateCw, Maximize, Palette, Sliders, ChevronLeft, ChevronRight, Layers, ChevronDown, ChevronUp, Eye, EyeOff, Zap, Radio } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModuleDefinition } from '../../lib/moduleLibrary';
 import { getAssetById, ParametricAssetDef } from '../../lib/assetManifest';
+import { simulationEngine } from '../../simulation/SimulationEngine';
 import { mToMm, mmToM, radToDeg, degToRad } from '../../utils/units';
 import BOMPanel from './BOMPanel';
 import { generateBOM } from '../../lib/bom/bomEngine';
@@ -50,8 +51,16 @@ function groupParams(params: [string, any][]) {
 }
 
 const RightPanel: React.FC = () => {
-  const { selectedObjectId, selectedObjectType, processNodes, environmentAssets, actors, transformMode, setTransformMode, updateObject, sceneSettings, setSceneSettings, rightPanelWidth, setRightPanelWidth, rightPanelCollapsed, setRightPanelCollapsed } = useEditorStore();
+  const { selectedObjectId, selectedObjectType, processNodes, environmentAssets, actors, transformMode, setTransformMode, updateObject, sceneSettings, setSceneSettings, rightPanelWidth, setRightPanelWidth, rightPanelCollapsed, setRightPanelCollapsed, isPlaying } = useEditorStore();
   const isResizing = useRef(false);
+  const [, forceUpdate] = useState(0);
+
+  // Poll sensor signals during simulation for live TRUE/FALSE display
+  useEffect(() => {
+    if (!isPlaying) return;
+    const iv = setInterval(() => forceUpdate(n => n + 1), 300);
+    return () => clearInterval(iv);
+  }, [isPlaying]);
 
   const selectedObject = React.useMemo(() => {
     if (!selectedObjectId || !selectedObjectType) return null;
@@ -91,14 +100,33 @@ const RightPanel: React.FC = () => {
     document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
   }, [rightPanelWidth, setRightPanelWidth]);
 
+  // Get all sensor tags in the scene for dropdowns
+  const allSensorTags = processNodes
+    .filter(n => n.type === 'sensor' && n.parameters?.sensorTag)
+    .map(n => n.parameters.sensorTag as string);
+
   const renderInput = (key: string, def: any) => {
     const val = selectedObject?.parameters[key];
+
+    // Special: triggerSensorTag → dropdown of available sensor tags
+    if (key === 'triggerSensorTag') {
+      return (
+        <select value={val ?? ''} onChange={e => handleParam(key, e.target.value)} style={inputStyle}>
+          <option value="" style={{ background: 'var(--mm-bg-panel)' }}>— None —</option>
+          {allSensorTags.map(tag => (
+            <option key={tag} value={tag} style={{ background: 'var(--mm-bg-panel)' }}>{tag}</option>
+          ))}
+        </select>
+      );
+    }
+
     switch (def.type) {
       case 'number': return <input type="number" value={val ?? def.default} onChange={e => handleParam(key, Number(e.target.value))} min={def.min} max={def.max} step={def.step} style={inputStyle} />;
-      case 'string': return <input type="text" value={val ?? def.default} onChange={e => handleParam(key, e.target.value)} style={inputStyle} />;
+      case 'text':
+      case 'string': return <input type="text" value={val ?? def.default ?? ''} onChange={e => handleParam(key, e.target.value)} style={inputStyle} />;
       case 'select': return (
         <select value={val ?? def.default} onChange={e => handleParam(key, e.target.value)} style={inputStyle}>
-          {def.options?.map((o: string) => <option key={o} value={o} style={{ background: 'var(--mm-bg-panel)' }}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
+          {def.options?.map((o: string) => <option key={o} value={o} style={{ background: 'var(--mm-bg-panel)' }}>{o.charAt(0).toUpperCase() + o.slice(1).replace(/-/g, ' ')}</option>)}
         </select>);
       case 'boolean': return (
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer' }}>
@@ -110,7 +138,7 @@ const RightPanel: React.FC = () => {
           <input type="color" value={val ?? def.default} onChange={e => handleParam(key, e.target.value)} style={{ width: 36, height: 30, border: '1px solid var(--mm-border)', borderRadius: 6, cursor: 'pointer', background: 'var(--mm-bg-input)' }} />
           <input type="text" value={val ?? def.default} onChange={e => handleParam(key, e.target.value)} style={{ ...inputStyle, flex: 1 }} />
         </div>);
-      default: return null;
+      default: return <input type="text" value={val ?? def.default ?? ''} onChange={e => handleParam(key, e.target.value)} style={inputStyle} />;
     }
   };
 
@@ -161,6 +189,58 @@ const RightPanel: React.FC = () => {
                 </div>
               </Section>
 
+              {/* Live Sensor Signal — shown for sensors and stoppers */}
+              {selectedObject.type === 'sensor' && selectedObject.parameters?.sensorTag && (() => {
+                const tag = selectedObject.parameters.sensorTag;
+                const signal = simulationEngine.getSensorSignals().get(tag);
+                const isActive = signal?.active ?? false;
+                return (
+                  <div style={{
+                    margin: '0 0 8px 0', padding: '10px 12px', borderRadius: 8,
+                    background: isActive ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.1)',
+                    border: `1px solid ${isActive ? 'rgba(16,185,129,0.3)' : 'var(--mm-border-subtle)'}`,
+                    display: 'flex', alignItems: 'center', gap: 10,
+                  }}>
+                    <Radio size={16} style={{ color: isActive ? '#10b981' : 'var(--mm-text-disabled)' }} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Orbitron', monospace", color: isActive ? '#10b981' : 'var(--mm-text-tertiary)' }}>
+                        {tag}: {isActive ? 'TRUE' : 'FALSE'}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--mm-text-disabled)', marginTop: 2 }}>
+                        {isActive ? `Detecting product` : 'No product in zone'}
+                      </div>
+                    </div>
+                    <div style={{
+                      width: 10, height: 10, borderRadius: '50%', flexShrink: 0, marginLeft: 'auto',
+                      background: isActive ? '#10b981' : '#475569',
+                      boxShadow: isActive ? '0 0 8px rgba(16,185,129,0.5)' : 'none',
+                    }} />
+                  </div>
+                );
+              })()}
+
+              {selectedObject.type === 'stopper' && selectedObject.parameters?.triggerSensorTag && (() => {
+                const tag = selectedObject.parameters.triggerSensorTag;
+                const signal = simulationEngine.getSensorSignals().get(tag);
+                const isActive = signal?.active ?? false;
+                return (
+                  <div style={{
+                    margin: '0 0 8px 0', padding: '8px 12px', borderRadius: 8,
+                    background: 'rgba(100,116,139,0.08)', border: '1px solid var(--mm-border-subtle)',
+                    display: 'flex', alignItems: 'center', gap: 8, fontSize: 11,
+                  }}>
+                    <span style={{ color: 'var(--mm-text-tertiary)' }}>Trigger:</span>
+                    <span style={{ fontWeight: 700, fontFamily: "'Orbitron', monospace", color: isActive ? '#10b981' : 'var(--mm-text-disabled)' }}>
+                      {tag} = {isActive ? 'TRUE' : 'FALSE'}
+                    </span>
+                    <div style={{
+                      width: 8, height: 8, borderRadius: '50%', marginLeft: 'auto',
+                      background: isActive ? '#10b981' : '#475569',
+                    }} />
+                  </div>
+                );
+              })()}
+
               {/* Transform */}
               <Section title="Transform" icon={Move3D} defaultOpen={true}>
                 <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
@@ -210,7 +290,7 @@ const RightPanel: React.FC = () => {
                 return (<>
                   {g.geo.length > 0 && <Section title="Geometry" icon={Maximize} defaultOpen={true}>{g.geo.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                   {g.sim.length > 0 && <Section title="Simulation" icon={Sliders} defaultOpen={true} badge="SIM">{g.sim.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
-                  {g.logic.length > 0 && <Section title="Logic" icon={Zap} defaultOpen={false} badge="LOGIC">{g.logic.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
+                  {g.logic.length > 0 && <Section title="Logic" icon={Zap} defaultOpen={['sensor','stopper','pusher'].includes(selectedObject.type)} badge="LOGIC">{g.logic.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                   {g.appear.length > 0 && <Section title="Appearance" icon={Palette} defaultOpen={false}>{g.appear.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                   {g.adv.length > 0 && <Section title="Advanced" icon={Settings} defaultOpen={false}>{g.adv.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                 </>);
