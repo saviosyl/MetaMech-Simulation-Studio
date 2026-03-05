@@ -197,6 +197,7 @@ export class SimulationEngine {
     for (const node of this.nodes) {
       const stats = this.nodeStats.get(node.id)!;
       stats.totalTime = this.simTime;
+      try {
 
       switch (node.type) {
         case 'source': this.tickSource(node, stats, elapsed); break;
@@ -253,6 +254,9 @@ export class SimulationEngine {
           }
           break;
         }
+      }
+      } catch (e) {
+        console.warn(`SimEngine tick error on node ${node.id} (${node.type}):`, e);
       }
 
       if (stats.totalTime > 0) {
@@ -1250,11 +1254,15 @@ export class SimulationEngine {
     // Use SensorLogic state machine if available
     let sState = this.sensorStates.get(node.id);
     if (sState) {
-      const events = evaluateSensor(config, sState, nearbyProducts, this.simTime);
-      // Push events to rule engine
-      for (const evt of events) {
-        this.pendingSensorEvents.push(evt);
-        this.addFlowEvent(stats, 'sensor-trigger', `${evt.type}: ${evt.productId?.slice(0, 8) || 'zone'}`);
+      try {
+        const events = evaluateSensor(node.id, sensorPos, config, sState, nearbyProducts, this.simTime);
+        // Push events to rule engine
+        for (const evt of events) {
+          this.pendingSensorEvents.push(evt);
+          this.addFlowEvent(stats, 'sensor-trigger', `${evt.type}: ${evt.productId?.slice(0, 8) || 'zone'}`);
+        }
+      } catch (e) {
+        console.warn('Sensor evaluation error:', node.id, e);
       }
     }
 
