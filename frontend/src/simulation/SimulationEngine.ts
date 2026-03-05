@@ -485,20 +485,6 @@ export class SimulationEngine {
     }
 
     // Find mounted stoppers on this conveyor that are currently ENGAGED (blocking)
-    const _convId = node.id.slice(0, 6);
-    const allStoppersOnConv = this.nodes.filter(n => n.type === 'stopper' && n.parameters?.parentConveyorId === node.id);
-    if (allStoppersOnConv.length > 0 && Math.floor(this.simTime * 2) % 2 === 0) {
-      // Log every 0.5s
-      for (const s of allStoppersOnConv) {
-        const tag = s.parameters?.stopperTag || '?';
-        const mode = s.parameters?.stopperMode || 'always-stop';
-        const trig = s.parameters?.triggerSensorTag || 'none';
-        const signal = this.sensorSignals.get(trig);
-        const latched = (s.parameters as any)?._latched;
-        console.log(`[CONV ${_convId}] stopper=${tag} mode=${mode} trigger=${trig} signal=${signal?.active} latched=${latched} mountPos=${s.parameters?.mountPosition}`);
-      }
-    }
-
     const mountedStoppers = this.nodes.filter(n => {
       if (n.type !== 'stopper') return false;
       if (n.parameters?.parentConveyorId !== node.id) return false;
@@ -1150,7 +1136,8 @@ export class SimulationEngine {
             const secNode = this.nodes.find(n => n.type === 'sensor' && n.parameters?.sensorTag === secTag);
             const secDwellThreshold = secNode?.parameters?.dwellTimeThreshold || 3;
             const secDwellSec = this.simTime - secSignal.activeSince;
-            console.log(`[STOPPER sensor-dwell] secTag=${secTag} dwell=${secDwellSec.toFixed(1)}s threshold=${secDwellThreshold}s`);
+            // sensor-dwell check runs each tick — only log when threshold met
+            if (secDwellSec >= secDwellThreshold) console.log(`[STOPPER] sensor-dwell MET: ${secTag} dwell=${secDwellSec.toFixed(1)}s`);
             if (secDwellSec >= secDwellThreshold) return true;
           }
         }
@@ -1409,19 +1396,6 @@ export class SimulationEngine {
     }
 
     const nearbyProduct = nearbyProducts[0] || null;
-    // Debug: log sensor detection
-    if (sensorTag && nearbyProduct && Math.floor(this.simTime * 2) % 2 === 0) {
-      console.log(`[SENSOR ${sensorTag}] DETECTED product at pathPos=${nearbyProduct.pathPosition?.toFixed(3)} on conv=${parentConveyorId?.slice(0,6)} mountPos=${mountPosition}`);
-    }
-    if (sensorTag && !nearbyProduct && parentConveyorId) {
-      // Log product positions on the conveyor for debugging (every 2s)
-      if (Math.floor(this.simTime) % 2 === 0 && Math.floor(this.simTime * 10) % 10 === 0) {
-        const prodsOnConv = this.products.filter(p => p.currentNodeId === parentConveyorId && p.state === 'queued');
-        if (prodsOnConv.length > 0) {
-          console.log(`[SENSOR ${sensorTag}] NO detect. mountPos=${mountPosition} products on conv: ${prodsOnConv.map(p => p.pathPosition?.toFixed(3)).join(', ')}`);
-        }
-      }
-    }
     const wasActive = stats.processing;
 
     // Publish sensor signal to the signal registry (by tag)
@@ -1458,32 +1432,42 @@ export class SimulationEngine {
       this.setFlowState(stats, 'idle', dt);
     }
 
-    // ── Dwell event logic ──
+    // ── Dwell event logic (fires ONCE per cycle) ──
     const dwellThreshold = node.parameters?.dwellTimeThreshold || 0;
     const onDwellEvent = node.parameters?.onDwellEvent || 'none';
     if (dwellThreshold > 0 && onDwellEvent !== 'none' && sensorTag) {
       const signal = this.sensorSignals.get(sensorTag);
       if (signal?.active && signal.activeSince > 0) {
         const dwellSec = this.simTime - signal.activeSince;
-        if (dwellSec >= dwellThreshold) {
-          // Fire dwell event — find target stoppers and sources
+        const alreadyFired = (node.parameters as any)._dwellFired ?? false;
+        
+        if (dwellSec >= dwellThreshold && !alreadyFired) {
+          // Fire dwell event ONCE
+          (node.parameters as any)._dwellFired = true;
+          console.log(`[DWELL-FIRE] ${sensorTag} dwell=${dwellSec.toFixed(1)}s → EVENT: ${onDwellEvent}`);
+          
           if (onDwellEvent === 'release-stopper' || onDwellEvent === 'stop-source-and-release') {
-            // Release ALL products on stoppers that reference this sensor as secondary OR trigger
             for (const n of this.nodes) {
               if (n.type === 'stopper' && (n.parameters?.secondarySensorTag === sensorTag || n.parameters?.triggerSensorTag === sensorTag)) {
+                // Release ALL stopped products
                 const stopped = this.products.filter(p => p.stoppedBy === n.id);
                 const nStats = this.nodeStats.get(n.id);
-                if (nStats && stopped.length > 0) {
-                  console.log(`[DWELL] ${sensorTag} dwell=${dwellSec.toFixed(1)}s → releasing ${stopped.length} products from stopper ${n.parameters?.stopperTag}`);
+                if (nStats) {
                   for (const p of stopped) this.releaseProduct(p, n, nStats);
                 }
+                // Clear the latch and set cooldown
+                (n.parameters as any)._latched = false;
+                (n.parameters as any)._lastReleaseTime = this.simTime;
+                console.log(`[DWELL-FIRE] Released ${stopped.length} from ${n.parameters?.stopperTag}, latch=false, cooldown started`);
               }
             }
           }
-          if (onDwellEvent === 'stop-source' || onDwellEvent === 'stop-source-and-release') {
-            // Mark source state — tickSource reads this via blockedBySensorTag
-            console.log(`[DWELL] ${sensorTag} dwell=${dwellSec.toFixed(1)}s → source control event`);
-          }
+        }
+      } else {
+        // Sensor went FALSE — reset dwell fired flag for next cycle
+        if ((node.parameters as any)._dwellFired) {
+          console.log(`[DWELL-RESET] ${sensorTag} sensor cleared, ready for next cycle`);
+          (node.parameters as any)._dwellFired = false;
         }
       }
     }
