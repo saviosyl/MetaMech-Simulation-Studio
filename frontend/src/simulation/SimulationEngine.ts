@@ -509,8 +509,11 @@ export class SimulationEngine {
         }
         
         // Cooldown: barrier stays OPEN for cooldownSec after release
-        if (ss.lastReleaseTime > 0 && (this.simTime - ss.lastReleaseTime) < ss.cooldownSec) {
+        const sinceLast = this.simTime - ss.lastReleaseTime;
+        if (ss.lastReleaseTime > 0 && sinceLast < ss.cooldownSec) {
           ss.latched = false;
+          // Log once when cooldown starts
+          if (sinceLast < 0.1) console.log(`[COOLDOWN] ${n.parameters?.stopperTag} OPEN for ${ss.cooldownSec}s (released at t=${ss.lastReleaseTime.toFixed(1)})`);
           return false; // barrier OPEN during cooldown
         }
         
@@ -520,7 +523,7 @@ export class SimulationEngine {
         
         if (sensorActive && !ss.latched) {
           ss.latched = true;
-          console.log(`[LATCH] ${n.parameters?.stopperTag} LATCHED by ${triggerTag}`);
+          console.log(`[LATCH] ${n.parameters?.stopperTag} at t=${this.simTime.toFixed(1)} lastRelease=${ss.lastReleaseTime.toFixed(1)} sinceLast=${sinceLast.toFixed(1)} cool=${ss.cooldownSec}`);
         }
         
         return ss.latched;
