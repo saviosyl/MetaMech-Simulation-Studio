@@ -354,7 +354,7 @@ export function createBacklogControlScenario(): Scenario {
           stopperMode: 'sensor-triggered', triggerSensorTag: 'SE001',
           stopCondition: 'any-product', releaseCondition: 'sensor-dwell',
           secondarySensorTag: 'SE002',
-          holdTime: 3, releaseCount: 1, releaseDelay: 0, stopCount: 0,
+          holdTime: 3, releaseCount: 99, releaseDelay: 3, stopCount: 0,
           parentConveyorId: conveyorId, mountPosition: 0.90, mountSide: 'center',
         }, name: 'ST001 (Sensor-Triggered)' },
 

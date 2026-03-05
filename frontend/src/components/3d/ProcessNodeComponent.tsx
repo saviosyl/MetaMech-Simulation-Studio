@@ -131,7 +131,7 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { document.body.style.cursor = 'auto'; }}
       >
-        <StopperModel parameters={node.parameters} isSelected={isSelected} />
+        <StopperModel parameters={node.parameters} isSelected={isSelected} nodeId={node.id} />
         <StopperZoneOverlay 
           width={(node.parameters.beltWidth || 600) / 1000}
           isEngaged={node.parameters.engaged ?? true}
