@@ -842,6 +842,10 @@ export class SimulationEngine {
         product.currentEdgeId = null;
         product.currentPosition = [...end];
         product.conveyorEntryTime = null;
+        const destNode = this.nodes.find(nn => nn.id === edge.to);
+        if (destNode && ['cartesian-robot','cobot','robot-5axis','robot-6axis'].includes(destNode.type)) {
+          console.log(`[ROBOT-ARRIVE] Product ${product.id.slice(0,8)} arrived at ${destNode.name} pos=[${end.map(v=>v.toFixed(2))}]`);
+        }
       } else {
         // Interpolate along the edge path between start and end world positions
         product.currentPosition = [
@@ -958,6 +962,11 @@ export class SimulationEngine {
       availableProductId = targetId;
     }
 
+    // Log robot phase every ~1 second
+    if (Math.floor(this.simTime * 2) !== Math.floor((this.simTime - dt) * 2)) {
+      console.log(`[ROBOT-STATE] ${node.name} t=${this.simTime.toFixed(1)} phase=${rState.phase} prog=${rState.phaseProgress.toFixed(2)} held=${rState.heldProductId?.slice(0,8)||'none'} queue=${stats.queue.length} pick=${JSON.stringify(rState.pickPosition)} place=${JSON.stringify(rState.placePosition)}`);
+    }
+
     // Tick the motion controller
     const placedId = tickRobot(rState, config, this.simTime, availableProductId);
 
@@ -991,6 +1000,7 @@ export class SimulationEngine {
 
     // If robot just placed a product
     if (placedId) {
+      console.log(`[ROBOT-PLACE] ${node.name} placed product ${placedId.slice(0,8)}`);
       const placed = this.products.find(p => p.id === placedId);
       if (placed) {
         // Check if place target is a pallet
