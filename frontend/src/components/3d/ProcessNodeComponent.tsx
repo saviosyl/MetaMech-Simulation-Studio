@@ -29,6 +29,9 @@ import {
   PassThroughHatchModel, CleanroomCartModel, GuardPartitionModel,
   LightCurtainModel, InspectionStationModel, MachineEnclosureModel,
 } from './models/MedicalModels';
+import FlowDirectionArrow from './overlays/FlowDirectionArrow';
+import SensorZoneOverlay from './overlays/SensorZoneOverlay';
+import StopperZoneOverlay from './overlays/StopperZoneOverlay';
 
 interface ProcessNodeComponentProps {
   node: ProcessNode;
@@ -74,10 +77,16 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
           />
         </Suspense>
         {isSelected && (
-          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[1.5, 1.7, 32]} />
-            <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
-          </mesh>
+          <>
+            <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[1.5, 1.7, 32]} />
+              <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
+            </mesh>
+            <FlowDirectionArrow 
+              length={(node.parameters.length || 3000) / 1000} 
+              height={(node.parameters.height || 800) / 1000} 
+            />
+          </>
         )}
       </group>
     );
@@ -123,6 +132,10 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         onPointerOut={() => { document.body.style.cursor = 'auto'; }}
       >
         <StopperModel parameters={node.parameters} isSelected={isSelected} />
+        <StopperZoneOverlay 
+          width={(node.parameters.beltWidth || 600) / 1000}
+          isEngaged={node.parameters.engaged ?? true}
+        />
         {isSelected && (
           <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[0.4, 0.5, 32]} />
@@ -169,6 +182,10 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         onPointerOut={() => { document.body.style.cursor = 'auto'; }}
       >
         <SensorModel parameters={node.parameters} isSelected={isSelected} />
+        <SensorZoneOverlay 
+          range={0.3}
+          height={(node.parameters.mountHeight || 800) / 1000}
+        />
         {isSelected && (
           <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[0.3, 0.4, 32]} />
