@@ -351,7 +351,7 @@ export class SimulationEngine {
       downstreamClear,
     };
 
-    const commands = evaluateRules(this.rules, this.ruleEngineState, context);
+    const commands = evaluateRules(this.ruleEngineState, context);
 
     // Execute action commands
     for (const cmd of commands) {

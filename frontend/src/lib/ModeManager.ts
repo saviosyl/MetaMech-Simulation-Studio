@@ -75,7 +75,7 @@ class ModeManagerSingleton {
   }
 
   /** Map editor tool names to interaction modes */
-  static toolToMode(tool: string): InteractionMode {
+  toolToMode(tool: string): InteractionMode {
     switch (tool) {
       case 'select':
         return 'viewport';
