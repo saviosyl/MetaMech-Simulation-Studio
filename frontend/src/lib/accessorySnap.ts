@@ -60,6 +60,10 @@ export interface MountData {
   mountSide: MountSide;
   /** Lateral offset from center in meters */
   lateralOffset: number;
+  /** Height offset from belt surface in meters */
+  heightOffset?: number;
+  /** Flip 180° around Y axis */
+  flip?: boolean;
 }
 
 export function isAccessoryType(type: string): boolean {
@@ -295,10 +299,15 @@ export function remountAccessory(
     pathPos, tangent, convWidthM, mountData.mountSide, lateralOff, conveyorNode.position[1]
   );
 
+  // Apply height offset (mm → m)
+  const heightOffsetM = (mountData.heightOffset || 0) / 1000;
+  mountPos[1] += heightOffsetM;
+
   const rotY = computeMountRotation(tangent, mountData.mountSide, accessoryType);
+  const flipOffset = mountData.flip ? Math.PI : 0;
 
   return {
     position: mountPos,
-    rotation: [0, rotY, 0],
+    rotation: [0, rotY + flipOffset, 0],
   };
 }

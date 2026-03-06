@@ -158,6 +158,8 @@ const DraggableObject: React.FC<{
               mountPosition: acc.parameters.mountPosition ?? 0.5,
               mountSide: acc.parameters.mountSide ?? 'center',
               lateralOffset: acc.parameters.lateralOffset ?? 0,
+              heightOffset: acc.parameters.heightOffset ?? 0,
+              flip: acc.parameters.flip ?? false,
             };
             const result = remountAccessory(mountData, updatedConveyor, acc.type);
             if (result) {

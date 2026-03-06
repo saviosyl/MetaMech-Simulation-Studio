@@ -234,6 +234,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       secondarySensorTag: { type: 'text', label: 'Secondary Sensor Tag (queue)', default: '' },
       mountPosition: { type: 'number', label: 'Position Along Path', default: 0.5, min: 0, max: 1, step: 0.05 },
       mountSide: { type: 'select', label: 'Mount Side', default: 'center', options: ['left', 'right', 'center'] },
+      heightOffset: { type: 'number', label: 'Height Offset (mm)', default: 0, min: -200, max: 200, step: 10 },
+      flip: { type: 'boolean', label: 'Flip 180°', default: false },
     },
   },
   {
@@ -260,6 +262,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       invertMatch: { type: 'boolean', label: 'Invert Match', default: false },
       autoRetract: { type: 'boolean', label: 'Auto Retract', default: true },
       mountPosition: { type: 'number', label: 'Position Along Path', default: 0.5, min: 0, max: 1, step: 0.05 },
+      heightOffset: { type: 'number', label: 'Height Offset (mm)', default: 0, min: -200, max: 200, step: 10 },
+      flip: { type: 'boolean', label: 'Flip 180°', default: false },
     },
   },
   {
@@ -289,6 +293,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       onDwellEvent: { type: 'select', label: 'On Dwell Event', default: 'none', options: ['none', 'stop-source', 'release-stopper', 'stop-source-and-release'] },
       mountPosition: { type: 'number', label: 'Position Along Path', default: 0.5, min: 0, max: 1, step: 0.05 },
       mountSide: { type: 'select', label: 'Mount Side', default: 'center', options: ['left', 'right', 'center'] },
+      heightOffset: { type: 'number', label: 'Height Offset (mm)', default: 0, min: -200, max: 200, step: 10 },
+      flip: { type: 'boolean', label: 'Flip 180°', default: false },
     },
   },
   {
