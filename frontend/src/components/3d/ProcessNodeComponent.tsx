@@ -13,6 +13,7 @@ import PusherModel from './models/PusherModel';
 import BendConveyorModel from './models/BendConveyorModel';
 import SensorModel from './models/SensorModel';
 import SourceModel from './models/SourceModel';
+import CeilingHangerModel from './models/CeilingHangerModel';
 import SinkModel from './models/SinkModel';
 import BufferModel from './models/BufferModel';
 import { CartesianRobotModel, CobotModel, Robot5AxisModel, Robot6AxisModel } from './models/RobotModels';
@@ -94,6 +95,17 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
               height={(node.parameters.height || 800) / 1000} 
             />
           </>
+        )}
+        {node.parameters.supportType === 'ceiling-hanger' && (
+          <CeilingHangerModel
+            conveyorHeight={(node.parameters.height || 800) / 1000}
+            ceilingHeight={(node.parameters.ceilingHeight || 3000) / 1000}
+            conveyorWidth={(node.parameters.width || 600) / 1000}
+            conveyorLength={(node.parameters.length || 3000) / 1000}
+            hangerStyle={node.parameters.hangerStyle || 'twin-rod'}
+            showCrossbar={node.parameters.hangerCrossbar !== false}
+            isSelected={isSelected}
+          />
         )}
       </group>
     );
