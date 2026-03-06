@@ -510,6 +510,8 @@ const Viewport: React.FC = () => {
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'copy';
   }, []);
 
   const getSelectedObject = () => {

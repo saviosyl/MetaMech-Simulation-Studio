@@ -706,6 +706,7 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Safety Fence',
     category: 'environment',
     icon: Package,
+    assetId: 'fence',
     description: 'Machine guard / safety fence panel',
     parameters: {
       width: { type: 'number', label: 'Width (mm)', default: 2000, min: 500, max: 6000, step: 100 },
@@ -717,6 +718,7 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Fence Gate',
     category: 'environment',
     icon: Package,
+    assetId: 'fence-gate',
     description: 'Access gate in safety fence',
     parameters: {
       width: { type: 'number', label: 'Width (mm)', default: 1200, min: 600, max: 2000, step: 100 },
@@ -728,6 +730,7 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Bollard',
     category: 'environment',
     icon: Package,
+    assetId: 'bollard',
     description: 'Safety bollard / post',
     parameters: {},
   },
@@ -736,6 +739,7 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Operator Station',
     category: 'environment',
     icon: Package,
+    assetId: 'operator-station',
     description: 'Packing bench / operator workstation with monitor',
     parameters: {
       width: { type: 'number', label: 'Width (mm)', default: 1500, min: 800, max: 3000, step: 100 },
@@ -747,6 +751,7 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Electrical Cabinet',
     category: 'environment',
     icon: Package,
+    assetId: 'electrical-cabinet',
     description: 'Electrical panel / control cabinet',
     parameters: {},
   },
@@ -755,6 +760,7 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Tower Light',
     category: 'environment',
     icon: Package,
+    assetId: 'tower-light',
     description: 'Stack light / warning beacon (red-amber-green)',
     parameters: {},
   },
@@ -763,6 +769,7 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Pallet Stack',
     category: 'environment',
     icon: Package,
+    assetId: 'pallet-stack',
     description: 'Stack of empty pallets',
     parameters: {
       stackCount: { type: 'number', label: 'Stack Count', default: 5, min: 1, max: 12, step: 1 },
@@ -773,6 +780,7 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Floor Zone',
     category: 'environment',
     icon: Package,
+    assetId: 'floor-zone',
     description: 'Floor marking / work zone indicator',
     parameters: {
       width: { type: 'number', label: 'Width (mm)', default: 4000, min: 1000, max: 20000, step: 500 },
@@ -785,6 +793,7 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'HMI Stand',
     category: 'environment',
     icon: Package,
+    assetId: 'hmi-stand',
     description: 'Touchscreen HMI control panel on stand',
     parameters: {},
   },
@@ -793,6 +802,7 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Machine Enclosure',
     category: 'environment',
     icon: Package,
+    assetId: 'machine-enclosure',
     description: 'Enclosed machine cell / cabinet',
     parameters: {
       width: { type: 'number', label: 'Width (mm)', default: 2000, min: 800, max: 5000, step: 100 },
@@ -1327,6 +1337,7 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Machine Enclosure',
     category: 'medical',
     icon: SquareStack,
+    assetId: 'machine-enclosure',
     description: 'Cleanroom-grade machine guard enclosure with polycarbonate panels',
     parameters: {
       width: { type: 'number', label: 'Width (mm)', default: 1500, min: 800, max: 3000, step: 100 },

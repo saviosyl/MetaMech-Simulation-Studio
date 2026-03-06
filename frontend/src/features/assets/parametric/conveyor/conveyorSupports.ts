@@ -158,14 +158,18 @@ export function buildSupportAssembly(params: ConveyorParams): THREE.Group | null
 
   } else if (supportType === 'ceiling-hanger') {
     // Ceiling hanger: rods drop from ceiling plate down to conveyor frame
+    // Only use the two outer (end) positions — no center hangers
     const ceilingH = (params.ceilingHeightMm || 3000) / 1000;
     const isTwin = (params.hangerStyle || 'twin-rod') === 'twin-rod';
     const showCrossbar = params.hangerCrossbar ?? true;
     const rodRadius = 0.01; // 20mm diameter threaded rod
     const bracketW = 0.06;
     const twinSpacing = 0.06; // 60mm between twin rods along X
+    const endPositions = positions.length >= 2
+      ? [positions[0], positions[positions.length - 1]]
+      : positions;
 
-    for (const xPos of positions) {
+    for (const xPos of endPositions) {
       // Ceiling mounting plate
       const ceilingPlate = new THREE.Mesh(
         new THREE.BoxGeometry(isTwin ? 0.18 : 0.1, 0.008, widthM + 0.08),

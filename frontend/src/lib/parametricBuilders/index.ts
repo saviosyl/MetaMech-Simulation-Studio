@@ -3,7 +3,7 @@ import { buildBeltConveyor } from './beltConveyorBuilder';
 import { buildBeltConveyorFromGLB } from './beltConveyorGLBBuilder';
 import { buildRollerConveyor } from './rollerConveyorBuilder';
 import { buildModularConveyorStraight, buildModularConveyorCurve } from './modularConveyorBuilder';
-import { wallBuilder, doorBuilder, windowBuilder, palletRackBuilder, stairsBuilder } from './environmentBuilders';
+import { wallBuilder, doorBuilder, windowBuilder, palletRackBuilder, stairsBuilder, fenceBuilder, fenceGateBuilder, bollardBuilder, operatorStationBuilder, electricalCabinetBuilder, towerLightBuilder, hmiStandBuilder, machineEnclosureBuilder, floorZoneBuilder, palletStackBuilder } from './environmentBuilders';
 import { buildTransferBridge, buildPopupTransfer, buildPusherTransfer, buildMergeDivert } from './transferBuilders';
 import { buildSpiralConveyor } from './spiralConveyorBuilder';
 import { buildVerticalLifter } from './verticalLifterBuilder';
@@ -39,6 +39,16 @@ const registry: Record<string, BuilderFunction> = {
   windowBuilder,
   palletRackBuilder,
   stairsBuilder,
+  fenceBuilder,
+  fenceGateBuilder,
+  bollardBuilder,
+  operatorStationBuilder,
+  electricalCabinetBuilder,
+  towerLightBuilder,
+  hmiStandBuilder,
+  machineEnclosureBuilder,
+  floorZoneBuilder,
+  palletStackBuilder,
   transferBridgeBuilder: buildTransferBridge,
   popupTransferBuilder: buildPopupTransfer,
   pusherTransferBuilder: buildPusherTransfer,
