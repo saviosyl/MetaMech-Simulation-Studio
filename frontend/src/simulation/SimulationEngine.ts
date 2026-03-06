@@ -450,7 +450,7 @@ export class SimulationEngine {
     const path = createTransportPath(node.type, node.parameters);
     const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
     const pathLen = path ? path.length : ((node.parameters.length || 3000) / 1000);
-    const MIN_GAP_M = 0.001; // ~1mm gap — products touch each other when accumulated
+    const MIN_GAP_M = 0.0001; // ~0.1mm epsilon — products visually touch when accumulated (zero-gap)
 
     // Accept new arrivals at path start
     for (const product of arrived) {
