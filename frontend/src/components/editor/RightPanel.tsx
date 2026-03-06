@@ -277,6 +277,44 @@ const RightPanel: React.FC = () => {
                 );
               })()}
 
+              {/* Robot Debug View */}
+              {['cartesian-robot', 'cobot', 'robot-5axis', 'robot-6axis'].includes(selectedObject.type) && (() => {
+                const rState = simulationEngine.getRobotStates().get(selectedObject.id);
+                if (!rState) return null;
+                const phaseColors: Record<string, string> = {
+                  'idle': '#64748b', 'approach-pick': '#f59e0b', 'pick': '#10b981',
+                  'retract-pick': '#06b6d4', 'move-to-place': '#8b5cf6',
+                  'approach-place': '#f59e0b', 'place': '#10b981',
+                  'retract-place': '#06b6d4', 'return': '#64748b',
+                };
+                const color = phaseColors[rState.phase] || '#64748b';
+                const stuckReason = rState.phase === 'idle' && !rState.heldProductId
+                  ? 'Waiting for product at pick point'
+                  : null;
+                return (
+                  <div style={{
+                    margin: '0 0 8px 0', padding: '10px 12px', borderRadius: 8,
+                    background: `${color}15`, border: `1px solid ${color}30`,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}` }} />
+                      <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Orbitron', monospace", color, textTransform: 'uppercase' }}>
+                        {rState.phase.replace(/-/g, ' ')}
+                      </span>
+                      <span style={{ fontSize: 10, color: 'var(--mm-text-disabled)', marginLeft: 'auto' }}>
+                        Cycle #{rState.cycleCount}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--mm-text-tertiary)', lineHeight: 1.6 }}>
+                      {rState.heldProductId && <div>🤏 Holding: {rState.heldProductId.slice(0, 8)}</div>}
+                      {rState.phase !== 'idle' && <div>Progress: {Math.round(rState.phaseProgress * 100)}%</div>}
+                      <div>Gripper: {rState.gripperOpen ? 'OPEN' : 'CLOSED'}</div>
+                      {stuckReason && <div style={{ color: '#f59e0b', marginTop: 4 }}>⚠ {stuckReason}</div>}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Transform */}
               <Section title="Transform" icon={Move3D} defaultOpen={true}>
                 <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
