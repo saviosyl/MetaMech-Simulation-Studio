@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { undo, redo } from '../../store/historyMiddleware';
 import { SaveStatus } from '../../pages/EditorPage';
 import ScenarioLoader from './ScenarioLoader';
+import AILayoutBuilder from './AILayoutBuilder';
 
 interface TopBarProps {
   projectName: string;
@@ -70,6 +71,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [showAIBuilder, setShowAIBuilder] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -296,6 +298,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           <div style={S.group}>
             <button onClick={handleImport} style={S.iconBtn()} title="Import Project"><Upload size={15} /></button>
             <button onClick={handleExport} style={S.iconBtn()} title="Export Project"><Download size={15} /></button>
+            <button onClick={() => setShowAIBuilder(true)} style={{ ...S.iconBtn(), color: 'var(--mm-accent-primary)', fontWeight: 700, fontSize: 11, padding: '4px 8px' }} title="AI Layout Builder">AI</button>
           </div>
           <span style={S.groupLabel}>File</span>
         </div>
@@ -318,6 +321,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           </div>
         </div>
       </div>
+      {showAIBuilder && <AILayoutBuilder onClose={() => setShowAIBuilder(false)} />}
     </div>
   );
 };
