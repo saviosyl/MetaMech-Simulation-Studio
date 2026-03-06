@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 20.1.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.1"
+   id="Layer_1"
+   x="0px"
+   y="0px"
+   viewBox="0 0 16 14.238983"
+   enable-background="new 0 0 16 16"
+   xml:space="preserve"
+   sodipodi:docname="rPickCandidate.svg"
+   width="16"
+   height="14.238983"
+   inkscape:version="0.92.1 r15371"><metadata
+   id="metadata11"><rdf:RDF><cc:Work
+       rdf:about=""><dc:format>image/svg+xml</dc:format><dc:type
+         rdf:resource="http://purl.org/dc/dcmitype/StillImage" /><dc:title /></cc:Work></rdf:RDF></metadata><defs
+   id="defs9" /><sodipodi:namedview
+   pagecolor="#ffffff"
+   bordercolor="#666666"
+   borderopacity="1"
+   objecttolerance="10"
+   gridtolerance="10"
+   guidetolerance="10"
+   inkscape:pageopacity="0"
+   inkscape:pageshadow="2"
+   inkscape:window-width="1920"
+   inkscape:window-height="1137"
+   id="namedview7"
+   showgrid="false"
+   showguides="false"
+   inkscape:zoom="59"
+   inkscape:cx="5.6387996"
+   inkscape:cy="7.0002564"
+   inkscape:window-x="-8"
+   inkscape:window-y="-8"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="Layer_1" />
+<path
+   style="fill:#393938;fill-opacity:1"
+   d="m 0.71186441,6.8559322 c 0.49999999,-2.1 1.80000009,-4.3 4.90000009,-4.8 V 0.35593222 l 3.1,3.09999998 -3.1,3 v -1.8 c -2.2,0 -3.8,0.7 -4.90000009,2.2 z"
+   id="path4485"
+   inkscape:connector-curvature="0" /><path
+   style="fill:#393938;fill-opacity:1"
+   d="m 10.523729,9.5983051 v -1.8 l -3.1000001,2.9999989 3.1000001,3 v -1.7 c 3.1,-0.4 4.5,-2.5999989 4.9,-4.7999989 -1.1,1.6 -2.7,2.3 -4.9,2.3 z"
+   id="path2"
+   inkscape:connector-curvature="0" />
+<path
+   d="m 9.9052843,1.2144444 c -1.0715238,1.0553264 -1.0715238,3.4220443 0,4.4773707 1.0715247,1.0553264 3.4745667,1.0553264 4.5460897,0 1.071524,-1.0553264 1.071524,-3.4220443 0,-4.4773707 -1.071523,-1.0553264 -3.474565,-1.0553264 -4.5460897,0 z M 1.6503212,8.5793717 c -1.07152361,1.0553266 -1.07152361,3.4220443 0,4.4773703 1.0715236,1.055327 3.4745659,1.055327 4.5460895,0 1.0715236,-1.055326 1.0715236,-3.4220437 0,-4.4773703 -1.0715236,-1.0553264 -3.4745659,-1.0553264 -4.5460895,0 z m 3.8775469,3.8189343 c -0.7563696,0.744936 -2.4526348,0.744936 -3.2090044,0 -0.7563695,-0.744937 -0.7563695,-2.4155601 0,-3.1604975 0.7563696,-0.7449366 2.4526348,-0.7449362 3.2090044,0 0.7563696,0.7449374 0.7563696,2.4155605 0,3.1604975 z"
+   id="path4"
+   inkscape:connector-curvature="0"
+   style="fill:#67bae9;fill-opacity:1;stroke-width:0.66347045"
+   sodipodi:nodetypes="aaaaaaaaaaaaaaa" />
+</svg>
