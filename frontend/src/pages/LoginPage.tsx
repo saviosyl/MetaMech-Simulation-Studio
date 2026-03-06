@@ -223,7 +223,7 @@ const LoginPage: React.FC = () => {
           textAlign: 'center', fontSize: 11, color: 'var(--mm-text-disabled)', marginTop: 32,
           animation: 'mm-fade-up 0.7s ease 1s both',
         }}>
-          © 2025 MetaMech Solutions · metamechsolutions.com
+          © 2026 MetaMech Solutions · metamechsolutions.com
         </p>
       </div>
     </div>
