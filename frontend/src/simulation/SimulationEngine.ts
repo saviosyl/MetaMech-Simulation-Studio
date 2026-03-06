@@ -1514,6 +1514,7 @@ export class SimulationEngine {
           this.sensorDwellFired.set(node.id, true);
           console.log(`[DWELL-FIRE] ${sensorTag} dwell=${dwellSec.toFixed(1)}s → EVENT: ${onDwellEvent}`);
           
+          // Release stoppers linked to this sensor
           if (onDwellEvent === 'release-stopper' || onDwellEvent === 'stop-source-and-release') {
             for (const n of this.nodes) {
               if (n.type === 'stopper' && (n.parameters?.secondarySensorTag === sensorTag || n.parameters?.triggerSensorTag === sensorTag)) {
@@ -1527,6 +1528,19 @@ export class SimulationEngine {
                 const sss = this.stopperState.get(n.id);
                 if (sss) { sss.latched = false; sss.lastReleaseTime = this.simTime; }
                 console.log(`[DWELL-FIRE] Released ${stopped.length} from ${n.parameters?.stopperTag}, latch=false, cooldown started`);
+              }
+            }
+          }
+
+          // Stop/resume sources linked to this sensor via blockedBySensorTag
+          if (onDwellEvent === 'stop-source' || onDwellEvent === 'stop-source-and-release') {
+            for (const n of this.nodes) {
+              if (n.type === 'source' && n.parameters?.blockedBySensorTag === sensorTag) {
+                // Switch source to signal-controlled mode if not already
+                if (n.parameters.runMode !== 'signal-controlled') {
+                  (n.parameters as any).runMode = 'signal-controlled';
+                }
+                console.log(`[DWELL-FIRE] Source ${n.id.slice(0, 8)} blocked by ${sensorTag} dwell`);
               }
             }
           }
