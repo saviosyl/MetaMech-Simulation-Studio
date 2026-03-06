@@ -1,0 +1,179 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+
+  <!--Control Content property -->
+  <!-- more font choice http://www.microsoft.com/typography/fonts/family.aspx?FID=331-->
+  <FontFamily x:Key="FontFamilyTitle">Segoe UI Light</FontFamily>
+  <FontFamily x:Key="DefaultFont">Segoe UI</FontFamily>
+  <FontFamily x:Key="DefaultFontFamily">SegoeUI Regular</FontFamily>
+
+  <sys:Double x:Key="FontSizeSmallest">6</sys:Double>
+  <sys:Double x:Key="FontSizeSmaller" >8</sys:Double>
+  <sys:Double x:Key="FontSizeNormal"  >9</sys:Double>
+  <sys:Double x:Key="FontSizeLarger"  >12</sys:Double>
+  <sys:Double x:Key="FontSizeLargest" >16</sys:Double>
+
+  <!--Control colors.-->
+  <!--M => minus  P=> plus-->
+  <!-- Background color -->
+  <Color x:Key="ThemeBgM2Color">#ffffff</Color>
+  <Color x:Key="ThemeBgM1Color">#f2f2f2</Color>
+  <Color x:Key="ThemeBgColor"  >#eeeeee</Color>
+  <Color x:Key="ThemeBgP1Color">#d8d8d8</Color>
+  <Color x:Key="ThemeBgP2Color">#cccccc</Color>
+
+  <Color x:Key="ThemeIdM2Color">#820D1B</Color>
+  <Color x:Key="ThemeIdM1Color">#A81023</Color>
+  <Color x:Key="ThemeIdColor"  >#CF142B</Color>
+  <Color x:Key="ThemeIdP1Color">#CF4949</Color>
+  <Color x:Key="ThemeIdP2Color">#CF7E67</Color>
+
+  <!-- Text colors, menu, scroll bars -->
+  <Color x:Key="ThemeFgM2Color">#aaaaaa</Color>
+  <Color x:Key="ThemeFgM1Color">#666666</Color>
+  <Color x:Key="ThemeFgColor"  >#252525</Color>
+  <Color x:Key="ThemeFgP1Color">#141414</Color>
+  <Color x:Key="ThemeFgP2Color">#000000</Color>
+
+  <!-- ??? -->
+  <Color x:Key="ThemeMarkFgColor">#ffffff</Color>
+  <Color x:Key="ThemeMarkBgColor">#ffffff</Color>
+
+  <!--Text Input colors-->
+  <Color x:Key="ThemeInputBgColor">        #dddddd</Color>
+  <Color x:Key="ThemeActiveInputBgColor">  #FFFFFF</Color>
+  <Color x:Key="ThemeInputFgColor">        #141414</Color>
+  <Color x:Key="ThemeActiveInputFgColor">  #000000</Color>
+
+  <!--Additional Colors for notification-->
+  <Color x:Key="ThemeExtraColor"      >#CF142B</Color>
+  <Color x:Key="ThemeAlertHighColor"  >#CF142B</Color>
+  <Color x:Key="ThemeAlertNormalColor">#CF142B</Color>
+  <Color x:Key="ThemeAlertLowColor"   >#CF142B</Color>
+
+  <Color x:Key="ThemeCheckMarkColor">#FFFFFF</Color>
+
+  <SolidColorBrush x:Key="ThemeBgM2Brush" Color="{StaticResource ThemeBgM2Color}"/>
+  <SolidColorBrush x:Key="ThemeBgM1Brush" Color="{StaticResource ThemeBgM1Color}"/>
+  <SolidColorBrush x:Key="ThemeBgBrush"   Color="{StaticResource ThemeBgColor  }" />
+  <SolidColorBrush x:Key="ThemeBgP1Brush" Color="{StaticResource ThemeBgP1Color}"/>
+  <SolidColorBrush x:Key="ThemeBgP2Brush" Color="{StaticResource ThemeBgP2Color}"/>
+
+  <SolidColorBrush x:Key="ThemeIdM2Brush" Color="{StaticResource ThemeIdM2Color}" />
+  <SolidColorBrush x:Key="ThemeIdM1Brush" Color="{StaticResource ThemeIdM1Color}"/>
+  <SolidColorBrush x:Key="ThemeIdBrush"   Color="{StaticResource ThemeIdColor  }" />
+  <SolidColorBrush x:Key="ThemeIdP1Brush" Color="{StaticResource ThemeIdP1Color}"/>
+  <SolidColorBrush x:Key="ThemeIdP2Brush" Color="{StaticResource ThemeIdP2Color}"/>
+
+  <SolidColorBrush x:Key="ThemeFgM2Brush" Color="{StaticResource ThemeFgM2Color}"/>
+  <SolidColorBrush x:Key="ThemeFgM1Brush" Color="{StaticResource ThemeFgM1Color}"/>
+  <SolidColorBrush x:Key="ThemeFgBrush"   Color="{StaticResource ThemeFgColor  }"/>
+  <SolidColorBrush x:Key="ThemeFgP1Brush" Color="{StaticResource ThemeFgP1Color}"/>
+  <SolidColorBrush x:Key="ThemeFgP2Brush" Color="{StaticResource ThemeFgP2Color}"/>
+
+  <SolidColorBrush x:Key="ThemeInputBgBrush"        Color="{StaticResource ThemeInputBgColor}"/>
+  <SolidColorBrush x:Key="ThemeActiveInputBgBrush"  Color="{StaticResource ThemeActiveInputBgColor}"/>
+  <SolidColorBrush x:Key="ThemeInputFgBrush"        Color="{StaticResource ThemeInputFgColor}"/>
+  <SolidColorBrush x:Key="ThemeActiveInputFgBrush"  Color="{StaticResource ThemeActiveInputFgColor}"/>
+
+  <SolidColorBrush x:Key="ThemeExtraBrush"       Color="{StaticResource ThemeExtraColor}"/>
+  <SolidColorBrush x:Key="ThemeAlertHighBrush"   Color="{StaticResource ThemeAlertHighColor}"/>
+  <SolidColorBrush x:Key="ThemeAlertNormalBrush" Color="{StaticResource ThemeAlertNormalColor}"/>
+  <SolidColorBrush x:Key="ThemeAlertLowBrush"    Color="{StaticResource ThemeAlertLowColor}"/>
+
+  <Color x:Key="ApplicationAccentColor">#CF142B</Color>
+  <Color x:Key="ApplicationWindowBorderColor"   >#08a7cc</Color>
+  <Color x:Key="CaptionButtonForegroundColor"   >#A1A1A1</Color>
+    <Color x:Key="ApplicationStatusBarColor"      >#FF2F0249</Color>
+
+    <!--ToggleButtonTool color-->
+    <Color x:Key="ToggleButtonToolIconNormalFillColor" >#4d4d4d</Color> <!--ThemeFgColor-->
+    <Color x:Key="ToggleButtonToolIconDisabledFillColor">#aaaaaa</Color> <!--ThemeFgM2Color-->
+
+    <!--ribbon tab-->
+    <Color x:Key="RibbonTabNormalForegroundColor"       >#aaaaaa</Color> <!--ThemeFgColor-->
+    <Color x:Key="RibbonTabItemSelectedForegroundColor"  >#3A90B3</Color> <!--ThemeIdColor-->
+    <Color x:Key="RibbonTabItemMouseOverForegroundColor"  >#2E738F</Color> <!--ThemeIdM1Color-->
+
+    <Color x:Key="RibbonFileTabItemNormalForegroundColor" >#FFFFFF</Color>
+
+    <FontFamily x:Key="RibbonTabItemHeaderFontFamily">Segoe UI Light</FontFamily>
+    <sys:Double x:Key="RibbonTabItemHeaderFontSize">12</sys:Double>
+  
+  <!--XamDockManager colors-->
+  <Color x:Key="XamDockManagerPaneSplitterBackgroundColor">#FFA69F9F</Color>
+  <Color x:Key="PaneNotActiveCaptionFillColor"            >#FCFCFC</Color>
+  <!--ThemeBgM1Color-->
+  <Color x:Key="PaneActiveCaptionFillColor"               >#CCCCCC</Color>
+  <!--ThemeBgP1Color-->
+  <Color x:Key="PaneNotActiveCaptionForegroundColor"      >#666666</Color>
+  <!--ThemeFgM1Color-->
+  <Color x:Key="PaneActiveCaptionForegroundColor"         >#141414</Color>
+  <!--ThemeBgP1Color-->
+
+  <!--Pane Header Icon (such as pin and close button ) colors-->
+  <Color x:Key="PaneHeaderIconFillColor"            >#005996</Color>
+  <!--ThemeFgColor-->
+  <Color x:Key="PaneHeaderIconStrokeColor"          >#005996</Color>
+  <!--ThemeFgColor-->
+
+  <!--XamDockManager TabGroupPane colors   -->
+  <Color x:Key="TabGroupPaneTabHeaderBackgroundColor"            >#cccccc</Color>
+  <!--ThemeBgP1Color-->
+  <Color x:Key="TabGroupPanePaneTabItemBorderColor"              >#666666</Color>
+  <!--ThemeFgM1Color-->
+  <Color x:Key="TabGroupPaneActivePaneTabItemBackgroundColor"    >#eeeeee</Color>
+  <!--ThemeBgColor  -->
+  <Color x:Key="TabGroupPaneActivePaneTabItemForegroundColor"    >#141414</Color>
+  <!--ThemeFgP1Color-->
+  <Color x:Key="TabGroupPaneNonActivePaneTabItemForegroundColor" >#666666</Color>
+  <!--ThemeFgM1Color-->
+  <Color x:Key="TabGroupPaneNonActivePaneTabItemBackgroundColor" >#cccccc</Color>
+  <!--ThemeBgP1Color-->
+
+  <!--xamdocmanager + Unpinned TabItem-->
+  <Color x:Key="UnpinnedTabItemOuterBorderBrushColor" >#666666</Color>
+  <!--ThemeFgM1Color-->
+
+  <!--Additional colors-->
+  <Color x:Key="ThemeMainDebugForegroundColor">#FF2F7429</Color>
+
+  <!--Backstage NavigationMenu Colors-->
+  <Color x:Key="BackstageNavigationMenuTabHeaderForegroundColor" >#FFFFFF</Color>
+
+  <!--CaptionBar -->
+  <Color x:Key="CaptionBarApplicationLogoIconFillColor"  >#666666</Color>
+  <!--ThemeFgM1Color-->
+  <Color x:Key="CaptionBarApplicationLogoIconStrokeColor">#666666</Color>
+  <!--ThemeFgM1Color-->
+
+  <Color x:Key="CaptionBarApplicationTitleForgroundColor">#252525</Color>
+  <!--ThemeFgColor-->
+  <Color x:Key="CaptionBarApplicationTitleWindowIsActiveForgroundColor">#666666</Color>
+  <!--ThemeFgM1Color-->
+
+  <!--<FontFamily x:Key="CaptionBarApplicationTitleFontFamily">Segoe UI</FontFamily>
+    <sys:Double x:Key="CaptionBarApplicationTitleFontSize">14</sys:Double>-->
+
+  <Color x:Key="RibbonToolMouseOverBackgroundColor">#CDE6F7</Color>
+  <Color x:Key="RibbonToolClickedBackgroundColor">#A0D7EA</Color>
+
+  <!--select and hove color indication used (forexample in Combobox)-->
+  <Color x:Key="ItemOnSelectFillColor">#FFA0D7EA</Color>
+  <Color x:Key="ItemOnHoverFillColor">#FFCDE6F7</Color>
+
+  <!--dockmanager spliter Tickness-->
+  <sys:Double x:Key="DockmanagerSpliterTickness">3</sys:Double>
+
+
+	<!--statistic colors-->
+	<Color x:Key="StatOffColor">#404040</Color>
+	<Color x:Key="StatDownColor">#ff3300</Color>
+	<Color x:Key="StatSetupColor">#99CBE3</Color>
+	<Color x:Key="StatBlockedColor">#faa519</Color>
+	<Color x:Key="StatStarvedColor">#ffdd00</Color>
+	<Color x:Key="StatActiveColor">#98ca4c</Color>
+	<Color x:Key="StatBusyColor">#2caf4a</Color>
+</ResourceDictionary>
