@@ -63,12 +63,17 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
 
   switch (product.type) {
     case 'cylinder':
-    case 'bottle':
+    case 'bottle': {
+      const cylTex = useProductTexture(product.textureUrl);
       return (
         <group ref={groupRef}>
           <mesh castShadow>
             <cylinderGeometry args={[pW / 2, pW / 2, pH, 12]} />
-            <meshStandardMaterial color={product.color} metalness={0.2} roughness={0.6} />
+            {cylTex ? (
+              <meshStandardMaterial map={cylTex} metalness={0.2} roughness={0.6} />
+            ) : (
+              <meshStandardMaterial color={product.color} metalness={0.2} roughness={0.6} />
+            )}
           </mesh>
           {product.type === 'bottle' && (
             <mesh position={[0, pH / 2 + pH * 0.15, 0]} castShadow>
@@ -76,8 +81,12 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
               <meshStandardMaterial color={product.color} metalness={0.3} roughness={0.5} />
             </mesh>
           )}
+          {product.label && (
+            <ProductLabel label={product.label} color={product.labelColor || '#fff'} pL={pW} pW={pW} pH={pH} />
+          )}
         </group>
       );
+    }
 
     case 'pallet':
       return (
@@ -99,19 +108,28 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
         </group>
       );
 
-    case 'tote':
+    case 'tote': {
+      const toteTex = useProductTexture(product.textureUrl);
       return (
         <group ref={groupRef}>
           <mesh castShadow>
             <boxGeometry args={[pL, pH, pW]} />
-            <meshStandardMaterial color={product.color} metalness={0.4} roughness={0.5} />
+            {toteTex ? (
+              <meshStandardMaterial map={toteTex} metalness={0.4} roughness={0.5} />
+            ) : (
+              <meshStandardMaterial color={product.color} metalness={0.4} roughness={0.5} />
+            )}
           </mesh>
           <mesh position={[0, pH * 0.45, 0]} castShadow>
             <boxGeometry args={[pL * 1.02, pH * 0.08, pW * 1.02]} />
             <meshStandardMaterial color={product.color} metalness={0.5} roughness={0.4} />
           </mesh>
+          {product.label && (
+            <ProductLabel label={product.label} color={product.labelColor || '#fff'} pL={pL} pW={pW} pH={pH} />
+          )}
         </group>
       );
+    }
 
     case 'box':
     default: {
