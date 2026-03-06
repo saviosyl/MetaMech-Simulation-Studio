@@ -55,6 +55,8 @@ export class SimulationEngine {
   private colorIndex = 0;
 
   init(nodes: ProcessNode[], edges: ProcessEdge[]) {
+    console.log('[SIM-ENGINE] init() called with', nodes.length, 'nodes,', edges.length, 'edges');
+    console.log('[SIM-ENGINE] Node types:', nodes.map(n => n.type).join(', '));
     this.nodes = nodes;
     this.edges = edges;
     this.products = [];
@@ -210,6 +212,11 @@ export class SimulationEngine {
     // Watchdog: if tick takes >16ms, skip heavy work next frame
     const tickStart = performance.now();
     this.simTime += elapsed;
+    
+    // Log first few ticks for debugging
+    if (this.simTime < 0.5 && Math.floor(this.simTime * 20) !== Math.floor((this.simTime - elapsed) * 20)) {
+      console.log(`[SIM-ENGINE] tick t=${this.simTime.toFixed(2)} products=${this.products.length} nodes=${this.nodes.length}`);
+    }
 
     // ── PASS 1: Tick ALL sensors first so signals are fresh for conveyors/stoppers ──
     for (const node of this.nodes) {

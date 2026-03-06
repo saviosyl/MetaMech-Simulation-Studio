@@ -108,8 +108,15 @@ const SimulationOverlay: React.FC = () => {
   const lastProductCount = useRef(0);
   const frameCounter = useRef(0);
 
+  // Refs to hold latest store values for useFrame (avoids stale closures)
+  const isPlayingRef = useRef(isPlaying);
+  const simSpeedRef = useRef(simulationSpeed);
+  isPlayingRef.current = isPlaying;
+  simSpeedRef.current = simulationSpeed;
+
   React.useEffect(() => {
     if (isPlaying && !initialized.current) {
+      console.log('[SIM-OVERLAY] Initializing simulation engine with', processNodes.length, 'nodes,', edges.length, 'edges');
       simulationEngine.init(processNodes, edges);
       initialized.current = true;
     }
@@ -123,13 +130,12 @@ const SimulationOverlay: React.FC = () => {
   }, [isPlaying, isPaused, processNodes, edges]);
 
   useFrame((_, delta) => {
-    if (!isPlaying) return; // Paused: skip tick but keep products
+    if (!isPlayingRef.current) return; // Paused: skip tick but keep products
     // Cap delta to prevent spiral-of-death (tab switch, lag spike)
     const cappedDelta = Math.min(delta, 0.05);
-    simulationEngine.tick(cappedDelta, simulationSpeed);
+    simulationEngine.tick(cappedDelta, simSpeedRef.current);
     
-    // Only re-render when product count changes (not every frame!)
-    // This avoids the per-frame React re-render that was freezing the UI
+    // Re-render periodically to pick up new/removed products
     frameCounter.current++;
     if (frameCounter.current % 6 === 0) { // Check every ~100ms at 60fps
       const currentCount = simulationEngine.getProducts().length;
