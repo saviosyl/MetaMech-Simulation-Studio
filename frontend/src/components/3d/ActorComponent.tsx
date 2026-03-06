@@ -49,8 +49,9 @@ const ActorComponent: React.FC<ActorComponentProps> = ({ actor, isSelected, onCl
   const actorGlbMap: Record<string, { url: string; targetSize: number }> = {
     'forklift': { url: '/models/forklift.glb', targetSize: 3 },
     'agv': { url: '/models/agv.glb', targetSize: 1.5 },
-    'operator': { url: '/models/worker.glb', targetSize: 1.8 },
-    'engineer': { url: '/models/worker.glb', targetSize: 1.8 },
+    'operator-1': { url: '/models/operator-1.glb', targetSize: 1.8 },
+    'operator-2': { url: '/models/operator-2.glb', targetSize: 1.8 },
+    'operator-3': { url: '/models/operator-3.glb', targetSize: 1.8 },
     'pallet-truck': { url: '/models/forklift.glb', targetSize: 2.5 },
   };
 

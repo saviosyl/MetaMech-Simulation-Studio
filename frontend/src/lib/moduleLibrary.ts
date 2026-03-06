@@ -821,31 +821,36 @@ export const moduleLibrary: ModuleDefinition[] = [
 
   // Actor Modules
   {
-    id: 'operator',
-    name: 'Operator',
+    id: 'operator-1',
+    name: 'Operator 1',
     category: 'actors',
-    icon: Package, // Replace with appropriate icon
-    description: 'Human operator worker',
+    icon: Package,
+    description: 'Human operator — model 1',
     parameters: {
-      walkSpeed: {
-        type: 'number',
-        label: 'Walk Speed (m/min)',
-        default: 90,
-        min: 30,
-        max: 180,
-        step: 5,
-      },
-      color: {
-        type: 'color',
-        label: 'Uniform Color',
-        default: '#4f46e5',
-      },
-      skillLevel: {
-        type: 'select',
-        label: 'Skill Level',
-        default: 'medium',
-        options: ['low', 'medium', 'high', 'expert'],
-      },
+      walkSpeed: { type: 'number', label: 'Walk Speed (m/min)', default: 90, min: 30, max: 180, step: 5 },
+      skillLevel: { type: 'select', label: 'Skill Level', default: 'medium', options: ['low', 'medium', 'high', 'expert'] },
+    },
+  },
+  {
+    id: 'operator-2',
+    name: 'Operator 2',
+    category: 'actors',
+    icon: Package,
+    description: 'Human operator — model 2',
+    parameters: {
+      walkSpeed: { type: 'number', label: 'Walk Speed (m/min)', default: 90, min: 30, max: 180, step: 5 },
+      skillLevel: { type: 'select', label: 'Skill Level', default: 'medium', options: ['low', 'medium', 'high', 'expert'] },
+    },
+  },
+  {
+    id: 'operator-3',
+    name: 'Operator 3',
+    category: 'actors',
+    icon: Package,
+    description: 'Human operator — model 3',
+    parameters: {
+      walkSpeed: { type: 'number', label: 'Walk Speed (m/min)', default: 90, min: 30, max: 180, step: 5 },
+      skillLevel: { type: 'select', label: 'Skill Level', default: 'medium', options: ['low', 'medium', 'high', 'expert'] },
     },
   },
 
