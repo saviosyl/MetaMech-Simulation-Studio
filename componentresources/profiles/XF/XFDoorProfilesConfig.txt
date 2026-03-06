@@ -1,0 +1,4 @@
+#DoorSize;DoorSlot;DoorHingeIsHidden;ProfileRole;ProfileVCID;ProfileSlot;PlacementInterface
+30X30;Open;false;HingeProfile;a331f76a-8a57-42c9-93c5-d0377b96faa6;Open;B1
+30X30;Open;false;HandleProfile;a331f76a-8a57-42c9-93c5-d0377b96faa6;Open;B1
+30X30;Open;false;OtherProfile;a331f76a-8a57-42c9-93c5-d0377b96faa6;Open;B1

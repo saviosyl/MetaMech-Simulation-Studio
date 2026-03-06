@@ -1,0 +1,113 @@
+[
+    /*
+    {
+        "Vcid": "920d01bb-9ea0-49a8-8347-fc47d834cc7a", //GR vcid
+        "Name": "Adjustable (W/H) plastic/zinc", //Display Name
+        "Platforms": ["XS", "X65", "X65Y", "X85", "XH", "XK", "X180", "X300", "SE50", "Spiral", "WL", "WK"], //Platforms available at
+		"ReplacedBy": "a814cd65-69bb-4924-bb18-21cbff0d7c85" //Used to give warning messages when built, places GR in Old solutions tab
+    }
+    */
+    {
+        "Vcid": "a814cd65-69bb-4924-bb18-21cbff0d7c85",
+        "Name": "QuickGuide (W/H)",
+        "Platforms": ["XS", "X45H", "X65", "X65Y", "X85", "XH", "XK", "X180", "X300", "WL", "WK"]
+    },
+    {
+        "Vcid": "920d01bb-9ea0-49a8-8347-fc47d834cc7a",
+        "Name": "Adjustable (W/H) plastic/zinc",
+        "Platforms": ["XS", "X45H", "X65", "X65Y", "X85", "XH", "XK", "X180", "X300", "SE50", "Spiral", "WL", "WK"],
+		"ReplacedBy": "a814cd65-69bb-4924-bb18-21cbff0d7c85"
+    },
+    {
+        "Vcid": "76c733ea-9ff2-45b0-8b5b-88c25ee6a025",
+        "Name": "Adjustable (H) plastic/zinc",
+        "Platforms": ["XS", "X45H", "X65", "X65Y", "X85", "XH", "XK", "X180", "X300", "SE50", "Spiral", "WL", "WK"]
+    }, 
+    {
+        "Vcid": "62e49ce4-91c1-4b0e-912d-42a9944bc526",
+        "Name": "Adjustable (W) aluminium",
+        "Platforms": ["XS", "X45H", "X65", "X65Y", "X85", "XK", "XH", "X180", "X300", "SE50"]
+    }, 
+    {
+        "Vcid": "ba885bd7-5c74-43a8-b2f7-45ed41cde1e0",
+        "Name": "QuickGuide (W) multi-level low",
+        "Platforms": ["XS", "X45H", "X65", "X65Y", "X85", "XH", "XK", "X180", "X300", "SE50", "Spiral", "WL", "WK"]
+    }, 
+    {
+        "Vcid": "6a4701cf-ffa2-43c9-96cc-7249ce989b7b",
+        "Name": "QuickGuide (W) multi-level high",
+        "Platforms": ["XS", "X45H", "X65", "X65Y", "X85", "XH", "XK", "X180", "X300", "SE50", "Spiral", "WL", "WK"]
+    }, 
+    {
+        "Vcid": "c3fc151d-a92d-4435-8e7a-f088563c7ad5",
+        "Name": "Adjustable (W) multi-level low plastic",
+        "Platforms": ["XS", "X45H", "X65", "X65Y", "X85", "XH", "XK", "X180", "X300", "SE50", "Spiral", "WL", "WK"],
+		"ReplacedBy": "ba885bd7-5c74-43a8-b2f7-45ed41cde1e0"
+    }, 
+    {
+        "Vcid": "ab35c8ba-ee51-47f1-bf05-5e2a72bc59ec",
+        "Name": "Adjustable (W) multi-level high plastic",
+        "Platforms": ["XS", "X45H", "X65", "X65Y", "X85", "XH", "XK", "X180", "X300", "SE50", "Spiral", "WL", "WK"],
+		"ReplacedBy": "6a4701cf-ffa2-43c9-96cc-7249ce989b7b"
+    }, 
+    {
+        "Vcid": "e029a009-1f13-4e39-9679-245b532b1483",
+        "Name": "Adjustable (W) multi-level plastic/stainless",
+        "Platforms": ["X70X", "X85X", "X180X", "X300X"]
+    }, 
+    {
+        "Vcid": "721ec171-cd55-4b79-8132-c933ec377380",
+        "Name": "Adjustable (W) multi-level stainless",
+        "Platforms": ["X70X", "X85X", "X180X", "X300X"]
+    }, 
+    {
+        "Vcid": "cb58b8ef-17eb-4dae-9339-1154abb1cd77",
+        "Name": "Adjustable (W) multi-level wash down",
+        "Platforms": ["WLX"]
+    }, 
+    {
+        "Vcid": "bbfa821b-ab92-4f39-a362-1f0cee8db792",
+        "Name": "Adjustable (W) plastic/aluminium",
+        "Platforms": ["X45", "X45H", "X65", "X65Y"]
+    }, 
+    {
+        "Vcid": "55ce7db5-f000-41bc-be42-9246710eac1e",
+        "Name": "Adjustable (W) plastic/stainless",
+        "Platforms": ["X70X", "X85X", "X180X", "X300X"]
+    },
+    {
+        "Vcid": "415f9966-60ae-4328-afb7-943e1cdb70e4",
+        "Name": "Guidance of High and Wide",
+        "Platforms": ["XS", "X45H", "X65", "X65Y", "X85", "XH", "XK", "X180", "X300"]
+    },
+    {
+        "Vcid": "a62b8f0d-bab2-4e50-bb2f-7f2eee27cfd8",
+        "Name": "Fixed aluminium",
+        "Platforms": ["XS", "X45H", "X65", "X65Y", "X85", "XH", "XK", "X180", "X300", "SE50"]
+    },
+    {
+        "Vcid": "3980cc40-1e34-486e-a6ae-2bd8de2b5c90",
+        "Name": "Fixed plastic",
+        "Platforms": ["XS", "X45H", "X65", "X65Y", "X85", "XH", "X180", "X300", "SE50", "Spiral", "WL", "WK"]
+    },
+    {
+        "Vcid": "8513387e-c32e-43df-ae63-16001bb671f8",
+        "Name": "AGS",
+        "Platforms": ["X65", "X65Y", "X85", "X180", "X300", "XH", "XK"]
+    },
+    {
+        "Vcid": "19c749c0-666d-4660-9693-9bfb4cc8536d",
+        "Name": "Bracket for Guide Rail",
+        "Platforms": ["X65P"]
+    },
+    {
+        "Vcid": "a3a90a73-e8e5-46c7-af2f-236bf746386e",
+        "Name": "Bracket for Guide Rail",
+        "Platforms": ["X85P"]
+    },
+    {
+        "Vcid": "de84748f-8c73-4675-9f2a-8154afb700b9",
+        "Name": "Bracket for Guide Rail",
+        "Platforms": ["XKP"]
+    }
+]

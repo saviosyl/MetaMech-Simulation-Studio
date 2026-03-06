@@ -1,0 +1,16 @@
+#DoorSize;DoorSlot;DoorHingeIsHidden;ProfileRole;ProfileVCID;ProfileSlot;PlacementInterface
+40X40;Open;false;HingeProfile;fef152c3-409f-42a1-9670-dce2e293870d;Open;B1
+40X40;Open;false;HandleProfile;fef152c3-409f-42a1-9670-dce2e293870d;Open;B1
+40X40;Open;false;OtherProfile;fef152c3-409f-42a1-9670-dce2e293870d;Open;B1
+40X40;Closed;false;HingeProfile;fef152c3-409f-42a1-9670-dce2e293870d;U-Closed;B1
+40X40;Closed;false;HandleProfile;fef152c3-409f-42a1-9670-dce2e293870d;U-Closed;B1
+40X40;Closed;false;OtherProfile;fef152c3-409f-42a1-9670-dce2e293870d;U-Closed;B1
+40X80;Open;false;HingeProfile;e9c608e7-4457-41fb-ba18-f349a8211b28;Open;A2
+40X80;Open;false;HandleProfile;fef152c3-409f-42a1-9670-dce2e293870d;Open;B1
+40X80;Open;false;OtherProfile;e9c608e7-4457-41fb-ba18-f349a8211b28;Open;A2
+40X80;Closed;false;HingeProfile;e9c608e7-4457-41fb-ba18-f349a8211b28;L-Closed;A2
+40X80;Closed;false;HandleProfile;fef152c3-409f-42a1-9670-dce2e293870d;U-Closed;B1
+40X80;Closed;false;OtherProfile;e9c608e7-4457-41fb-ba18-f349a8211b28;L-Closed;A2
+40X40;Closed;true;HingeProfile;22fdd148-91f7-4e1e-931b-1b61c8804757;;C1
+40X40;Closed;true;HandleProfile;fef152c3-409f-42a1-9670-dce2e293870d;U-Closed;B1
+40X40;Closed;true;OtherProfile;fef152c3-409f-42a1-9670-dce2e293870d;U-Closed;B1

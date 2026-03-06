@@ -1,0 +1,9 @@
+#Type;Bracket;Spacer;BracketImage
+DoorCatch40;NoBracket;0mm;TCEL_48_NoBracket_tooltip.png;TCEL_48_spacer_tooltip.png
+DoorCatch48;NoBracket;0mm;TCEL_48_NoBracket_tooltip.png;TCEL_48_spacer_tooltip.png
+DoorCatch48;NoBracket;4mm;TCEL_48_NoBracket_tooltip.png;TCEL_48_spacer_tooltip.png
+DoorCatch48;NoBracket;8mm;TCEL_48_NoBracket_tooltip.png;TCEL_48_spacer_tooltip.png
+DoorCatch48;Bracket;0mm;TCEL_48_MirroredForProfile_tooltip.png;TCEL_48_spacer_tooltip.png
+DoorCatch48;MirrorBracket;0mm;TCEL_48_BracketForPanel_tooltip.png;TCEL_48_spacer_tooltip.png
+DoorCatch74;NoBracket;0mm;TCEL_48_NoBracket_tooltip.png;TCEL_48_spacer_tooltip.png
+DoorCatch90;NoBracket;0mm;TCEL_48_NoBracket_tooltip.png;TCEL_48_spacer_tooltip.png

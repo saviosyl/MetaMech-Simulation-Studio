@@ -1,0 +1,3 @@
+XCMA 10;Drilling;44;88;10
+XCMA 12;Drilling;44;88;12
+XCMA 18;Drilling;44;88;18

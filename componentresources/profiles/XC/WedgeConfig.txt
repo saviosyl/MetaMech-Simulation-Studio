@@ -1,0 +1,7 @@
+#ID;SpacerId;VCID;Helper;TooltipImage
+XCLA660A;NoSpacer;8c3e7a59-3a07-4bb4-a99a-1cd1b76dd794;Actuator;XCLA660A.png
+XCLA950A;NoSpacer;8c3e7a59-3a07-4bb4-a99a-1cd1b76dd794;Actuator;XCLA950A.png
+XCFW90;NoSpacer;988d9a3a-0535-4311-8fdc-a4c87d1c1abb;GearUnit;XCFW90.png
+XCFW90;WithSpacer;988d9a3a-0535-4311-8fdc-a4c87d1c1abb;GearUnit;XCFW90.png
+XLAW160X10;NoSpacer;1d52e816-aa4d-440e-8172-80e066cd66ba;HandWheel;XLAW160X10.png
+XLFX;NoSpacer;9439aee2-bcad-4012-a758-ccb5ee145fa2;DriveShaft;XLFX.png

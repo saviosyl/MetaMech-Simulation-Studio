@@ -1,0 +1,14 @@
+[
+	{
+	"value": "profinet",
+	"name": "PROFINET"
+	},
+	{
+	"value": "ethernetip",
+	"name": "EtherNet/IP"
+	},
+	{
+	"value": "none",
+	"name": "None"
+	}	
+]

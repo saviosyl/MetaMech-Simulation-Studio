@@ -1,0 +1,6 @@
+All;
+Missing;Icons\FlexLink\Profiles\Joints\No_joint.png
+Corner;Icons\FlexLink\Profiles\Joints\corner.png
+Crossing;Icons\FlexLink\Profiles\Joints\crossing.png
+Extending;Icons\FlexLink\Profiles\Joints\end_to_end.png
+Perpendicular;Icons\FlexLink\Profiles\Joints\end_to_side.png

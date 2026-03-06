@@ -1,0 +1,17 @@
+# Note that the pallet sizes are used for components that DO NOT have the FL::PalletSize property
+# For components that have the FL::PalletSize, the the pallet sizes in this file is ignored
+# The following platforms always have FL::PalletSize:
+#  * XT
+#  * XTC
+#
+# BUT this file is still used to know if a conveyor is a pallet platform or not.This is a manual
+# hardcoded file as there is no information in the databases that have both X45P and X85P.
+#
+# 
+X65P;128;128
+X85P;100,125,175,225;100
+XKP;200,250,300;200
+XT;240x240,240x320;240x240
+XTC;240x240,240x320;240x240
+HU;480X480;480X480
+

@@ -1,0 +1,665 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<MachiningDefinitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  
+    <MachiningDefinition>
+      <Id>TCMA AC 30-90</Id>
+      <Operations>
+        <Operation xsi:type="AngleCutOperation">
+          <Type>AngleCutting</Type>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X57 E</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-28.25</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>28.25</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X28</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-14</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>14</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X68</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-34</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>34</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 14X26 E</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>26</Depth>
+          <Diameter>14.2</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA M12X40</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>11.5</Depth>
+          <Diameter>20</Diameter>
+        </Operation>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>41</Depth>
+          <Diameter>13</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA M12X80</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>11.5</Depth>
+          <Diameter>20</Diameter>
+        </Operation>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>81</Depth>
+          <Diameter>13</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA M12X120</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>11.5</Depth>
+          <Diameter>20</Diameter>
+        </Operation>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>121</Depth>
+          <Diameter>13</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA M12X160</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>52</Depth>
+          <Diameter>20</Diameter>
+        </Operation>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>161</Depth>
+          <Diameter>13</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA TM12</Id>
+      <Operations>
+        <Operation xsi:type="ThreadingOperation">
+          <Type>Threading</Type>
+          <Depth>35</Depth>
+          <Screw>M12</Screw>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA D9X3-16</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Diameter>9</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA M8X40</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>11.5</Depth>
+          <Diameter>15</Diameter>
+        </Operation>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>41</Depth>
+          <Diameter>9</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA M8X80</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>11.5</Depth>
+          <Diameter>15</Diameter>
+        </Operation>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>81</Depth>
+          <Diameter>9</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA D9-40</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>41</Depth>
+          <Diameter>9</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA D9-80</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>81</Depth>
+          <Diameter>9</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X68 E</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-34</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>34</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X32 E</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-16</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>16</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+  <MachiningDefinition>
+    <Id>TCMA 8X48 E</Id>
+    <Operations>
+      <Operation xsi:type="MillingOperation">
+        <Type>Milling</Type>
+        <Depth>5</Depth>
+        <Diameter>8.5</Diameter>
+        <StartOffset>
+          <X>-24</X>
+          <Y>0</Y>
+        </StartOffset>
+        <StopOffset>
+          <X>24</X>
+          <Y>0</Y>
+        </StopOffset>
+      </Operation>
+    </Operations>
+  </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X8</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-4.25</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>4.25</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X78</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-39</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>39</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X30</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-15</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>15</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X38</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-19</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>19</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X70 E</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-35</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>35</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X90 E</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-45</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>45</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X102</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-51</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>51</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA D6</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>5</Depth>
+          <Diameter>6</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA D7</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>5</Depth>
+          <Diameter>7</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA D9</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Depth>5</Depth>
+          <Diameter>9</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X23</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-11.5</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>11.5</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA D23-40</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Diameter>22.5</Diameter>
+          <Depth>41</Depth>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X100 E</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+          <StartOffset>
+            <X>-50</X>
+            <Y>0</Y>
+          </StartOffset>
+          <StopOffset>
+            <X>50</X>
+            <Y>0</Y>
+          </StopOffset>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X0-100</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA 8X100-500</Id>
+      <Operations>
+        <Operation xsi:type="MillingOperation">
+          <Type>Milling</Type>
+          <Depth>5</Depth>
+          <Diameter>8.5</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA D6 A</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Diameter>6</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA D7 A</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Diameter>7</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA D9 A</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Diameter>9</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA D13 A</Id>
+      <Operations>
+        <Operation xsi:type="DrillingOperation">
+          <Type>Drilling</Type>
+          <Diameter>13</Diameter>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+    <MachiningDefinition>
+      <Id>TCMA CUT1</Id>
+      <Operations>
+        <Operation xsi:type="CutOperation">
+          <Type>Cutting</Type>
+          <Angle>90</Angle>
+        </Operation>
+      </Operations>
+    </MachiningDefinition>
+  <MachiningDefinition>
+    <Id>TCMA CUT2</Id>
+    <Operations>
+      <Operation xsi:type="CutOperation">
+        <Type>Cutting</Type>
+        <Angle>90</Angle>
+      </Operation>
+    </Operations>
+  </MachiningDefinition>
+  <MachiningDefinition>
+    <Id>TCMA CUT3</Id>
+    <Operations>
+      <Operation xsi:type="CutOperation">
+        <Type>Cutting</Type>
+        <Angle>90</Angle>
+      </Operation>
+    </Operations>
+  </MachiningDefinition>
+  
+  <MachiningDefinition>
+    <Id>HUMA D34X35</Id>
+    <Operations>
+      <Operation xsi:type="DrillingOperation">
+        <Type>Drilling</Type>
+        <Diameter>34</Diameter>
+        <Depth>35</Depth>
+      </Operation>
+    </Operations>
+  </MachiningDefinition>
+  
+  <MachiningDefinition>
+    <Id>XCMA 10</Id>
+    <Operations>
+      <Operation xsi:type="DrillingOperation">
+        <Type>Drilling</Type>
+        <Diameter>10</Diameter>
+      </Operation>
+    </Operations>
+  </MachiningDefinition>
+  <MachiningDefinition>
+    <Id>XCMA 12</Id>
+    <Operations>
+      <Operation xsi:type="DrillingOperation">
+        <Type>Drilling</Type>
+        <Diameter>12.2</Diameter>
+      </Operation>
+    </Operations>
+  </MachiningDefinition>
+  <MachiningDefinition>
+    <Id>XFMA 12</Id>
+    <Operations>
+      <Operation xsi:type="DrillingOperation">
+        <Type>Drilling</Type>
+        <Diameter>12.2</Diameter>
+      </Operation>
+    </Operations>
+  </MachiningDefinition>
+  <MachiningDefinition>
+    <Id>XCMA 18</Id>
+    <Operations>
+      <Operation xsi:type="DrillingOperation">
+        <Type>Drilling</Type>
+        <Diameter>18.25</Diameter>
+      </Operation>
+    </Operations>
+  </MachiningDefinition>
+  <MachiningDefinition>
+	<Id>CUT</Id>
+	<Operations>
+	  <Operation xsi:type="CutOperation">
+		<Type>Cutting</Type>
+		<Angle>90</Angle>
+	  </Operation>
+	</Operations>
+  </MachiningDefinition>
+  <MachiningDefinition>
+	<Id>XCMA AC 1-90</Id>
+	<Operations>
+	  <Operation xsi:type="AngleCutOperation">
+		<Type>AngleCutting</Type>
+      </Operation>
+	</Operations>
+  </MachiningDefinition>
+  <MachiningDefinition>
+	<Id>XFMA AC 1-90</Id>
+	<Operations>
+	  <Operation xsi:type="AngleCutOperation">
+		<Type>AngleCutting</Type>
+      </Operation>
+	</Operations>
+  </MachiningDefinition>
+  <MachiningDefinition>
+	<Id>XDMA AC 1-90</Id>
+	<Operations>
+	  <Operation xsi:type="AngleCutOperation">
+		<Type>AngleCutting</Type>
+      </Operation>
+	</Operations>
+  </MachiningDefinition>
+  <MachiningDefinition>
+    <Id>XCMA TM8</Id>
+    <Operations>
+	  <Operation xsi:type="ThreadingOperation">
+	    <Type>Threading</Type>
+	    <Depth>30</Depth>
+	    <Screw>M8</Screw>
+	  </Operation>
+    </Operations>
+  </MachiningDefinition>
+  <MachiningDefinition>
+    <Id>XFMA TM6</Id>
+    <Operations>
+	  <Operation xsi:type="ThreadingOperation">
+	    <Type>Threading</Type>
+	    <Depth>30</Depth>
+	    <Screw>M6</Screw>
+	  </Operation>
+    </Operations>
+  </MachiningDefinition>
+  <MachiningDefinition>
+    <Id>XDMA TM5</Id>
+    <Operations>
+	  <Operation xsi:type="ThreadingOperation">
+	    <Type>Threading</Type>
+	    <Depth>20</Depth>
+	    <Screw>M5</Screw>
+	  </Operation>
+    </Operations>
+  </MachiningDefinition>
+  <MachiningDefinition>
+    <Id>XCMA TM6</Id>
+    <Operations>
+	  <Operation xsi:type="ThreadingOperation">
+	    <Type>Threading</Type>
+	    <Depth>30</Depth>
+	    <Screw>M6</Screw>
+	  </Operation>
+    </Operations>
+  </MachiningDefinition>
+</MachiningDefinitions>
