@@ -168,12 +168,12 @@ function loadInlineManifest(): AssetDef[] {
 
     // === STATIC: Robots & Vehicles ===
     {
-      id: 'fanuc-robot',
+      id: 'industrial-robot',
       assetType: 'static',
       category: 'process',
-      name: 'Fanuc Robot',
+      name: 'Industrial Robot',
       description: 'Industrial robot arm',
-      glbUrl: '/models/fanuc-robot.glb',
+      glbUrl: '/models/industrial-robot.glb',
       thumbnailUrl: '',
       defaultScale: [1, 1, 1],
       connectionPorts: [

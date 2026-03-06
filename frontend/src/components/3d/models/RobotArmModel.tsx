@@ -7,7 +7,7 @@ interface RobotArmModelProps {
 }
 
 const GLBRobot: React.FC<{ isSelected: boolean }> = ({ isSelected }) => {
-  const { scene } = useGLTF('/models/fanuc-robot.glb');
+  const { scene } = useGLTF('/models/industrial-robot.glb');
   const cloned = scene.clone();
   
   cloned.traverse((child) => {
@@ -88,7 +88,7 @@ const ProceduralRobot: React.FC<RobotArmModelProps> = ({ isSelected }) => {
         </mesh>
       ))}
 
-      {/* FANUC label area */}
+      {/* Brand label area */}
       <mesh position={[0.11, 0.9, 0.05]} castShadow>
         <boxGeometry args={[0.01, 0.15, 0.12]} />
         <meshStandardMaterial color="#cc0000" metalness={0.3} roughness={0.5} />
@@ -105,6 +105,6 @@ const RobotArmModel: React.FC<RobotArmModelProps> = (props) => {
   );
 };
 
-useGLTF.preload('/models/fanuc-robot.glb');
+useGLTF.preload('/models/industrial-robot.glb');
 
 export default RobotArmModel;

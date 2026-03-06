@@ -10,7 +10,7 @@ export interface ProcessNode {
   type: 'source' | 'sink' | 'conveyor' | 'buffer' | 'machine' | 'router' | 
         'transfer-bridge' | 'popup-transfer' | 'pusher-transfer' | 'merge-divert' |
         'spiral-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
-        'belt-conveyor' | 'roller-conveyor' | 'fanuc-robot' | 'machine-static' |
+        'belt-conveyor' | 'roller-conveyor' | 'industrial-robot' | 'machine-static' |
         'stopper' | 'pusher' | 'bend-conveyor' | 'sensor' |
         'cartesian-robot' | 'cobot' | 'robot-5axis' | 'robot-6axis' |
         'eur-pallet' | 'standard-pallet' | 'custom-pallet' |
@@ -945,7 +945,7 @@ function getDefaultParameters(type: string): Record<string, any> {
     conveyor: { length: 5000, width: 1000, speed: 20 },
     'belt-conveyor': { width: 600, length: 3000, height: 800, angle: 0, beltSpeed: 20, sideGuides: true, driveEnd: 'right', supportSpacing: 1500 },
     'roller-conveyor': { width: 600, length: 3000, height: 800, rollerPitch: 100, driven: true, sideRails: true },
-    'fanuc-robot': {},
+    'industrial-robot': {},
     'machine-static': {},
     buffer: { capacity: 10 },
     machine: { processingTime: 2.0, capacity: 1 },

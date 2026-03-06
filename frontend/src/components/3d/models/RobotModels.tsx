@@ -21,7 +21,7 @@ import { simulationEngine } from '../../../simulation/SimulationEngine';
 import { useEditorStore } from '../../../store/editorStore';
 
 // ─── Shared Industrial Materials ───────────────────────────────
-// Body paint: warm industrial orange (KUKA-style)
+// Body paint: warm industrial orange
 const matBodyOrange = new THREE.MeshStandardMaterial({
   color: 0xd45a10, metalness: 0.25, roughness: 0.55,
 });

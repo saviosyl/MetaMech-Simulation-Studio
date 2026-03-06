@@ -272,10 +272,10 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
   // Map types to GLB files with target sizes
   const glbMap: Record<string, { url: string; targetSize: number }> = {
     'conveyor': { url: '/models/conveyor.glb', targetSize: 5 },
-    'pick-and-place': { url: '/models/fanuc-robot.glb', targetSize: 2 },
-    'palletizer': { url: '/models/fanuc-robot.glb', targetSize: 2 },
+    'pick-and-place': { url: '/models/industrial-robot.glb', targetSize: 2 },
+    'palletizer': { url: '/models/industrial-robot.glb', targetSize: 2 },
     'machine-static': { url: '/models/machine.glb', targetSize: 2 },
-    'fanuc-robot': { url: '/models/fanuc-robot.glb', targetSize: 2 },
+    'industrial-robot': { url: '/models/industrial-robot.glb', targetSize: 2 },
   };
 
   const renderModel = () => {
