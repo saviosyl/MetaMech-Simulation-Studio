@@ -227,6 +227,10 @@ const DraggableObject: React.FC<{
 // Inner scene component that has access to Three.js context
 const OVERLAY_HIDDEN_TYPES = new Set(['source', 'sink']);
 
+// Detect mobile/iPad Safari for performance optimizations
+const isMobileSafari = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+  (typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
+
 const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }) => {
   const {
     processNodes,
@@ -259,8 +263,8 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
         position={[10, 10, 5]}
         intensity={1}
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        shadow-mapSize-width={isMobileSafari ? 1024 : 2048}
+        shadow-mapSize-height={isMobileSafari ? 1024 : 2048}
         shadow-camera-far={50}
         shadow-camera-left={-20}
         shadow-camera-right={20}
@@ -302,13 +306,16 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
       )}
 
       {/* Contact Shadows */}
-      <ContactShadows 
-        position={[0, -0.01, 0]} 
-        opacity={0.5} 
-        scale={50} 
-        blur={2.5} 
-        far={10} 
-      />
+      {/* ContactShadows — disabled on mobile Safari for performance */}
+      {!isMobileSafari && (
+        <ContactShadows 
+          position={[0, -0.01, 0]} 
+          opacity={0.5} 
+          scale={50} 
+          blur={2.5} 
+          far={10} 
+        />
+      )}
 
       {/* Ground plane for raycasting (invisible) */}
       <mesh
@@ -534,7 +541,10 @@ const Viewport: React.FC = () => {
         gl={{ 
           antialias: true,
           alpha: true,
+          powerPreference: 'high-performance',
+          preserveDrawingBuffer: true,
         }}
+        frameloop="always"
       >
         <CameraCapture />
         <Suspense fallback={null}>

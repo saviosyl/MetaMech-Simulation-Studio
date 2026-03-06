@@ -20,20 +20,32 @@ function useProductTexture(url?: string): THREE.Texture | null {
   }, [url]);
 }
 
-/** Product label — rendered as Text on the top face */
-const ProductLabel: React.FC<{ label: string; color: string; pL: number; pW: number; pH: number }> = ({ label, color, pL, pW, pH }) => (
-  <Text
-    position={[0, pH / 2 + 0.002, 0]}
-    rotation={[-Math.PI / 2, 0, 0]}
-    fontSize={Math.min(pL, pW) * 0.4}
-    color={color}
-    anchorX="center"
-    anchorY="middle"
-    maxWidth={pL * 0.9}
-  >
-    {label}
-  </Text>
-);
+/** Product label — rendered on front + side faces with auto-sizing */
+const ProductLabel: React.FC<{ label: string; color: string; pL: number; pW: number; pH: number }> = ({ label, color, pL, pW, pH }) => {
+  // Auto-size: font scales to fit the face, capped for readability
+  const frontFontSize = Math.min(pH * 0.35, pL * 0.3, 0.06);
+  const sideFontSize = Math.min(pH * 0.35, pW * 0.3, 0.06);
+  return (
+    <>
+      {/* Front face (+Z) */}
+      <Text position={[0, 0, pW / 2 + 0.001]} fontSize={frontFontSize} color={color} anchorX="center" anchorY="middle" maxWidth={pL * 0.85}>
+        {label}
+      </Text>
+      {/* Back face (-Z) */}
+      <Text position={[0, 0, -pW / 2 - 0.001]} rotation={[0, Math.PI, 0]} fontSize={frontFontSize} color={color} anchorX="center" anchorY="middle" maxWidth={pL * 0.85}>
+        {label}
+      </Text>
+      {/* Right side (+X) */}
+      <Text position={[pL / 2 + 0.001, 0, 0]} rotation={[0, Math.PI / 2, 0]} fontSize={sideFontSize} color={color} anchorX="center" anchorY="middle" maxWidth={pW * 0.85}>
+        {label}
+      </Text>
+      {/* Left side (-X) */}
+      <Text position={[-pL / 2 - 0.001, 0, 0]} rotation={[0, -Math.PI / 2, 0]} fontSize={sideFontSize} color={color} anchorX="center" anchorY="middle" maxWidth={pW * 0.85}>
+        {label}
+      </Text>
+    </>
+  );
+};
 
 /** Render a single animated product using refs for smooth motion */
 const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {

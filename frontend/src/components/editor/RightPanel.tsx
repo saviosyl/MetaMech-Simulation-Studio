@@ -123,7 +123,32 @@ const RightPanel: React.FC = () => {
     switch (def.type) {
       case 'number': return <input type="number" value={val ?? def.default} onChange={e => handleParam(key, Number(e.target.value))} min={def.min} max={def.max} step={def.step} style={inputStyle} />;
       case 'text':
-      case 'string': return <input type="text" value={val ?? def.default ?? ''} onChange={e => handleParam(key, e.target.value)} style={inputStyle} />;
+      case 'string': {
+        // Texture fields get a file picker + URL input
+        if (key.toLowerCase().includes('texture')) {
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input type="text" placeholder="Paste URL or pick file…" value={val ?? ''} onChange={e => handleParam(key, e.target.value)} style={{ ...inputStyle, flex: 1, fontSize: 10 }} />
+                {val && <button onClick={() => handleParam(key, '')} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--mm-border)', background: 'var(--mm-bg-surface)', color: 'var(--mm-text-tertiary)', cursor: 'pointer', fontSize: 10 }}>✕</button>}
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 6, border: '1px dashed var(--mm-border)', background: 'var(--mm-bg-surface)', cursor: 'pointer', fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                📁 Choose Image…
+                <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" style={{ display: 'none' }} onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => { handleParam(key, ev.target?.result as string); };
+                  reader.readAsDataURL(file);
+                  e.target.value = '';
+                }} />
+              </label>
+              {val && <div style={{ width: '100%', height: 48, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--mm-border)' }}><img src={val} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+            </div>
+          );
+        }
+        return <input type="text" value={val ?? def.default ?? ''} onChange={e => handleParam(key, e.target.value)} style={inputStyle} />;
+      }
       case 'select': return (
         <select value={val ?? def.default} onChange={e => handleParam(key, e.target.value)} style={inputStyle}>
           {def.options?.map((o: string) => <option key={o} value={o} style={{ background: 'var(--mm-bg-panel)' }}>{o.charAt(0).toUpperCase() + o.slice(1).replace(/-/g, ' ')}</option>)}
@@ -344,40 +369,17 @@ const RightPanel: React.FC = () => {
                 ))}
               </Section>
 
-              {/* Parametric params */}
-              {paramAssetDef && (
-                <Section title="Parameters" icon={Sliders} defaultOpen={true}>
-                  {Object.entries(paramAssetDef.parameterDefs).map(([k, d]) => (
-                    <div key={k} style={fieldGap}>
-                      <label style={labelStyle}>{d.label}{d.unit ? ` (${d.unit})` : ''}</label>
-                      {d.type === 'number' && <input type="number" value={selectedObject.parameters[k] ?? paramAssetDef.defaults[k]} onChange={e => handleParam(k, Number(e.target.value))} min={paramAssetDef.limits[k]?.[0]} max={paramAssetDef.limits[k]?.[1]} step={d.step || 1} style={inputStyle} />}
-                      {d.type === 'boolean' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer' }}><input type="checkbox" checked={selectedObject.parameters[k] ?? false} onChange={e => handleParam(k, e.target.checked)} /><span style={{ fontSize: 12, color: 'var(--mm-text-secondary)' }}>Enabled</span></label>}
-                      {d.type === 'select' && d.options && <select value={selectedObject.parameters[k] ?? paramAssetDef.defaults[k]} onChange={e => handleParam(k, e.target.value)} style={inputStyle}>{d.options.map(o => <option key={o} value={o} style={{ background: 'var(--mm-bg-panel)' }}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}</select>}
-                    </div>
-                  ))}
-                </Section>
-              )}
-
-              {/* Module params — grouped */}
-              {!paramAssetDef && moduleDef && (() => {
+              {/* Module params — always show grouped (covers both parametric + non-parametric) */}
+              {moduleDef && (() => {
                 const g = groupParams(Object.entries(moduleDef.parameters));
                 return (<>
                   {g.geo.length > 0 && <Section title="Geometry" icon={Maximize} defaultOpen={true}>{g.geo.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                   {g.sim.length > 0 && <Section title="Simulation" icon={Sliders} defaultOpen={true} badge="SIM">{g.sim.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                   {g.logic.length > 0 && <Section title="Logic" icon={Zap} defaultOpen={['sensor','stopper','pusher','source'].includes(selectedObject.type)} badge="LOGIC">{g.logic.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
-                  {g.appear.length > 0 && <Section title="Appearance" icon={Palette} defaultOpen={false}>{g.appear.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
+                  {g.appear.length > 0 && <Section title="Appearance" icon={Palette} defaultOpen={true}>{g.appear.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                   {g.adv.length > 0 && <Section title="Advanced" icon={Settings} defaultOpen={false}>{g.adv.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                 </>);
               })()}
-
-              {/* BOM */}
-              {selectedObject.type === 'belt-conveyor' && (
-                <Section title="Bill of Materials" icon={Layers} defaultOpen={false} badge="BOM">
-                  <BOMPanel parameters={selectedObject.parameters} moduleType={selectedObject.type}
-                    onExportGLB={() => { const bom = generateBOM(selectedObject.parameters); alert(`GLB: ${bom.config.length}×${bom.config.width}mm`); }}
-                    onExportSTL={() => { const bom = generateBOM(selectedObject.parameters); alert(`STL: ${bom.config.length}×${bom.config.width}mm`); }} />
-                </Section>
-              )}
             </div>
           ) : (
             <div style={{ padding: 14 }}>
