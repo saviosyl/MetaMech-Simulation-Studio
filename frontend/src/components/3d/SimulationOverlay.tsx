@@ -104,19 +104,10 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
 const SimulationOverlay: React.FC = () => {
   const { isPlaying, isPaused, simulationSpeed, processNodes, edges } = useEditorStore();
   const initialized = useRef(false);
-  const [productCount, setProductCount] = useState(0);
-  const lastProductCount = useRef(0);
-  const frameCounter = useRef(0);
-
-  // Refs to hold latest store values for useFrame (avoids stale closures)
-  const isPlayingRef = useRef(isPlaying);
-  const simSpeedRef = useRef(simulationSpeed);
-  isPlayingRef.current = isPlaying;
-  simSpeedRef.current = simulationSpeed;
+  const [, setTick] = useState(0);
 
   React.useEffect(() => {
     if (isPlaying && !initialized.current) {
-      console.log('[SIM-OVERLAY] Initializing simulation engine with', processNodes.length, 'nodes,', edges.length, 'edges');
       simulationEngine.init(processNodes, edges);
       initialized.current = true;
     }
@@ -124,26 +115,15 @@ const SimulationOverlay: React.FC = () => {
     if (!isPlaying && !isPaused) {
       initialized.current = false;
       simulationEngine.reset();
-      setProductCount(0);
-      lastProductCount.current = 0;
+      setTick(0);
     }
   }, [isPlaying, isPaused, processNodes, edges]);
 
   useFrame((_, delta) => {
-    if (!isPlayingRef.current) return; // Paused: skip tick but keep products
-    // Cap delta to prevent spiral-of-death (tab switch, lag spike)
-    const cappedDelta = Math.min(delta, 0.05);
-    simulationEngine.tick(cappedDelta, simSpeedRef.current);
-    
-    // Re-render periodically to pick up new/removed products
-    frameCounter.current++;
-    if (frameCounter.current % 6 === 0) { // Check every ~100ms at 60fps
-      const currentCount = simulationEngine.getProducts().length;
-      if (currentCount !== lastProductCount.current) {
-        lastProductCount.current = currentCount;
-        setProductCount(currentCount);
-      }
-    }
+    if (!isPlaying) return; // Paused: skip tick but keep products
+    simulationEngine.tick(Math.min(delta, 0.1), simulationSpeed);
+    // Force re-render every ~100ms to pick up new/removed products
+    setTick(t => t + 1);
   });
 
   // Show products when playing OR paused (not when fully reset)

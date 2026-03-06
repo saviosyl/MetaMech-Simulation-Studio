@@ -3,7 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { AssetDef, getAssetManifest, getAssetById, ParametricAssetDef } from '../lib/assetManifest';
 import { runBuilder } from '../lib/parametricBuilders';
 import { getPortWorldPosition, getWorldPorts as computeWorldPorts } from '../lib/nodeTransform';
-import { ModeManager } from '../lib/ModeManager';
 
 // Types
 export interface ProcessNode {
@@ -812,10 +811,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   setActiveTool: (tool) => {
-    // Sync ModeManager with the active tool
-    const mode = ModeManager.toolToMode(tool);
-    ModeManager.activate(mode, `tool-switch:${tool}`);
-
     const updates: Partial<EditorState> = { activeTool: tool } as any;
     if (tool === 'move' || tool === 'snap-move') (updates as any).transformMode = 'translate';
     else if (tool === 'rotate') (updates as any).transformMode = 'rotate';
@@ -910,22 +905,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSnapTarget: (target) => set({ snapTarget: target }),
   
   play: () => {
-    // Safety: unlock ModeManager in case a drag was interrupted
-    ModeManager.unlock();
-    ModeManager.activate('viewport', 'simulation-play');
     set({ isPlaying: true, isPaused: false });
   },
   
   pause: () => {
     // Pause freezes simulation in place — products remain visible
-    ModeManager.unlock();
     set({ isPlaying: false, isPaused: true });
   },
   
   reset: () => {
     // Reset stops and clears everything
-    ModeManager.unlock();
-    ModeManager.activate('viewport', 'simulation-reset');
     set({ isPlaying: false, isPaused: false });
   },
   

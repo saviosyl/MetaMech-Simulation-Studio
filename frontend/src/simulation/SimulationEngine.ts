@@ -55,8 +55,6 @@ export class SimulationEngine {
   private colorIndex = 0;
 
   init(nodes: ProcessNode[], edges: ProcessEdge[]) {
-    console.log('[SIM-ENGINE] init() called with', nodes.length, 'nodes,', edges.length, 'edges');
-    console.log('[SIM-ENGINE] Node types:', nodes.map(n => n.type).join(', '));
     this.nodes = nodes;
     this.edges = edges;
     this.products = [];
@@ -104,9 +102,8 @@ export class SimulationEngine {
           placeHeight: bH + pedH,
           homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
         };
-        const reachMm = node.parameters.reach || node.parameters.reachX || 1400;
-        const rState = createRobotState(config, reachMm, node.parameters.baseHeight || 500);
-        const reach = reachMm / 1000;
+        const rState = createRobotState(config);
+        const reach = (node.parameters.reach || node.parameters.reachX || 1400) / 1000;
         const pickH = (node.parameters.pickHeight || 800) / 1000;
         const placeH = (node.parameters.placeHeight || 800) / 1000;
 
@@ -205,18 +202,8 @@ export class SimulationEngine {
   }
 
   tick(dt: number, speed: number) {
-    // Cap dt to prevent spiral-of-death on tab switch or lag spikes
-    const cappedDt = Math.min(dt, 0.05); // max 50ms per tick (20fps minimum)
-    const elapsed = cappedDt * speed;
-    
-    // Watchdog: if tick takes >16ms, skip heavy work next frame
-    const tickStart = performance.now();
+    const elapsed = dt * speed;
     this.simTime += elapsed;
-    
-    // Log first few ticks for debugging
-    if (this.simTime < 0.5 && Math.floor(this.simTime * 20) !== Math.floor((this.simTime - elapsed) * 20)) {
-      console.log(`[SIM-ENGINE] tick t=${this.simTime.toFixed(2)} products=${this.products.length} nodes=${this.nodes.length}`);
-    }
 
     // ── PASS 1: Tick ALL sensors first so signals are fresh for conveyors/stoppers ──
     for (const node of this.nodes) {
@@ -309,12 +296,6 @@ export class SimulationEngine {
 
     // Cleanup completed products that left the system
     this.products = this.products.filter(p => p.state !== 'completed' || (this.simTime - (p.completedAt || 0)) < 2);
-    
-    // Watchdog: warn if tick took too long
-    const tickMs = performance.now() - tickStart;
-    if (tickMs > 16) {
-      console.warn(`[WATCHDOG] Simulation tick took ${tickMs.toFixed(1)}ms (>${16}ms budget). Products: ${this.products.length}`);
-    }
   }
 
   // ─── Rule Engine tick ────────────────────────────────────────
@@ -468,7 +449,7 @@ export class SimulationEngine {
     const path = createTransportPath(node.type, node.parameters);
     const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
     const pathLen = path ? path.length : ((node.parameters.length || 3000) / 1000);
-    const MIN_GAP_M = 0.0001; // ~0.1mm epsilon — products visually touch when accumulated (zero-gap)
+    const MIN_GAP_M = 0.001; // ~1mm gap — products touch each other when accumulated
 
     // Accept new arrivals at path start
     for (const product of arrived) {
@@ -959,63 +940,61 @@ export class SimulationEngine {
       homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
     };
 
-    // ─── Accept arriving products into queue ───
+    // Find available product at pick source — accept arriving products into queue
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
       if (!stats.queue.includes(product.id)) {
         product.state = 'queued';
-        // Park product at pick position so it's visible there
-        product.currentPosition = [...rState.pickPosition];
         stats.queue.push(product.id);
         console.log(`[ROBOT] ${node.name} queued product ${product.id.slice(0,8)}, queue=${stats.queue.length}`);
       }
     }
 
-    // ─── Also accept products that landed on conveyor near pick zone ───
-    // (Some products might be 'queued' on an upstream conveyor near the robot pick point)
-
-    // ─── Offer product to state machine ───
+    // Only offer a product to the state machine when idle (ready for next cycle)
     let availableProductId: string | null = null;
     if (stats.queue.length > 0 && rState.phase === 'idle') {
       availableProductId = stats.queue[0];
+      console.log(`[ROBOT] ${node.name} idle, offering product ${availableProductId?.slice(0,8)}, pickPos=${JSON.stringify(rState.pickPosition)}`);
     }
-    // Pass in-flight target during active cycle
+    // Also pass the in-flight target so pick phase can confirm it
     const targetId = (rState as any)._targetProductId as string | undefined;
     if (targetId && !availableProductId) {
       availableProductId = targetId;
     }
 
+    // Log robot phase every ~1 second
+    if (Math.floor(this.simTime * 2) !== Math.floor((this.simTime - dt) * 2)) {
+      console.log(`[ROBOT-STATE] ${node.name} t=${this.simTime.toFixed(1)} phase=${rState.phase} prog=${rState.phaseProgress.toFixed(2)} held=${rState.heldProductId?.slice(0,8)||'none'} queue=${stats.queue.length} pick=${JSON.stringify(rState.pickPosition)} place=${JSON.stringify(rState.placePosition)}`);
+    }
+
     // Tick the motion controller
     const placedId = tickRobot(rState, config, this.simTime, availableProductId);
 
-    // ─── Take ownership of product when gripped ───
-    // Robot holds product from retract-pick onward until place
-    const CARRY_PHASES = new Set(['retract-pick', 'move-to-place', 'approach-place', 'place']);
-    if (rState.heldProductId) {
+    // If robot just gripped a product (entering retract-pick), take ownership
+    if (rState.heldProductId && rState.phase === 'retract-pick' && rState.phaseProgress < 0.15) {
+      const held = this.products.find(p => p.id === rState.heldProductId && p.state !== 'processing');
+      if (held) {
+        held.state = 'processing';
+        held.currentNodeId = node.id;    // Now owned by robot
+        held.currentEdgeId = null;
+        held.stoppedBy = null;
+        held.conveyorEntryTime = null;
+        held.pathPosition = 0;
+        // Remove from ALL queues
+        stats.queue = stats.queue.filter(id => id !== rState.heldProductId);
+        for (const [, ns] of this.nodeStats) {
+          ns.queue = ns.queue.filter(id => id !== rState.heldProductId);
+        }
+      }
+    }
+
+    // Move held product to TCP position — only AFTER pick phase (physically gripping)
+    // During approach-pick and pick, product stays at conveyor/queue position
+    const GRIP_PHASES: string[] = ['retract-pick', 'move-to-place', 'approach-place', 'place', 'retract-place', 'return'];
+    if (rState.heldProductId && GRIP_PHASES.includes(rState.phase)) {
       const held = this.products.find(p => p.id === rState.heldProductId);
       if (held) {
-        // First time gripping: take ownership
-        if (held.state !== 'processing') {
-          held.state = 'processing';
-          held.currentNodeId = node.id;
-          held.currentEdgeId = null;
-          held.stoppedBy = null;
-          held.conveyorEntryTime = null;
-          held.pathPosition = 0;
-          // Remove from ALL queues
-          stats.queue = stats.queue.filter(id => id !== rState.heldProductId);
-          for (const [, ns] of this.nodeStats) {
-            ns.queue = ns.queue.filter(id => id !== rState.heldProductId);
-          }
-        }
-        // Move product with TCP (product visually follows the robot arm)
-        if (CARRY_PHASES.has(rState.phase) || rState.phase === 'retract-place') {
-          held.currentPosition = [
-            rState.toolCenterPoint[0],
-            rState.toolCenterPoint[1] - 0.05, // slightly below TCP (hanging from gripper)
-            rState.toolCenterPoint[2],
-          ];
-        }
+        held.currentPosition = [...rState.toolCenterPoint];
       }
     }
 
@@ -1532,7 +1511,6 @@ export class SimulationEngine {
           this.sensorDwellFired.set(node.id, true);
           console.log(`[DWELL-FIRE] ${sensorTag} dwell=${dwellSec.toFixed(1)}s → EVENT: ${onDwellEvent}`);
           
-          // Release stoppers linked to this sensor
           if (onDwellEvent === 'release-stopper' || onDwellEvent === 'stop-source-and-release') {
             for (const n of this.nodes) {
               if (n.type === 'stopper' && (n.parameters?.secondarySensorTag === sensorTag || n.parameters?.triggerSensorTag === sensorTag)) {
@@ -1546,19 +1524,6 @@ export class SimulationEngine {
                 const sss = this.stopperState.get(n.id);
                 if (sss) { sss.latched = false; sss.lastReleaseTime = this.simTime; }
                 console.log(`[DWELL-FIRE] Released ${stopped.length} from ${n.parameters?.stopperTag}, latch=false, cooldown started`);
-              }
-            }
-          }
-
-          // Stop/resume sources linked to this sensor via blockedBySensorTag
-          if (onDwellEvent === 'stop-source' || onDwellEvent === 'stop-source-and-release') {
-            for (const n of this.nodes) {
-              if (n.type === 'source' && n.parameters?.blockedBySensorTag === sensorTag) {
-                // Switch source to signal-controlled mode if not already
-                if (n.parameters.runMode !== 'signal-controlled') {
-                  (n.parameters as any).runMode = 'signal-controlled';
-                }
-                console.log(`[DWELL-FIRE] Source ${n.id.slice(0, 8)} blocked by ${sensorTag} dwell`);
               }
             }
           }
