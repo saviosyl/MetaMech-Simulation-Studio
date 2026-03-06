@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AssetDef, getAssetManifest, getAssetById, ParametricAssetDef } from '../lib/assetManifest';
 import { runBuilder } from '../lib/parametricBuilders';
 import { getPortWorldPosition, getWorldPorts as computeWorldPorts } from '../lib/nodeTransform';
+import { ModeManager } from '../lib/ModeManager';
 
 // Types
 export interface ProcessNode {
@@ -783,6 +784,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   setActiveTool: (tool) => {
+    // Sync ModeManager with the active tool
+    const mode = ModeManager.toolToMode(tool);
+    ModeManager.activate(mode, `tool-switch:${tool}`);
+
     const updates: Partial<EditorState> = { activeTool: tool } as any;
     if (tool === 'move' || tool === 'snap-move') (updates as any).transformMode = 'translate';
     else if (tool === 'rotate') (updates as any).transformMode = 'rotate';

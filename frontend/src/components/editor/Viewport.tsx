@@ -12,32 +12,16 @@ import {
 } from '@react-three/drei';
 // EffectComposer removed — ToneMapping+SMAA can cause blank screens on some devices
 import * as THREE from 'three';
+import { ModeManager } from '../../lib/ModeManager';
+import { ViewportModule, raycastToGround, setCamera } from '../../lib/interaction/ViewportModule';
+import { onGizmoDragStart, onGizmoDragEnd } from '../../lib/interaction/ModelingModule';
 
-// Module-level camera ref for drop raycast (accessible outside Canvas)
-let _threeCamera: THREE.Camera | null = null;
-let _canvasSize: { width: number; height: number } = { width: 1, height: 1 };
-
-/** Tiny component inside Canvas that captures the camera */
+/** Tiny component inside Canvas that captures the camera for the ViewportModule */
 const CameraCapture: React.FC = () => {
   const { camera, size } = useThree();
-  _threeCamera = camera;
-  _canvasSize = size;
+  setCamera(camera, size);
   return null;
 };
-
-/** Raycast from screen coordinates to ground plane (y=0) */
-function raycastToGround(clientX: number, clientY: number, canvasRect: DOMRect): [number, number, number] | null {
-  if (!_threeCamera) return null;
-  const ndcX = ((clientX - canvasRect.left) / canvasRect.width) * 2 - 1;
-  const ndcY = -((clientY - canvasRect.top) / canvasRect.height) * 2 + 1;
-  const raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), _threeCamera);
-  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // y=0 plane
-  const intersection = new THREE.Vector3();
-  const hit = raycaster.ray.intersectPlane(groundPlane, intersection);
-  if (!hit) return null;
-  return [intersection.x, 0, intersection.z];
-}
 import { useEditorStore, getConnectionPorts } from '../../store/editorStore';
 import ProcessNodeComponent from '../3d/ProcessNodeComponent';
 import EnvironmentAssetComponent from '../3d/EnvironmentAssetComponent';
@@ -86,7 +70,8 @@ const DraggableObject: React.FC<{
       }
 
       if (event.value) {
-        // Started dragging
+        // Started dragging — lock modeling mode
+        onGizmoDragStart();
         setIsDragging(true);
         setDragNodeId(id);
       } else {
@@ -122,6 +107,7 @@ const DraggableObject: React.FC<{
             }
           }
         }
+        onGizmoDragEnd();
         setIsDragging(false);
         setDragNodeId(null);
         setSnapTarget(null);
@@ -465,7 +451,7 @@ const Viewport: React.FC = () => {
       const data = JSON.parse(event.dataTransfer.getData('application/json'));
       
       if (data.type === 'module') {
-        // Proper raycast from mouse to ground plane (y=0) using Three.js camera
+        // Proper raycast from mouse to ground plane (y=0) via ViewportModule
         const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
         const rayHit = raycastToGround(event.clientX, event.clientY, rect);
         
