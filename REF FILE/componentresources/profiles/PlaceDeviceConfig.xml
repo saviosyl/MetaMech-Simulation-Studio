@@ -1,0 +1,7 @@
+<Devices>
+	<Device>
+		<Id>SCDC</Id>
+		<Vcid>d7998015-6414-403d-a803-3e1d017fe539</Vcid>
+		<HelperType>SimpleSlotComponent</HelperType>
+	</Device>
+</Devices>

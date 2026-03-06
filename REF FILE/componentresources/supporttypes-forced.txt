@@ -1,0 +1,6 @@
+#
+# These will always be matched if no other rule finds the connection
+#
+#Conveyor part vcid; Support part vcid
+#
+80888d4a-54fb-48bf-ab58-ae81264206a8;301cd012-8028-48a4-800a-c30d217e07cd

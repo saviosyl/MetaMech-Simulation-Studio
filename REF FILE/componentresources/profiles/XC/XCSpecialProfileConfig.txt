@@ -1,0 +1,4 @@
+#ItemNumber;VCID;Image;ToolTipImage;HelperLogic
+XCBALX44;4105ae7f-5710-45f0-a520-2566bbd12cde;FlexLink/Profiles/XC/XCBALX44;Icons\FlexLink\Profiles\XC\SpecialProfiles\xcba_Lx44.png;SingleCorner;None
+XCBRLX44;77129840-4c1f-4c7f-a30e-919648e317dd;FlexLink/Profiles/TCBRLX40;Icons\FlexLink\Profiles\XC\SpecialProfiles\xcbr_lx44.png;SingleCorner;None
+XCBRLX88;1ceb9330-b965-46c2-a438-40f69197d97a;FlexLink/Profiles/XC/XCBRLX88;Icons\FlexLink\Profiles\XC\SpecialProfiles\xcbr_L88.png;DoubleCorner;None

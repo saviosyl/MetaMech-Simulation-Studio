@@ -1,0 +1,4 @@
+Profile.ProfileType=Basic
+Panel.PanelMaterial=Polycarbonate
+Panel.PanelThickness=5
+Panel.Fixation=RimStrip

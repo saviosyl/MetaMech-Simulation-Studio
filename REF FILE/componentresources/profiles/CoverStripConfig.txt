@@ -1,0 +1,4 @@
+#VCID;ID;KEY;TOOLTIPIMAGE
+9bc0acbe-61a9-4de9-9c60-c97c27b71f80;SlidingCover;Sliding;Icons\FlexLink\Profiles\CoverStrips\SlidingCover.png
+9bc0acbe-61a9-4de9-9c60-c97c27b71f80;BumperCover;Bumper;Icons\FlexLink\Profiles\CoverStrips\BumperCover.png
+9bc0acbe-61a9-4de9-9c60-c97c27b71f80;TableCover;Table;Icons\FlexLink\Profiles\CoverStrips\TableCover.png

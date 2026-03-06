@@ -1,0 +1,210 @@
+[
+  /*
+  {
+    "Platform": "X45",
+    "NumberOfTracks": 2, // Defaults to 1
+    "MaxConveyorLengthForWarning": 6000, // mm, Default none
+    "MaxConveyorLengthForError": 4000, // mm, Default none
+    "MaxGuidedConveyorLengthForWarning": 2000, // mm, Default none
+    "MaxGuidedConveyorLengthForError": 2000, // mm, Default none
+    "MaxNumberOfBends": 2, // Default none
+    "MaxCombinedBendAngles": 270, // Default none
+    "RequiresChainInsertionSection": true, // Default false
+    "IsSupportedByFlct": true, // Default true,
+    "HasAccumulationChain": true // if it has a different chain type than common FL platforms, bicycle chain, Default false
+    "ChainIsAffectedBySubplatform": true // if the chain may need to be changed due to a sub platform change, default true
+    "SlideRailIsAffectedBySubplatform": true // if the sliderail may need to be changed due to a sub platform change, default true
+    "RequiresDriveUnit": true, // Default true
+    "RequiresIdler": true, // Default true
+    "ApplicableForWedge":true, // Default false
+    "FeederVCID":"0bb5c7ae-8251-488f-80cb-34aca1026245", //Default Generic Feeder
+	  "SupportsConditionMonitoring": true, // Default false
+    "ConditionMonitoringExcludedChains": ["XBTP 5A85 A", "5056849"], //List of chains excluded for CM
+    "ConditionMonitoringSpeedLimit": 60.0 // Speed limit for CM per platform in m/min
+  }
+  */
+  {
+    "Platform": "SR30",
+    "RequiresDriveUnit": false,
+    "RequiresIdler": false,
+    "IsSupportedByFlct": false
+  },
+  {
+    "Platform": "MOD6",
+    "RequiresDriveUnit": false,
+    "RequiresIdler": false,
+    "IsSupportedByFlct": false
+  },
+  {
+    "Platform": "MOD4",
+    "RequiresDriveUnit": false,
+    "RequiresIdler": false,
+    "IsSupportedByFlct": false
+  },
+  {
+    "Platform": "WK",
+  },
+  {
+    "Platform": "WLX",
+    "IsSupportedByFlct":false,
+  },
+  {
+    "Platform": "X45",
+    "MaxConveyorLengthForWarning": 6000,
+    "MaxNumberOfBends": 2,
+    "MaxCombinedBendAngles": 270,
+    "RequiresChainInsertionSection": false,
+	  "ApplicableForWedge":true,
+  },
+  {
+    "Platform": "X45E",
+    "MaxConveyorLengthForWarning": 6000,
+    "MaxNumberOfBends": 2,
+    "MaxCombinedBendAngles": 270,
+    "RequiresChainInsertionSection": false,
+  },
+  {
+    "Platform": "X45P",
+    "MaxConveyorLengthForWarning": 6000,
+    "MaxNumberOfBends": 2,
+    "MaxCombinedBendAngles": 270,
+    "RequiresChainInsertionSection": false,
+	  "FeederVCID":"f8be8729-5a23-4024-b42a-fe61532391b0",
+  },
+  {
+    "Platform": "X45H",
+
+  },
+  {
+    "Platform": "X45HP",
+
+  },
+  {
+    "Platform": "X65",
+    "ApplicableForWedge":true,
+  },
+  {
+    "Platform": "X65Y",
+    "IsSupportedByFlct":false,
+  },
+  
+  {
+    "Platform": "X65P",
+    "FeederVCID":"3db1f92b-6ade-4592-b281-8af83102866b",
+  },
+  {
+    "Platform": "X85",
+    "ApplicableForWedge":true,
+	"SupportsConditionMonitoring": true,
+    "ConditionMonitoringExcludedChains": ["XBTP 5A85 A", "5056849"],
+    "ConditionMonitoringSpeedLimit": 60.0, 
+  },
+  {
+    "Platform": "X85P",
+    "FeederVCID":"a0ce89c8-1b13-414f-a252-af495cd84c57",
+	"SupportsConditionMonitoring": true,
+    "ConditionMonitoringExcludedChains": ["XBTP 5A85 A", "5056849"],
+    "ConditionMonitoringSpeedLimit": 60.0,
+  },
+  {
+    "Platform": "XS",
+
+  },
+  {
+    "Platform": "XK",
+
+  },
+  {
+    "Platform": "XKP",
+    "FeederVCID":"26ec361f-386f-4440-a937-3c54dce651ff",
+  },
+  {
+    "Platform": "X180",
+    "ApplicableForWedge":true,
+  },
+  {
+    "Platform": "X300",
+    "ApplicableForWedge":true,
+  },
+  {
+    "Platform": "XH",
+    "ApplicableForWedge":true,
+  },
+  {
+    "Platform": "X70X",
+    "ApplicableForWedge":true,
+  },
+  {
+    "Platform": "X85X",
+    "ApplicableForWedge":true,
+  },
+  {
+    "Platform": "X180X",
+    "ApplicableForWedge":true,
+  },
+  {
+    "Platform": "X300X",
+    "ApplicableForWedge":true,
+  },
+  {
+    "Platform": "XT",
+    "MaxConveyorLengthForWarning": 25000,
+    "MaxNumberOfBends": 2,
+    "MaxCombinedBendAngles": 270,
+    "NumberOfTracks": 2,
+    "ChainIsAffectedBySubplatform": false,
+    "SlideRailIsAffectedBySubplatform": false,
+    "FeederVCID":"32ee86b7-b3fa-4295-b786-5ba1b3aba625",
+  },
+  {
+    "Platform": "XTC",
+    "MaxConveyorLengthForError": 4000,
+    "MaxNumberOfBends": 2,
+    "MaxCombinedBendAngles": 180,
+    "NumberOfTracks": 2,
+    "RequiresChainInsertionSection": false,
+    "ChainIsAffectedBySubplatform": false,
+    "SlideRailIsAffectedBySubplatform": false,
+    "FeederVCID":"32ee86b7-b3fa-4295-b786-5ba1b3aba625",
+  },
+  {
+    "Platform": "WL",
+    "MaxConveyorLengthForWarning": 15000,
+    "MaxNumberOfBends": 2,
+    "RequiresChainInsertionSection": true,
+  },
+  {
+    "Platform": "HU",
+    "MaxConveyorLengthForWarning": 10000,
+    "MaxGuidedConveyorLengthForError": 2000,
+    "NumberOfTracks": 2,
+    "IsSupportedByFlct": false,
+    "HasAccumulationChain": true,
+    "ChainIsAffectedBySubplatform": false,
+    "SlideRailIsAffectedBySubplatform": false,
+    "FeederVCID":"0846c889-e906-40d8-80c4-c917dc2be625",
+  },
+  {
+    "Platform": "AVANCON",
+    "RequiresDriveUnit": false,
+    "RequiresIdler": false,
+    "IsSupportedByFlct": false,
+  },
+  {
+    "Platform": "SUPERTRACK",
+    "RequiresDriveUnit": false,
+    "RequiresIdler": false,
+    "IsSupportedByFlct": false,
+  },
+  {
+    "Platform": "E_X85X",
+    "IsSupportedByFlct": false,
+  },
+  {
+    "Platform": "Genius",
+    "IsSupportedByFlct": false,
+    "RequiresDriveUnit": false,
+    "RequiresIdler": false,
+    "RequiresChainInsertionSection": false
+  }
+]

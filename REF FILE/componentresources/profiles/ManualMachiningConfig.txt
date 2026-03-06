@@ -1,0 +1,6 @@
+TCMA D6 A;Drilling;40;80;6
+TCMA D7 A;Drilling;40;80;7
+TCMA D9 A;Drilling;40;80;9
+TCMA D13 A;Drilling;40;80;13
+TCMA 8X0-100;Milling;8.5;100
+TCMA 8X100-500;Milling;101;500

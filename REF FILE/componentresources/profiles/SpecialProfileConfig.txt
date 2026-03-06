@@ -1,0 +1,9 @@
+#ItemNumber;VCID;Image;ToolTipImage;HelperLogic;ThreewayJoint
+TCBALX40;a4caa80e-21b6-453c-ac62-291c96691e56;FlexLink/Profiles/TCBALX40.svg;Icons\FlexLink\Profiles\SpecialProfiles\TCBALX40.png;SingleCorner;ThreewayJoint40x40_90
+TCBALX80;d726b281-f631-4744-a137-7fb221c8a674;FlexLink/Profiles/TCBALX80.svg;Icons\FlexLink\Profiles\SpecialProfiles\TCBALX80.png;DoubleCorner;None
+TCRCLX40X120;54d08488-a64c-4e7f-a816-2260cf4ea793;FlexLink/Profiles/TCRCLX40X120.svg;Icons\FlexLink\Profiles\SpecialProfiles\TCRCLX40X120.png;Sink;None
+TCRCLX40X80;5f0fdca3-bcf1-4bb8-8914-920df6b628ca;FlexLink/Profiles/TCRCLX40X80.svg;Icons\FlexLink\Profiles\SpecialProfiles\TCRCLX40X80.png;Sink;None
+TCBRLX40;24487e32-e492-470c-895f-cbf19756abb4;FlexLink/Profiles/TCBRLX40.svg;Icons\FlexLink\Profiles\SpecialProfiles\TCBRLX40.png;SingleCorner;ThreewayJoint40x40_90_R40
+TCBBLX40X16;c6aff5a6-fb52-40d7-8cb4-e4c7d7b8d32d;FlexLink/Profiles/TCBBLX40X16.svg;Icons\FlexLink\Profiles\SpecialProfiles\TCBBLX40X16.png;Flat;None
+TCBSLX40MC;22fdd148-91f7-4e1e-931b-1b61c8804757;FlexLink/Profiles/TCBSLX40MC.svg;Icons\FlexLink\Profiles\SpecialProfiles\TCBSLX40MC.png;MC;None
+TCBBLX40F;08be9334-4d9e-4a08-ac66-f878f80bf9df;FlexLink/Profiles/tcbblx40f.svg;tooltip;ProfileA;None

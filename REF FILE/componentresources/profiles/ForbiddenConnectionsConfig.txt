@@ -1,0 +1,33 @@
+#ConnectionType = Perpendicular, Extending, Crossing, Corner, OuterCorner, Parallel, None
+#JointId;ConnectionType;EndProfileId;SideProfileId
+CentralJoint;Perpendicular;TCBB LX40X16;Any
+CentralJoint;Perpendicular;TCBR LX56;Any
+CentralJoint;Perpendicular;TCBR LX40;Any
+CentralJoint;Perpendicular;TCBA LX40;Any
+CentralJoint;Perpendicular;TCBA LX80;Any
+CentralJoint;Perpendicular;TCBS LX40;Any
+CentralJoint;Perpendicular;TCRC LX40X80;Any
+CentralJoint;Perpendicular;TCRC LX40X120;Any
+CentralJoint;Perpendicular;TCBS LX40 MC;Any
+XCAF44;Perpendicular;XCBA LX44;Any
+XCAF44;Perpendicular;XCBR LX44;Any
+XCAF44;Perpendicular;XCBR LX88;Any
+XCAF64;Perpendicular;XCBA LX44;Any
+XCAF64;Perpendicular;XCBR LX44;Any
+XCAF64;Perpendicular;XCBR LX88;Any
+XCAF88;Perpendicular;XCBA LX44;Any
+XCAF88;Perpendicular;XCBR LX44;Any
+XCAF88;Perpendicular;XCBR LX88;Any
+XCAQ20CA;Perpendicular;Any;XCBR LX88
+XCEC12;Perpendicular;XCBA LX44;Any
+XCEC12;Perpendicular;XCBR LX88;Any
+XCFA24;Perpendicular;XCBR LX88;Any
+XCFA44;Perpendicular;XCBR LX88;Any
+XCFA44A;Perpendicular;XCBR LX88;Any
+XCFA44B;Perpendicular;XCBR LX88;Any
+XCFA44C;Perpendicular;XCBR LX88;Any
+XCFA44D;Perpendicular;XCBR LX88;Any
+XMRX20A;Perpendicular;XCBR LX88;Any
+XMRY20;Perpendicular;XCBR LX88;Any
+XMRY20A;Perpendicular;XCBR LX88;Any
+XMRY20B;Perpendicular;XCBR LX88;Any

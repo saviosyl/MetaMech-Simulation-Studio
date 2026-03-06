@@ -1,0 +1,29 @@
+<Fixations>
+	<Fixation>
+		<Id>XFAM6</Id>
+		<Vcid>1c508f5e-11fc-4833-be6c-8b6d2ac982d4</Vcid>
+		<HelperType>Block</HelperType>
+		<SubCategory>Multiblock</SubCategory>
+		<MinimumPanelWidth>2</MinimumPanelWidth>
+		<MaximumPanelWidth>5</MaximumPanelWidth>
+		<ToolTipImage>Icons\FlexLink\Profiles\XF\Fixations\XFAM6.png</ToolTipImage>
+	</Fixation>
+	<Fixation>
+		<Id>XFET3C</Id>
+		<Vcid>1115c0ca-e14b-4098-8ee1-6d785669f93f</Vcid>
+		<HelperType>Strip</HelperType>
+		<SubCategory>NetStrip</SubCategory>
+		<MinimumPanelWidth>2</MinimumPanelWidth>
+		<MaximumPanelWidth>3</MaximumPanelWidth>
+		<ToolTipImage>Icons\FlexLink\Profiles\XF\Fixations\XCETXC.png</ToolTipImage>
+	</Fixation>
+	<Fixation>
+		<Id>XFET3A</Id>
+		<Vcid>1115c0ca-e14b-4098-8ee1-6d785669f93f</Vcid>
+		<HelperType>Strip</HelperType>
+		<SubCategory>RimStrip</SubCategory>
+		<MinimumPanelWidth>4</MinimumPanelWidth>
+		<MaximumPanelWidth>5</MaximumPanelWidth>
+		<ToolTipImage>Icons\FlexLink\Profiles\XF\Fixations\XCETXA.png</ToolTipImage>
+	</Fixation>
+</Fixations>

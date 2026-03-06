@@ -1,0 +1,132 @@
+#Id;PropertyName;PropertyValue
+LockableHandleA;FlexLink::Option;A
+LockableHandleB;FlexLink::Option;B
+SimpleHandle130;FlexLink::Size;130
+SimpleHandle135;FlexLink::Size;135
+SimpleHandle175;FlexLink::Size;175
+SimpleHandle190;FlexLink::Size;190
+SimpleHandle200;FlexLink::Size;200
+SimpleHandle240;FlexLink::Size;240
+40x40CornerJoint;FlexLink::Size;40x40
+40x40CornerJoint;FlexLink::Type;Corner Joint
+40x40AngleBracket;FlexLink::Size;40x40
+40x40AngleBracket;FlexLink::Type;Angle Bracket
+40x80AngleBracket;FlexLink::Size;40x80
+40x80AngleBracket;FlexLink::Type;Angle Bracket
+80x40CornerJoint;FlexLink::Size;80x40
+80x40CornerJoint;FlexLink::Type;Corner Joint
+70x40AngleJoint;FlexLink::Size;70x40
+70x40AngleJoint;FlexLink::Type;Angle Joint
+70x80AngleJoint;FlexLink::Size;70x80
+70x80AngleJoint;FlexLink::Type;Angle Joint
+TCAH30L;FlexLink::ItemKey;TCAH 30 L
+TCAH30R;FlexLink::ItemKey;TCAH 30 R
+TCAH50A;FlexLink::ItemKey;TCAH 50 A
+TCAH50B;FlexLink::ItemKey;TCAH 50 B
+TCAH50P;FlexLink::ItemKey;TCAH 50 PG
+TCAH50CP;FlexLink::ItemKey;TCAH 50 CPG
+TCAH90A;FlexLink::ItemKey;TCAH 90 A
+TCAH90B;FlexLink::ItemKey;TCAH 90 B
+TCAH90C;FlexLink::ItemKey;TCAH 90 C
+TCAH30DP;FlexLink::ItemKey;TCAH 30 DPG
+TCAH75H;FlexLink::ItemKey;TCAH 75 H
+TCFJ40;FlexLink::UseArm;false
+TCFJ40A;FlexLink::UseArm;true
+TCAH30L;FlexLink::Angle;0
+TCAH30R;FlexLink::Angle;0
+TCAH50A;FlexLink::Angle;0
+TCAH50P;FlexLink::Angle;0
+TCAH50CP;FlexLink::Angle;0
+TCAH90A;FlexLink::Angle;0
+TCAH90B;FlexLink::Angle;0
+TCAH90C;FlexLink::Angle;0
+TCAH30DP;FlexLink::Angle;0
+125x125Plate;FlexLink::Size;125x125
+150x125Plate;FlexLink::Size;150x125
+200x200Plate;FlexLink::Size;200x200
+200x169Plate;FlexLink::Size;200x169
+ConnectingTab74;FlexLink::ItemKey;TCCS 74
+ConnectingTab114;FlexLink::ItemKey;TCCS 114
+TCCH22x22B;FlexLink::CableHolderVariant;TCCH 22x22 B
+DoorCatch40;FlexLink::ItemKey;40
+DoorCatch48;FlexLink::ItemKey;48
+DoorCatch74;FlexLink::ItemKey;74
+DoorCatch90;FlexLink::ItemKey;90
+TCCH25B;FlexLink::CableHolderVariant;TCCH 25 B
+TCCH45B;FlexLink::CableHolderVariant;TCCH 45 B
+SlidingCover;FlexLink::ItemKey;Sliding
+BumperCover;FlexLink::ItemKey;Bumper
+TableCover;FlexLink::ItemKey;Table
+20mmUniversalJoint;FlexLink::Size;20
+#40mmUniversalJoint;FlexLink::Size;40
+ThreewayJoint;FlexLink::ItemKey;TCFA 40 AB
+ThreewayJoint40x40_90;FlexLink::ItemKey;TCFA 40 BB
+ThreewayJoint40x40_90_R40;FlexLink::ItemKey;TCFA 40 CB
+XCFA24;FlexLink::ItemKey;XCFA24
+XCFA44;FlexLink::ItemKey;XCFA44
+XCFA44A;FlexLink::ItemKey;XCFA44A
+XCFA44B;FlexLink::ItemKey;XCFA44B
+XCFA44C;FlexLink::ItemKey;XCFA44C
+XCFA44D;FlexLink::ItemKey;XCFA44D
+XCFA84;FlexLink::ItemKey;XCFA84
+XCFA88A;FlexLink::ItemKey;XCFA88A
+XCFA88B;FlexLink::ItemKey;XCFA88B
+XLCS44;FlexLink::ItemKey;XLCS44
+XSCS44;FlexLink::ItemKey;XSCS44
+XLCS64C;FlexLink::ItemKey;XLCS64C
+XMCS64C;FlexLink::ItemKey;XMCS64C
+XSCS64;FlexLink::ItemKey;XSCS64
+XHCS64B;FlexLink::ItemKey;XHCS64B
+XLCS88;FlexLink::ItemKey;XLCS88
+XMCS88B;FlexLink::ItemKey;XMCS88B
+XHCS88B;FlexLink::ItemKey;XHCS88B
+XKCS88R;FlexLink::ItemKey;XKCS88R
+XUCS44;FlexLink::ItemKey;XUCS44
+XLCT11x100C;FlexLink::ItemKey;XLCT11x100C
+XLCT21x135B;FlexLink::ItemKey;XLCT21x135B
+XLCT21x158R;FlexLink::ItemKey;XLCT21x158R
+XUCT50;FlexLink::ItemKey;XUCT50
+XLCU73;FlexLink::ItemKey;XLCU73
+XLCU103;FlexLink::ItemKey;XLCU103
+XCFB44;FlexLink::ItemKey;XCFB44
+XCFB44X88A;FlexLink::ItemKey;XCFB44X88A
+XCFB44X88B;FlexLink::ItemKey;XCFB44X88B
+XCFB88;FlexLink::ItemKey;XCFB88
+XCFB64A;FlexLink::ItemKey;XCFB64A
+XCFB44X64A;FlexLink::ItemKey;XCFB44X64A
+XCFB44X64B;FlexLink::ItemKey;XCFB44X64B
+XMRX20A;FlexLink::ItemKey;XMRX20A
+XMRY20;FlexLink::ItemKey;XMRY20
+XMRY20B;FlexLink::ItemKey;XMRY20B
+XMRY20A;FlexLink::ItemKey;XMRY20A
+XLCJ5X76;FlexLink::ItemKey;XLCJ5X76
+XLCJ5X140;FlexLink::ItemKey;XLCJ5X140
+XMRW20;FlexLink::ItemKey;XMRW20
+XMRW20X45;FlexLink::ItemKey;XMRW20X45
+XMRY20X45A;FlexLink::ItemKey;XMRY20X45A
+XCAQ20CA;FlexLink::ItemKey;XCAQ20CA
+XCAQ20X64CA;FlexLink::ItemKey;XCAQ20X64CA
+XCAC2;FlexLink::ItemKey;XCAC2
+XCAC3P;FlexLink::ItemKey;XCAC3P
+XCAC25P;FlexLink::ItemKey;XCAC25P
+XCAF44;FlexLink::ItemKey;XCAF44
+XCAF64;FlexLink::ItemKey;XCAF64
+XCAF88;FlexLink::ItemKey;XCAF88
+XCLA660A;FlexLink::ItemKey;XCLA660A
+XCLA950A;FlexLink::ItemKey;XCLA950A
+XCAF88;FlexLink::ItemKey;XCAF88
+XFAF30;FlexLink::ItemKey;XFAF30
+XFAF60;FlexLink::ItemKey;XFAF60
+XFAC3T;FlexLink::ItemKey;XFAC3T
+XFEL60B;FlexLink::ItemKey;XFEL60B
+XFEL60W;FlexLink::ItemKey;XFEL60W
+XFEL60BA;FlexLink::ItemKey;XFEL60BA
+XFEL60WA;FlexLink::ItemKey;XFEL60WA
+XCAH50;FlexLink::ItemKey;XCAH50
+XCAH110A;FlexLink::ItemKey;XCAH110
+XCEL60B;FlexLink::ItemKey;XCEL60B
+XCEL60BA;FlexLink::ItemKey;XCEL60BA
+XFEL60WAXC;FlexLink::ItemKey;XFEL60WA
+XCEL60WA;FlexLink::ItemKey;XCEL60WA
+XFAH110A;FlexLink::Angle;180
+XFAH110B;FlexLink::Angle;180

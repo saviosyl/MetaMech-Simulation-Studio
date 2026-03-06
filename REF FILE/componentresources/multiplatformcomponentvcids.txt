@@ -1,0 +1,95 @@
+73e4c6df-4610-4af9-91df-0b70ff446736;Leg;MOD6;AMC Dual Leg
+7b5c2430-d4db-48f9-81cc-788948968fe6;Leg;MOD4,MOD6,SR30;AMC Single Leg
+fc6a54c8-8cd9-4daf-98f8-5c8d60f23607;Function;X65,XH;American Stopper
+9a61dd2a-c5f9-433c-b354-2197070a0766;Function;X85;Clamp Stopper
+652bbaab-bff4-4cd6-a191-d29573fa1d14;Function;X65P,X85P;Pallet Stopper
+82f18cbb-645d-4c7d-aaec-302c14b67d5a;Function;X85,X180,X180X,X300;Roller Stopper
+9c22c9e9-61e9-4de3-baa7-0bcd05cd8ac1;Function;X65,X85;Side Pusher
+b04a9dc1-d811-487d-b8bd-26db8e35117a;Function;X85;Side Stopper
+163cb24c-6cf1-4101-a248-6bbec00a242c;Function;X180,X300;Support Pusher
+cb58b8ef-17eb-4dae-9339-1154abb1cd77;GuideRail;WLX;Adjustable (W) multi-level wash down
+62e49ce4-91c1-4b0e-912d-42a9944bc526;GuideRail;XS,X45H, X65,X65Y, X65V, X85, X85V,XK, XH, X180, X300, SE50;Adjustable (W) aluminium
+76c733ea-9ff2-45b0-8b5b-88c25ee6a025;GuideRail;XS,X45H, X65,X65Y, X85, XH, XK, X180, X300,SE50,Spiral,WL,WK;Adjustable (H) plastic/zinc
+ab35c8ba-ee51-47f1-bf05-5e2a72bc59ec;GuideRail;XS,X45H, X65,X65Y, X85, XH, XK, X180, X300,SE50,Spiral,WL,WK;Adjustable (W) multi-level high plastic
+c3fc151d-a92d-4435-8e7a-f088563c7ad5;GuideRail;XS,X45H, X65,X65Y, X85, XH, XK, X180, X300,SE50,Spiral,WL,WK;Adjustable (W) multi-level low plastic
+920d01bb-9ea0-49a8-8347-fc47d834cc7a;GuideRail;XS,X45H, X65,X65Y, X85, XH, XK, X180, X300,SE50,Spiral,WL,WK;Adjustable (W/H) plastic/zinc
+8513387e-c32e-43df-ae63-16001bb671f8;GuideRail;X65,X65Y, X85, X180, X300, XH, XK ;AGS
+a62b8f0d-bab2-4e50-bb2f-7f2eee27cfd8;GuideRail;XS,X45H, X65,X65Y, X65V, X85, X85V, XH, XK, X180, X300, SE50;Fixed aluminium
+3980cc40-1e34-486e-a6ae-2bd8de2b5c90;GuideRail;XS,X45H, X65,X65Y, X85, XH, X180, X300,SE50,Spiral,WL,WK;Fixed plastic
+415f9966-60ae-4328-afb7-943e1cdb70e4;GuideRail;XS,X45H, X65,X65Y, X85, XH, XK, X180, X300;Guidance of High and Wide
+55ce7db5-f000-41bc-be42-9246710eac1e;GuideRail;X70X, X85X, X180X, X300X;Adjustable (W) plastic/stainless
+721ec171-cd55-4b79-8132-c933ec377380;GuideRail;X70X, X85X, X180X, X300X;Adjustable (W) multi-level stainless
+e029a009-1f13-4e39-9679-245b532b1483;GuideRail;X70X, X85X, X180X, X300X;Adjustable (W) multi-level plastic/stainless
+6a4701cf-ffa2-43c9-96cc-7249ce989b7b;GuideRail;XS,X45H, X65,X65Y, X85, XH, XK, X180, X300,SE50,Spiral,WL,WK;QuickGuide (W) multi-level high
+ba885bd7-5c74-43a8-b2f7-45ed41cde1e0;GuideRail;XS,X45H, X65,X65Y, X85, XH, XK, X180, X300,SE50,Spiral,WL,WK;QuickGuide (W) multi-level low
+a814cd65-69bb-4924-bb18-21cbff0d7c85;GuideRail;XS,X45H, X65,X65Y, X85, XH, XK, X180, X300,WL,WK;QuickGuide (W/H)
+63e33753-8440-4f91-97ec-d33de81b109b;GuideRail;XS,X45H, X65,X65Y, X85, XH, XK, X180, X300;Quick release (W) plastic
+019aa502-e7ee-4fce-8d2e-8238436a5b7e;GuideRail;XS, X65,X65Y, X85, XH, XK, X180, X300,WL,WK;Adjustable (W) heavy-duty plastic
+bbfa821b-ab92-4f39-a362-1f0cee8db792;GuideRail;X45,X45H, X65,X65Y;Adjustable (W) plastic/aluminium
+9caa5296-ff53-4065-aebb-cc1b30c8cb75;Leg;HU;Level support
+cc054588-e3b8-4f33-8db6-385ca23883ef;Function;HU;Locating Module
+312884fe-4719-4917-b3fc-a4a5dd39d131;RollerKit;HU;Roller Kit
+0583febb-17f0-4749-9019-83066d197fbb;Function;HU;Sensor
+3561c0fd-7efd-44f6-8012-642cac3837c1;Leg;HU;Single support
+f3a4d887-a251-444c-ab26-fecf77d2c06f;Function;HU;Stop Module
+9a813ef0-d124-4c51-bcd3-1c050f183b4a;Fitting;XC,XF;BallLatch XC_XF
+db9a0d28-153a-462d-80d6-ff9ba94db875;Fitting;XC,XF;Hinge XC_XF
+77a57e85-68d0-49d0-be5a-5804c5567d1a;Leg;XS,X65,X65P,X65V,X65Y,X85,X85P,X85V,XH,XK,XKP,X180,X300,X45H,X45HP;Ceiling Support
+ece249f4-c6e1-47a3-9f03-889a39ffbb38;Leg;X65,X65P,X65V,X85,X85P,X85V,XH,XK,XKP;Center support
+c935a95c-eecc-479a-94eb-1d2e6e86316a;Leg;X45,X45e,X45H,XS,X65,X65P,X65V,X65Y,X85,X85P,X85V,XH,XK,XKP,X45P,X45HP;Double support single-leg
+197aa9ce-dd85-4b51-b012-843a535d61c5;Leg;X65,X65P,X65V,X85,X85P,X85V;End drive support
+0756b24b-bed1-455b-bfed-4b3bf329e903;Leg;WL,WK,X65,X65P,X70X,X85,X85P,X85X,X180,X180X,X300,X300X,XH,XK,XKP,XS;Custom end drive support for US
+e782aa82-bcfb-45e9-905c-cc9231678166;Leg;X45,X45H,XS,X65,X65Y,X65P,X65V,X85,X85P,X85V,XH,XK,XKP,X180,X300,X45P,X45HP;Multi support double-leg
+8580b8f3-67a1-4b62-8a5d-d59d2b7f967d;Leg;X45,X45H,XS,X65,X65Y,X65P,X65V,X85,X85P,X85V,XH,XK,XKP,X180,X300,X45P,X45HP;Multi support single-leg
+301cd012-8028-48a4-800a-c30d217e07cd;Leg;X85P,X65P;Pallet Module Support
+574184d7-575c-48d6-af8c-f92a23a5426d;Leg;X45,X45P,X45H,X45HP, XS, X65,X65P,X65Y,X65V,X85,X85P,X85V, XH, XK,XKP;Single support
+52db505e-126c-4512-8426-8860c73f232d;Leg;X65,X65Y, X85,XH, XK;Single support vertical
+0e377c7c-ff39-4837-9b83-adba52e9cabb;Leg;X45,X45e,X180,X300,X45H;T-beam support
+0b77da80-435b-4b3b-b055-3e31a235353a;Leg;X180,X300;Single support
+b7e5f66f-92d4-4a8c-9764-177b99e1a28d;Leg;X70X,X85X,X180X,X300X;Ceiling Support Stainless
+af9baa93-ff7b-4e15-97f4-3e83dbbad58e;Leg;X70X,X85X,X180X,X300X;Horizontal bend support C type
+c3bb3cb7-f9a7-41ac-b14e-f1cb5d112e16;Leg;X70X,X85X,X180X,X300X;Single support C type
+2d77d708-8c20-4e6b-9bca-928b4f127f42;Leg;X70X,X85X;Wheel bend support C type
+5527db55-d881-4624-ad02-9f572978b76e;Leg;X70X,X85X,X180X,X300X;End drive Support
+fff46d6a-19a4-44a4-a753-4dece97744c5;Leg;X300X;Heavy end drive support
+a9afceb0-4088-4cdf-b30f-1973bc352242;Leg;X300X;Heavy single Support
+05082abc-1956-45a7-a510-8e82d97cffab;Leg;X70X,X85X,X180X,X300X;Horizontal bend support
+4a72b9dc-6628-4be7-aeb2-e1c567c34d61;Leg;X70X,X85X,X180X,X300X;Single support
+3785c392-b6ad-4e4e-bad8-9d9dc4509498;Leg;X70X,X85X;Wheel bend support
+900d255c-b948-48bc-ae2a-788d892f43ac;Leg;X85,X85P,X65,X65P;Wheel bend drive support
+ab4d1663-3e34-4416-b4f2-81b56bb1b150;Leg;WLX;WLX Support
+af7417ab-efbd-46e8-8ac0-354941841b82;Leg;WL,WK;Support
+37600565-80e3-487b-8ed5-40192155876c;Leg;XKP;XKP Module Support
+57cb9833-b586-434b-b465-e7cc03733f22;BeltTensionerUnit;WLX;Belt tensioner unit
+9d7c63ce-8cad-4a44-a1c5-c0032ede80e2;Function;X45P,X45HP;Sensor Maximum Queue
+deadc640-31fe-4ce5-bca0-233e476de37c;Function;X45P,X45HP;Combined Diverter/Merger 90
+def196b4-5a94-40d8-a5dd-e3d7bcf3b3b6;Function;X45P,X45HP;Combined  Diverter/Merger 180
+eb06441f-8d62-47c6-9497-023b4b63a729;Function;X45P,X45HP;Diverter 90
+444dda1e-4e0f-446f-bc86-3945579f9ba2;Function;X45P,X45HP;Diverter Parallel
+0a7757ab-ba3c-4070-9c35-f07f5f06f07e;Function;X45P;Locating Bypass
+c4803ec1-86f3-4597-b8a4-158bbdd1aaca;Function;X45P;Locating Satellite
+bffa70cf-39b0-4996-988c-25f088355bdb;Function;X45P,X45HP;Locating unit
+710b98c2-c407-4f5f-9b3c-f28aedb3e461;Function;X45P, X45HP;Merger 90
+c3131cb1-2351-436f-856c-6f3a015cb82a;Function;X45P,X45HP;Merger Parallel
+8494c16c-f450-4dbc-a2c9-4c81e5390a2a;Function;X45P,X45HP;Stop unit
+27ddac7b-5763-451b-bc5e-9cebee694f13;Function;X45P,X45HP;Transfer 180
+09cc6fb3-0b1d-4a86-9245-b2ca025a61cc;Function;X45P, X45HP;Transfer 90
+94edf8b1-b61f-4cff-a85b-5627406c216a;Bridge;X45P,X45HP;Transfer parallel
+c1c0a4e6-50f5-41c3-b1d5-aefe336fcb0e;Bridge;X65,X65V,X65P;Bridge
+19c749c0-666d-4660-9693-9bfb4cc8536d;GuideRail;X65P;Bracket for Guide Rail
+640e3f9b-e5ce-434f-85fc-0741f8540fca;Bridge;X85,X85V,X85P;Bridge
+a3a90a73-e8e5-46c7-af2f-236bf746386e;GuideRail;X85P;Bracket for Guide Rail
+de84748f-8c73-4675-9f2a-8154afb700b9;GuideRail;XKP;Bracket for Guide Rail
+2dcbe613-e7a0-4392-a75e-3d5b0283723b;Leg;XT,XTC;Level support
+0299cb5e-448f-490b-a90f-11f78e5d5d50;Function;XT,XTC;Lift-and-locate module
+a3b7b094-ec61-4346-9c12-e0114e608bc0;Function;XT,XTC;Lift unit kit
+c5d73e4b-ca5a-4e9b-a93b-f233f0e39168;Function;XT,XTC;Locating function module
+f93e24f0-1dcc-4962-9a2e-f621454b45c9;Function;XT,XTC;Pallet locating station
+f4d50877-50b1-4845-8ce9-e230e0a8c9e7;Function;XT,XTC;Pallet stop device
+b87e730c-e12d-493f-9d49-5292f22caffb;Leg;XT,XTC;Parallel support
+e368737b-ed13-4c33-b6c8-52c843787f8d;RollerKit;XT,XTC;Roller Kit
+f00839de-652d-43e2-b10f-7e002aabe389;Function;XT,XTC;Sensor bracket
+61de6051-37fe-43e9-b226-6aa7be635924;Leg;XT,XTC;Single support
+34d10bbe-9da0-4fed-a3c9-40b8c7d8bc7c;Function;XT,XTC;Stop function module P11
+8820feb0-1660-4aab-ba04-caccef584348;Function;XT,XTC;Transfer Module S10
+0e045d83-1233-4e3e-9380-774c69949317;Leg;XT,XTC;Wheel bend support

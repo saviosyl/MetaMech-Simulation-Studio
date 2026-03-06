@@ -1,0 +1,12 @@
+#Panel vcid;Material;Varient;Thickness;Allowed fixations
+41d41773-43e3-4afc-9540-39348c83ac35;WovenWireGrille;30X30;3;NetStripLarge
+41d41773-43e3-4afc-9540-39348c83ac35;WovenWireGrille;40X40;4;NetStripLarge
+41d41773-43e3-4afc-9540-39348c83ac35;AcrylicGlass;Clear;4;NetStripLarge,RimStrip,ConnectingStrip
+41d41773-43e3-4afc-9540-39348c83ac35;AcrylicGlass;Clear;5;NetStripSmall,NetStripLarge,RimStrip,ConnectingStrip
+41d41773-43e3-4afc-9540-39348c83ac35;Polycarbonate;Clear;4;NetStripLarge,RimStrip,ConnectingStrip
+41d41773-43e3-4afc-9540-39348c83ac35;Polycarbonate;Clear;5;NetStripSmall,NetStripLarge,RimStrip,ConnectingStrip
+41d41773-43e3-4afc-9540-39348c83ac35;All-plasticMaterial;Blue;4;NetStripLarge,RimStrip,ConnectingStrip
+41d41773-43e3-4afc-9540-39348c83ac35;All-plasticMaterial;Yellow;4;NetStripLarge,RimStrip,ConnectingStrip
+41d41773-43e3-4afc-9540-39348c83ac35;All-plasticMaterial;Red;4;NetStripLarge,RimStrip,ConnectingStrip
+41d41773-43e3-4afc-9540-39348c83ac35;All-plasticMaterial;Grey;4;NetStripLarge,RimStrip,ConnectingStrip
+41d41773-43e3-4afc-9540-39348c83ac35;All-plasticMaterial;Black;4;NetStripLarge,RimStrip,ConnectingStrip

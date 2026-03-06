@@ -1,0 +1,25 @@
+# Component replacements
+# 
+# This file contains VCID's that have been removed and should be replaced by another component.
+# The addon will read this file while loading components from the ecat using VCID. If a 
+# the addon finds an old VCID, it will use the new VCID instead.
+# When adding replacements, please add a date and a comment why.
+#
+# Format:
+# Old VCID ; New VCID
+#
+
+# The Single T Support was deployed with a new VCID by missstake, the new VCID is the same as before it was dployed
+# ie a reset of the VCID
+# 2014-12-10, Erik Ramfelt
+a2f480fe-1da7-461f-afaf-cd1f89e0e5ec; 0e377c7c-ff39-4837-9b83-adba52e9cabb
+#2021-05-09 Used to get handles to use new bridges X85
+9ed2f9a8-bc42-46f9-8c7c-4fd9e05846b3;640e3f9b-e5ce-434f-85fc-0741f8540fca
+#2021-05-09 Used to get handles to use new bridges X85P
+08090584-5964-4ee7-b01c-e6043b89e456;640e3f9b-e5ce-434f-85fc-0741f8540fca
+#2021-05-09 Used to get handles to use new bridges X85X
+4f1b3e25-a942-4d4d-82ff-73f176faa3ab;79f02bd4-230b-4967-b628-e186ad4513fc
+#2021-05-09 Used to get handles to use new bridges X180X
+2d8c8bf7-da15-4e12-b0f0-e29aaafc9723;95817a30-2641-4316-a2de-9aef8b414aba
+#2021-05-09 Used to get handles to use new bridges X300X
+4ca37ec1-e136-4c67-a5e6-aa82dffc6d6d;d24fa6b6-a51f-42e7-bfea-b3bc97e3f86f
