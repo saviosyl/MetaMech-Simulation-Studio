@@ -203,7 +203,9 @@ export class SimulationEngine {
   }
 
   tick(dt: number, speed: number) {
-    const elapsed = dt * speed;
+    // Cap dt to prevent spiral-of-death on tab switch or lag spikes
+    const cappedDt = Math.min(dt, 0.1); // max 100ms per tick
+    const elapsed = cappedDt * speed;
     this.simTime += elapsed;
 
     // ── PASS 1: Tick ALL sensors first so signals are fresh for conveyors/stoppers ──
