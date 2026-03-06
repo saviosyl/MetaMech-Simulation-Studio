@@ -8,6 +8,12 @@ import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
 import './index.css';
 
+// Apply saved theme on load
+const savedTheme = localStorage.getItem('metamech_theme') as 'dark' | 'light' | null;
+if (savedTheme) {
+  document.documentElement.setAttribute('data-theme', savedTheme);
+}
+
 function App() {
   return (
     <AuthProvider>

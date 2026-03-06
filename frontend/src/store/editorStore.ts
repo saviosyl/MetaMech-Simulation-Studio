@@ -467,6 +467,11 @@ interface EditorState {
   leftPanelCollapsed: boolean;
   rightPanelCollapsed: boolean;
   
+  // Theme
+  themeMode: 'dark' | 'light';
+  setThemeMode: (mode: 'dark' | 'light') => void;
+  toggleTheme: () => void;
+  
   // Snap state
   isDragging: boolean;
   dragNodeId: string | null;
@@ -600,6 +605,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   rightPanelWidth: 320,
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
+  
+  // Theme defaults (restored from localStorage)
+  themeMode: (typeof localStorage !== 'undefined' && localStorage.getItem('metamech_theme') as 'dark' | 'light') || 'dark',
+  setThemeMode: (mode) => {
+    document.documentElement.setAttribute('data-theme', mode);
+    localStorage.setItem('metamech_theme', mode);
+    set({ themeMode: mode });
+  },
+  toggleTheme: () => {
+    const current = get().themeMode;
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('metamech_theme', next);
+    set({ themeMode: next });
+  },
   
   // Snap defaults
   isDragging: false,
