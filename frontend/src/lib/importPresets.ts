@@ -131,7 +131,7 @@ export function autoDetectPreset(filename: string): ImportPresetId {
   if (/\.(png|jpg|jpeg|svg|dxf|dwg|pdf)$/.test(lower)) return 'floorplan';
   
   // Robot detection (common naming)
-  if (/robot|arm|cobot|fanuc|kuka|abb|ur\d|manipulator/i.test(lower)) return 'robot';
+  if (/robot|arm|cobot|ur\d|manipulator|articulated/i.test(lower)) return 'robot';
   
   // Product detection
   if (/product|box|carton|bottle|pallet|tote|part/i.test(lower)) return 'product';
