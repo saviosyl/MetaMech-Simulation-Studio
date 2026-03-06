@@ -137,18 +137,26 @@ const LeftPanel: React.FC = () => {
 
         {viewMode === 'scene' ? <SceneHierarchy /> : (
           <>
-            {/* Category pills */}
-            <div style={{ display: 'flex', gap: 4, padding: '8px 14px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0, overflowX: 'auto' }} className="scrollbar-none">
+            {/* Category tabs — 2-row grid so all are always visible */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, padding: '6px 10px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0 }}>
               {TABS.map(tab => {
                 const active = activeLibraryTab === tab.id;
                 const count = getModulesByCategory(tab.id).length;
                 const Icon = tab.icon;
                 return (
                   <button key={tab.id} onClick={() => setActiveLibraryTab(tab.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, border: `1px solid ${active ? 'rgba(34,211,238,0.3)' : 'var(--mm-border-subtle)'}`, background: active ? 'var(--mm-accent-primary-muted)' : 'transparent', color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-tertiary)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, fontSize: 11, fontWeight: 600, fontFamily: "'Orbitron', monospace", transition: 'all 0.15s' }}>
-                    <Icon size={11} />
-                    {tab.name}
-                    <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 10, background: active ? 'rgba(34,211,238,0.15)' : 'var(--mm-bg-surface)', color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-disabled)' }}>
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                      padding: '5px 2px', borderRadius: 6,
+                      border: `1px solid ${active ? 'rgba(34,211,238,0.3)' : 'transparent'}`,
+                      background: active ? 'var(--mm-accent-primary-muted)' : 'transparent',
+                      color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-tertiary)',
+                      cursor: 'pointer', fontSize: 9, fontWeight: 600,
+                      fontFamily: "'Orbitron', monospace", transition: 'all 0.15s',
+                    }}>
+                    <Icon size={14} />
+                    <span style={{ lineHeight: 1 }}>{tab.name}</span>
+                    <span style={{ fontSize: 8, padding: '0px 4px', borderRadius: 6, background: active ? 'rgba(34,211,238,0.15)' : 'var(--mm-bg-surface)', color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-disabled)' }}>
                       {count}
                     </span>
                   </button>

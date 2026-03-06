@@ -30,6 +30,8 @@ const ViewportToolbar: React.FC = () => {
   const hiddenIds = useEditorStore(s => s.hiddenIds);
   const toggleVisibility = useEditorStore(s => s.toggleVisibility);
   const processNodes = useEditorStore(s => s.processNodes);
+  const overlaysHidden = useEditorStore(s => s.overlaysHidden);
+  const setOverlaysHidden = useEditorStore(s => s.setOverlaysHidden);
 
   // Check if selected node has any connections
   const selectedEdges = selectedObjectId
@@ -43,20 +45,9 @@ const ViewportToolbar: React.FC = () => {
     }
   };
 
-  // Toggle visibility of all non-conveyor items (sources, sinks, etc)
-  const [showHelpers, setShowHelpers] = React.useState(true);
-  const toggleHelpers = () => {
-    const helperTypes = ['source', 'sink'];
-    for (const node of processNodes) {
-      if (helperTypes.includes(node.type)) {
-        // Only toggle if current state matches
-        const isHidden = hiddenIds.has(node.id);
-        if (showHelpers ? !isHidden : isHidden) {
-          toggleVisibility(node.id);
-        }
-      }
-    }
-    setShowHelpers(!showHelpers);
+  // Toggle clean view: hide sources, sinks, mates, connection lines, snap ports
+  const toggleCleanView = () => {
+    setOverlaysHidden(!overlaysHidden);
   };
 
   const btnStyle = (active: boolean): React.CSSProperties => ({
@@ -140,13 +131,13 @@ const ViewportToolbar: React.FC = () => {
 
       {divider}
 
-      {/* Show/hide helpers (sources, sinks) */}
+      {/* Clean view: hide all overlays (sources, sinks, mates, connections) */}
       <button
-        title={showHelpers ? 'Hide Helpers (Sources, Sinks)' : 'Show Helpers'}
-        onClick={toggleHelpers}
-        style={btnStyle(!showHelpers)}
+        title={overlaysHidden ? 'Show All (Sources, Sinks, Connections)' : 'Hide All (Clean View — models only)'}
+        onClick={toggleCleanView}
+        style={btnStyle(overlaysHidden)}
       >
-        {showHelpers ? '👁' : '👁‍🗨'}
+        {overlaysHidden ? '👁‍🗨' : '👁'}
       </button>
     </div>
   );

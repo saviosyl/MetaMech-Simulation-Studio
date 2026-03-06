@@ -225,6 +225,8 @@ const DraggableObject: React.FC<{
 };
 
 // Inner scene component that has access to Three.js context
+const OVERLAY_HIDDEN_TYPES = new Set(['source', 'sink']);
+
 const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }) => {
   const {
     processNodes,
@@ -237,6 +239,8 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
     hiddenIds,
     measureActive,
     addMeasurePoint,
+    overlaysHidden,
+    themeMode,
   } = useEditorStore();
 
   const handleObjectClick = useCallback((objectId: string, objectType: 'process' | 'environment' | 'actor') => {
@@ -282,10 +286,10 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
           args={[sceneSettings.grid.size, sceneSettings.grid.divisions]}
           cellSize={1}
           cellThickness={0.5}
-          cellColor="#6f6f6f"
+          cellColor={themeMode === 'light' ? '#b0b0b0' : '#6f6f6f'}
           sectionSize={10}
           sectionThickness={1}
-          sectionColor="#9d4b4b"
+          sectionColor={themeMode === 'light' ? '#8a8a8a' : '#9d4b4b'}
           fadeDistance={50}
           fadeStrength={1}
           infiniteGrid
@@ -327,7 +331,7 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
       {/* Scene Objects - wrapped in DraggableObject */}
       <group>
         {/* Process Nodes */}
-        {processNodes.filter(n => !hiddenIds.has(n.id)).map(node => (
+        {processNodes.filter(n => !hiddenIds.has(n.id) && !(overlaysHidden && OVERLAY_HIDDEN_TYPES.has(n.type))).map(node => (
           <DraggableObject
             key={node.id}
             id={node.id}
@@ -387,20 +391,20 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
         ))}
       </group>
 
-      {/* Snap System - shows connection ports */}
-      <SnapSystem />
-      <AccessorySnapPreview />
+      {/* Snap System - shows connection ports (hidden in clean view) */}
+      {!overlaysHidden && <SnapSystem />}
+      {!overlaysHidden && <AccessorySnapPreview />}
 
       {/* Snap target highlight */}
-      {snapTarget && (
+      {!overlaysHidden && snapTarget && (
         <mesh position={snapTarget.position}>
           <sphereGeometry args={[0.2, 16, 16]} />
           <meshBasicMaterial color="#06b6d4" transparent opacity={0.6} />
         </mesh>
       )}
 
-      {/* Connection Lines between connected objects */}
-      <ConnectionLines />
+      {/* Connection Lines between connected objects (hidden in clean view) */}
+      {!overlaysHidden && <ConnectionLines />}
 
       {/* Simulation Overlay */}
       <SimulationOverlay />
@@ -423,8 +427,8 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
         maxPolarAngle={Math.PI / 2}
       />
 
-      {/* Scene background color — ensures viewport is never black even if Environment HDR fails */}
-      <color attach="background" args={['#1e293b']} />
+      {/* Scene background color — adapts to theme */}
+      <color attach="background" args={[themeMode === 'light' ? '#e0e4ea' : '#1e293b']} />
 
       {/* Loading Placeholder */}
       {processNodes.length === 0 && environmentAssets.length === 0 && actors.length === 0 && (
@@ -515,7 +519,7 @@ const Viewport: React.FC = () => {
 
   return (
     <div 
-      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: '#1a1a2e' }}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--mm-bg-viewport)' }}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
@@ -537,7 +541,7 @@ const Viewport: React.FC = () => {
           <SceneContent orbitRef={orbitRef} />
         </Suspense>
         {/* 3D UCS Orientation Gizmo — bottom left */}
-        <GizmoHelper alignment="bottom-left" margin={[60, 60]}>
+        <GizmoHelper alignment="bottom-left" margin={[80, 120]}>
           <GizmoViewport
             axisColors={['#ef4444', '#22c55e', '#3b82f6']}
             labelColor="white"

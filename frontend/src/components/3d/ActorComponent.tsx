@@ -51,7 +51,7 @@ const ActorComponent: React.FC<ActorComponentProps> = ({ actor, isSelected, onCl
     'agv': { url: '/models/agv.glb', targetSize: 1.5 },
     'operator': { url: '/models/worker.glb', targetSize: 1.8 },
     'engineer': { url: '/models/worker.glb', targetSize: 1.8 },
-    'pallet-truck': { url: '/models/pallet-truck.glb', targetSize: 2 },
+    'pallet-truck': { url: '/models/forklift.glb', targetSize: 2.5 },
   };
 
   const renderActor = () => {

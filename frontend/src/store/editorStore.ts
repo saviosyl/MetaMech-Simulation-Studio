@@ -505,9 +505,11 @@ interface EditorState {
   // Object visibility
   hiddenIds: Set<string>;
   toggleVisibility: (id: string) => void;
+  overlaysHidden: boolean;
+  setOverlaysHidden: (hidden: boolean) => void;
   
   setSceneSettings: (settings: Partial<SceneSettings>) => void;
-  setActiveLibraryTab: (tab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets') => void;
+  setActiveLibraryTab: (tab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical') => void;
   
   // Panel actions
   setLeftPanelWidth: (width: number) => void;
@@ -595,6 +597,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   showShortcuts: false,
   focusRequest: 0,
   hiddenIds: new Set(),
+  overlaysHidden: false,
   
   isPlaying: false,
   isPaused: false,
@@ -865,6 +868,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return { hiddenIds: newHidden };
     });
   },
+  setOverlaysHidden: (hidden) => set({ overlaysHidden: hidden }),
   
   setSceneSettings: (settings) => {
     set(state => ({
