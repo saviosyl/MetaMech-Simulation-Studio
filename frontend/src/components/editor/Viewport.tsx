@@ -457,12 +457,8 @@ const Viewport: React.FC = () => {
         const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
         const rayHit = raycastToGround(event.clientX, event.clientY, rect);
         
-        // Fallback to simple approximation if camera not ready
-        const position: [number, number, number] = rayHit || [
-          (((event.clientX - rect.left) / rect.width) * 2 - 1) * 8,
-          0,
-          -(((event.clientY - rect.top) / rect.height) * 2 + 1) * 8,
-        ];
+        // Fallback to origin if camera not ready (rare — CameraCapture runs on first frame)
+        const position: [number, number, number] = rayHit || [0, 0, 0];
         
         switch (data.category) {
           case 'process':
