@@ -472,6 +472,10 @@ interface EditorState {
   setThemeMode: (mode: 'dark' | 'light') => void;
   toggleTheme: () => void;
   
+  // Presentation mode
+  presentationMode: boolean;
+  setPresentationMode: (active: boolean) => void;
+  
   // Snap state
   isDragging: boolean;
   dragNodeId: string | null;
@@ -620,6 +624,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     localStorage.setItem('metamech_theme', next);
     set({ themeMode: next });
   },
+  
+  // Presentation mode
+  presentationMode: false,
+  setPresentationMode: (active) => set({ presentationMode: active }),
   
   // Snap defaults
   isDragging: false,

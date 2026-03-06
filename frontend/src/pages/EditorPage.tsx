@@ -42,6 +42,8 @@ const EditorPage: React.FC = () => {
     showShortcuts,
     selectAll,
     requestFocus,
+    presentationMode,
+    setPresentationMode,
   } = useEditorStore();
 
   // Track changes for undo history
@@ -119,7 +121,9 @@ const EditorPage: React.FC = () => {
         case 'm': setMeasureActive(!measureActive); break;
         case 'f': requestFocus(); break;
         case '?': setShowShortcuts(!showShortcuts); break;
-        case 'escape': setSelectedObject(null, null); setContextMenu(null); setShowShortcuts(false); break;
+        case 'escape':
+          if (presentationMode) { setPresentationMode(false); break; }
+          setSelectedObject(null, null); setContextMenu(null); setShowShortcuts(false); break;
         case 'delete':
         case 'backspace':
           if (selectedObjectId && selectedObjectType) {
@@ -202,32 +206,74 @@ const EditorPage: React.FC = () => {
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden" style={{ background: 'var(--mm-bg-app)' }}>
-      <TopBar
-        projectName={projectName}
-        setProjectName={setProjectName}
-        saveStatus={saveStatus}
-        onSave={handleSave}
-      />
-      <div className="flex-1 flex overflow-hidden min-h-0" style={{ borderTop: '1px solid var(--mm-border-subtle)' }}>
-        <div className="flex-shrink-0">
-          <LeftPanel />
-        </div>
+      {!presentationMode && (
+        <TopBar
+          projectName={projectName}
+          setProjectName={setProjectName}
+          saveStatus={saveStatus}
+          onSave={handleSave}
+        />
+      )}
+      <div className="flex-1 flex overflow-hidden min-h-0" style={{ borderTop: presentationMode ? 'none' : '1px solid var(--mm-border-subtle)' }}>
+        {!presentationMode && (
+          <div className="flex-shrink-0">
+            <LeftPanel />
+          </div>
+        )}
         <div 
           className="flex-1 relative min-w-0 overflow-hidden"
-          style={{ borderLeft: '1px solid var(--mm-border-subtle)', borderRight: '1px solid var(--mm-border-subtle)', background: 'var(--mm-bg-viewport)' }}
+          style={{ borderLeft: presentationMode ? 'none' : '1px solid var(--mm-border-subtle)', borderRight: presentationMode ? 'none' : '1px solid var(--mm-border-subtle)', background: 'var(--mm-bg-viewport)' }}
           onContextMenu={handleContextMenu}
         >
           <Viewport />
-          <BottomPanel />
+          {!presentationMode && <BottomPanel />}
         </div>
-        <div className="flex-shrink-0">
-          <RightPanel />
-        </div>
+        {!presentationMode && (
+          <div className="flex-shrink-0">
+            <RightPanel />
+          </div>
+        )}
       </div>
 
-      <ShortcutsPanel />
+      {/* Presentation mode overlay — minimal controls */}
+      {presentationMode && (
+        <div style={{
+          position: 'absolute', bottom: 20, right: 20, display: 'flex', gap: 8, zIndex: 50,
+        }}>
+          <button
+            onClick={() => {
+              const canvas = document.querySelector('canvas');
+              if (canvas) {
+                const link = document.createElement('a');
+                link.download = `metamech-screenshot-${Date.now()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+              }
+            }}
+            style={{
+              padding: '8px 16px', fontSize: 12, fontWeight: 600, borderRadius: 8,
+              background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)',
+              cursor: 'pointer', backdropFilter: 'blur(8px)',
+            }}
+          >
+            📷 Screenshot
+          </button>
+          <button
+            onClick={() => setPresentationMode(false)}
+            style={{
+              padding: '8px 16px', fontSize: 12, fontWeight: 600, borderRadius: 8,
+              background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)',
+              cursor: 'pointer', backdropFilter: 'blur(8px)',
+            }}
+          >
+            ✕ Exit
+          </button>
+        </div>
+      )}
 
-      {contextMenu && (
+      {!presentationMode && <ShortcutsPanel />}
+
+      {contextMenu && !presentationMode && (
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}

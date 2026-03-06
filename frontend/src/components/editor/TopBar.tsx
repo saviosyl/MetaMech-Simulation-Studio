@@ -4,7 +4,7 @@ import {
   Play, Pause, Square, Save, Download, Upload, Video,
   ArrowLeft, Gauge, Undo2, Redo2, Check, AlertCircle,
   Loader2, Grid3X3, Ruler, HelpCircle, MousePointer, Move, RotateCcw,
-  Link2, Magnet, GitBranch, Sun, Moon,
+  Link2, Magnet, GitBranch, Sun, Moon, Maximize2,
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuth } from '../../contexts/AuthContext';
@@ -283,6 +283,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
             <button onClick={() => useEditorStore.getState().toggleTheme()} style={S.iconBtn()} title="Toggle Theme">
               {useEditorStore.getState().themeMode === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
             </button>
+            <button onClick={() => useEditorStore.getState().setPresentationMode(true)} style={S.iconBtn()} title="Presentation Mode"><Maximize2 size={15} /></button>
             <button onClick={() => setShowShortcuts(true)} style={S.iconBtn()} title="Shortcuts (?)"><HelpCircle size={15} /></button>
           </div>
           <span style={S.groupLabel}>View</span>
