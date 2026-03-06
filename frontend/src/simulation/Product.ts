@@ -19,6 +19,12 @@ export interface Product {
   // ─── 1D path occupancy fields ──────────────────
   pathPosition: number;          // 0-1 position along conveyor path (front of product)
   productLength: number;         // meters — physical length along path direction
+
+  // ─── Appearance ───
+  textureUrl?: string;           // URL to image for wrapping on product faces
+  label?: string;                // Text label on product
+  labelColor?: string;           // Color of label text
+  labelFontSize?: number;        // Font size for label
 }
 
 /** Flow state for a node — describes current operational condition */

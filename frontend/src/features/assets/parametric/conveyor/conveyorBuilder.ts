@@ -125,6 +125,7 @@ export function editorParamsToConveyorParams(editorParams: Record<string, any>):
     hangerStyle: editorParams.hangerStyle || 'twin-rod',
     hangerCrossbar: editorParams.hangerCrossbar ?? true,
     beltColor: editorParams.beltColor || '#1e1e1e',
+    frameColor: editorParams.frameColor || '#c0c0c0',
     cleatHeightMm: editorParams.cleatHeight || editorParams.cleatHeightMm || 25,
     cleatSpacingMm: editorParams.cleatSpacing || editorParams.cleatSpacingMm || 150,
     cleatStyle: editorParams.cleatStyle || 'straight',

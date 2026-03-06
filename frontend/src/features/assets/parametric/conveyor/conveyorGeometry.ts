@@ -20,15 +20,18 @@ import {
 } from '../premiumMaterials';
 
 /** Build frame side rails */
-function buildFrame(lengthM: number, widthM: number, heightM: number): THREE.Group {
+function buildFrame(lengthM: number, widthM: number, heightM: number, frameColor?: string): THREE.Group {
   const frame = new THREE.Group();
   frame.name = 'frame';
   const railH = 0.04; // 40mm tall rail
   const railD = 0.04; // 40mm deep rail
+  const frameMat = frameColor && frameColor !== '#c0c0c0'
+    ? new THREE.MeshStandardMaterial({ color: frameColor, metalness: 0.6, roughness: 0.35 })
+    : matFrame;
 
   for (const side of [-1, 1]) {
     const railGeo = new THREE.BoxGeometry(lengthM, railH, railD);
-    const rail = new THREE.Mesh(railGeo, matFrame);
+    const rail = new THREE.Mesh(railGeo, frameMat);
     rail.position.set(0, heightM - railH / 2, side * (widthM / 2 + railD / 2));
     rail.castShadow = true;
     frame.add(rail);
@@ -40,7 +43,7 @@ function buildFrame(lengthM: number, widthM: number, heightM: number): THREE.Gro
   for (let i = 0; i < numCross; i++) {
     const x = -lengthM / 2 + 0.05 + (lengthM - 0.1) * (i / (numCross - 1));
     const crossGeo = new THREE.BoxGeometry(0.03, 0.03, widthM + railD * 2);
-    const cross = new THREE.Mesh(crossGeo, matFrame);
+    const cross = new THREE.Mesh(crossGeo, frameMat);
     cross.position.set(x, heightM - railH - 0.015, 0);
     frame.add(cross);
   }
@@ -273,7 +276,7 @@ export function buildConveyorBody(params: ConveyorParams): THREE.Group {
   const heightM = params.heightMm / 1000;
 
   // Frame
-  group.add(buildFrame(lengthM, widthM, heightM));
+  group.add(buildFrame(lengthM, widthM, heightM, params.frameColor));
 
   // Surface based on type
   switch (params.conveyorType) {

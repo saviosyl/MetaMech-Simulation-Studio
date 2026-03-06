@@ -16,8 +16,50 @@ export function wallBuilder(params: Record<string, any>): BuilderResult {
   const t = (params.thickness ?? 200) / 1000;
 
   const group = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, metalness: 0.1, roughness: 0.8 });
+
+  // Wall color
+  const wallColor = params.wallColor || '#e8e8e8';
+  const matOpts: any = { color: wallColor, metalness: 0.1, roughness: 0.8 };
+
+  // Texture support
+  if (params.textureUrl) {
+    try {
+      const tex = new THREE.TextureLoader().load(params.textureUrl);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      // Auto-tile: 1 repeat per meter
+      tex.repeat.set(w, h);
+      matOpts.map = tex;
+    } catch (_) { /* fallback to color */ }
+  }
+
+  const mat = new THREE.MeshStandardMaterial(matOpts);
   addMesh(group, new THREE.BoxGeometry(w, h, t), mat, [0, h / 2, 0]);
+
+  // Text label (rendered as a canvas texture on a plane in front of the wall)
+  if (params.wallLabel) {
+    const fontSize = params.labelFontSize || 128;
+    const labelColor = params.labelColor || '#333333';
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+    canvas.width = 1024;
+    canvas.height = 512;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = labelColor;
+    ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(params.wallLabel, canvas.width / 2, canvas.height / 2);
+    const labelTex = new THREE.CanvasTexture(canvas);
+    labelTex.colorSpace = THREE.SRGBColorSpace;
+    const labelMat = new THREE.MeshBasicMaterial({ map: labelTex, transparent: true, depthWrite: false });
+    const labelW = Math.min(w * 0.8, w);
+    const labelH = labelW * 0.5;
+    const labelMesh = new THREE.Mesh(new THREE.PlaneGeometry(labelW, labelH), labelMat);
+    labelMesh.position.set(0, h / 2, t / 2 + 0.005); // slightly in front of wall
+    group.add(labelMesh);
+  }
 
   return { group, ports: [], bounds: new THREE.Box3().setFromObject(group), pathLength: 0 };
 }

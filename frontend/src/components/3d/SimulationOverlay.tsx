@@ -1,10 +1,39 @@
-import React, { useRef, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
+import React, { useRef, useState, useMemo } from 'react';
+import { useFrame, useLoader } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import { useEditorStore } from '../../store/editorStore';
 import { simulationEngine } from '../../simulation/SimulationEngine';
 import { Product } from '../../simulation/Product';
 import * as THREE from 'three';
+
+/** Cached texture loader */
+const textureCache = new Map<string, THREE.Texture>();
+function useProductTexture(url?: string): THREE.Texture | null {
+  return useMemo(() => {
+    if (!url) return null;
+    if (textureCache.has(url)) return textureCache.get(url)!;
+    const loader = new THREE.TextureLoader();
+    const tex = loader.load(url);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    textureCache.set(url, tex);
+    return tex;
+  }, [url]);
+}
+
+/** Product label — rendered as Text on the top face */
+const ProductLabel: React.FC<{ label: string; color: string; pL: number; pW: number; pH: number }> = ({ label, color, pL, pW, pH }) => (
+  <Text
+    position={[0, pH / 2 + 0.002, 0]}
+    rotation={[-Math.PI / 2, 0, 0]}
+    fontSize={Math.min(pL, pW) * 0.4}
+    color={color}
+    anchorX="center"
+    anchorY="middle"
+    maxWidth={pL * 0.9}
+  >
+    {label}
+  </Text>
+);
 
 /** Render a single animated product using refs for smooth motion */
 const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
@@ -85,19 +114,30 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
       );
 
     case 'box':
-    default:
+    default: {
+      const texture = useProductTexture(product.textureUrl);
       return (
         <group ref={groupRef}>
           <mesh castShadow>
             <boxGeometry args={[pL, pH, pW]} />
-            <meshStandardMaterial color={product.color} metalness={0.1} roughness={0.7} />
+            {texture ? (
+              <meshStandardMaterial map={texture} metalness={0.1} roughness={0.7} />
+            ) : (
+              <meshStandardMaterial color={product.color} metalness={0.1} roughness={0.7} />
+            )}
           </mesh>
-          <mesh position={[0, pH * 0.5 + 0.001, 0]}>
-            <boxGeometry args={[pL * 0.15, 0.002, pW * 1.01]} />
-            <meshStandardMaterial color="#d4a574" />
-          </mesh>
+          {!texture && (
+            <mesh position={[0, pH * 0.5 + 0.001, 0]}>
+              <boxGeometry args={[pL * 0.15, 0.002, pW * 1.01]} />
+              <meshStandardMaterial color="#d4a574" />
+            </mesh>
+          )}
+          {product.label && (
+            <ProductLabel label={product.label} color={product.labelColor || '#fff'} pL={pL} pW={pW} pH={pH} />
+          )}
         </group>
       );
+    }
   }
 };
 

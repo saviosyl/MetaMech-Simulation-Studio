@@ -29,6 +29,7 @@ export interface ConveyorParams {
   /** Whether to show crossbar between hanger rods */
   hangerCrossbar: boolean;
   beltColor: string;
+  frameColor: string;
   // Cleated belt specific
   cleatHeightMm: number;
   cleatSpacingMm: number;
@@ -80,6 +81,7 @@ export const CONVEYOR_DEFAULTS: ConveyorParams = {
   hangerStyle: 'twin-rod',
   hangerCrossbar: true,
   beltColor: '#1e1e1e',
+  frameColor: '#c0c0c0',
   cleatHeightMm: 25,
   cleatSpacingMm: 150,
   cleatStyle: 'straight',

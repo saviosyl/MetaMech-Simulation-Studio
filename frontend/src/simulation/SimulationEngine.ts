@@ -1652,6 +1652,10 @@ export class SimulationEngine {
       stoppedBy: null,
       pathPosition: 0,
       productLength: pL,
+      textureUrl: node.parameters.productTextureUrl || undefined,
+      label: node.parameters.productLabel || undefined,
+      labelColor: node.parameters.labelColor || '#ffffff',
+      labelFontSize: node.parameters.labelFontSize || 64,
     };
   }
 
