@@ -910,16 +910,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSnapTarget: (target) => set({ snapTarget: target }),
   
   play: () => {
+    // Safety: unlock ModeManager in case a drag was interrupted
+    ModeManager.unlock();
+    ModeManager.activate('viewport', 'simulation-play');
     set({ isPlaying: true, isPaused: false });
   },
   
   pause: () => {
     // Pause freezes simulation in place — products remain visible
+    ModeManager.unlock();
     set({ isPlaying: false, isPaused: true });
   },
   
   reset: () => {
     // Reset stops and clears everything
+    ModeManager.unlock();
+    ModeManager.activate('viewport', 'simulation-reset');
     set({ isPlaying: false, isPaused: false });
   },
   

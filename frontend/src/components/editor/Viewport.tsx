@@ -59,6 +59,8 @@ const DraggableObject: React.FC<{
     setSnapTarget,
     addEdge,
   } = useEditorStore();
+  
+  const isLocked = processNodes.find(n => n.id === id)?.locked ?? false;
 
   useEffect(() => {
     if (!isSelected || !transformRef.current) return;
@@ -199,7 +201,7 @@ const DraggableObject: React.FC<{
       >
         {children}
       </group>
-      {isSelected && !((useEditorStore.getState().processNodes.find(n => n.id === id) as any)?.locked) && (activeTool === 'move' || activeTool === 'rotate' || activeTool === 'scale' || activeTool === 'snap-move') && (
+      {isSelected && !isLocked && (activeTool === 'move' || activeTool === 'rotate' || activeTool === 'scale' || activeTool === 'snap-move') && (
         <TransformControls
           ref={transformRef}
           object={groupRef.current || undefined}

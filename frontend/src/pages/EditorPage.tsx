@@ -25,7 +25,7 @@ const EditorPage: React.FC = () => {
   const {
     loadScene,
     setSelectedObject,
-    setTransformMode,
+    setTransformMode, setActiveTool,
     selectedObjectId,
     selectedObjectType,
     removeObject,
@@ -114,9 +114,9 @@ const EditorPage: React.FC = () => {
       }
 
       switch (event.key.toLowerCase()) {
-        case 'w': setTransformMode('translate'); break;
-        case 'e': setTransformMode('rotate'); break;
-        case 'r': setTransformMode('scale'); break;
+        case 'w': setActiveTool('move'); break;
+        case 'e': setActiveTool('rotate'); break;
+        case 'r': setActiveTool('scale'); break;
         case 'g': setGridSnap(!gridSnap); break;
         case 'm': setMeasureActive(!measureActive); break;
         case 'f': requestFocus(); break;

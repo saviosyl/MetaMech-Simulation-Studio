@@ -204,8 +204,11 @@ export class SimulationEngine {
 
   tick(dt: number, speed: number) {
     // Cap dt to prevent spiral-of-death on tab switch or lag spikes
-    const cappedDt = Math.min(dt, 0.1); // max 100ms per tick
+    const cappedDt = Math.min(dt, 0.05); // max 50ms per tick (20fps minimum)
     const elapsed = cappedDt * speed;
+    
+    // Watchdog: if tick takes >16ms, skip heavy work next frame
+    const tickStart = performance.now();
     this.simTime += elapsed;
 
     // ── PASS 1: Tick ALL sensors first so signals are fresh for conveyors/stoppers ──
@@ -299,6 +302,12 @@ export class SimulationEngine {
 
     // Cleanup completed products that left the system
     this.products = this.products.filter(p => p.state !== 'completed' || (this.simTime - (p.completedAt || 0)) < 2);
+    
+    // Watchdog: warn if tick took too long
+    const tickMs = performance.now() - tickStart;
+    if (tickMs > 16) {
+      console.warn(`[WATCHDOG] Simulation tick took ${tickMs.toFixed(1)}ms (>${16}ms budget). Products: ${this.products.length}`);
+    }
   }
 
   // ─── Rule Engine tick ────────────────────────────────────────

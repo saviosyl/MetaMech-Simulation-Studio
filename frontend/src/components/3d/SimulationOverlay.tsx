@@ -104,7 +104,9 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
 const SimulationOverlay: React.FC = () => {
   const { isPlaying, isPaused, simulationSpeed, processNodes, edges } = useEditorStore();
   const initialized = useRef(false);
-  const [, setTick] = useState(0);
+  const [productCount, setProductCount] = useState(0);
+  const lastProductCount = useRef(0);
+  const frameCounter = useRef(0);
 
   React.useEffect(() => {
     if (isPlaying && !initialized.current) {
@@ -115,15 +117,27 @@ const SimulationOverlay: React.FC = () => {
     if (!isPlaying && !isPaused) {
       initialized.current = false;
       simulationEngine.reset();
-      setTick(0);
+      setProductCount(0);
+      lastProductCount.current = 0;
     }
   }, [isPlaying, isPaused, processNodes, edges]);
 
   useFrame((_, delta) => {
     if (!isPlaying) return; // Paused: skip tick but keep products
-    simulationEngine.tick(Math.min(delta, 0.1), simulationSpeed);
-    // Force re-render every ~100ms to pick up new/removed products
-    setTick(t => t + 1);
+    // Cap delta to prevent spiral-of-death (tab switch, lag spike)
+    const cappedDelta = Math.min(delta, 0.05);
+    simulationEngine.tick(cappedDelta, simulationSpeed);
+    
+    // Only re-render when product count changes (not every frame!)
+    // This avoids the per-frame React re-render that was freezing the UI
+    frameCounter.current++;
+    if (frameCounter.current % 6 === 0) { // Check every ~100ms at 60fps
+      const currentCount = simulationEngine.getProducts().length;
+      if (currentCount !== lastProductCount.current) {
+        lastProductCount.current = currentCount;
+        setProductCount(currentCount);
+      }
+    }
   });
 
   // Show products when playing OR paused (not when fully reset)

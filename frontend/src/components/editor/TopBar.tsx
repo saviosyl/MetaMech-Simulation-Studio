@@ -82,7 +82,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     getSceneData, loadScene,
     gridSnap, setGridSnap,
     measureActive, setMeasureActive,
-    transformMode, setTransformMode,
+    transformMode, setTransformMode, activeTool, setActiveTool,
     setShowShortcuts,
     selectObject,
   } = useEditorStore();
@@ -203,12 +203,12 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         {/* Build / Transform group */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
           <div style={S.group}>
-            <button onClick={() => setTransformMode('select' as any)} style={S.iconBtn(transformMode === 'select')} title="Select (V)"><MousePointer size={15} /></button>
-            <button onClick={() => setTransformMode('translate')} style={S.iconBtn(transformMode === 'translate')} title="Move (W)"><Move size={15} /></button>
-            <button onClick={() => setTransformMode('rotate')} style={S.iconBtn(transformMode === 'rotate')} title="Rotate (E)"><RotateCcw size={15} /></button>
+            <button onClick={() => setActiveTool('select')} style={S.iconBtn(activeTool === 'select')} title="Select (V)"><MousePointer size={15} /></button>
+            <button onClick={() => setActiveTool('move')} style={S.iconBtn(activeTool === 'move')} title="Move (W)"><Move size={15} /></button>
+            <button onClick={() => setActiveTool('rotate')} style={S.iconBtn(activeTool === 'rotate')} title="Rotate (E)"><RotateCcw size={15} /></button>
             <div style={{ width: 1, height: 18, background: 'var(--mm-border-subtle)' }} />
-            <button onClick={() => setTransformMode('mate' as any)} style={S.iconBtn(transformMode === ('mate' as any))} title="Mate"><Link2 size={15} /></button>
-            <button onClick={() => setGridSnap(!gridSnap)} style={S.iconBtn(gridSnap)} title="Snap (G)"><Magnet size={15} /></button>
+            <button onClick={() => setActiveTool('mate')} style={S.iconBtn(activeTool === 'mate')} title="Mate"><Link2 size={15} /></button>
+            <button onClick={() => setActiveTool('snap-move')} style={S.iconBtn(activeTool === 'snap-move')} title="Snap Move"><Magnet size={15} /></button>
           </div>
           <span style={S.groupLabel}>Build</span>
         </div>
