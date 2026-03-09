@@ -51,6 +51,7 @@ import MeasurementTool from '../editor/MeasurementTool';
 import CameraControls from '../3d/CameraControls';
 import CustomModelRenderer from '../3d/CustomModelRenderer';
 import PathRenderer from '../3d/PathRenderer';
+import CameraPathPlayer from '../3d/CameraPathPlayer';
 import ViewportToolbar from '../editor/ViewportToolbar';
 
 // Wrapper that attaches TransformControls to the selected object
@@ -477,6 +478,7 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
 
       {/* Actor Paths */}
       <PathRenderer />
+      <CameraPathPlayer />
 
       {/* Simulation Overlay */}
       <SimulationOverlay />
@@ -604,12 +606,15 @@ const Viewport: React.FC = () => {
           near: 0.1,
           far: 1000,
         }}
+        dpr={[1, 2]}
         shadows
         gl={{ 
           antialias: true,
           alpha: true,
           powerPreference: 'high-performance',
           preserveDrawingBuffer: true,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.1,
         }}
         frameloop="always"
       >

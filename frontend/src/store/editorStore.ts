@@ -105,6 +105,41 @@ export interface ActorPath {
   color: string;
 }
 
+/** Camera keyframe for camera path tool */
+export interface CameraKeyframe {
+  position: [number, number, number];
+  target: [number, number, number];
+  /** Duration in seconds to travel FROM this keyframe to the next */
+  duration: number;
+  /** Optional pause at this keyframe before moving (seconds) */
+  pause: number;
+}
+
+/** Camera path for automated recording */
+export interface CameraPath {
+  id: string;
+  name: string;
+  keyframes: CameraKeyframe[];
+  loop: boolean;
+}
+
+/** Camera keyframe for cinematic camera paths */
+export interface CameraKeyframe {
+  position: [number, number, number];
+  target: [number, number, number];
+  /** Duration in seconds to travel FROM this keyframe to the next */
+  duration: number;
+  /** Easing: 'linear' | 'ease-in-out' */
+  easing: 'linear' | 'ease-in-out';
+}
+
+export interface CameraPath {
+  id: string;
+  name: string;
+  keyframes: CameraKeyframe[];
+  loop: boolean;
+}
+
 /** Clipboard entry for copy/paste */
 interface ClipboardEntry {
   type: 'process' | 'environment' | 'actor' | 'custom-model';
@@ -606,6 +641,19 @@ interface EditorState {
   setCameraMode: (mode: 'perspective' | 'orthographic') => void;
   setCameraView: (view: 'top' | 'front' | 'right' | 'left' | 'back' | 'bottom' | 'perspective') => void;
 
+  // Camera paths (cinematic)
+  cameraPaths: CameraPath[];
+  activeCameraPathId: string | null;
+  isCameraPathPlaying: boolean;
+  addCameraPath: () => string;
+  removeCameraPath: (id: string) => void;
+  updateCameraPath: (id: string, updates: Partial<CameraPath>) => void;
+  addCameraKeyframe: (pathId: string, kf: CameraKeyframe) => void;
+  removeCameraKeyframe: (pathId: string, index: number) => void;
+  updateCameraKeyframe: (pathId: string, index: number, updates: Partial<CameraKeyframe>) => void;
+  setActiveCameraPathId: (id: string | null) => void;
+  setIsCameraPathPlaying: (playing: boolean) => void;
+
   // Scene management
   clearScene: () => void;
   loadScene: (data: any) => void;
@@ -642,6 +690,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   paths: [],
   clipboard: null,
   cameraMode: 'perspective' as const,
+  cameraPaths: [],
+  activeCameraPathId: null,
+  isCameraPathPlaying: false,
   
   sceneSettings: defaultSceneSettings,
   
@@ -1061,6 +1112,46 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
+  // ─── Camera Paths (Cinematic) ─────────────────────
+  addCameraPath: () => {
+    const id = uuidv4();
+    const cp: CameraPath = { id, name: `Camera_Path_${Date.now()}`, keyframes: [], loop: false };
+    set(state => ({ cameraPaths: [...state.cameraPaths, cp] }));
+    return id;
+  },
+  removeCameraPath: (id) => {
+    set(state => ({
+      cameraPaths: state.cameraPaths.filter(p => p.id !== id),
+      activeCameraPathId: state.activeCameraPathId === id ? null : state.activeCameraPathId,
+    }));
+  },
+  updateCameraPath: (id, updates) => {
+    set(state => ({ cameraPaths: state.cameraPaths.map(p => p.id === id ? { ...p, ...updates } : p) }));
+  },
+  addCameraKeyframe: (pathId, kf) => {
+    set(state => ({
+      cameraPaths: state.cameraPaths.map(p =>
+        p.id === pathId ? { ...p, keyframes: [...p.keyframes, kf] } : p
+      ),
+    }));
+  },
+  removeCameraKeyframe: (pathId, index) => {
+    set(state => ({
+      cameraPaths: state.cameraPaths.map(p =>
+        p.id === pathId ? { ...p, keyframes: p.keyframes.filter((_, i) => i !== index) } : p
+      ),
+    }));
+  },
+  updateCameraKeyframe: (pathId, index, updates) => {
+    set(state => ({
+      cameraPaths: state.cameraPaths.map(p =>
+        p.id === pathId ? { ...p, keyframes: p.keyframes.map((kf, i) => i === index ? { ...kf, ...updates } : kf) } : p
+      ),
+    }));
+  },
+  setActiveCameraPathId: (id) => set({ activeCameraPathId: id }),
+  setIsCameraPathPlaying: (playing) => set({ isCameraPathPlaying: playing }),
+
   // ─── Clipboard (Copy/Paste) ─────────────────────
   copySelected: () => {
     const state = get();
@@ -1162,6 +1253,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       customProducts: data.customProducts || [],
       customModels: data.customModels || [],
       paths: data.paths || [],
+      cameraPaths: data.cameraPaths || [],
+      activeCameraPathId: null,
+      isCameraPathPlaying: false,
       selectedObjectId: null,
       selectedObjectType: null,
       isPlaying: false,
@@ -1180,6 +1274,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       customProducts: state.customProducts,
       customModels: state.customModels,
       paths: state.paths,
+      cameraPaths: state.cameraPaths,
     };
   },
 }));

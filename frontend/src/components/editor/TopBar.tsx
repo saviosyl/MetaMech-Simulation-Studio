@@ -95,13 +95,28 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     { value: 4, label: '4×' },
   ];
 
-  // ─── Record Video ───
+  // ─── Record Video (high quality) ───
   const startRecording = useCallback(() => {
     const canvas = document.querySelector('canvas');
     if (!canvas) { alert('No 3D viewport found'); return; }
     try {
-      const stream = canvas.captureStream(30);
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+      // Capture at 60fps for smoother output
+      const stream = canvas.captureStream(60);
+
+      // Try VP9 first (best quality), fall back to VP8
+      let mimeType = 'video/webm;codecs=vp9';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm;codecs=vp8';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm';
+      }
+
+      const recorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: 20_000_000, // 20 Mbps — high quality
+      });
+
       chunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
@@ -113,7 +128,8 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
       };
-      recorder.start(100);
+      // Larger timeslice = fewer chunks = cleaner encoding
+      recorder.start(1000);
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
     } catch (err) {
@@ -127,7 +143,33 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
       mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
+    // Stop camera path playback too
+    useEditorStore.getState().setIsCameraPathPlaying(false);
   }, []);
+
+  // Record with camera path: starts recording + plays the active camera path
+  const startRecordingWithCameraPath = useCallback(() => {
+    const { activeCameraPathId, cameraPaths, setIsCameraPathPlaying, setActiveCameraPathId } = useEditorStore.getState();
+    if (!activeCameraPathId) {
+      // Find first path with >=2 keyframes
+      const validPath = cameraPaths.find(p => p.keyframes.length >= 2);
+      if (!validPath) {
+        alert('Create a camera path with at least 2 keyframes first (Actors tab → Camera Paths)');
+        return;
+      }
+      setActiveCameraPathId(validPath.id);
+    }
+    // Start recording first
+    startRecording();
+    // Then start camera path playback
+    setTimeout(() => {
+      useEditorStore.getState().setIsCameraPathPlaying(true);
+      // Also start simulation if not already playing
+      if (!useEditorStore.getState().isPlaying) {
+        useEditorStore.getState().play();
+      }
+    }, 100);
+  }, [startRecording]);
 
   const handleExport = () => {
     const sceneData = getSceneData();
@@ -263,9 +305,17 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
               ...S.simBtn(isRecording ? '#ef4444' : '#8b5cf6'),
               animation: isRecording ? 'pulse 1.5s ease-in-out infinite' : undefined,
             }}
-            title={isRecording ? 'Stop Recording' : 'Record Video'}>
+            title={isRecording ? 'Stop Recording' : 'Record Video (manual camera)'}>
             <Video size={16} />
           </button>
+          {/* Record with camera path */}
+          {!isRecording && (
+            <button onClick={startRecordingWithCameraPath}
+              style={S.simBtn('#6366f1')}
+              title="Record with Camera Path (auto smooth camera)">
+              <Video size={14} /><span style={{ fontSize: 9, marginLeft: -2 }}>🎬</span>
+            </button>
+          )}
           {isRecording && (
             <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', fontFamily: "'Orbitron', monospace", animation: 'pulse 1s ease-in-out infinite' }}>
               REC

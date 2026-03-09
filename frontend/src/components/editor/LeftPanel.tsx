@@ -4,6 +4,7 @@ import { useEditorStore } from '../../store/editorStore';
 import { getModulesByCategory, ModuleDefinition } from '../../lib/moduleLibrary';
 import SceneHierarchy from './SceneHierarchy';
 import PathPanel from './PathPanel';
+import CameraPathPanel from './CameraPathPanel';
 
 type ViewLayout = 'compact' | 'grid';
 
@@ -226,6 +227,13 @@ const LeftPanel: React.FC = () => {
               {activeLibraryTab === 'actors' && (
                 <div style={{ padding: '12px 14px', borderTop: '1px solid var(--mm-border-subtle)' }}>
                   <PathPanel />
+                </div>
+              )}
+
+              {/* Camera Path Panel — shown under Actors tab */}
+              {activeLibraryTab === 'actors' && (
+                <div style={{ borderTop: '1px solid var(--mm-border-subtle)' }}>
+                  <CameraPathPanel />
                 </div>
               )}
             </div>
