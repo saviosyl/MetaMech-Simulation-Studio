@@ -349,19 +349,27 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.02, 0]}
-        onPointerMissed={handlePointerMissed}
+        onPointerMissed={() => {
+          // Don't deselect when drawing a path
+          const state = useEditorStore.getState();
+          if (state.drawingPathId || state.activeTool === 'path-draw') return;
+          setSelectedObject(null, null);
+        }}
         onClick={(e) => {
+          e.stopPropagation();
           const p = e.point;
           // Path drawing mode
-          const { drawingPathId, addPathPoint } = useEditorStore.getState();
-          if (drawingPathId && activeTool === 'path-draw') {
-            e.stopPropagation();
-            addPathPoint(drawingPathId, [p.x, 0, p.z]);
+          const state = useEditorStore.getState();
+          if (state.drawingPathId) {
+            state.addPathPoint(state.drawingPathId, [
+              Math.round(p.x * 100) / 100,
+              0,
+              Math.round(p.z * 100) / 100,
+            ]);
             return;
           }
           // Measurement mode
           if (measureActive) {
-            e.stopPropagation();
             addMeasurePoint([p.x, p.y, p.z]);
           }
         }}
