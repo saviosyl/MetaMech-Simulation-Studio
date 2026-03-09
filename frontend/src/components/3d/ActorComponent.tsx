@@ -1,7 +1,8 @@
 import React, { useRef, Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Actor } from '../../store/editorStore';
+import { Actor, useEditorStore } from '../../store/editorStore';
+import { actorPathAnimator } from '../../simulation/ActorPathAnimator';
 import GLBModel from './GLBModel';
 
 interface ActorComponentProps {
@@ -35,13 +36,68 @@ const ProceduralForklift: React.FC<{ isSelected: boolean }> = ({ isSelected: _is
   </group>
 );
 
+const ProceduralOperator: React.FC<{ color: string }> = ({ color }) => (
+  <group>
+    {/* Body */}
+    <mesh position={[0, 0.75, 0]} castShadow>
+      <capsuleGeometry args={[0.18, 0.6, 4, 8]} />
+      <meshStandardMaterial color={color || '#4f46e5'} metalness={0.1} roughness={0.7} />
+    </mesh>
+    {/* Head */}
+    <mesh position={[0, 1.35, 0]} castShadow>
+      <sphereGeometry args={[0.13, 8, 6]} />
+      <meshStandardMaterial color="#f5d0a9" metalness={0.05} roughness={0.8} />
+    </mesh>
+    {/* Hard hat */}
+    <mesh position={[0, 1.48, 0]} castShadow>
+      <sphereGeometry args={[0.14, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2]} />
+      <meshStandardMaterial color="#eab308" metalness={0.3} roughness={0.4} />
+    </mesh>
+    {/* Legs */}
+    <mesh position={[-0.08, 0.22, 0]} castShadow>
+      <capsuleGeometry args={[0.06, 0.3, 3, 6]} />
+      <meshStandardMaterial color="#1e3a5f" roughness={0.8} />
+    </mesh>
+    <mesh position={[0.08, 0.22, 0]} castShadow>
+      <capsuleGeometry args={[0.06, 0.3, 3, 6]} />
+      <meshStandardMaterial color="#1e3a5f" roughness={0.8} />
+    </mesh>
+  </group>
+);
+
 const ActorComponent: React.FC<ActorComponentProps> = ({ actor, isSelected, onClick }) => {
   const groupRef = useRef<THREE.Group>(null);
+  const { isPlaying, paths, simulationSpeed } = useEditorStore();
+  const lastTimeRef = useRef(0);
 
   useFrame((state) => {
-    if (groupRef.current && isSelected) {
+    if (!groupRef.current) return;
+
+    // If simulation is running and actor has a path, animate along it
+    if (isPlaying && actor.parameters?.pathId) {
+      const dt = Math.min(state.clock.getDelta(), 0.1) * simulationSpeed;
+      const results = actorPathAnimator.update(dt, paths, [actor]);
+      const result = results.get(actor.id);
+      if (result) {
+        groupRef.current.position.set(result.position[0], result.position[1], result.position[2]);
+        groupRef.current.rotation.y = result.rotationY;
+
+        // Walking bob animation
+        if (result.state === 'walking') {
+          const bobPhase = state.clock.elapsedTime * 8; // walking cadence
+          const isOperator = actor.type.startsWith('operator') || actor.type === 'engineer';
+          if (isOperator) {
+            groupRef.current.position.y += Math.abs(Math.sin(bobPhase)) * 0.03;
+          }
+        }
+        return;
+      }
+    }
+
+    // Default: selected bounce
+    if (isSelected) {
       groupRef.current.position.y = actor.position[1] + Math.sin(state.clock.elapsedTime * 2) * 0.05;
-    } else if (groupRef.current) {
+    } else {
       groupRef.current.position.y = actor.position[1];
     }
   });
@@ -59,18 +115,22 @@ const ActorComponent: React.FC<ActorComponentProps> = ({ actor, isSelected, onCl
     const glb = actorGlbMap[actor.type];
     if (glb) {
       return (
-        <Suspense fallback={<ProceduralForklift isSelected={isSelected} />}>
+        <Suspense fallback={
+          actor.type.startsWith('operator') || actor.type === 'engineer'
+            ? <ProceduralOperator color={actor.parameters?.color || '#4f46e5'} />
+            : <ProceduralForklift isSelected={isSelected} />
+        }>
           <GLBModel url={glb.url} targetSize={glb.targetSize} isSelected={isSelected} />
         </Suspense>
       );
     }
 
-    return (
-      <mesh castShadow>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#6b7280" />
-      </mesh>
-    );
+    // Fallback procedural models
+    if (actor.type.startsWith('operator') || actor.type === 'engineer') {
+      return <ProceduralOperator color={actor.parameters?.color || '#4f46e5'} />;
+    }
+
+    return <ProceduralForklift isSelected={isSelected} />;
   };
 
   return (
@@ -84,10 +144,20 @@ const ActorComponent: React.FC<ActorComponentProps> = ({ actor, isSelected, onCl
       onPointerOut={() => { document.body.style.cursor = 'auto'; }}
     >
       {renderActor()}
+
+      {/* Selection ring */}
       {isSelected && (
         <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[1.2, 1.4, 32]} />
           <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+
+      {/* Path assignment indicator */}
+      {actor.parameters?.pathId && !isPlaying && (
+        <mesh position={[0, 2, 0]}>
+          <sphereGeometry args={[0.08, 8, 6]} />
+          <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={0.5} />
         </mesh>
       )}
     </group>

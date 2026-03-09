@@ -469,8 +469,12 @@ interface EditorState {
   selectedObjectType: 'process' | 'environment' | 'actor' | null;
   selectedIds: string[];
   transformMode: 'translate' | 'rotate' | 'scale';
-  activeTool: 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure';
+  activeTool: 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure' | 'path-draw';
   
+  // Path drawing
+  drawingPathId: string | null;
+  setDrawingPathId: (id: string | null) => void;
+
   // Mate mode
   mateMode: {
     active: boolean;
@@ -538,7 +542,7 @@ interface EditorState {
   toggleSelectId: (id: string, type: 'process' | 'environment' | 'actor') => void;
   selectAll: () => void;
   setTransformMode: (mode: 'translate' | 'rotate' | 'scale') => void;
-  setActiveTool: (tool: 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure') => void;
+  setActiveTool: (tool: 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure' | 'path-draw') => void;
   setMateSelectedPort: (port: { nodeId: string; portId: string; type: 'input' | 'output'; worldPosition: [number, number, number] } | null) => void;
   setGridSnap: (snap: boolean) => void;
   setGridSnapSize: (size: number) => void;
@@ -644,7 +648,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedIds: [],
   transformMode: 'translate',
   activeTool: 'select',
-  
+  drawingPathId: null,
+  setDrawingPathId: (id) => set({ drawingPathId: id, activeTool: id ? 'path-draw' : 'select' }),
+
   mateMode: {
     active: false,
     selectedPort: null,

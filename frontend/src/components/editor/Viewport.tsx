@@ -254,7 +254,7 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
   // Click empty space to deselect → orbit re-enables
   useEffect(() => {
     if (!orbitRef.current) return;
-    const toolsBlockingRotate = ['move', 'rotate', 'scale', 'mate', 'snap-move'];
+    const toolsBlockingRotate = ['move', 'rotate', 'scale', 'mate', 'snap-move', 'path-draw'];
     const shouldBlock = selectedObjectId !== null && toolsBlockingRotate.includes(activeTool);
     orbitRef.current.enableRotate = !shouldBlock;
   }, [activeTool, selectedObjectId, orbitRef]);
@@ -345,15 +345,23 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
         />
       )}
 
-      {/* Ground plane for raycasting (invisible) */}
+      {/* Ground plane for raycasting (invisible) — handles path drawing + measurement clicks */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.02, 0]}
         onPointerMissed={handlePointerMissed}
         onClick={(e) => {
+          const p = e.point;
+          // Path drawing mode
+          const { drawingPathId, addPathPoint } = useEditorStore.getState();
+          if (drawingPathId && activeTool === 'path-draw') {
+            e.stopPropagation();
+            addPathPoint(drawingPathId, [p.x, 0, p.z]);
+            return;
+          }
+          // Measurement mode
           if (measureActive) {
             e.stopPropagation();
-            const p = e.point;
             addMeasurePoint([p.x, p.y, p.z]);
           }
         }}
