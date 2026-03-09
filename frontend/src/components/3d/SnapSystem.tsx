@@ -1,23 +1,56 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { useEditorStore, getConnectionPorts, ProcessNode, ConnectionPort } from '../../store/editorStore';
+import { useEditorStore, getConnectionPorts, ProcessNode, EnvironmentAsset, ConnectionPort } from '../../store/editorStore';
 import { getPortWorldPosition, alignNodeToPort, solveMateTransform, localDirToWorld } from '../../lib/nodeTransform';
 import { findNearestConveyorSnap, isAccessoryType, isConveyorType, applyAccessorySnap } from '../../lib/accessorySnap';
 
 const SNAP_THRESHOLD = 0.5;
 
+/** Types that should auto-match conveyor belt top height */
+const MACHINE_TYPES = new Set([
+  'machine', 'checkweigher', 'metal-detector', 'labeler', 'carton-erector',
+  'case-packer', 'sealing-station', 'reject-station',
+]);
+
+const CONVEYOR_TYPES_SET = new Set([
+  'conveyor', 'belt-conveyor', 'roller-conveyor', 'modular-conveyor-straight',
+  'modular-conveyor-90-curve', 'modular-conveyor-45-curve', 'incline-conveyor',
+  'pallet-conveyor',
+]);
+
+/** Get the belt top height of a conveyor in mm */
+function getConveyorBeltTopMm(node: ProcessNode): number {
+  return node.parameters?.height || 800; // height param is already belt top height in mm
+}
+
+/** Unified node shape that both ProcessNode and EnvironmentAsset satisfy */
+type AnyNode = ProcessNode | EnvironmentAsset;
+
+/** Determine which store category an object belongs to */
+function nodeCategory(id: string, processNodesList: ProcessNode[], _environmentAssetsList: EnvironmentAsset[]): 'process' | 'environment' {
+  if (processNodesList.some(n => n.id === id)) return 'process';
+  return 'environment';
+}
+
 const SnapSystem: React.FC = () => {
-  const { processNodes, edges, selectedObjectId, isDragging, mateMode, activeTool, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
+  const { processNodes, environmentAssets, edges, selectedObjectId, isDragging, mateMode, activeTool, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
   const wasDragging = useRef(false);
+
+  // Merged list of all nodes that can have ports (process + environment)
+  const allNodes: AnyNode[] = useMemo(
+    () => [...processNodes, ...environmentAssets],
+    [processNodes, environmentAssets],
+  );
 
   // Auto-snap on drag end: accessory snap + snap-move port proximity snap
   useEffect(() => {
     if (wasDragging.current && !isDragging && selectedObjectId) {
-      const node = processNodes.find(n => n.id === selectedObjectId);
+      const node = allNodes.find(n => n.id === selectedObjectId);
       if (!node) { wasDragging.current = false; return; }
+      const cat = nodeCategory(node.id, processNodes, environmentAssets);
 
-      // Accessory snap (any mode)
-      if (isAccessoryType(node.type)) {
+      // Accessory snap (process nodes only)
+      if (cat === 'process' && isAccessoryType(node.type)) {
         const conveyors = processNodes.filter(n => isConveyorType(n.type));
         const snap = findNearestConveyorSnap(node.position, conveyors, node.type);
         if (snap) {
@@ -31,22 +64,21 @@ const SnapSystem: React.FC = () => {
       }
 
       // Auto-mate: snap to nearest compatible port when close enough
-      // Works in snap-move mode (150mm) or normal move mode (100mm for any node with ports)
+      // Works for both process nodes AND environment assets (wall-to-wall, fence-to-fence, etc.)
       {
-        const SNAP_DIST = activeTool === 'snap-move' ? 0.15 : 0.1; // snap-move: 150mm, normal: 100mm
-        const myPorts = getConnectionPorts(node.type, node.parameters);
+        const SNAP_DIST = activeTool === 'snap-move' ? 0.15 : 0.1;
+        const myPorts = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
         let bestDist = SNAP_DIST;
-        let bestMatch: { myPort: ConnectionPort; targetNode: ProcessNode; targetPort: ConnectionPort; targetWorldPos: [number, number, number]; targetWorldDir: [number, number, number] } | null = null;
+        let bestMatch: { myPort: ConnectionPort; targetNode: AnyNode; targetPort: ConnectionPort; targetWorldPos: [number, number, number]; targetWorldDir: [number, number, number] } | null = null;
 
-        for (const other of processNodes) {
+        for (const other of allNodes) {
           if (other.id === node.id) continue;
-          const otherPorts = getConnectionPorts(other.type, other.parameters);
+          const otherPorts = getConnectionPorts(other.type, other.parameters, (other as any).assetId);
           for (const mp of myPorts) {
-            const mpWorld = getPortWorldPosition(mp.localPosition, node);
+            const mpWorld = getPortWorldPosition(mp.localPosition, node as any);
             for (const op of otherPorts) {
-              // Compatible: output↔input
               if (mp.type === op.type) continue;
-              const opWorld = getPortWorldPosition(op.localPosition, other);
+              const opWorld = getPortWorldPosition(op.localPosition, other as any);
               const dx = mpWorld[0] - opWorld[0];
               const dy = mpWorld[1] - opWorld[1];
               const dz = mpWorld[2] - opWorld[2];
@@ -61,20 +93,63 @@ const SnapSystem: React.FC = () => {
         }
 
         if (bestMatch) {
+          // Auto-height: if a machine is connecting to a conveyor, match belt top height
+          const targetCat = nodeCategory(bestMatch.targetNode.id, processNodes, environmentAssets);
+          let extraParams: Record<string, any> | null = null;
+          if (cat === 'process' && targetCat === 'process') {
+            const targetAsProcess = bestMatch.targetNode as ProcessNode;
+            const nodeAsProcess = node as ProcessNode;
+            // Machine connecting to conveyor
+            if (MACHINE_TYPES.has(nodeAsProcess.type) && CONVEYOR_TYPES_SET.has(targetAsProcess.type)) {
+              const beltTopMm = getConveyorBeltTopMm(targetAsProcess);
+              if (bestMatch.myPort.id === 'input') {
+                extraParams = { infeedHeight: beltTopMm, outfeedHeight: nodeAsProcess.parameters?.outfeedHeight || beltTopMm };
+              } else {
+                extraParams = { outfeedHeight: beltTopMm, infeedHeight: nodeAsProcess.parameters?.infeedHeight || beltTopMm };
+              }
+            }
+            // Conveyor connecting to machine — set the machine's height to match
+            if (MACHINE_TYPES.has(targetAsProcess.type) && CONVEYOR_TYPES_SET.has(nodeAsProcess.type)) {
+              const beltTopMm = getConveyorBeltTopMm(nodeAsProcess);
+              const tParams: Record<string, any> = {};
+              if (bestMatch.targetPort.id === 'input') {
+                tParams.infeedHeight = beltTopMm;
+                if (!targetAsProcess.parameters?.outfeedHeight) tParams.outfeedHeight = beltTopMm;
+              } else {
+                tParams.outfeedHeight = beltTopMm;
+                if (!targetAsProcess.parameters?.infeedHeight) tParams.infeedHeight = beltTopMm;
+              }
+              updateObject(targetAsProcess.id, 'process', { parameters: { ...targetAsProcess.parameters, ...tParams } });
+            }
+          }
+
+          // Recompute ports if we changed params (so mate uses updated port positions)
+          const nodePorts = extraParams
+            ? getConnectionPorts(node.type, { ...node.parameters, ...extraParams }, (node as any).assetId)
+            : null;
+          const myPortUpdated = nodePorts ? (nodePorts.find(p => p.id === bestMatch!.myPort.id) || bestMatch.myPort) : bestMatch.myPort;
+
           const mate = solveMateTransform(
             bestMatch.targetWorldPos,
             bestMatch.targetWorldDir,
-            bestMatch.myPort.localPosition,
-            bestMatch.myPort.direction,
+            myPortUpdated.localPosition,
+            myPortUpdated.direction,
             node.scale,
           );
-          updateObject(node.id, 'process', { position: mate.position, rotation: mate.rotation });
 
-          // Auto-create edge
-          if (bestMatch.myPort.type === 'output') {
-            addEdge(node.id, bestMatch.myPort.id, bestMatch.targetNode.id, bestMatch.targetPort.id);
-          } else {
-            addEdge(bestMatch.targetNode.id, bestMatch.targetPort.id, node.id, bestMatch.myPort.id);
+          const updates: Record<string, any> = { position: mate.position, rotation: mate.rotation };
+          if (extraParams) {
+            updates.parameters = { ...node.parameters, ...extraParams };
+          }
+          updateObject(node.id, cat, updates);
+
+          // Auto-create edge (only for process→process connections)
+          if (cat === 'process' && targetCat === 'process') {
+            if (bestMatch.myPort.type === 'output') {
+              addEdge(node.id, bestMatch.myPort.id, bestMatch.targetNode.id, bestMatch.targetPort.id);
+            } else {
+              addEdge(bestMatch.targetNode.id, bestMatch.targetPort.id, node.id, bestMatch.myPort.id);
+            }
           }
         }
       }
@@ -88,22 +163,32 @@ const SnapSystem: React.FC = () => {
   const portVisuals = useMemo(() => {
     if (!showPorts) return [];
 
-    const visuals: { position: [number, number, number]; type: 'input' | 'output'; nodeId: string; portId: string; connected: boolean }[] = [];
+    const visuals: { position: [number, number, number]; type: 'input' | 'output'; nodeId: string; portId: string; connected: boolean; category: 'process' | 'environment' }[] = [];
 
+    // Process nodes
     processNodes.forEach((node: ProcessNode) => {
-      const ports = getConnectionPorts(node.type, node.parameters);
+      const ports = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
       ports.forEach((port: ConnectionPort) => {
         const worldPos = getPortWorldPosition(port.localPosition, node);
         const connected = edges.some(e =>
           (e.from === node.id && e.fromPort === port.id) ||
           (e.to === node.id && e.toPort === port.id)
         );
-        visuals.push({ position: worldPos, type: port.type, nodeId: node.id, portId: port.id, connected });
+        visuals.push({ position: worldPos, type: port.type, nodeId: node.id, portId: port.id, connected, category: 'process' });
+      });
+    });
+
+    // Environment assets (edge mate ports for walls, fences, etc.)
+    environmentAssets.forEach((asset: EnvironmentAsset) => {
+      const ports = getConnectionPorts(asset.type, asset.parameters, (asset as any).assetId);
+      ports.forEach((port: ConnectionPort) => {
+        const worldPos = getPortWorldPosition(port.localPosition, asset as any);
+        visuals.push({ position: worldPos, type: port.type, nodeId: asset.id, portId: port.id, connected: false, category: 'environment' });
       });
     });
 
     return visuals;
-  }, [processNodes, edges, showPorts]);
+  }, [processNodes, environmentAssets, edges, showPorts]);
 
   if (!showPorts) return null;
 
@@ -132,20 +217,19 @@ const SnapSystem: React.FC = () => {
         return;
       }
       // Full 3D mate: move AND rotate the second object so ports align face-to-face
-      const firstNode = processNodes.find(n => n.id === selectedPort.nodeId);
-      const secondNode = processNodes.find(n => n.id === pv.nodeId);
+      // Works for both process nodes AND environment assets
+      const firstNode = allNodes.find(n => n.id === selectedPort.nodeId);
+      const secondNode = allNodes.find(n => n.id === pv.nodeId);
       if (secondNode && firstNode) {
-        const firstPorts = getConnectionPorts(firstNode.type, firstNode.parameters);
+        const firstPorts = getConnectionPorts(firstNode.type, firstNode.parameters, (firstNode as any).assetId);
         const firstPort = firstPorts.find(p => p.id === selectedPort.portId);
-        const secondPorts = getConnectionPorts(secondNode.type, secondNode.parameters);
+        const secondPorts = getConnectionPorts(secondNode.type, secondNode.parameters, (secondNode as any).assetId);
         const secondPort = secondPorts.find(p => p.id === pv.portId);
         if (firstPort && secondPort) {
-          // Get first port's world direction
           const firstWorldDir = localDirToWorld(
             firstPort.direction,
             firstNode.rotation,
           );
-          // Solve: position + rotation for second node
           const mate = solveMateTransform(
             selectedPort.worldPosition,
             firstWorldDir,
@@ -153,18 +237,23 @@ const SnapSystem: React.FC = () => {
             secondPort.direction,
             secondNode.scale,
           );
-          updateObject(pv.nodeId, 'process', {
+          const secondCat = nodeCategory(secondNode.id, processNodes, environmentAssets);
+          updateObject(pv.nodeId, secondCat, {
             position: mate.position,
             rotation: mate.rotation,
           });
         }
       }
 
-      // Create edge: output -> input
-      if (selectedPort.type === 'output') {
-        addEdge(selectedPort.nodeId, selectedPort.portId, pv.nodeId, pv.portId);
-      } else {
-        addEdge(pv.nodeId, pv.portId, selectedPort.nodeId, selectedPort.portId);
+      // Create edge: output -> input (only for process↔process)
+      const firstCat = nodeCategory(selectedPort.nodeId, processNodes, environmentAssets);
+      const secondCat = nodeCategory(pv.nodeId, processNodes, environmentAssets);
+      if (firstCat === 'process' && secondCat === 'process') {
+        if (selectedPort.type === 'output') {
+          addEdge(selectedPort.nodeId, selectedPort.portId, pv.nodeId, pv.portId);
+        } else {
+          addEdge(pv.nodeId, pv.portId, selectedPort.nodeId, selectedPort.portId);
+        }
       }
       setMateSelectedPort(null);
     }
@@ -200,8 +289,8 @@ const SnapSystem: React.FC = () => {
             >
               <sphereGeometry args={[portSize, 12, 8]} />
               <meshStandardMaterial
-                color={selected ? '#ffffff' : pv.connected ? '#6b7280' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
-                emissive={selected ? '#06b6d4' : pv.connected ? '#333333' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
+                color={selected ? '#ffffff' : pv.connected ? '#6b7280' : pv.category === 'environment' ? '#f59e0b' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
+                emissive={selected ? '#06b6d4' : pv.connected ? '#333333' : pv.category === 'environment' ? '#f59e0b' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
                 emissiveIntensity={selected ? 1.0 : pv.connected ? 0.1 : 0.5}
                 transparent
                 opacity={pv.connected ? 0.4 : 0.9}
@@ -212,7 +301,7 @@ const SnapSystem: React.FC = () => {
               <mesh rotation={[-Math.PI / 2, 0, 0]}>
                 <ringGeometry args={[portSize + 0.02, portSize + 0.07, 16]} />
                 <meshBasicMaterial
-                  color={selected ? '#06b6d4' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
+                  color={selected ? '#06b6d4' : pv.category === 'environment' ? '#f59e0b' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
                   transparent
                   opacity={selected ? 0.8 : 0.4}
                   side={THREE.DoubleSide}

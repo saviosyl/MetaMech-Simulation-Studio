@@ -43,36 +43,54 @@ function validateScene(nodes: any[], edges: any[]): ValidationIssue[] {
     return issues;
   }
 
-  // Check: has source
+  // Check: has source (Product In)
   const sources = nodes.filter(n => n.type === 'source');
   if (sources.length === 0) {
     issues.push({
       id: 'no-source',
       severity: 'error',
-      title: 'No product source',
-      detail: 'Add a Source node to generate products for simulation.',
+      title: 'No Product In',
+      detail: 'Add a Product In node to generate products for simulation.',
     });
   }
 
-  // Check: has sink
+  // Check: has sink (Product Out)
   const sinks = nodes.filter(n => n.type === 'sink');
   if (sinks.length === 0) {
     issues.push({
       id: 'no-sink',
       severity: 'warning',
-      title: 'No product sink',
-      detail: 'Add a Sink to collect products at the end of your line. Without one, products may accumulate.',
+      title: 'No Product Out',
+      detail: 'Add a Product Out to collect products at the end of your line. Without one, products may accumulate.',
     });
   }
 
   // Check: disconnected nodes (no edges in or out)
+  // Decorative / environment assets don't need flow edges — skip them
+  const DECORATIVE_TYPES = new Set([
+    // Environment
+    'wall', 'door', 'window', 'stairs', 'pallet-rack', 'safety-rail', 'warehouse-shell',
+    'fence', 'fence-gate', 'bollard', 'operator-station', 'electrical-cabinet',
+    'tower-light', 'hmi-stand', 'machine-enclosure', 'floor-zone', 'pallet-stack',
+    'pallet', 'cardboard-box', 'floor-marking', 'floor', 'stretch-wrapper',
+    'guard-partition', 'light-curtain',
+    // Pallets (placed as scene objects, not flow nodes)
+    'eur-pallet', 'standard-pallet', 'custom-pallet',
+    // Actors
+    'operator', 'operator-1', 'operator-2', 'operator-3', 'engineer',
+    'forklift', 'agv', 'pallet-truck',
+    // Static models
+    'forklift-static', 'agv-static', 'worker-static', 'pallet-truck-static',
+    'pallet-static', 'cardboard-box-static',
+  ]);
+
   for (const node of nodes) {
+    if (DECORATIVE_TYPES.has(node.type)) continue;
+
     const hasIn = edges.some(e => e.to === node.id);
     const hasOut = edges.some(e => e.from === node.id);
     
     if (!hasIn && !hasOut && node.type !== 'source' && node.type !== 'sink') {
-      // Skip environment/pallet nodes
-      if (['eur-pallet', 'standard-pallet', 'custom-pallet'].includes(node.type)) continue;
       issues.push({
         id: `disconnected-${node.id}`,
         severity: 'warning',
@@ -91,8 +109,8 @@ function validateScene(nodes: any[], edges: any[]): ValidationIssue[] {
       issues.push({
         id: `source-no-out-${src.id}`,
         severity: 'error',
-        title: `Source "${src.name}" has no output`,
-        detail: 'Connect the source output to a conveyor or machine.',
+        title: `Product In "${src.name}" has no output`,
+        detail: 'Connect the Product In output to a conveyor or machine.',
         nodeId: src.id,
         nodeName: src.name,
       });
@@ -106,8 +124,8 @@ function validateScene(nodes: any[], edges: any[]): ValidationIssue[] {
       issues.push({
         id: `sink-no-in-${sink.id}`,
         severity: 'warning',
-        title: `Sink "${sink.name}" has no input`,
-        detail: 'Connect the sink input to receive products.',
+        title: `Product Out "${sink.name}" has no input`,
+        detail: 'Connect the Product Out input to receive products.',
         nodeId: sink.id,
         nodeName: sink.name,
       });

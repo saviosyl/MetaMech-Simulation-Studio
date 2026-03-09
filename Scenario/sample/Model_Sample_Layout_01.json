@@ -1,0 +1,154 @@
+{
+  "meta": {
+    "name": "Sample Production Line",
+    "category": "FMCG",
+    "description": "Basic FMCG production line: source → conveyor → checkweigher → labeler → sink. Demonstrates flow control and inline quality checks.",
+    "version": "1.0",
+    "thumbnail": "Scenario/sample/thumbnails/Model_Sample_Layout_01.png"
+  },
+  "project": {
+    "processNodes": [
+      {
+        "id": "src-01",
+        "type": "source",
+        "name": "Product In",
+        "position": [-6, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1],
+        "parameters": {
+          "spawnRate": 20,
+          "productType": "box",
+          "productColor": "brown",
+          "productLength": 300,
+          "productWidth": 200,
+          "productHeight": 150
+        }
+      },
+      {
+        "id": "conv-01",
+        "type": "belt-conveyor",
+        "name": "Infeed Conveyor",
+        "position": [-4, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1],
+        "parameters": {
+          "length": 2000,
+          "width": 600,
+          "height": 800,
+          "beltSpeed": 15,
+          "showLegs": true
+        }
+      },
+      {
+        "id": "cw-01",
+        "type": "checkweigher",
+        "name": "Checkweigher",
+        "position": [-1.5, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1],
+        "parameters": {
+          "width": 800,
+          "height": 900,
+          "weightTolerance": 5,
+          "rejectEnabled": true,
+          "infeedHeight": 800,
+          "outfeedHeight": 800
+        }
+      },
+      {
+        "id": "conv-02",
+        "type": "belt-conveyor",
+        "name": "Mid Conveyor",
+        "position": [0.5, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1],
+        "parameters": {
+          "length": 2000,
+          "width": 600,
+          "height": 800,
+          "beltSpeed": 15,
+          "showLegs": true
+        }
+      },
+      {
+        "id": "lab-01",
+        "type": "labeler",
+        "name": "Labeler",
+        "position": [3, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1],
+        "parameters": {
+          "width": 600,
+          "height": 1200,
+          "labelSide": "front",
+          "labelsPerMin": 40,
+          "infeedHeight": 800,
+          "outfeedHeight": 800
+        }
+      },
+      {
+        "id": "conv-03",
+        "type": "belt-conveyor",
+        "name": "Outfeed Conveyor",
+        "position": [5.5, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1],
+        "parameters": {
+          "length": 2000,
+          "width": 600,
+          "height": 800,
+          "beltSpeed": 15,
+          "showLegs": true
+        }
+      },
+      {
+        "id": "sink-01",
+        "type": "sink",
+        "name": "Product Out",
+        "position": [7.5, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1],
+        "parameters": {
+          "capacity": 1000,
+          "showCounter": true
+        }
+      },
+      {
+        "id": "wall-01",
+        "type": "wall",
+        "name": "Back Wall",
+        "position": [0, 0, -3],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1],
+        "parameters": {
+          "width": 16000,
+          "height": 3000,
+          "thickness": 200,
+          "wallColor": "#e0e0e0"
+        }
+      },
+      {
+        "id": "fence-01",
+        "type": "fence",
+        "name": "Safety Fence",
+        "position": [0, 0, 2],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1],
+        "parameters": {
+          "width": 14000,
+          "height": 2000
+        }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "from": "src-01", "to": "conv-01", "fromPort": "output", "toPort": "input" },
+      { "id": "e2", "from": "conv-01", "to": "cw-01", "fromPort": "output", "toPort": "input" },
+      { "id": "e3", "from": "cw-01", "to": "conv-02", "fromPort": "output", "toPort": "input" },
+      { "id": "e4", "from": "conv-02", "to": "lab-01", "fromPort": "output", "toPort": "input" },
+      { "id": "e5", "from": "lab-01", "to": "conv-03", "fromPort": "output", "toPort": "input" },
+      { "id": "e6", "from": "conv-03", "to": "sink-01", "fromPort": "output", "toPort": "input" }
+    ],
+    "environmentAssets": [],
+    "actors": []
+  }
+}

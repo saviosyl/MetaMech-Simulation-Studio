@@ -2,6 +2,7 @@ import {
   Cog, 
   Package, 
   ArrowRight, 
+  ArrowDown,
   Database, 
   GitBranch,
   Columns,
@@ -40,9 +41,9 @@ export const moduleLibrary: ModuleDefinition[] = [
   // Process Modules
   {
     id: 'source',
-    name: 'Source',
+    name: 'Product In',
     category: 'process',
-    icon: Package,
+    icon: ArrowDown,
     description: 'Generates products at specified intervals',
     parameters: {
       spawnRate: {
@@ -128,9 +129,9 @@ export const moduleLibrary: ModuleDefinition[] = [
   },
   {
     id: 'sink',
-    name: 'Sink',
+    name: 'Product Out',
     category: 'process',
-    icon: ArrowRight,
+    icon: ArrowDown,
     description: 'Collects and removes products from the system',
     parameters: {
       capacity: {
@@ -395,6 +396,8 @@ export const moduleLibrary: ModuleDefinition[] = [
         label: 'Show Status Light',
         default: true,
       },
+      infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
+      outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
     },
   },
   {
@@ -645,13 +648,15 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Pallet Rack',
     category: 'environment',
     icon: Package,
-    description: 'Industrial pallet racking',
+    description: 'Premium industrial pallet racking with wire decking',
     assetId: 'pallet-rack',
     parameters: {
       bayWidth: { type: 'number', label: 'Bay Width (mm)', default: 2700, min: 1500, max: 4000, step: 100 },
       depth: { type: 'number', label: 'Depth (mm)', default: 1100, min: 800, max: 1500, step: 50 },
       height: { type: 'number', label: 'Height (mm)', default: 5000, min: 2000, max: 12000, step: 100 },
       levels: { type: 'number', label: 'Levels', default: 4, min: 2, max: 8, step: 1 },
+      bays: { type: 'number', label: 'Bays', default: 1, min: 1, max: 4, step: 1 },
+      showPallets: { type: 'boolean', label: 'Show Pallets', default: true },
     },
   },
   {
@@ -1104,6 +1109,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       depth: { type: 'number', label: 'Depth (mm)', default: 800, min: 500, max: 1500, step: 50 },
       height: { type: 'number', label: 'Height (mm)', default: 1800, min: 1200, max: 2500, step: 50 },
       cycleTime: { type: 'number', label: 'Cycle Time (s)', default: 3, min: 0.5, max: 30, step: 0.5 },
+      infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
+      outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
     },
   },
   {
@@ -1118,6 +1125,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       height: { type: 'number', label: 'Height (mm)', default: 2000, min: 1500, max: 2500, step: 50 },
       cycleTime: { type: 'number', label: 'Cycle Time (s)', default: 5, min: 1, max: 30, step: 0.5 },
       casesPerMinute: { type: 'number', label: 'Cases/min', default: 15, min: 5, max: 60, step: 1 },
+      infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
+      outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
     },
   },
   {
@@ -1131,6 +1140,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       height: { type: 'number', label: 'Height (mm)', default: 900, min: 600, max: 1200, step: 50 },
       weightTolerance: { type: 'number', label: 'Tolerance (%)', default: 5, min: 0.5, max: 20, step: 0.5 },
       rejectEnabled: { type: 'boolean', label: 'Reject Enabled', default: true },
+      infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
+      outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
     },
   },
   {
@@ -1143,6 +1154,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       width: { type: 'number', label: 'Width (mm)', default: 600, min: 400, max: 1000, step: 50 },
       height: { type: 'number', label: 'Height (mm)', default: 900, min: 600, max: 1200, step: 50 },
       sensitivity: { type: 'select', label: 'Sensitivity', default: 'high', options: ['low', 'medium', 'high'] },
+      infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
+      outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
     },
   },
   {
@@ -1156,6 +1169,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       height: { type: 'number', label: 'Height (mm)', default: 1200, min: 800, max: 1600, step: 50 },
       labelSide: { type: 'select', label: 'Label Side', default: 'front', options: ['front', 'back', 'top', 'both-sides'] },
       labelsPerMin: { type: 'number', label: 'Labels/min', default: 40, min: 10, max: 200, step: 5 },
+      infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
+      outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
     },
   },
   {
@@ -1168,6 +1183,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       width: { type: 'number', label: 'Width (mm)', default: 700, min: 500, max: 1000, step: 50 },
       height: { type: 'number', label: 'Height (mm)', default: 1000, min: 700, max: 1500, step: 50 },
       sealType: { type: 'select', label: 'Seal Type', default: 'tape', options: ['tape', 'glue', 'heat-seal'] },
+      infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
+      outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
     },
   },
   {
@@ -1180,6 +1197,8 @@ export const moduleLibrary: ModuleDefinition[] = [
       width: { type: 'number', label: 'Width (mm)', default: 600, min: 400, max: 1000, step: 50 },
       height: { type: 'number', label: 'Height (mm)', default: 900, min: 600, max: 1200, step: 50 },
       rejectMethod: { type: 'select', label: 'Reject Method', default: 'pusher', options: ['pusher', 'air-blast', 'diverter', 'trap-door'] },
+      infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
+      outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
     },
   },
   {

@@ -209,7 +209,7 @@ const RightPanel: React.FC = () => {
                 <div>
                   <label style={labelStyle}>Type</label>
                   <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--mm-text-secondary)', background: 'var(--mm-bg-surface)', borderRadius: 6, textTransform: 'capitalize' }}>
-                    {selectedObject.type.replace(/-/g, ' ')}
+                    {moduleDef?.name || selectedObject.type.replace(/-/g, ' ')}
                   </div>
                 </div>
               </Section>

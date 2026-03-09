@@ -228,11 +228,14 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
         { id: 'input', type: 'input', localPosition: [-1, 0.4, 0] },
         { id: 'output', type: 'output', localPosition: [1, 0.4, 0] },
       ];
-    case 'machine':
+    case 'machine': {
+      const machInH = params?.infeedHeight ? (params.infeedHeight / 1000) : 0.75;
+      const machOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : machInH;
       return [
-        { id: 'input', type: 'input', localPosition: [-1, 0.75, 0] },
-        { id: 'output', type: 'output', localPosition: [1, 0.75, 0] },
+        { id: 'input', type: 'input', localPosition: [-1, machInH, 0] },
+        { id: 'output', type: 'output', localPosition: [1, machOutH, 0] },
       ];
+    }
     case 'palletizer':
       return [
         { id: 'input', type: 'input', localPosition: [-1.5, 1.25, 0] },
@@ -341,9 +344,12 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     case 'reject-station': {
       const eqW = (params?.width || 800) / 1000;
       const eqH = (params?.height || 900) / 1000;
+      // Auto-match conveyor belt top height if infeedHeight is set (from mate auto-height)
+      const infeedH = params?.infeedHeight ? (params.infeedHeight / 1000) : (eqH * 0.55);
+      const outfeedH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : infeedH;
       return [
-        { id: 'input', type: 'input', localPosition: [-eqW / 2 - 0.15, eqH * 0.55, 0] as [number, number, number] },
-        { id: 'output', type: 'output', localPosition: [eqW / 2 + 0.15, eqH * 0.55, 0] as [number, number, number] },
+        { id: 'input', type: 'input', localPosition: [-eqW / 2 - 0.15, infeedH, 0] as [number, number, number] },
+        { id: 'output', type: 'output', localPosition: [eqW / 2 + 0.15, outfeedH, 0] as [number, number, number] },
       ];
     }
     case 'accumulation-table': {

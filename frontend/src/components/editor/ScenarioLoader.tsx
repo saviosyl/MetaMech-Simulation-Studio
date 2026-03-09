@@ -2,9 +2,11 @@
  * ScenarioLoader — Load pre-built industrial scenarios
  * 
  * Dropdown UI to select and load demo scenarios into the editor.
+ * Supports both programmatic (code-defined) and JSON file-based scenarios.
+ * File-based scenarios are loaded from Scenario/sample/ via manifest.json.
  */
-import React, { useState } from 'react';
-import { Play, ChevronDown, Factory, Package, ArrowUpDown, CornerDownRight, Rotate3d, Layers } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Play, ChevronDown, Factory, Package, ArrowUpDown, CornerDownRight, Rotate3d, Layers, FileJson } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { simulationEngine } from '../../simulation/SimulationEngine';
 import {
@@ -26,6 +28,7 @@ import {
   createRobotVerification,
   createMachineVerification,
 } from '../../simulation/factoryScenarios';
+import { listScenarios, loadScenarioFile, ScenarioMeta } from '../../lib/scenarioFileLoader';
 
 interface ScenarioOption {
   id: string;
@@ -136,10 +139,86 @@ const SCENARIOS: ScenarioOption[] = [
   },
 ];
 
+// Category icon/color map for JSON scenarios
+const CATEGORY_STYLES: Record<string, { color: string }> = {
+  'FMCG': { color: 'text-orange-400' },
+  'Medical': { color: 'text-blue-400' },
+  'Factory': { color: 'text-green-400' },
+  'Demo': { color: 'text-purple-400' },
+};
+
 const ScenarioLoader: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
+  const [fileScenarios, setFileScenarios] = useState<{ filename: string; meta: ScenarioMeta }[]>([]);
   const { clearScene, loadScene } = useEditorStore();
+
+  // Load file-based scenarios from manifest when dropdown opens
+  useEffect(() => {
+    if (isOpen && fileScenarios.length === 0) {
+      listScenarios().then(setFileScenarios).catch(() => {});
+    }
+  }, [isOpen]);
+
+  const loadFileScenario = async (filename: string) => {
+    setLoading(filename);
+    const scenario = await loadScenarioFile(filename);
+    if (scenario) {
+      clearScene();
+
+      // Separate process nodes from environment/actor nodes based on type
+      const processTypes = new Set([
+        'source', 'sink', 'conveyor', 'belt-conveyor', 'roller-conveyor', 'buffer', 'machine',
+        'router', 'transfer-bridge', 'popup-transfer', 'pusher-transfer', 'merge-divert',
+        'spiral-conveyor', 'vertical-lifter', 'pick-and-place', 'palletizer',
+        'modular-conveyor-straight', 'modular-conveyor-90-curve', 'modular-conveyor-45-curve',
+        'bend-conveyor', 'stopper', 'pusher', 'sensor', 'industrial-robot', 'machine-static',
+        'cartesian-robot', 'cobot', 'robot-5axis', 'robot-6axis',
+        'eur-pallet', 'standard-pallet', 'custom-pallet',
+        'carton-erector', 'case-packer', 'checkweigher', 'metal-detector',
+        'labeler', 'sealing-station', 'reject-station', 'accumulation-table',
+        'stretch-wrapper', 'packing-station', 'pallet-conveyor', 'forklift',
+      ]);
+      const envTypes = new Set([
+        'wall', 'door', 'window', 'stairs', 'safety-rail', 'floor-marking',
+        'pallet-rack', 'warehouse-shell', 'floor', 'pallet', 'cardboard-box',
+        'fence', 'fence-gate', 'bollard', 'operator-station', 'electrical-cabinet',
+        'tower-light', 'hmi-stand', 'machine-enclosure', 'floor-zone', 'pallet-stack',
+      ]);
+
+      const allNodes = scenario.project.processNodes || [];
+      const pNodes = allNodes.filter((n: any) => processTypes.has(n.type));
+      const eNodes = [
+        ...allNodes.filter((n: any) => envTypes.has(n.type)),
+        ...(scenario.project.environmentAssets || []),
+      ];
+
+      loadScene({
+        processNodes: pNodes.map((n: any) => ({
+          ...n,
+          scale: n.scale || [1, 1, 1],
+          rotation: n.rotation || [0, 0, 0],
+          parameters: n.parameters || {},
+          locked: false,
+          visible: true,
+        })),
+        edges: (scenario.project.edges || []).map((e: any) => ({
+          ...e,
+          fromPort: e.fromPort || 'output',
+          toPort: e.toPort || 'input',
+        })),
+        environmentAssets: eNodes.map((n: any) => ({
+          ...n,
+          scale: n.scale || [1, 1, 1],
+          rotation: n.rotation || [0, 0, 0],
+          parameters: n.parameters || {},
+        })),
+        actors: scenario.project.actors || [],
+      });
+    }
+    setLoading(null);
+    setIsOpen(false);
+  };
 
   const loadScenario = (option: ScenarioOption) => {
     setLoading(option.id);
@@ -209,6 +288,41 @@ const ScenarioLoader: React.FC = () => {
             </div>
 
             <div className="max-h-80 overflow-y-auto">
+              {/* File-based scenarios from Scenario/sample/ */}
+              {fileScenarios.length > 0 && (
+                <>
+                  <div className="px-3 py-1.5 border-b border-gray-700">
+                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Saved Scenarios</span>
+                  </div>
+                  {fileScenarios.map(fs => (
+                    <button
+                      key={fs.filename}
+                      onClick={() => loadFileScenario(fs.filename)}
+                      disabled={loading !== null}
+                      className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-gray-800 transition-colors text-left border-b border-gray-800 last:border-0 disabled:opacity-50"
+                    >
+                      <div className="mt-0.5 flex-shrink-0">
+                        <FileJson size={16} className={CATEGORY_STYLES[fs.meta.category]?.color || 'text-gray-400'} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-white">{fs.meta.name}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-400">{fs.meta.category}</span>
+                          {loading === fs.filename && (
+                            <span className="text-xs text-teal-400 animate-pulse">Loading...</span>
+                          )}
+                        </div>
+                        {fs.meta.description && <p className="text-xs text-gray-400 mt-0.5">{fs.meta.description}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {/* Built-in programmatic scenarios */}
+              <div className="px-3 py-1.5 border-b border-gray-700">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Demo Scenarios</span>
+              </div>
               {SCENARIOS.map(option => (
                 <button
                   key={option.id}

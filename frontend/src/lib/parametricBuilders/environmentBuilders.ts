@@ -185,57 +185,146 @@ export function palletRackBuilder(params: Record<string, any>): BuilderResult {
   const depth = (params.depth ?? 1100) / 1000;
   const totalH = (params.height ?? 5000) / 1000;
   const levels = params.levels ?? 4;
+  const bays = params.bays ?? 1; // single-bay or double-bay
 
   const group = new THREE.Group();
-  const uprightMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, metalness: 0.7, roughness: 0.3 });
-  const beamMat = new THREE.MeshStandardMaterial({ color: 0xf97316, metalness: 0.6, roughness: 0.3 });
-  const deckMat = new THREE.MeshStandardMaterial({ color: 0xc4a882, metalness: 0.1, roughness: 0.8 });
+
+  // Premium industrial colors
+  const uprightColor = params.uprightColor || '#1d4ed8'; // industrial blue
+  const beamColor = params.beamColor || '#ea580c';       // safety orange
+  const safetyYellow = '#eab308';
+
+  const uprightMat = new THREE.MeshStandardMaterial({ color: uprightColor, metalness: 0.75, roughness: 0.25 });
+  const beamMat = new THREE.MeshStandardMaterial({ color: beamColor, metalness: 0.65, roughness: 0.28 });
+  const deckMat = new THREE.MeshStandardMaterial({ color: '#b8955a', metalness: 0.05, roughness: 0.85 });
+  const braceMat = new THREE.MeshStandardMaterial({ color: uprightColor, metalness: 0.7, roughness: 0.3 });
+  const footMat = new THREE.MeshStandardMaterial({ color: '#404040', metalness: 0.8, roughness: 0.2 });
+  const safetyMat = new THREE.MeshStandardMaterial({ color: safetyYellow, metalness: 0.5, roughness: 0.4 });
+  const palletMat = new THREE.MeshStandardMaterial({ color: '#a87b4f', metalness: 0.05, roughness: 0.9 });
 
   const uprightW = 0.08;
-  const beamH = 0.1;
+  const uprightD = 0.06;
+  const beamH = 0.12;
+  const beamD = 0.05;
+  const totalBayWidth = bayW * bays;
 
-  // 4 uprights (corners)
-  for (const x of [-bayW / 2, bayW / 2]) {
-    for (const z of [-depth / 2, depth / 2]) {
-      addMesh(group, new THREE.BoxGeometry(uprightW, totalH, uprightW), uprightMat, [x, totalH / 2, z]);
-      // Foot plate
-      addMesh(group, new THREE.BoxGeometry(0.15, 0.02, 0.15), uprightMat, [x, 0.01, z]);
+  // Build for each bay
+  for (let bay = 0; bay < bays; bay++) {
+    const bayOffset = (bay - (bays - 1) / 2) * bayW;
+
+    // ─── Uprights (C-channel profile) ───
+    const uprightXs = [-bayW / 2 + bayOffset, bayW / 2 + bayOffset];
+    // Only add the left upright for bay > 0 (shared with previous bay)
+    const startIdx = bay > 0 ? 1 : 0;
+    for (let i = startIdx; i < uprightXs.length; i++) {
+      const x = uprightXs[i];
+      for (const z of [-depth / 2, depth / 2]) {
+        // Main upright column
+        addMesh(group, new THREE.BoxGeometry(uprightW, totalH, uprightD), uprightMat, [x, totalH / 2, z]);
+
+        // Punched holes pattern (visual detail — small indentations)
+        const holeSpacing = 0.05; // 50mm pitch
+        for (let hy = holeSpacing; hy < totalH; hy += holeSpacing) {
+          if (hy % (holeSpacing * 4) < holeSpacing * 0.5) {
+            // Every 4th position gets a slightly wider notch (visual only)
+            addMesh(group, new THREE.BoxGeometry(uprightW + 0.002, 0.008, uprightD + 0.002),
+              braceMat, [x, hy, z]);
+          }
+        }
+
+        // Heavy-duty foot plate with bolt holes
+        addMesh(group, new THREE.BoxGeometry(0.18, 0.015, 0.18), footMat, [x, 0.0075, z]);
+        // Anchor bolts (4 per foot)
+        for (const [bx, bz] of [[-0.055, -0.055], [0.055, -0.055], [-0.055, 0.055], [0.055, 0.055]]) {
+          addMesh(group, new THREE.CylinderGeometry(0.008, 0.008, 0.02, 6), footMat, [x + bx, 0.025, z + bz]);
+        }
+      }
+    }
+
+    // ─── Beams per level (box beam profile with step notch) ───
+    const levelH = totalH / levels;
+    for (let lvl = 1; lvl <= levels; lvl++) {
+      const y = lvl * levelH;
+      for (const z of [-depth / 2, depth / 2]) {
+        // Main beam
+        addMesh(group, new THREE.BoxGeometry(bayW - uprightW, beamH, beamD), beamMat,
+          [bayOffset, y - beamH / 2, z]);
+        // Step beam (lower lip for pallet support)
+        addMesh(group, new THREE.BoxGeometry(bayW - uprightW - 0.04, 0.015, beamD + 0.02), beamMat,
+          [bayOffset, y - beamH + 0.008, z]);
+        // Beam connector clips at each end
+        for (const side of [-1, 1]) {
+          addMesh(group, new THREE.BoxGeometry(0.03, beamH + 0.02, beamD + 0.015), beamMat,
+            [bayOffset + side * (bayW / 2 - uprightW / 2 - 0.01), y - beamH / 2, z]);
+        }
+      }
+    }
+
+    // ─── Wire decking per level ───
+    for (let lvl = 1; lvl <= levels; lvl++) {
+      const y = lvl * levelH;
+      const deckW = bayW - uprightW * 2 - 0.03;
+      const deckD = depth - uprightD * 2 - 0.02;
+
+      // Wire deck frame
+      addMesh(group, new THREE.BoxGeometry(deckW, 0.005, deckD), deckMat, [bayOffset, y - 0.003, 0]);
+
+      // Wire channels (cross wires)
+      const numWires = Math.floor(deckW / 0.05);
+      for (let w = 0; w < numWires; w++) {
+        const wx = bayOffset - deckW / 2 + (w + 0.5) * (deckW / numWires);
+        addMesh(group, new THREE.BoxGeometry(0.003, 0.02, deckD - 0.02), deckMat, [wx, y + 0.008, 0]);
+      }
+
+      // Support channels (length-wise)
+      for (let c = 0; c < 3; c++) {
+        const cz = -deckD / 2 + (c + 0.5) * (deckD / 3);
+        addMesh(group, new THREE.BoxGeometry(deckW, 0.025, 0.008), deckMat, [bayOffset, y + 0.01, cz]);
+      }
+    }
+
+    // ─── Diagonal bracing on sides (X-pattern) ───
+    for (const x of uprightXs.slice(startIdx)) {
+      for (let lvl = 0; lvl < levels; lvl++) {
+        const y1 = lvl * levelH + (lvl === 0 ? 0.04 : 0);
+        const y2 = (lvl + 1) * levelH - beamH;
+        const midY = (y1 + y2) / 2;
+        const segH = y2 - y1;
+        const diagD = depth - uprightD * 2;
+        const braceLen = Math.sqrt(segH * segH + diagD * diagD);
+        const braceAngle = Math.atan2(segH, diagD);
+
+        // X-brace pattern
+        addMesh(group, new THREE.BoxGeometry(0.022, braceLen, 0.01), braceMat,
+          [x, midY, 0], [braceAngle, 0, 0]);
+        addMesh(group, new THREE.BoxGeometry(0.022, braceLen, 0.01), braceMat,
+          [x, midY, 0], [-braceAngle, 0, 0]);
+      }
+    }
+
+    // ─── Optional pallets inside rack (visual) ───
+    if (params.showPallets !== false) {
+      for (let lvl = 1; lvl <= levels; lvl++) {
+        const y = lvl * levelH;
+        // Pallet on each level (EUR 1200x800)
+        const palW = Math.min(1.2, bayW - 0.2);
+        const palD = Math.min(0.8, depth - 0.15);
+        addMesh(group, new THREE.BoxGeometry(palW, 0.14, palD), palletMat,
+          [bayOffset, y + 0.07 + 0.025, 0]);
+      }
     }
   }
 
-  // Beams and decking per level
-  const levelH = totalH / levels;
-  for (let lvl = 1; lvl <= levels; lvl++) {
-    const y = lvl * levelH;
-    // Front and back beams
-    for (const z of [-depth / 2, depth / 2]) {
-      addMesh(group, new THREE.BoxGeometry(bayW - uprightW, beamH, 0.04), beamMat, [0, y - beamH / 2, z]);
-    }
-    // Decking (3 boards)
-    const deckW = bayW - uprightW * 2 - 0.02;
-    const boardDepth = (depth - 0.06) / 3;
-    for (let b = 0; b < 3; b++) {
-      const dz = -depth / 2 + 0.03 + boardDepth / 2 + b * (boardDepth + 0.01);
-      addMesh(group, new THREE.BoxGeometry(deckW, 0.018, boardDepth), deckMat, [0, y, dz]);
-    }
+  // ─── Safety end protectors (yellow) ───
+  for (const x of [-totalBayWidth / 2 - 0.05, totalBayWidth / 2 + 0.05]) {
+    addMesh(group, new THREE.BoxGeometry(0.08, 0.4, depth + 0.1), safetyMat, [x, 0.2, 0]);
   }
 
-  // Diagonal bracing on sides
-  for (const x of [-bayW / 2, bayW / 2]) {
-    for (let lvl = 0; lvl < levels; lvl++) {
-      const y1 = lvl * levelH;
-      const y2 = (lvl + 1) * levelH;
-      const midY = (y1 + y2) / 2;
-      const braceLen = Math.sqrt(Math.pow(levelH, 2) + Math.pow(depth - uprightW, 2));
-      const braceAngle = Math.atan2(levelH, depth - uprightW);
-      addMesh(group, new THREE.BoxGeometry(0.03, braceLen, 0.015), uprightMat,
-        [x, midY, 0], [0, 0, braceAngle * (lvl % 2 === 0 ? 1 : -1)]);
-    }
-  }
-
+  // ─── Ports for alignment ───
   const ports = [
-    { id: 'left', type: 'output' as const, localPosition: [-bayW / 2 - 0.005, totalH / 2, 0] as [number, number, number], direction: [-1, 0, 0] as [number, number, number] },
-    { id: 'right', type: 'input' as const, localPosition: [bayW / 2 + 0.005, totalH / 2, 0] as [number, number, number], direction: [1, 0, 0] as [number, number, number] },
+    { id: 'left', type: 'output' as const, localPosition: [-totalBayWidth / 2 - 0.005, totalH / 2, 0] as [number, number, number], direction: [-1, 0, 0] as [number, number, number] },
+    { id: 'right', type: 'input' as const, localPosition: [totalBayWidth / 2 + 0.005, totalH / 2, 0] as [number, number, number], direction: [1, 0, 0] as [number, number, number] },
+    { id: 'floor', type: 'input' as const, localPosition: [0, 0, 0] as [number, number, number], direction: [0, -1, 0] as [number, number, number] },
   ];
   return { group, ports, bounds: new THREE.Box3().setFromObject(group), pathLength: 0 };
 }
