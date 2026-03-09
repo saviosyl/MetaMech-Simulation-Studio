@@ -73,6 +73,44 @@ export interface ProcessEdge {
   parameters: Record<string, any>;
 }
 
+/** Custom imported 3D model */
+export interface CustomModel {
+  id: string;
+  name: string;
+  /** Data URL or blob URL of the GLB file */
+  glbUrl: string;
+  /** Original filename */
+  sourceFile: string;
+  /** File size in bytes */
+  fileSize: number;
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+  parameters: Record<string, any>;
+  /** Optional category tag */
+  category?: string;
+}
+
+/** Path for actor movement */
+export interface ActorPath {
+  id: string;
+  name: string;
+  /** Ordered list of waypoints in world space */
+  points: [number, number, number][];
+  /** Whether the path loops back to start */
+  loop: boolean;
+  /** Whether to show direction arrows */
+  showArrows: boolean;
+  /** Color for visualization */
+  color: string;
+}
+
+/** Clipboard entry for copy/paste */
+interface ClipboardEntry {
+  type: 'process' | 'environment' | 'actor' | 'custom-model';
+  data: any;
+}
+
 export interface ConnectionPort {
   id: string;
   type: 'input' | 'output';
@@ -420,6 +458,8 @@ interface EditorState {
   edges: ProcessEdge[];
   underlay: Underlay | null;
   customProducts: CustomProduct[];
+  customModels: CustomModel[];
+  paths: ActorPath[];
   
   // Scene settings
   sceneSettings: SceneSettings;
@@ -538,6 +578,28 @@ interface EditorState {
   reset: () => void;
   setSimulationSpeed: (speed: number) => void;
   
+  // Custom model import
+  addCustomModel: (model: Omit<CustomModel, 'id'>) => void;
+  removeCustomModel: (id: string) => void;
+  updateCustomModel: (id: string, updates: Partial<CustomModel>) => void;
+
+  // Path management
+  addPath: (path?: Partial<ActorPath>) => string;
+  updatePath: (id: string, updates: Partial<ActorPath>) => void;
+  removePath: (id: string) => void;
+  addPathPoint: (pathId: string, point: [number, number, number]) => void;
+  removePathPoint: (pathId: string, index: number) => void;
+
+  // Clipboard (copy/paste)
+  clipboard: ClipboardEntry | null;
+  copySelected: () => void;
+  pasteClipboard: () => void;
+
+  // Camera view mode
+  cameraMode: 'perspective' | 'orthographic';
+  setCameraMode: (mode: 'perspective' | 'orthographic') => void;
+  setCameraView: (view: 'top' | 'front' | 'right' | 'left' | 'back' | 'bottom' | 'perspective') => void;
+
   // Scene management
   clearScene: () => void;
   loadScene: (data: any) => void;
@@ -570,6 +632,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   edges: [],
   underlay: null,
   customProducts: [],
+  customModels: [],
+  paths: [],
+  clipboard: null,
+  cameraMode: 'perspective' as const,
   
   sceneSettings: defaultSceneSettings,
   
@@ -780,6 +846,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         base.processNodes = state.processNodes.filter(node => node.id !== id);
       } else if (type === 'environment') {
         base.environmentAssets = state.environmentAssets.filter(asset => asset.id !== id);
+        // Also check custom models
+        base.customModels = state.customModels.filter(m => m.id !== id);
       } else if (type === 'actor') {
         base.actors = state.actors.filter(actor => actor.id !== id);
       }
@@ -932,6 +1000,130 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ simulationSpeed: speed });
   },
   
+  // ─── Custom Model Import ─────────────────────────
+  addCustomModel: (model) => {
+    const newModel: CustomModel = { ...model, id: uuidv4() };
+    set(state => ({
+      customModels: [...state.customModels, newModel],
+      selectedObjectId: newModel.id,
+      selectedObjectType: 'environment' as const,
+    }));
+  },
+  removeCustomModel: (id) => {
+    set(state => ({
+      customModels: state.customModels.filter(m => m.id !== id),
+      selectedObjectId: state.selectedObjectId === id ? null : state.selectedObjectId,
+      selectedObjectType: state.selectedObjectId === id ? null : state.selectedObjectType,
+    }));
+  },
+  updateCustomModel: (id, updates) => {
+    set(state => ({
+      customModels: state.customModels.map(m => m.id === id ? { ...m, ...updates } : m),
+    }));
+  },
+
+  // ─── Path Management ────────────────────────────
+  addPath: (partial) => {
+    const id = uuidv4();
+    const path: ActorPath = {
+      id,
+      name: partial?.name || `Path_${Date.now()}`,
+      points: partial?.points || [],
+      loop: partial?.loop ?? false,
+      showArrows: partial?.showArrows ?? true,
+      color: partial?.color || '#06b6d4',
+    };
+    set(state => ({ paths: [...state.paths, path] }));
+    return id;
+  },
+  updatePath: (id, updates) => {
+    set(state => ({ paths: state.paths.map(p => p.id === id ? { ...p, ...updates } : p) }));
+  },
+  removePath: (id) => {
+    set(state => ({ paths: state.paths.filter(p => p.id !== id) }));
+  },
+  addPathPoint: (pathId, point) => {
+    set(state => ({
+      paths: state.paths.map(p => p.id === pathId ? { ...p, points: [...p.points, point] } : p),
+    }));
+  },
+  removePathPoint: (pathId, index) => {
+    set(state => ({
+      paths: state.paths.map(p => p.id === pathId ? { ...p, points: p.points.filter((_, i) => i !== index) } : p),
+    }));
+  },
+
+  // ─── Clipboard (Copy/Paste) ─────────────────────
+  copySelected: () => {
+    const state = get();
+    if (!state.selectedObjectId || !state.selectedObjectType) return;
+    let data: any = null;
+    let type = state.selectedObjectType;
+
+    // Find the selected object
+    if (type === 'process') data = state.processNodes.find(n => n.id === state.selectedObjectId);
+    else if (type === 'environment') data = state.environmentAssets.find(a => a.id === state.selectedObjectId);
+    else if (type === 'actor') data = state.actors.find(a => a.id === state.selectedObjectId);
+
+    // Also check custom models
+    if (!data) {
+      const cm = state.customModels.find(m => m.id === state.selectedObjectId);
+      if (cm) { data = cm; type = 'environment' as any; }
+    }
+
+    if (data) {
+      set({ clipboard: { type: type as any, data: JSON.parse(JSON.stringify(data)) } });
+    }
+  },
+  pasteClipboard: () => {
+    const state = get();
+    if (!state.clipboard) return;
+    const { type, data } = state.clipboard;
+    const clone = JSON.parse(JSON.stringify(data));
+    clone.id = uuidv4();
+    clone.name = (clone.name || 'Object') + ' (copy)';
+    // Offset position slightly so it's visible
+    clone.position = [
+      (clone.position?.[0] || 0) + 0.5,
+      clone.position?.[1] || 0,
+      (clone.position?.[2] || 0) + 0.5,
+    ];
+
+    if (type === 'process') {
+      set(s => ({ processNodes: [...s.processNodes, clone], selectedObjectId: clone.id, selectedObjectType: 'process' }));
+    } else if (type === 'environment') {
+      // Check if it's a custom model
+      if (clone.glbUrl) {
+        set(s => ({ customModels: [...s.customModels, clone], selectedObjectId: clone.id, selectedObjectType: 'environment' }));
+      } else {
+        set(s => ({ environmentAssets: [...s.environmentAssets, clone], selectedObjectId: clone.id, selectedObjectType: 'environment' }));
+      }
+    } else if (type === 'actor') {
+      set(s => ({ actors: [...s.actors, clone], selectedObjectId: clone.id, selectedObjectType: 'actor' }));
+    }
+  },
+
+  // ─── Camera View ────────────────────────────────
+  setCameraMode: (mode) => set({ cameraMode: mode }),
+  setCameraView: (view) => {
+    const dist = 25;
+    const viewMap: Record<string, { pos: [number, number, number]; target: [number, number, number]; mode: 'perspective' | 'orthographic' }> = {
+      top:         { pos: [0, dist, 0.01], target: [0, 0, 0], mode: 'orthographic' },
+      front:       { pos: [0, 2, dist], target: [0, 2, 0], mode: 'orthographic' },
+      right:       { pos: [dist, 2, 0], target: [0, 2, 0], mode: 'orthographic' },
+      left:        { pos: [-dist, 2, 0], target: [0, 2, 0], mode: 'orthographic' },
+      back:        { pos: [0, 2, -dist], target: [0, 2, 0], mode: 'orthographic' },
+      bottom:      { pos: [0, -dist, 0.01], target: [0, 0, 0], mode: 'orthographic' },
+      perspective: { pos: [15, 15, 15], target: [0, 0, 0], mode: 'perspective' },
+    };
+    const v = viewMap[view] || viewMap.perspective;
+    set({
+      cameraTargetPosition: v.pos,
+      cameraTargetLookAt: v.target,
+      cameraMode: v.mode,
+    });
+  },
+
   clearScene: () => {
     set({
       processNodes: [],
@@ -939,6 +1131,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       actors: [],
       edges: [],
       underlay: null,
+      customModels: [],
+      paths: [],
       selectedObjectId: null,
       selectedObjectType: null,
       isPlaying: false,
@@ -954,6 +1148,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       underlay: data.underlay || null,
       sceneSettings: { ...defaultSceneSettings, ...(data.sceneSettings || {}) },
       customProducts: data.customProducts || [],
+      customModels: data.customModels || [],
+      paths: data.paths || [],
       selectedObjectId: null,
       selectedObjectType: null,
       isPlaying: false,
@@ -970,6 +1166,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       underlay: state.underlay,
       sceneSettings: state.sceneSettings,
       customProducts: state.customProducts,
+      customModels: state.customModels,
+      paths: state.paths,
     };
   },
 }));
@@ -1026,11 +1224,11 @@ function getDefaultParameters(type: string): Record<string, any> {
     'custom-pallet': { length: 1000, width: 1000, height: 150, deckStyle: 'standard', maxLayers: 5, rows: 3, columns: 3, productSpacing: 10, layerPattern: 'aligned', maxPalletHeight: 1800 },
 
     // Actors
-    operator: { walkSpeed: 1.5, color: '#4f46e5' },
-    engineer: { walkSpeed: 1.2, color: '#059669' },
-    forklift: { speed: 3.0, liftHeight: 4, capacity: 2000 },
-    agv: { speed: 2.0, capacity: 500, batteryLevel: 100 },
-    'pallet-truck': { speed: 1.5 },
+    operator: { walkSpeed: 1.5, color: '#4f46e5', pathId: '', animationState: 'idle', loopPath: true },
+    engineer: { walkSpeed: 1.2, color: '#059669', pathId: '', animationState: 'idle', loopPath: true },
+    forklift: { speed: 3.0, liftHeight: 4, capacity: 2000, pathId: '', loopPath: true, forkHeight: 0 },
+    agv: { speed: 2.0, capacity: 500, batteryLevel: 100, pathId: '', loopPath: true },
+    'pallet-truck': { speed: 1.5, pathId: '', loopPath: true },
   };
   
   return defaults[type] || {};

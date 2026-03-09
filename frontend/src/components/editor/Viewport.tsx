@@ -9,6 +9,8 @@ import {
   Text,
   GizmoHelper,
   GizmoViewport,
+  OrthographicCamera,
+  PerspectiveCamera,
 } from '@react-three/drei';
 // EffectComposer removed — ToneMapping+SMAA can cause blank screens on some devices
 import * as THREE from 'three';
@@ -49,6 +51,8 @@ import ConnectionLines from '../3d/ConnectionLine';
 import SimulationOverlay from '../3d/SimulationOverlay';
 import MeasurementTool from '../editor/MeasurementTool';
 import CameraControls from '../3d/CameraControls';
+import CustomModelRenderer from '../3d/CustomModelRenderer';
+import PathRenderer from '../3d/PathRenderer';
 import ViewportToolbar from '../editor/ViewportToolbar';
 
 // Wrapper that attaches TransformControls to the selected object
@@ -267,19 +271,34 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
 
   return (
     <>
-      {/* Lighting */}
-      <ambientLight intensity={0.4} />
+      {/* Enhanced Lighting — premium industrial look */}
+      <ambientLight intensity={0.35} color="#e8edf5" />
+      {/* Key light — warm industrial */}
       <directionalLight
-        position={[10, 10, 5]}
-        intensity={1}
+        position={[12, 15, 8]}
+        intensity={1.2}
+        color="#fff5e6"
         castShadow
-        shadow-mapSize-width={isMobileSafari ? 1024 : 2048}
-        shadow-mapSize-height={isMobileSafari ? 1024 : 2048}
-        shadow-camera-far={50}
-        shadow-camera-left={-20}
-        shadow-camera-right={20}
-        shadow-camera-top={20}
-        shadow-camera-bottom={-20}
+        shadow-mapSize-width={isMobileSafari ? 1024 : 4096}
+        shadow-mapSize-height={isMobileSafari ? 1024 : 4096}
+        shadow-camera-far={60}
+        shadow-camera-left={-25}
+        shadow-camera-right={25}
+        shadow-camera-top={25}
+        shadow-camera-bottom={-25}
+        shadow-bias={-0.001}
+      />
+      {/* Fill light — cool blue from opposite side */}
+      <directionalLight
+        position={[-8, 8, -5]}
+        intensity={0.3}
+        color="#c8d8f0"
+      />
+      {/* Rim light — subtle backlight for depth */}
+      <directionalLight
+        position={[0, 3, -10]}
+        intensity={0.15}
+        color="#f0f0ff"
       />
 
       {/* Environment */}
@@ -315,15 +334,16 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
         <axesHelper args={[sceneSettings.axes.size]} />
       )}
 
-      {/* Contact Shadows */}
-      {/* ContactShadows — disabled on mobile Safari for performance */}
+      {/* Contact Shadows — premium ground contact effect */}
       {!isMobileSafari && (
         <ContactShadows 
           position={[0, -0.01, 0]} 
-          opacity={0.5} 
-          scale={50} 
-          blur={2.5} 
-          far={10} 
+          opacity={0.6} 
+          scale={60} 
+          blur={2.0} 
+          far={12} 
+          resolution={isMobileSafari ? 256 : 512}
+          color="#1a1a2e"
         />
       )}
 
@@ -422,6 +442,12 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
 
       {/* Connection Lines between connected objects (hidden in clean view) */}
       {!overlaysHidden && <ConnectionLines />}
+
+      {/* Custom Imported Models */}
+      <CustomModelRenderer orbitRef={orbitRef} />
+
+      {/* Actor Paths */}
+      <PathRenderer />
 
       {/* Simulation Overlay */}
       <SimulationOverlay />

@@ -830,10 +830,12 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Operator 1',
     category: 'actors',
     icon: Package,
-    description: 'Human operator — model 1',
+    description: 'Human operator — model 1. Assign a path for walking animation.',
     parameters: {
       walkSpeed: { type: 'number', label: 'Walk Speed (m/min)', default: 90, min: 30, max: 180, step: 5 },
       skillLevel: { type: 'select', label: 'Skill Level', default: 'medium', options: ['low', 'medium', 'high', 'expert'] },
+      pathId: { type: 'string', label: 'Assigned Path ID', default: '' },
+      loopPath: { type: 'boolean', label: 'Loop Path', default: true },
     },
   },
   {
@@ -841,10 +843,12 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Operator 2',
     category: 'actors',
     icon: Package,
-    description: 'Human operator — model 2',
+    description: 'Human operator — model 2. Assign a path for walking animation.',
     parameters: {
       walkSpeed: { type: 'number', label: 'Walk Speed (m/min)', default: 90, min: 30, max: 180, step: 5 },
       skillLevel: { type: 'select', label: 'Skill Level', default: 'medium', options: ['low', 'medium', 'high', 'expert'] },
+      pathId: { type: 'string', label: 'Assigned Path ID', default: '' },
+      loopPath: { type: 'boolean', label: 'Loop Path', default: true },
     },
   },
   {
@@ -852,10 +856,12 @@ export const moduleLibrary: ModuleDefinition[] = [
     name: 'Operator 3',
     category: 'actors',
     icon: Package,
-    description: 'Human operator — model 3',
+    description: 'Human operator — model 3. Assign a path for walking animation.',
     parameters: {
       walkSpeed: { type: 'number', label: 'Walk Speed (m/min)', default: 90, min: 30, max: 180, step: 5 },
       skillLevel: { type: 'select', label: 'Skill Level', default: 'medium', options: ['low', 'medium', 'high', 'expert'] },
+      pathId: { type: 'string', label: 'Assigned Path ID', default: '' },
+      loopPath: { type: 'boolean', label: 'Loop Path', default: true },
     },
   },
 
@@ -898,6 +904,8 @@ export const moduleLibrary: ModuleDefinition[] = [
         max: 100,
         step: 1,
       },
+      pathId: { type: 'string', label: 'Assigned Path ID', default: '' },
+      loopPath: { type: 'boolean', label: 'Loop Path', default: true },
     },
   },
 

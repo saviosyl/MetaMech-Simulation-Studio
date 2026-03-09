@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
+import ImportModelDialog from './ImportModelDialog';
+import CameraViewToolbar from './CameraViewToolbar';
 
 type ToolType = 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure';
 
@@ -20,6 +22,7 @@ const tools: ToolButton[] = [
 ];
 
 const ViewportToolbar: React.FC = () => {
+  const [showImport, setShowImport] = useState(false);
   const activeTool = useEditorStore(s => s.activeTool);
   const setActiveTool = useEditorStore(s => s.setActiveTool);
   const gridSnap = useEditorStore(s => s.gridSnap);
@@ -27,9 +30,9 @@ const ViewportToolbar: React.FC = () => {
   const selectedObjectId = useEditorStore(s => s.selectedObjectId);
   const edges = useEditorStore(s => s.edges);
   const removeEdge = useEditorStore(s => s.removeEdge);
-  const hiddenIds = useEditorStore(s => s.hiddenIds);
-  const toggleVisibility = useEditorStore(s => s.toggleVisibility);
-  const processNodes = useEditorStore(s => s.processNodes);
+  const clipboard = useEditorStore(s => s.clipboard);
+  const copySelected = useEditorStore(s => s.copySelected);
+  const pasteClipboard = useEditorStore(s => s.pasteClipboard);
   const overlaysHidden = useEditorStore(s => s.overlaysHidden);
   const setOverlaysHidden = useEditorStore(s => s.setOverlaysHidden);
 
@@ -131,7 +134,38 @@ const ViewportToolbar: React.FC = () => {
 
       {divider}
 
-      {/* Clean view: hide all overlays (sources, sinks, mates, connections) */}
+      {/* Copy / Paste */}
+      <button
+        title="Copy (Ctrl+C)"
+        onClick={copySelected}
+        style={{ ...btnStyle(false), fontSize: 14, opacity: selectedObjectId ? 1 : 0.4 }}
+        disabled={!selectedObjectId}
+      >
+        📋
+      </button>
+      <button
+        title="Paste (Ctrl+V)"
+        onClick={pasteClipboard}
+        style={{ ...btnStyle(false), fontSize: 14, opacity: clipboard ? 1 : 0.4 }}
+        disabled={!clipboard}
+      >
+        📄
+      </button>
+
+      {divider}
+
+      {/* Import 3D Model */}
+      <button
+        title="Import 3D Model (.GLB)"
+        onClick={() => setShowImport(true)}
+        style={{ ...btnStyle(false), fontSize: 15 }}
+      >
+        📦
+      </button>
+
+      {divider}
+
+      {/* Clean view */}
       <button
         title={overlaysHidden ? 'Show All (Sources, Sinks, Connections)' : 'Hide All (Clean View — models only)'}
         onClick={toggleCleanView}
@@ -139,6 +173,14 @@ const ViewportToolbar: React.FC = () => {
       >
         {overlaysHidden ? '👁‍🗨' : '👁'}
       </button>
+
+      {/* Camera Views */}
+      <div style={{ marginLeft: 4 }}>
+        <CameraViewToolbar />
+      </div>
+
+      {/* Import dialog */}
+      <ImportModelDialog isOpen={showImport} onClose={() => setShowImport(false)} />
     </div>
   );
 };

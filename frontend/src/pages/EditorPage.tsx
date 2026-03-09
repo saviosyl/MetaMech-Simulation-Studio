@@ -113,6 +113,18 @@ const EditorPage: React.FC = () => {
         return;
       }
 
+      // Copy/Paste
+      if ((event.metaKey || event.ctrlKey) && event.key === 'c') {
+        event.preventDefault();
+        useEditorStore.getState().copySelected();
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key === 'v') {
+        event.preventDefault();
+        useEditorStore.getState().pasteClipboard();
+        return;
+      }
+
       switch (event.key.toLowerCase()) {
         case 'w': setTransformMode('translate'); break;
         case 'e': setTransformMode('rotate'); break;
@@ -121,6 +133,13 @@ const EditorPage: React.FC = () => {
         case 'm': setMeasureActive(!measureActive); break;
         case 'f': requestFocus(); break;
         case '?': setShowShortcuts(!showShortcuts); break;
+        // Numpad camera views
+        case '7': useEditorStore.getState().setCameraView('top'); break;
+        case '1': useEditorStore.getState().setCameraView('front'); break;
+        case '3': useEditorStore.getState().setCameraView('right'); break;
+        case '5': useEditorStore.getState().setCameraView(
+          useEditorStore.getState().cameraMode === 'orthographic' ? 'perspective' : 'top'
+        ); break;
         case 'escape':
           if (presentationMode) { setPresentationMode(false); break; }
           setSelectedObject(null, null); setContextMenu(null); setShowShortcuts(false); break;

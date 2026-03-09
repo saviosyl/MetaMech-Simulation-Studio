@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { useEditorStore } from '../../store/editorStore';
 
 const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }) => {
-  const { camera } = useThree();
+  const { camera, set: setThree, size } = useThree();
   const {
     cameraTargetPosition,
     cameraTargetLookAt,
@@ -13,7 +13,36 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef
     processNodes,
     environmentAssets,
     actors,
+    cameraMode,
   } = useEditorStore();
+
+  // Switch between perspective and orthographic camera
+  const orthoRef = useRef<THREE.OrthographicCamera | null>(null);
+  const perspRef = useRef<THREE.PerspectiveCamera | null>(null);
+
+  useEffect(() => {
+    if (cameraMode === 'orthographic') {
+      if (!orthoRef.current) {
+        const aspect = size.width / size.height;
+        const frustum = 15;
+        orthoRef.current = new THREE.OrthographicCamera(
+          -frustum * aspect, frustum * aspect, frustum, -frustum, 0.1, 200
+        );
+      }
+      // Copy current camera position/rotation to ortho cam
+      orthoRef.current.position.copy(camera.position);
+      orthoRef.current.rotation.copy(camera.rotation);
+      orthoRef.current.zoom = 1;
+      orthoRef.current.updateProjectionMatrix();
+      setThree({ camera: orthoRef.current });
+    } else {
+      if (camera instanceof THREE.OrthographicCamera && perspRef.current) {
+        setThree({ camera: perspRef.current });
+      } else if (!(camera instanceof THREE.OrthographicCamera)) {
+        perspRef.current = camera as THREE.PerspectiveCamera;
+      }
+    }
+  }, [cameraMode]);
 
   const animating = useRef(false);
   const targetPos = useRef(new THREE.Vector3());

@@ -3,6 +3,7 @@ import { Search, ChevronLeft, ChevronRight, List, GripVertical, LayoutGrid, Layo
 import { useEditorStore } from '../../store/editorStore';
 import { getModulesByCategory, ModuleDefinition } from '../../lib/moduleLibrary';
 import SceneHierarchy from './SceneHierarchy';
+import PathPanel from './PathPanel';
 
 type ViewLayout = 'compact' | 'grid';
 
@@ -218,6 +219,13 @@ const LeftPanel: React.FC = () => {
                 <div style={{ textAlign: 'center', padding: '32px 0' }}>
                   <Search size={20} style={{ color: 'var(--mm-text-disabled)', margin: '0 auto 8px', display: 'block' }} />
                   <div style={{ fontSize: 12, color: 'var(--mm-text-tertiary)' }}>No assets found</div>
+                </div>
+              )}
+
+              {/* Path Panel — shown under Actors tab */}
+              {activeLibraryTab === 'actors' && (
+                <div style={{ padding: '12px 14px', borderTop: '1px solid var(--mm-border-subtle)' }}>
+                  <PathPanel />
                 </div>
               )}
             </div>
