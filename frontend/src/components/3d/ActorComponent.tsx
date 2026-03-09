@@ -93,8 +93,10 @@ const ActorComponent: React.FC<ActorComponentProps> = ({ actor, isSelected, onCl
         // Set world position directly (no DraggableObject wrapper during animation)
         groupRef.current.position.set(result.position[0], result.position[1], result.position[2]);
 
-        // Rotation: add PI so models face forward along path direction
-        groupRef.current.rotation.set(0, result.rotationY + Math.PI, 0);
+        // Rotation: operators need PI + PI/2 (270°), vehicles need PI (180°)
+        const isOperator = actor.type.startsWith('operator') || actor.type === 'engineer';
+        const rotOffset = isOperator ? Math.PI + Math.PI / 2 : Math.PI;
+        groupRef.current.rotation.set(0, result.rotationY + rotOffset, 0);
 
         // Walking bob for operators
         if (result.state === 'walking') {
