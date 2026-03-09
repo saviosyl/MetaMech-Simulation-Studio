@@ -39,6 +39,8 @@ export function buildBeltConveyor(params: Record<string, any>): BuilderResult {
   const sideGuides = params.sideGuides ?? true;
   const driveEnd = params.driveEnd ?? 'right';
   const supportSpacing = ((params.supportSpacing ?? 1500) / 1000);
+  const showLegs = params.showLegs !== false;  // default true
+  const adjustableFeet = params.adjustableFeetEnabled !== false; // default true
 
   const group = new THREE.Group();
 
@@ -149,27 +151,34 @@ export function buildBeltConveyor(params: Record<string, any>): BuilderResult {
 
   group.add(convGroup);
 
-  // --- Support legs ---
-  const numLegs = Math.max(2, Math.ceil(l / supportSpacing) + 1);
-  const legSpacing = l / (numLegs - 1);
+  // --- Support legs (only when showLegs is true) ---
+  if (showLegs) {
+    const numLegs = Math.max(2, Math.ceil(l / supportSpacing) + 1);
+    const legSpacing = l / (numLegs - 1);
 
-  for (let i = 0; i < numLegs; i++) {
-    const x = -halfL + i * legSpacing;
-    const legH = h - frameChannelH - 0.02;
+    for (let i = 0; i < numLegs; i++) {
+      const x = -halfL + i * legSpacing;
+      const legH = h - frameChannelH - 0.02;
 
-    for (const side of [-1, 1]) {
-      const z = side * (w / 2 + frameChannelW / 2);
-      // Vertical post
-      addMesh(group, new THREE.BoxGeometry(0.05, legH, 0.05), legMat(),
-        [x, legH / 2, z]);
-      // Floor pad
-      addMesh(group, new THREE.BoxGeometry(0.1, 0.015, 0.1), legMat(),
-        [x, 0.0075, z]);
+      for (const side of [-1, 1]) {
+        const z = side * (w / 2 + frameChannelW / 2);
+        // Vertical post
+        addMesh(group, new THREE.BoxGeometry(0.05, legH, 0.05), legMat(),
+          [x, legH / 2, z]);
+        // Floor pad / adjustable feet
+        if (adjustableFeet) {
+          // Adjustable foot: threaded bolt + base plate
+          addMesh(group, new THREE.BoxGeometry(0.12, 0.01, 0.12), legMat(),
+            [x, 0.005, z]); // base plate
+          addMesh(group, new THREE.BoxGeometry(0.03, 0.03, 0.03), legMat(),
+            [x, 0.025, z]); // threaded nut
+        }
+      }
+
+      // Cross brace between legs
+      addMesh(group, new THREE.BoxGeometry(0.03, 0.03, w + frameChannelW * 2), legMat(),
+        [x, legH * 0.3, 0]);
     }
-
-    // Cross brace between legs
-    addMesh(group, new THREE.BoxGeometry(0.03, 0.03, w + frameChannelW * 2), legMat(),
-      [x, legH * 0.3, 0]);
   }
 
   // Compute bounds

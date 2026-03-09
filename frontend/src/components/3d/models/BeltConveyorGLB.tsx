@@ -17,11 +17,12 @@ interface Props {
 const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
   const groupRef = useRef<THREE.Group>(null);
 
-  // Build the conveyor from parameters
+  // Build the conveyor from parameters — use JSON key to detect nested changes
+  const paramKey = JSON.stringify(parameters);
   const built = useMemo(() => {
     const conveyorParams = editorParamsToConveyorParams(parameters);
     return buildConveyor(conveyorParams);
-  }, [parameters]);
+  }, [paramKey]);
 
   // Selection highlight
   useEffect(() => {

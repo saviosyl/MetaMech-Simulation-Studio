@@ -23,6 +23,8 @@ export function buildTransferBridge(params: Record<string, any>): BuilderResult 
   const w = (params.width ?? 600) / 1000;
   const l = (params.length ?? 1000) / 1000;
   const h = (params.height ?? 800) / 1000;
+  const showLegs = params.showLegs !== false;
+  const adjustableFeet = params.adjustableFeetEnabled !== false;
   const group = new THREE.Group();
   const halfL = l / 2;
 
@@ -36,16 +38,19 @@ export function buildTransferBridge(params: Record<string, any>): BuilderResult 
   }
 
   // Legs (4 corners)
-  for (const sx of [-1, 1]) {
-    for (const sz of [-1, 1]) {
-      addMesh(group, new THREE.BoxGeometry(0.05, h, 0.05), legMat(), [sx * (halfL - 0.05), h / 2, sz * (w / 2 - 0.03)]);
-      addMesh(group, new THREE.BoxGeometry(0.1, 0.015, 0.1), legMat(), [sx * (halfL - 0.05), 0.0075, sz * (w / 2 - 0.03)]);
+  if (showLegs) {
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        addMesh(group, new THREE.BoxGeometry(0.05, h, 0.05), legMat(), [sx * (halfL - 0.05), h / 2, sz * (w / 2 - 0.03)]);
+        if (adjustableFeet) {
+          addMesh(group, new THREE.BoxGeometry(0.12, 0.01, 0.12), legMat(), [sx * (halfL - 0.05), 0.005, sz * (w / 2 - 0.03)]);
+        }
+      }
     }
+    // Cross braces
+    addMesh(group, new THREE.BoxGeometry(0.03, 0.03, w), legMat(), [-halfL + 0.05, h * 0.3, 0]);
+    addMesh(group, new THREE.BoxGeometry(0.03, 0.03, w), legMat(), [halfL - 0.05, h * 0.3, 0]);
   }
-
-  // Cross braces
-  addMesh(group, new THREE.BoxGeometry(0.03, 0.03, w), legMat(), [-halfL + 0.05, h * 0.3, 0]);
-  addMesh(group, new THREE.BoxGeometry(0.03, 0.03, w), legMat(), [halfL - 0.05, h * 0.3, 0]);
 
   const ports: ConnectionPort[] = [
     { id: 'input', type: 'input', localPosition: [-halfL, h, 0] },

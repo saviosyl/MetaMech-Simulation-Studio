@@ -29,6 +29,8 @@ export function buildRollerConveyor(params: Record<string, any>): BuilderResult 
   const rollerType = params.rollerType ?? 'driven';
   const driveType = params.driveType ?? 'chain-driven';
   const sideRails = params.sideRails ?? true;
+  const showLegs = params.showLegs !== false;
+  const adjustableFeet = params.adjustableFeetEnabled !== false;
   // For gravity type, slight decline
   const driven = rollerType === 'driven';
 
@@ -120,18 +122,23 @@ export function buildRollerConveyor(params: Record<string, any>): BuilderResult 
   group.add(convGroup);
 
   // --- Support legs ---
-  const numLegs = Math.max(2, Math.ceil(l / 1.5) + 1);
-  const legSpacing = l / (numLegs - 1);
-  const legH = h - frameH;
+  if (showLegs) {
+    const numLegs = Math.max(2, Math.ceil(l / 1.5) + 1);
+    const legSpacing = l / (numLegs - 1);
+    const legH = h - frameH;
 
-  for (let i = 0; i < numLegs; i++) {
-    const x = -halfL + i * legSpacing;
-    for (const side of [-1, 1]) {
-      const z = side * (w / 2 + frameW / 2);
-      addMesh(group, new THREE.BoxGeometry(0.05, legH, 0.05), legMat(), [x, legH / 2, z]);
-      addMesh(group, new THREE.BoxGeometry(0.1, 0.015, 0.1), legMat(), [x, 0.0075, z]);
+    for (let i = 0; i < numLegs; i++) {
+      const x = -halfL + i * legSpacing;
+      for (const side of [-1, 1]) {
+        const z = side * (w / 2 + frameW / 2);
+        addMesh(group, new THREE.BoxGeometry(0.05, legH, 0.05), legMat(), [x, legH / 2, z]);
+        if (adjustableFeet) {
+          addMesh(group, new THREE.BoxGeometry(0.12, 0.01, 0.12), legMat(), [x, 0.005, z]);
+          addMesh(group, new THREE.BoxGeometry(0.03, 0.03, 0.03), legMat(), [x, 0.025, z]);
+        }
+      }
+      addMesh(group, new THREE.BoxGeometry(0.03, 0.03, w + frameW * 2), legMat(), [x, legH * 0.3, 0]);
     }
-    addMesh(group, new THREE.BoxGeometry(0.03, 0.03, w + frameW * 2), legMat(), [x, legH * 0.3, 0]);
   }
 
   const bounds = new THREE.Box3().setFromObject(group);

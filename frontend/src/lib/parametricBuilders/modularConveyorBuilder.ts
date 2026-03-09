@@ -27,6 +27,8 @@ export function buildModularConveyorStraight(params: Record<string, any>): Build
   const sideGuides = params.sideGuides ?? true;
   const drivePosition = params.drivePosition ?? 'end';
   const beltType = params.beltType ?? 'flat-top';
+  const showLegs = params.showLegs !== false;
+  const adjustableFeet = params.adjustableFeetEnabled !== false;
 
   const group = new THREE.Group();
   const halfL = l / 2;
@@ -107,17 +109,22 @@ export function buildModularConveyorStraight(params: Record<string, any>): Build
   }
 
   // --- Support legs ---
-  const numLegs = Math.max(2, Math.ceil(l / 1.5) + 1);
-  const legSpacing = l / (numLegs - 1);
-  const legH = h - frameH;
-  for (let i = 0; i < numLegs; i++) {
-    const x = -halfL + i * legSpacing;
-    for (const side of [-1, 1]) {
-      const z = side * (w / 2 + frameW / 2);
-      addMesh(group, new THREE.BoxGeometry(0.05, legH, 0.05), legMat(), [x, legH / 2, z]);
-      addMesh(group, new THREE.BoxGeometry(0.1, 0.015, 0.1), legMat(), [x, 0.0075, z]);
+  if (showLegs) {
+    const numLegs = Math.max(2, Math.ceil(l / 1.5) + 1);
+    const legSpacing = l / (numLegs - 1);
+    const legH = h - frameH;
+    for (let i = 0; i < numLegs; i++) {
+      const x = -halfL + i * legSpacing;
+      for (const side of [-1, 1]) {
+        const z = side * (w / 2 + frameW / 2);
+        addMesh(group, new THREE.BoxGeometry(0.05, legH, 0.05), legMat(), [x, legH / 2, z]);
+        if (adjustableFeet) {
+          addMesh(group, new THREE.BoxGeometry(0.12, 0.01, 0.12), legMat(), [x, 0.005, z]);
+          addMesh(group, new THREE.BoxGeometry(0.03, 0.03, 0.03), legMat(), [x, 0.025, z]);
+        }
+      }
+      addMesh(group, new THREE.BoxGeometry(0.03, 0.03, w + frameW * 2), legMat(), [x, legH * 0.3, 0]);
     }
-    addMesh(group, new THREE.BoxGeometry(0.03, 0.03, w + frameW * 2), legMat(), [x, legH * 0.3, 0]);
   }
 
   // --- Cross supports under belt ---
@@ -145,6 +152,8 @@ export function buildModularConveyorCurve(params: Record<string, any>): BuilderR
   const sideGuides = params.sideGuides ?? true;
   const drivePosition = params.drivePosition ?? 'end';
   const beltType = params.beltType ?? 'flat-top';
+  const showLegs = params.showLegs !== false;
+  const adjustableFeet = params.adjustableFeetEnabled !== false;
 
   const curveAngleRad = curveAngle * Math.PI / 180;
   const group = new THREE.Group();
@@ -237,20 +246,25 @@ export function buildModularConveyorCurve(params: Record<string, any>): BuilderR
     [0, -motorAngle, 0]);
 
   // Support legs at start, middle, end of curve
-  const legAngles = [0, curveAngleRad / 2, curveAngleRad];
-  const legH = h - frameH;
-  for (const a of legAngles) {
-    for (const r of [innerR - frameW / 2, outerR + frameW / 2]) {
-      const lx = r * Math.cos(a);
-      const lz = r * Math.sin(a);
-      addMesh(group, new THREE.BoxGeometry(0.05, legH, 0.05), lMat, [lx, legH / 2, lz]);
-      addMesh(group, new THREE.BoxGeometry(0.1, 0.015, 0.1), lMat, [lx, 0.0075, lz]);
+  if (showLegs) {
+    const legAngles = [0, curveAngleRad / 2, curveAngleRad];
+    const legH = h - frameH;
+    for (const a of legAngles) {
+      for (const r of [innerR - frameW / 2, outerR + frameW / 2]) {
+        const lx = r * Math.cos(a);
+        const lz = r * Math.sin(a);
+        addMesh(group, new THREE.BoxGeometry(0.05, legH, 0.05), lMat, [lx, legH / 2, lz]);
+        if (adjustableFeet) {
+          addMesh(group, new THREE.BoxGeometry(0.12, 0.01, 0.12), lMat, [lx, 0.005, lz]);
+          addMesh(group, new THREE.BoxGeometry(0.03, 0.03, 0.03), lMat, [lx, 0.025, lz]);
+        }
+      }
+      // Cross brace
+      const bcx = curveRadius * Math.cos(a);
+      const bcz = curveRadius * Math.sin(a);
+      addMesh(group, new THREE.BoxGeometry(0.03, 0.03, w + frameW * 2), lMat,
+        [bcx, legH * 0.3, bcz], [0, -a, 0]);
     }
-    // Cross brace
-    const bcx = curveRadius * Math.cos(a);
-    const bcz = curveRadius * Math.sin(a);
-    addMesh(group, new THREE.BoxGeometry(0.03, 0.03, w + frameW * 2), lMat,
-      [bcx, legH * 0.3, bcz], [0, -a, 0]);
   }
 
   const bounds = new THREE.Box3().setFromObject(group);
