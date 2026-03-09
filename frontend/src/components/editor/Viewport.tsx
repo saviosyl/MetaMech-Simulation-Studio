@@ -245,7 +245,21 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
     addMeasurePoint,
     overlaysHidden,
     themeMode,
+    activeTool,
   } = useEditorStore();
+
+  // Disable orbit rotation when a manipulation tool is active (move/rotate/scale/mate/snap-move)
+  // User must be in 'select' mode to orbit the camera, or use right-click/middle-click
+  useEffect(() => {
+    if (!orbitRef.current) return;
+    const toolsBlockingRotate = ['move', 'rotate', 'scale', 'mate', 'snap-move'];
+    if (toolsBlockingRotate.includes(activeTool)) {
+      // Disable left-click orbit, but allow right-click pan and scroll zoom
+      orbitRef.current.enableRotate = false;
+    } else {
+      orbitRef.current.enableRotate = true;
+    }
+  }, [activeTool, orbitRef]);
 
   const handleObjectClick = useCallback((objectId: string, objectType: 'process' | 'environment' | 'actor') => {
     setSelectedObject(objectId, objectType);
@@ -253,6 +267,11 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
 
   const handlePointerMissed = useCallback(() => {
     setSelectedObject(null, null);
+    // When clicking empty space, reset to select tool so camera orbit re-enables
+    const { activeTool, setActiveTool } = useEditorStore.getState();
+    if (activeTool !== 'select' && activeTool !== 'measure') {
+      setActiveTool('select');
+    }
   }, [setSelectedObject]);
 
   return (
