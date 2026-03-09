@@ -199,9 +199,9 @@ const ACTOR_MODELS: Record<string, ActorModelDef> = {
   'operator-2': { url: '/models/operator-2.glb', targetSize: 1.75, animated: false, modelRotY: Math.PI + Math.PI / 2 },
   'operator-3': { url: '/models/operator-3.glb', targetSize: 1.75, animated: false, modelRotY: Math.PI + Math.PI / 2 },
   'engineer':   { url: '/models/operator-1.glb', targetSize: 1.75, animated: false, modelRotY: Math.PI + Math.PI / 2 },
-  'forklift':   { url: '/models/forklift.glb', targetSize: 3, animated: false, modelRotY: 0 },
-  'agv':        { url: '/models/agv.glb', targetSize: 1.5, animated: false, modelRotY: 0 },
-  'pallet-truck': { url: '/models/forklift.glb', targetSize: 2.5, animated: false, modelRotY: 0 },
+  'forklift':   { url: '/models/forklift.glb', targetSize: 3, animated: false, modelRotY: Math.PI },
+  'agv':        { url: '/models/agv.glb', targetSize: 1.5, animated: false, modelRotY: Math.PI },
+  'pallet-truck': { url: '/models/forklift.glb', targetSize: 2.5, animated: false, modelRotY: Math.PI },
 };
 
 const ActorComponent: React.FC<ActorComponentProps> = ({ actor, isSelected, onClick }) => {
