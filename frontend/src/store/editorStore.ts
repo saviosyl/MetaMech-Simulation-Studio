@@ -1106,15 +1106,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // ─── Camera View ────────────────────────────────
   setCameraMode: (mode) => set({ cameraMode: mode }),
   setCameraView: (view) => {
-    const dist = 25;
+    const dist = 30;
+    // All views look at scene center with correct orientation
+    // Top: camera above, looking down — X goes right, Z goes down on screen
+    // Front: camera in front (positive Z), looking at center — X goes right, Y goes up
+    // Right: camera on right (positive X), looking at center — Z goes left, Y goes up
     const viewMap: Record<string, { pos: [number, number, number]; target: [number, number, number]; mode: 'perspective' | 'orthographic' }> = {
-      top:         { pos: [0, dist, 0.01], target: [0, 0, 0], mode: 'orthographic' },
-      front:       { pos: [0, 2, dist], target: [0, 2, 0], mode: 'orthographic' },
-      right:       { pos: [dist, 2, 0], target: [0, 2, 0], mode: 'orthographic' },
-      left:        { pos: [-dist, 2, 0], target: [0, 2, 0], mode: 'orthographic' },
-      back:        { pos: [0, 2, -dist], target: [0, 2, 0], mode: 'orthographic' },
-      bottom:      { pos: [0, -dist, 0.01], target: [0, 0, 0], mode: 'orthographic' },
-      perspective: { pos: [15, 15, 15], target: [0, 0, 0], mode: 'perspective' },
+      top:         { pos: [0, dist, 0.001], target: [0, 0, 0], mode: 'orthographic' },
+      front:       { pos: [0, 3, dist], target: [0, 3, 0], mode: 'orthographic' },
+      right:       { pos: [dist, 3, 0], target: [0, 3, 0], mode: 'orthographic' },
+      left:        { pos: [-dist, 3, 0], target: [0, 3, 0], mode: 'orthographic' },
+      back:        { pos: [0, 3, -dist], target: [0, 3, 0], mode: 'orthographic' },
+      bottom:      { pos: [0, dist, 0.001], target: [0, 0, 0], mode: 'orthographic' }, // same as top for safety (polar clamp)
+      perspective: { pos: [15, 12, 15], target: [0, 0, 0], mode: 'perspective' },
     };
     const v = viewMap[view] || viewMap.perspective;
     set({

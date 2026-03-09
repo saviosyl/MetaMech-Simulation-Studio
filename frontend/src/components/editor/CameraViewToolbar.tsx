@@ -1,19 +1,20 @@
 /**
  * CameraViewToolbar — Quick orthographic view switcher
  * Top / Front / Right / Left / Back / Perspective
+ * Theme-aware — uses CSS variables
  */
 import React, { useState } from 'react';
 import { Eye, ChevronDown } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 
 const VIEWS = [
-  { id: 'top', label: 'Top', key: '7' },
-  { id: 'front', label: 'Front', key: '1' },
-  { id: 'right', label: 'Right', key: '3' },
-  { id: 'left', label: 'Left', key: '' },
-  { id: 'back', label: 'Back', key: '' },
-  { id: 'bottom', label: 'Bottom', key: '' },
-  { id: 'perspective', label: 'Perspective', key: '5' },
+  { id: 'top', label: 'Top View', desc: 'XZ plane', key: '7' },
+  { id: 'front', label: 'Front View', desc: 'XY plane', key: '1' },
+  { id: 'right', label: 'Right View', desc: 'YZ plane', key: '3' },
+  { id: 'left', label: 'Left View', desc: 'YZ plane', key: '' },
+  { id: 'back', label: 'Back View', desc: 'XY plane', key: '' },
+  { id: 'bottom', label: 'Bottom View', desc: 'XZ plane', key: '' },
+  { id: 'perspective', label: '3D Perspective', desc: 'Free orbit', key: '5' },
 ] as const;
 
 const CameraViewToolbar: React.FC = () => {
@@ -21,35 +22,67 @@ const CameraViewToolbar: React.FC = () => {
   const { setCameraView, cameraMode } = useEditorStore();
 
   return (
-    <div className="relative">
+    <div style={{ position: 'relative' }}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-300 hover:text-white bg-gray-800/90 hover:bg-gray-700 rounded-md border border-gray-600/50 transition-colors backdrop-blur-sm"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          padding: '5px 10px', fontSize: 11, fontWeight: 600,
+          color: 'var(--mm-text-secondary)', background: 'var(--mm-bg-surface)',
+          border: '1px solid var(--mm-border)', borderRadius: 8, cursor: 'pointer',
+          fontFamily: "'Orbitron', monospace", letterSpacing: '0.03em',
+          transition: 'all 0.15s',
+        }}
         title="Camera Views"
       >
-        <Eye size={13} />
-        <span className="hidden sm:inline">{cameraMode === 'orthographic' ? 'Ortho' : '3D'}</span>
-        <ChevronDown size={10} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        <Eye size={13} style={{ color: 'var(--mm-accent-primary)' }} />
+        <span>{cameraMode === 'orthographic' ? 'ORTHO' : '3D'}</span>
+        <ChevronDown size={10} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
 
       {open && (
         <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute top-full right-0 mt-1 w-36 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-40 overflow-hidden">
-            <div className="px-3 py-1.5 border-b border-gray-700">
-              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Camera View</span>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 30 }} onClick={() => setOpen(false)} />
+          <div style={{
+            position: 'absolute', top: '100%', right: 0, marginTop: 4, width: 180,
+            background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)',
+            borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.4)', zIndex: 40,
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              padding: '8px 12px', borderBottom: '1px solid var(--mm-border-subtle)',
+              fontSize: 9, fontWeight: 700, color: 'var(--mm-text-tertiary)',
+              fontFamily: "'Orbitron', monospace", letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}>
+              Camera View
             </div>
             {VIEWS.map(v => (
               <button
                 key={v.id}
-                onClick={() => {
-                  setCameraView(v.id);
-                  setOpen(false);
+                onClick={() => { setCameraView(v.id); setOpen(false); }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '8px 12px', border: 'none', cursor: 'pointer',
+                  background: 'transparent', color: 'var(--mm-text-primary)',
+                  fontSize: 12, textAlign: 'left', transition: 'background 0.1s',
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+                onMouseEnter={e => { (e.currentTarget).style.background = 'var(--mm-bg-surface)'; }}
+                onMouseLeave={e => { (e.currentTarget).style.background = 'transparent'; }}
               >
-                <span>{v.label}</span>
-                {v.key && <span className="text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">{v.key}</span>}
+                <div>
+                  <div style={{ fontWeight: 500 }}>{v.label}</div>
+                  <div style={{ fontSize: 9, color: 'var(--mm-text-tertiary)', marginTop: 1 }}>{v.desc}</div>
+                </div>
+                {v.key && (
+                  <span style={{
+                    fontSize: 9, padding: '2px 6px', borderRadius: 4,
+                    background: 'var(--mm-bg-input)', color: 'var(--mm-text-tertiary)',
+                    fontFamily: 'monospace',
+                  }}>
+                    {v.key}
+                  </span>
+                )}
               </button>
             ))}
           </div>

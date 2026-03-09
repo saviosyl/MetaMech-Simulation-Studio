@@ -9,8 +9,6 @@ import {
   Text,
   GizmoHelper,
   GizmoViewport,
-  OrthographicCamera,
-  PerspectiveCamera,
 } from '@react-three/drei';
 // EffectComposer removed — ToneMapping+SMAA can cause blank screens on some devices
 import * as THREE from 'three';
