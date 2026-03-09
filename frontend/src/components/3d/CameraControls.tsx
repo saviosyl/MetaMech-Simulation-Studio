@@ -9,8 +9,7 @@ const _right = new THREE.Vector3();
 const _up = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
 const _offset = new THREE.Vector3();
-const _quat = new THREE.Quaternion();
-const _euler = new THREE.Euler();
+const _yAxis = new THREE.Vector3(0, 1, 0);
 
 const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }) => {
   const { camera } = useThree();
@@ -28,8 +27,9 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef
   const targetPos = useRef(new THREE.Vector3());
   const targetLookAt = useRef(new THREE.Vector3());
   const lastFocusRequest = useRef(0);
+  const loggedOnce = useRef(false);
 
-  // Handle camera presets / view changes
+  // Handle camera presets
   useEffect(() => {
     if (cameraTargetPosition && cameraTargetLookAt) {
       targetPos.current.set(...cameraTargetPosition);
@@ -42,14 +42,12 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef
   useEffect(() => {
     if (focusRequest <= lastFocusRequest.current) return;
     lastFocusRequest.current = focusRequest;
-
     let obj: any = null;
     if (selectedObjectId) {
       obj = processNodes.find(n => n.id === selectedObjectId)
         || environmentAssets.find(a => a.id === selectedObjectId)
         || actors.find(a => a.id === selectedObjectId);
     }
-
     if (obj) {
       const pos = obj.position;
       targetLookAt.current.set(pos[0], pos[1], pos[2]);
@@ -61,11 +59,11 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef
     animating.current = true;
   }, [focusRequest]);
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     const controls = orbitRef.current;
-    const dt = Math.min(delta, 0.05); // cap delta
+    const dt = Math.min(delta, 0.05);
 
-    // ── Camera preset / focus animation ──
+    // ── Camera preset animation ──
     if (animating.current) {
       camera.position.lerp(targetPos.current, 0.1);
       if (controls) {
@@ -82,140 +80,86 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef
     const sm = spaceMouse.poll();
     if (!sm.connected) return;
 
-    const [tx, ty, tz] = sm.translate;
-    const [rx, ry, rz] = sm.rotate;
-    const hasInput = Math.abs(tx) + Math.abs(ty) + Math.abs(tz) + Math.abs(rx) + Math.abs(ry) + Math.abs(rz) > 0.001;
+    const [tx, ty, tz] = sm.translate;  // axes 0,1,2
+    const [rx, ry, rz] = sm.rotate;     // axes 3,4,5
 
-    // Button 1 toggles mode: object → camera → fly → object
-    // (Handled in the UI; here we just read the mode)
+    // Debug: log raw axes once to console so user can verify mapping
+    if (!loggedOnce.current) {
+      const hasAny = Math.abs(tx) + Math.abs(ty) + Math.abs(tz) + Math.abs(rx) + Math.abs(ry) + Math.abs(rz) > 0.05;
+      if (hasAny) {
+        console.log('[SpaceMouse] First input — translate:', [tx.toFixed(2), ty.toFixed(2), tz.toFixed(2)],
+          'rotate:', [rx.toFixed(2), ry.toFixed(2), rz.toFixed(2)]);
+        loggedOnce.current = true;
+      }
+    }
 
-    const mode = spaceMouse.config.mode;
-    const ts = spaceMouse.config.translateSpeed;
-    const rs = spaceMouse.config.rotateSpeed;
-    const zs = spaceMouse.config.zoomSpeed;
+    // 3Dconnexion SpaceMouse axis mapping:
+    //   translate: [X=left/right, Y=up/down, Z=push/pull(zoom)]
+    //   rotate:    [rX=pitch(tilt), rY=roll, rZ=yaw(twist left/right)]
+    //
+    // For orbit: rZ (yaw/twist) = horizontal orbit, rX (pitch/tilt) = vertical orbit
+    // This matches how you physically twist the SpaceMouse cap
 
-    if (!hasInput && mode !== 'fly') return;
+    const hasInput = Math.abs(tx) + Math.abs(ty) + Math.abs(tz) +
+                     Math.abs(rx) + Math.abs(ry) + Math.abs(rz) > 0.005;
+    if (!hasInput) return;
+    if (!controls) return;
 
-    // Get camera basis vectors
+    // Get camera-relative directions
     camera.getWorldDirection(_fwd);
     _right.crossVectors(_fwd, camera.up).normalize();
     _up.crossVectors(_right, _fwd).normalize();
 
-    if (mode === 'object' && controls) {
-      // ═══ OBJECT MODE ═══
-      // Rotate around orbit target (like rotating the world)
-      const speed = dt * 5;
+    // Distance to orbit target (for proportional speeds)
+    _offset.copy(camera.position).sub(controls.target);
+    const dist = _offset.length();
 
-      // Pan: move both camera and target together
+    // ── PAN: slide left/right (tx), up/down (ty) ──
+    if (Math.abs(tx) > 0.005 || Math.abs(ty) > 0.005) {
+      const panSpeed = dt * dist * 0.8;  // proportional to distance for natural feel
       _v.set(0, 0, 0);
-      _v.addScaledVector(_right, tx * speed * ts);
-      _v.addScaledVector(_up, ty * speed * ts);
+      _v.addScaledVector(_right, -tx * panSpeed);   // negative: push right = pan right
+      _v.addScaledVector(_up, ty * panSpeed);
       camera.position.add(_v);
       controls.target.add(_v);
+    }
 
-      // Zoom: move camera toward/away from target
+    // ── ZOOM: push/pull (tz) ──
+    if (Math.abs(tz) > 0.005) {
+      const zoomSpeed = dt * dist * 1.2;  // proportional zoom
+      const zoomAmount = tz * zoomSpeed;
+      // Move camera along the camera→target direction
       _offset.copy(camera.position).sub(controls.target);
-      const dist = _offset.length();
-      const zoomAmount = tz * dt * zs * dist * 0.5; // proportional to distance
-      _offset.normalize().multiplyScalar(Math.max(0.5, dist - zoomAmount));
+      const newDist = Math.max(0.3, _offset.length() + zoomAmount);
+      _offset.normalize().multiplyScalar(newDist);
       camera.position.copy(controls.target).add(_offset);
+    }
 
-      // Orbit: rotate camera around target
-      if (Math.abs(ry) > 0.01) {
-        _offset.copy(camera.position).sub(controls.target);
-        _offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), -ry * dt * rs * 3);
+    // ── ORBIT HORIZONTAL: twist/yaw (rZ) — twist left = orbit left ──
+    if (Math.abs(rz) > 0.005) {
+      _offset.copy(camera.position).sub(controls.target);
+      const yawAngle = rz * dt * 4.0;  // strong, direct response
+      _offset.applyAxisAngle(_yAxis, yawAngle);
+      camera.position.copy(controls.target).add(_offset);
+    }
+
+    // ── ORBIT VERTICAL: tilt/pitch (rX) — tilt forward = orbit down ──
+    if (Math.abs(rx) > 0.005) {
+      _offset.copy(camera.position).sub(controls.target);
+      const pitchAngle = rx * dt * 3.0;
+      _offset.applyAxisAngle(_right, pitchAngle);
+      // Prevent flipping past poles
+      const normalized = _offset.clone().normalize();
+      if (Math.abs(normalized.y) < 0.95) {
         camera.position.copy(controls.target).add(_offset);
       }
-      if (Math.abs(rx) > 0.01) {
-        _offset.copy(camera.position).sub(controls.target);
-        _offset.applyAxisAngle(_right, -rx * dt * rs * 2);
-        // Prevent flipping past poles
-        const newDir = _offset.clone().normalize();
-        if (Math.abs(newDir.y) < 0.98) {
-          camera.position.copy(controls.target).add(_offset);
-        }
-      }
-
-      camera.lookAt(controls.target);
-      controls.update();
-
-    } else if (mode === 'camera' && controls) {
-      // ═══ CAMERA MODE ═══
-      // Move the camera; orbit target follows
-      const speed = dt * 8;
-
-      // Strafe left/right + crane up/down
-      _v.set(0, 0, 0);
-      _v.addScaledVector(_right, tx * speed * ts);
-      _v.addScaledVector(_up, ty * speed * ts);
-
-      // Dolly forward/back
-      _v.addScaledVector(_fwd, -tz * speed * zs);
-
-      camera.position.add(_v);
-      controls.target.add(_v);
-
-      // Pitch + Yaw (rotate the view direction)
-      if (Math.abs(rx) > 0.01 || Math.abs(ry) > 0.01) {
-        _offset.copy(controls.target).sub(camera.position);
-        const lookDist = _offset.length();
-
-        // Yaw
-        if (Math.abs(ry) > 0.01) {
-          _offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), -ry * dt * rs * 3);
-        }
-        // Pitch
-        if (Math.abs(rx) > 0.01) {
-          _offset.applyAxisAngle(_right, -rx * dt * rs * 2);
-          const newDir = _offset.clone().normalize();
-          if (Math.abs(newDir.y) > 0.98) {
-            // Skip pitch near poles
-            _offset.applyAxisAngle(_right, rx * dt * rs * 2); // undo
-          }
-        }
-
-        controls.target.copy(camera.position).add(_offset.normalize().multiplyScalar(lookDist));
-      }
-
-      camera.lookAt(controls.target);
-      controls.update();
-
-    } else if (mode === 'fly') {
-      // ═══ FLY MODE ═══
-      // Smooth momentum-based flight
-      spaceMouse.updateFlyMomentum(sm, dt);
-      const vel = spaceMouse.flyVelocity;
-      const ang = spaceMouse.flyAngular;
-
-      const hasVel = Math.abs(vel[0]) + Math.abs(vel[1]) + Math.abs(vel[2]) + Math.abs(ang[0]) + Math.abs(ang[1]) > 0.0001;
-      if (!hasVel) return;
-
-      // Move camera
-      _v.set(0, 0, 0);
-      _v.addScaledVector(_right, vel[0]);
-      _v.addScaledVector(_up, vel[1]);
-      _v.addScaledVector(_fwd, -vel[2]);
-      camera.position.add(_v);
-
-      // Rotate view
-      if (Math.abs(ang[1]) > 0.0001) {
-        _euler.setFromQuaternion(camera.quaternion, 'YXZ');
-        _euler.y -= ang[1];
-        camera.quaternion.setFromEuler(_euler);
-      }
-      if (Math.abs(ang[0]) > 0.0001) {
-        _euler.setFromQuaternion(camera.quaternion, 'YXZ');
-        _euler.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, _euler.x - ang[0]));
-        camera.quaternion.setFromEuler(_euler);
-      }
-
-      // Update orbit target to stay in front of camera
-      if (controls) {
-        camera.getWorldDirection(_fwd);
-        controls.target.copy(camera.position).add(_fwd.multiplyScalar(10));
-        controls.update();
-      }
     }
+
+    // ── ROLL (rY) — optional, used for camera roll if needed ──
+    // Most 3D apps ignore roll for orbit, so we skip it
+
+    camera.lookAt(controls.target);
+    controls.update();
   });
 
   return null;
