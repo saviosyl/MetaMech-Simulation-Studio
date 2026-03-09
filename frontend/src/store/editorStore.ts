@@ -1236,9 +1236,9 @@ function getDefaultParameters(type: string): Record<string, any> {
     // Actors
     operator: { walkSpeed: 1.5, color: '#4f46e5', pathId: '', animationState: 'idle', loopPath: true },
     engineer: { walkSpeed: 1.2, color: '#059669', pathId: '', animationState: 'idle', loopPath: true },
-    forklift: { speed: 3.0, liftHeight: 4, capacity: 2000, pathId: '', loopPath: true, forkHeight: 0 },
-    agv: { speed: 2.0, capacity: 500, batteryLevel: 100, pathId: '', loopPath: true },
-    'pallet-truck': { speed: 1.5, pathId: '', loopPath: true },
+    forklift: { speed: 180, liftHeight: 4, capacity: 2000, pathId: '', loopPath: true, forkHeight: 0 },
+    agv: { speed: 150, capacity: 500, batteryLevel: 100, pathId: '', loopPath: true },
+    'pallet-truck': { speed: 120, pathId: '', loopPath: true },
   };
   
   return defaults[type] || {};

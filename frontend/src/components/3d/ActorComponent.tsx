@@ -76,17 +76,31 @@ const ActorComponent: React.FC<ActorComponentProps> = ({ actor, isSelected, onCl
     // If simulation is running and actor has a path, animate along it
     if (isPlaying && actor.parameters?.pathId) {
       const dt = Math.min(state.clock.getDelta(), 0.1) * simulationSpeed;
-      const results = actorPathAnimator.update(dt, paths, [actor]);
+      // Pass the actor with its type info so the animator can read speed params
+      const actorInfo = {
+        id: actor.id,
+        type: actor.type,
+        parameters: {
+          ...actor.parameters,
+          // Ensure speed is available for all vehicle types
+          walkSpeed: actor.parameters?.walkSpeed || 90,
+          speed: actor.parameters?.speed || 180,
+        },
+      };
+      const results = actorPathAnimator.update(dt, paths, [actorInfo]);
       const result = results.get(actor.id);
       if (result) {
+        // Set world position directly (no DraggableObject wrapper during animation)
         groupRef.current.position.set(result.position[0], result.position[1], result.position[2]);
-        groupRef.current.rotation.y = result.rotationY;
 
-        // Walking bob animation
+        // Rotation: add PI so models face forward along path direction
+        groupRef.current.rotation.set(0, result.rotationY + Math.PI, 0);
+
+        // Walking bob for operators
         if (result.state === 'walking') {
-          const bobPhase = state.clock.elapsedTime * 8; // walking cadence
           const isOperator = actor.type.startsWith('operator') || actor.type === 'engineer';
           if (isOperator) {
+            const bobPhase = state.clock.elapsedTime * 8;
             groupRef.current.position.y += Math.abs(Math.sin(bobPhase)) * 0.03;
           }
         }
@@ -94,11 +108,9 @@ const ActorComponent: React.FC<ActorComponentProps> = ({ actor, isSelected, onCl
       }
     }
 
-    // Default: selected bounce
+    // Default: selected bounce (only in editor mode, position comes from props)
     if (isSelected) {
       groupRef.current.position.y = actor.position[1] + Math.sin(state.clock.elapsedTime * 2) * 0.05;
-    } else {
-      groupRef.current.position.y = actor.position[1];
     }
   });
 

@@ -421,25 +421,40 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
           </DraggableObject>
         ))}
 
-        {/* Actors */}
-        {actors.filter(a => !hiddenIds.has(a.id)).map(actor => (
-          <DraggableObject
-            key={actor.id}
-            id={actor.id}
-            objectType="actor"
-            position={actor.position}
-            rotation={actor.rotation}
-            scale={actor.scale}
-            isSelected={selectedObjectId === actor.id}
-            orbitRef={orbitRef}
-          >
-            <ActorComponent
-              actor={{ ...actor, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] }}
+        {/* Actors — during simulation with path, render without DraggableObject so path anim controls position directly */}
+        {actors.filter(a => !hiddenIds.has(a.id)).map(actor => {
+          const hasPathAndPlaying = useEditorStore.getState().isPlaying && actor.parameters?.pathId;
+          if (hasPathAndPlaying) {
+            // Path animation mode: ActorComponent controls its own world position
+            return (
+              <ActorComponent
+                key={actor.id}
+                actor={actor}
+                isSelected={selectedObjectId === actor.id}
+                onClick={() => handleObjectClick(actor.id, 'actor')}
+              />
+            );
+          }
+          // Normal editor mode: wrapped in DraggableObject for transform gizmos
+          return (
+            <DraggableObject
+              key={actor.id}
+              id={actor.id}
+              objectType="actor"
+              position={actor.position}
+              rotation={actor.rotation}
+              scale={actor.scale}
               isSelected={selectedObjectId === actor.id}
-              onClick={() => handleObjectClick(actor.id, 'actor')}
-            />
-          </DraggableObject>
-        ))}
+              orbitRef={orbitRef}
+            >
+              <ActorComponent
+                actor={{ ...actor, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] }}
+                isSelected={selectedObjectId === actor.id}
+                onClick={() => handleObjectClick(actor.id, 'actor')}
+              />
+            </DraggableObject>
+          );
+        })}
       </group>
 
       {/* Snap System - shows connection ports (hidden in clean view) */}

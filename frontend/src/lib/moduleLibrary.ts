@@ -946,6 +946,8 @@ export const moduleLibrary: ModuleDefinition[] = [
         default: 'shortest',
         options: ['shortest', 'safest', 'efficient'],
       },
+      pathId: { type: 'string', label: 'Assigned Path ID', default: '' },
+      loopPath: { type: 'boolean', label: 'Loop Path', default: true },
     },
   },
   {
@@ -963,6 +965,8 @@ export const moduleLibrary: ModuleDefinition[] = [
         max: 180,
         step: 5,
       },
+      pathId: { type: 'string', label: 'Assigned Path ID', default: '' },
+      loopPath: { type: 'boolean', label: 'Loop Path', default: true },
     },
   },
 
