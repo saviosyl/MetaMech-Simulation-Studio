@@ -166,43 +166,105 @@ export const CasePackerModel: React.FC<ModelProps> = ({ params }) => {
 export const CheckweigherModel: React.FC<ModelProps> = ({ params }) => {
   const w = (params?.width || 800) / 1000;
   const h = (params?.height || 900) / 1000;
+  const beltH = h * 0.55;
+  const beltW = w * 0.85;
+  const frameD = 0.45;
 
   return (
     <group>
-      {/* Base frame */}
-      <mesh position={[0, h * 0.4, 0]} castShadow>
-        <boxGeometry args={[w, h * 0.3, 0.5]} />
-        <meshStandardMaterial {...matStainless} />
+      {/* ── Floor legs (4 adjustable feet) ── */}
+      {[[-w/2 + 0.06, -frameD/2 + 0.06], [-w/2 + 0.06, frameD/2 - 0.06],
+        [w/2 - 0.06, -frameD/2 + 0.06], [w/2 - 0.06, frameD/2 - 0.06]].map(([lx, lz], i) => (
+        <group key={`leg-${i}`}>
+          <mesh position={[lx, beltH * 0.35, lz]} castShadow>
+            <boxGeometry args={[0.04, beltH * 0.7, 0.04]} />
+            <meshStandardMaterial {...matStainless} />
+          </mesh>
+          <mesh position={[lx, 0.005, lz]}>
+            <cylinderGeometry args={[0.03, 0.035, 0.01, 12]} />
+            <meshStandardMaterial {...matDarkSteel} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* ── Main frame crossbars ── */}
+      {[0.12, beltH - 0.03].map((fy, fi) => (
+        <group key={`cross-${fi}`}>
+          <mesh position={[0, fy, -frameD/2 + 0.02]} castShadow>
+            <boxGeometry args={[w - 0.08, 0.025, 0.025]} />
+            <meshStandardMaterial {...matStainless} />
+          </mesh>
+          <mesh position={[0, fy, frameD/2 - 0.02]} castShadow>
+            <boxGeometry args={[w - 0.08, 0.025, 0.025]} />
+            <meshStandardMaterial {...matStainless} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* ── Load cell housing (precision weighing unit) ── */}
+      <mesh position={[0, beltH - 0.04, 0]} castShadow>
+        <boxGeometry args={[w * 0.5, 0.06, frameD * 0.6]} />
+        <meshStandardMaterial color="#2d2d2d" metalness={0.9} roughness={0.15} />
       </mesh>
-      {/* Weighing belt section */}
-      <mesh position={[0, h * 0.58, 0]} castShadow>
-        <boxGeometry args={[w * 0.8, 0.015, 0.4]} />
+
+      {/* ── Weighing belt (shorter than full width — isolated section) ── */}
+      <mesh position={[0, beltH, 0]} castShadow>
+        <boxGeometry args={[w * 0.45, 0.012, frameD * 0.7]} />
         <meshStandardMaterial {...matBelt} />
       </mesh>
-      {/* Load cell housing */}
-      <mesh position={[0, h * 0.5, 0]} castShadow>
-        <boxGeometry args={[w * 0.6, 0.08, 0.35]} />
-        <meshStandardMaterial {...matDarkSteel} />
-      </mesh>
-      {/* Display column */}
-      <mesh position={[w * 0.35, h * 0.75, 0.2]} castShadow>
-        <boxGeometry args={[0.04, h * 0.4, 0.04]} />
+      {/* Belt side rails */}
+      {[-1, 1].map((sz, i) => (
+        <mesh key={`wr-${i}`} position={[0, beltH + 0.015, sz * frameD * 0.38]} castShadow>
+          <boxGeometry args={[w * 0.45, 0.02, 0.008]} />
+          <meshStandardMaterial {...matStainless} />
+        </mesh>
+      ))}
+
+      {/* ── Infeed/outfeed conveyor sections ── */}
+      {[-1, 1].map((sx, i) => (
+        <group key={`conv-${i}`}>
+          <mesh position={[sx * (w * 0.37), beltH, 0]} castShadow>
+            <boxGeometry args={[w * 0.28, 0.015, frameD * 0.7]} />
+            <meshStandardMaterial {...matBelt} />
+          </mesh>
+          {/* Rollers (3 per side) */}
+          {[0, 0.08, -0.08].map((rOff, ri) => (
+            <mesh key={`roller-${ri}`} position={[sx * (w * 0.37) + rOff * sx, beltH + 0.01, 0]} rotation={[0, 0, Math.PI/2]}>
+              <cylinderGeometry args={[0.012, 0.012, frameD * 0.65, 8]} />
+              <meshStandardMaterial color="#b0b0b0" metalness={0.85} roughness={0.15} />
+            </mesh>
+          ))}
+          {/* Side guides */}
+          {[-1, 1].map((gz, gi) => (
+            <mesh key={`guide-${gi}`} position={[sx * (w * 0.37), beltH + 0.03, gz * frameD * 0.38]}>
+              <boxGeometry args={[w * 0.28, 0.04, 0.006]} />
+              <meshStandardMaterial {...matStainless} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+
+      {/* ── HMI display arm ── */}
+      <mesh position={[w * 0.38, beltH + 0.2, frameD * 0.3]} castShadow>
+        <boxGeometry args={[0.03, 0.4, 0.03]} />
         <meshStandardMaterial {...matFrame} />
       </mesh>
-      {/* Display head */}
-      <mesh position={[w * 0.35, h * 0.95, 0.2]} castShadow>
-        <boxGeometry args={[0.18, 0.12, 0.06]} />
+      {/* Display head (tilted) */}
+      <mesh position={[w * 0.38, beltH + 0.42, frameD * 0.32]} rotation={[-0.2, 0, 0]} castShadow>
+        <boxGeometry args={[0.2, 0.14, 0.04]} />
         <meshStandardMaterial {...matPanel} />
       </mesh>
-      <mesh position={[w * 0.35, h * 0.97, 0.233]}>
-        <boxGeometry args={[0.12, 0.06, 0.003]} />
-        <meshStandardMaterial color="#1a1a2e" emissive="#10b981" emissiveIntensity={0.4} />
+      {/* Screen */}
+      <mesh position={[w * 0.38, beltH + 0.43, frameD * 0.345]} rotation={[-0.2, 0, 0]}>
+        <boxGeometry args={[0.14, 0.08, 0.003]} />
+        <meshStandardMaterial color="#0a0a1a" emissive="#10b981" emissiveIntensity={0.3} />
       </mesh>
-      {/* Infeed/outfeed belts */}
-      {[-1, 1].map((sx, i) => (
-        <mesh key={i} position={[sx * (w / 2 + 0.15), h * 0.58, 0]} castShadow>
-          <boxGeometry args={[0.3, 0.015, 0.4]} />
-          <meshStandardMaterial {...matBelt} />
+
+      {/* ── Status indicator lights ── */}
+      {['#10b981', '#eab308', '#ef4444'].map((col, ci) => (
+        <mesh key={`light-${ci}`} position={[w * 0.38, beltH + 0.52 + ci * 0.035, frameD * 0.32]}>
+          <sphereGeometry args={[0.012, 8, 6]} />
+          <meshStandardMaterial color={col} emissive={col} emissiveIntensity={0.6} />
         </mesh>
       ))}
     </group>
@@ -258,35 +320,115 @@ export const MetalDetectorModel: React.FC<ModelProps> = ({ params }) => {
 export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
   const w = (params?.width || 600) / 1000;
   const h = (params?.height || 1200) / 1000;
+  const beltH = h * 0.48;
+  const frameD = 0.42;
 
   return (
     <group>
-      {/* Base/frame */}
-      <mesh position={[0, h * 0.35, 0]} castShadow>
-        <boxGeometry args={[w, h * 0.25, 0.4]} />
+      {/* ── Stainless steel frame with legs ── */}
+      {[[-w/2 + 0.04, -frameD/2 + 0.04], [-w/2 + 0.04, frameD/2 - 0.04],
+        [w/2 - 0.04, -frameD/2 + 0.04], [w/2 - 0.04, frameD/2 - 0.04]].map(([lx, lz], i) => (
+        <group key={`leg-${i}`}>
+          <mesh position={[lx, beltH * 0.45, lz]} castShadow>
+            <boxGeometry args={[0.035, beltH * 0.9, 0.035]} />
+            <meshStandardMaterial {...matStainless} />
+          </mesh>
+          <mesh position={[lx, 0.005, lz]}>
+            <cylinderGeometry args={[0.025, 0.03, 0.01, 12]} />
+            <meshStandardMaterial {...matDarkSteel} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Frame crossbars */}
+      <mesh position={[0, 0.08, 0]} castShadow>
+        <boxGeometry args={[w - 0.06, 0.02, frameD - 0.06]} />
         <meshStandardMaterial {...matStainless} />
       </mesh>
-      {/* Belt */}
-      <mesh position={[0, h * 0.5, 0]} castShadow>
-        <boxGeometry args={[w * 0.9, 0.015, 0.35]} />
+
+      {/* ── Conveyor belt section ── */}
+      <mesh position={[0, beltH, 0]} castShadow>
+        <boxGeometry args={[w * 0.9, 0.02, frameD * 0.75]} />
         <meshStandardMaterial {...matBelt} />
       </mesh>
-      {/* Labeler arm tower */}
-      <mesh position={[0, h * 0.75, -0.25]} castShadow>
-        <boxGeometry args={[0.12, h * 0.5, 0.12]} />
+      {/* Belt frame */}
+      <mesh position={[0, beltH - 0.02, 0]} castShadow>
+        <boxGeometry args={[w * 0.92, 0.03, frameD * 0.78]} />
+        <meshStandardMaterial {...matStainless} />
+      </mesh>
+      {/* Side guides */}
+      {[-1, 1].map((sz, i) => (
+        <mesh key={`sg-${i}`} position={[0, beltH + 0.03, sz * frameD * 0.42]}>
+          <boxGeometry args={[w * 0.9, 0.04, 0.006]} />
+          <meshStandardMaterial {...matStainless} />
+        </mesh>
+      ))}
+      {/* Drive rollers at ends */}
+      {[-1, 1].map((sx, i) => (
+        <mesh key={`dr-${i}`} position={[sx * w * 0.44, beltH, 0]} rotation={[0, 0, Math.PI/2]}>
+          <cylinderGeometry args={[0.018, 0.018, frameD * 0.7, 10]} />
+          <meshStandardMaterial color="#999" metalness={0.8} roughness={0.2} />
+        </mesh>
+      ))}
+
+      {/* ── Label applicator tower (rear-mounted) ── */}
+      <mesh position={[0, beltH + 0.3, -frameD * 0.4]} castShadow>
+        <boxGeometry args={[0.08, 0.6, 0.08]} />
         <meshStandardMaterial {...matFrame} />
       </mesh>
-      {/* Label applicator head */}
-      <mesh position={[0, h * 0.7, -0.1]} castShadow>
-        <boxGeometry args={[0.2, 0.15, 0.25]} />
+      {/* Horizontal arm */}
+      <mesh position={[0, beltH + 0.55, -frameD * 0.2]} castShadow>
+        <boxGeometry args={[0.06, 0.06, 0.35]} />
+        <meshStandardMaterial {...matFrame} />
+      </mesh>
+
+      {/* ── Print & apply head ── */}
+      <mesh position={[0, beltH + 0.35, -frameD * 0.08]} castShadow>
+        <boxGeometry args={[0.22, 0.18, 0.2]} />
         <meshStandardMaterial {...matDarkSteel} />
       </mesh>
-      {/* Label roll */}
-      <mesh position={[0, h * 0.9, -0.25]} castShadow rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.08, 0.08, 0.06, 16]} />
-        <meshStandardMaterial color="#f5f5f5" metalness={0.1} roughness={0.6} />
+      {/* Applicator pad (bottom) */}
+      <mesh position={[0, beltH + 0.25, -frameD * 0.08]}>
+        <boxGeometry args={[0.15, 0.02, 0.12]} />
+        <meshStandardMaterial color="#444" metalness={0.7} roughness={0.3} />
       </mesh>
-      <ControlPanel position={[w / 2 + 0.14, h * 0.65, 0]} height={0.25} />
+
+      {/* ── Label roll (large) ── */}
+      <mesh position={[0, beltH + 0.55, -frameD * 0.42]} castShadow rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.1, 0.1, 0.06, 20]} />
+        <meshStandardMaterial color="#f0f0f0" metalness={0.1} roughness={0.5} />
+      </mesh>
+      {/* Roll core */}
+      <mesh position={[0, beltH + 0.55, -frameD * 0.42]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.065, 12]} />
+        <meshStandardMaterial color="#888" metalness={0.6} roughness={0.3} />
+      </mesh>
+      {/* Take-up roll (smaller, below) */}
+      <mesh position={[0, beltH + 0.2, -frameD * 0.42]} castShadow rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.06, 16]} />
+        <meshStandardMaterial color="#e0e0e0" metalness={0.1} roughness={0.5} />
+      </mesh>
+
+      {/* ── Label path (thin ribbon from roll to head) ── */}
+      <mesh position={[0, beltH + 0.42, -frameD * 0.25]} rotation={[0.4, 0, 0]}>
+        <boxGeometry args={[0.05, 0.001, 0.2]} />
+        <meshStandardMaterial color="#f8f8f8" metalness={0} roughness={0.9} transparent opacity={0.8} />
+      </mesh>
+
+      {/* ── Control panel (side-mounted) ── */}
+      <ControlPanel position={[w / 2 + 0.12, beltH + 0.15, 0]} height={0.22} />
+
+      {/* ── Status tower light ── */}
+      <mesh position={[-w/2 + 0.04, beltH + 0.6, -frameD * 0.35]} castShadow>
+        <cylinderGeometry args={[0.015, 0.015, 0.08, 8]} />
+        <meshStandardMaterial {...matFrame} />
+      </mesh>
+      {['#10b981', '#eab308'].map((col, ci) => (
+        <mesh key={`tl-${ci}`} position={[-w/2 + 0.04, beltH + 0.65 + ci * 0.03, -frameD * 0.35]}>
+          <cylinderGeometry args={[0.012, 0.012, 0.025, 8]} />
+          <meshStandardMaterial color={col} emissive={col} emissiveIntensity={0.5} />
+        </mesh>
+      ))}
     </group>
   );
 };
@@ -340,37 +482,125 @@ export const SealingStationModel: React.FC<ModelProps> = ({ params }) => {
 export const RejectStationModel: React.FC<ModelProps> = ({ params }) => {
   const w = (params?.width || 600) / 1000;
   const h = (params?.height || 900) / 1000;
+  const beltH = h * 0.52;
+  const frameD = 0.42;
+  const rejectSide = params?.side === 'left' ? -1 : 1;
 
   return (
     <group>
-      {/* Main belt */}
-      <mesh position={[0, h * 0.5, 0]} castShadow>
-        <boxGeometry args={[w, 0.06, 0.4]} />
+      {/* ── Frame legs ── */}
+      {[[-w/2 + 0.04, -frameD/2 + 0.04], [-w/2 + 0.04, frameD/2 - 0.04],
+        [w/2 - 0.04, -frameD/2 + 0.04], [w/2 - 0.04, frameD/2 - 0.04]].map(([lx, lz], i) => (
+        <group key={`leg-${i}`}>
+          <mesh position={[lx, beltH * 0.45, lz]} castShadow>
+            <boxGeometry args={[0.035, beltH * 0.9, 0.035]} />
+            <meshStandardMaterial {...matStainless} />
+          </mesh>
+          <mesh position={[lx, 0.005, lz]}>
+            <cylinderGeometry args={[0.025, 0.03, 0.01, 12]} />
+            <meshStandardMaterial {...matDarkSteel} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* ── Main conveyor belt ── */}
+      <mesh position={[0, beltH - 0.02, 0]} castShadow>
+        <boxGeometry args={[w * 0.92, 0.04, frameD * 0.78]} />
         <meshStandardMaterial {...matStainless} />
       </mesh>
-      <mesh position={[0, h * 0.535, 0]} castShadow>
-        <boxGeometry args={[w * 0.9, 0.015, 0.35]} />
+      <mesh position={[0, beltH, 0]} castShadow>
+        <boxGeometry args={[w * 0.88, 0.015, frameD * 0.72]} />
         <meshStandardMaterial {...matBelt} />
       </mesh>
-      {/* Pusher arm */}
-      <mesh position={[0, h * 0.6, -0.25]} castShadow>
-        <boxGeometry args={[0.08, 0.08, 0.15]} />
-        <meshStandardMaterial {...matRed} />
-      </mesh>
-      {/* Pusher cylinder */}
-      <mesh position={[0, h * 0.6, -0.4]} castShadow rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.025, 0.025, 0.2, 8]} />
+      {/* Side guides (with opening on reject side) */}
+      <mesh position={[0, beltH + 0.03, -rejectSide * frameD * 0.42]}>
+        <boxGeometry args={[w * 0.88, 0.04, 0.006]} />
         <meshStandardMaterial {...matStainless} />
       </mesh>
-      {/* Reject bin */}
-      <mesh position={[0, h * 0.25, 0.4]} castShadow>
-        <boxGeometry args={[0.4, 0.5, 0.3]} />
-        <meshStandardMaterial color="#6b7280" metalness={0.4} roughness={0.5} />
+      {/* Partial guide on reject side (with gap) */}
+      {[-1, 1].map((sx, i) => (
+        <mesh key={`pg-${i}`} position={[sx * w * 0.35, beltH + 0.03, rejectSide * frameD * 0.42]}>
+          <boxGeometry args={[w * 0.18, 0.04, 0.006]} />
+          <meshStandardMaterial {...matStainless} />
+        </mesh>
+      ))}
+
+      {/* ── Pneumatic pusher assembly (opposite reject side) ── */}
+      <mesh position={[0, beltH + 0.06, -rejectSide * (frameD * 0.45 + 0.04)]} castShadow>
+        <boxGeometry args={[0.06, 0.06, 0.08]} />
+        <meshStandardMaterial color="#3b82f6" metalness={0.7} roughness={0.3} />
       </mesh>
-      {/* Warning light */}
-      <mesh position={[w / 2, h * 0.85, 0]}>
-        <cylinderGeometry args={[0.02, 0.02, 0.06, 8]} />
-        <meshStandardMaterial {...matRed} emissive="#ef4444" emissiveIntensity={0.5} />
+      {/* Cylinder body */}
+      <mesh position={[0, beltH + 0.06, -rejectSide * (frameD * 0.45 + 0.12)]} castShadow
+        rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.028, 0.028, 0.12, 10]} />
+        <meshStandardMaterial {...matStainless} />
+      </mesh>
+      {/* Cylinder rod */}
+      <mesh position={[0, beltH + 0.06, -rejectSide * (frameD * 0.3)]}
+        rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.01, 0.01, 0.15, 8]} />
+        <meshStandardMaterial color="#c0c0c0" metalness={0.9} roughness={0.1} />
+      </mesh>
+      {/* Push plate */}
+      <mesh position={[0, beltH + 0.06, -rejectSide * (frameD * 0.2)]} castShadow>
+        <boxGeometry args={[0.2, 0.1, 0.015]} />
+        <meshStandardMaterial color="#ef4444" metalness={0.4} roughness={0.4} />
+      </mesh>
+
+      {/* ── Reject chute (on reject side) ── */}
+      <mesh position={[0, beltH - 0.1, rejectSide * (frameD * 0.55)]} castShadow
+        rotation={[rejectSide * 0.3, 0, 0]}>
+        <boxGeometry args={[0.35, 0.01, 0.25]} />
+        <meshStandardMaterial {...matStainless} />
+      </mesh>
+      {/* Chute side walls */}
+      {[-1, 1].map((sx, i) => (
+        <mesh key={`cw-${i}`} position={[sx * 0.17, beltH - 0.06, rejectSide * (frameD * 0.55)]}
+          rotation={[rejectSide * 0.3, 0, 0]} castShadow>
+          <boxGeometry args={[0.01, 0.06, 0.25]} />
+          <meshStandardMaterial {...matStainless} />
+        </mesh>
+      ))}
+
+      {/* ── Reject bin (stainless) ── */}
+      <mesh position={[0, 0.2, rejectSide * (frameD * 0.5 + 0.2)]} castShadow>
+        <boxGeometry args={[0.4, 0.38, 0.3]} />
+        <meshStandardMaterial color="#7a7a7a" metalness={0.6} roughness={0.35} />
+      </mesh>
+      {/* Bin rim */}
+      <mesh position={[0, 0.39, rejectSide * (frameD * 0.5 + 0.2)]}>
+        <boxGeometry args={[0.42, 0.02, 0.32]} />
+        <meshStandardMaterial {...matStainless} />
+      </mesh>
+
+      {/* ── Sensor bar above belt (photoelectric) ── */}
+      <mesh position={[-w * 0.15, beltH + 0.15, -frameD * 0.42]} castShadow>
+        <boxGeometry args={[0.03, 0.03, 0.03]} />
+        <meshStandardMaterial {...matDarkSteel} />
+      </mesh>
+      <mesh position={[-w * 0.15, beltH + 0.15, frameD * 0.42]} castShadow>
+        <boxGeometry args={[0.03, 0.03, 0.03]} />
+        <meshStandardMaterial {...matDarkSteel} />
+      </mesh>
+      {/* Sensor beam (red) */}
+      <mesh position={[-w * 0.15, beltH + 0.15, 0]}>
+        <cylinderGeometry args={[0.003, 0.003, frameD * 0.8, 4]} />
+        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.8} transparent opacity={0.4} />
+      </mesh>
+
+      {/* ── Warning tower light ── */}
+      <mesh position={[w/2 - 0.04, beltH + 0.15, -frameD * 0.35]} castShadow>
+        <cylinderGeometry args={[0.015, 0.015, 0.12, 8]} />
+        <meshStandardMaterial {...matFrame} />
+      </mesh>
+      <mesh position={[w/2 - 0.04, beltH + 0.22, -frameD * 0.35]}>
+        <cylinderGeometry args={[0.018, 0.018, 0.03, 8]} />
+        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.6} />
+      </mesh>
+      <mesh position={[w/2 - 0.04, beltH + 0.25, -frameD * 0.35]}>
+        <cylinderGeometry args={[0.018, 0.018, 0.03, 8]} />
+        <meshStandardMaterial color="#eab308" emissive="#eab308" emissiveIntensity={0.4} />
       </mesh>
     </group>
   );
