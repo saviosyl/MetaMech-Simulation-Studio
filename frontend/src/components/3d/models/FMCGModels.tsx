@@ -220,28 +220,12 @@ export const CheckweigherModel: React.FC<ModelProps> = ({ params }) => {
         </mesh>
       ))}
 
-      {/* ── Infeed/outfeed conveyor sections ── */}
+      {/* ── Infeed/outfeed entry plates (small transition lips) ── */}
       {[-1, 1].map((sx, i) => (
-        <group key={`conv-${i}`}>
-          <mesh position={[sx * (w * 0.37), beltH, 0]} castShadow>
-            <boxGeometry args={[w * 0.28, 0.015, frameD * 0.7]} />
-            <meshStandardMaterial {...matBelt} />
-          </mesh>
-          {/* Rollers (3 per side) */}
-          {[0, 0.08, -0.08].map((rOff, ri) => (
-            <mesh key={`roller-${ri}`} position={[sx * (w * 0.37) + rOff * sx, beltH + 0.01, 0]} rotation={[0, 0, Math.PI/2]}>
-              <cylinderGeometry args={[0.012, 0.012, frameD * 0.65, 8]} />
-              <meshStandardMaterial color="#b0b0b0" metalness={0.85} roughness={0.15} />
-            </mesh>
-          ))}
-          {/* Side guides */}
-          {[-1, 1].map((gz, gi) => (
-            <mesh key={`guide-${gi}`} position={[sx * (w * 0.37), beltH + 0.03, gz * frameD * 0.38]}>
-              <boxGeometry args={[w * 0.28, 0.04, 0.006]} />
-              <meshStandardMaterial {...matStainless} />
-            </mesh>
-          ))}
-        </group>
+        <mesh key={`entry-${i}`} position={[sx * (w * 0.48), beltH - 0.005, 0]} castShadow>
+          <boxGeometry args={[0.04, 0.01, frameD * 0.65]} />
+          <meshStandardMaterial {...matStainless} />
+        </mesh>
       ))}
 
       {/* ── HMI display arm ── */}
@@ -346,28 +330,16 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
         <meshStandardMaterial {...matStainless} />
       </mesh>
 
-      {/* ── Conveyor belt section ── */}
-      <mesh position={[0, beltH, 0]} castShadow>
-        <boxGeometry args={[w * 0.9, 0.02, frameD * 0.75]} />
-        <meshStandardMaterial {...matBelt} />
-      </mesh>
-      {/* Belt frame */}
-      <mesh position={[0, beltH - 0.02, 0]} castShadow>
-        <boxGeometry args={[w * 0.92, 0.03, frameD * 0.78]} />
+      {/* ── Machine top plate (product passes through here) ── */}
+      <mesh position={[0, beltH - 0.01, 0]} castShadow>
+        <boxGeometry args={[w * 0.85, 0.02, frameD * 0.72]} />
         <meshStandardMaterial {...matStainless} />
       </mesh>
-      {/* Side guides */}
-      {[-1, 1].map((sz, i) => (
-        <mesh key={`sg-${i}`} position={[0, beltH + 0.03, sz * frameD * 0.42]}>
-          <boxGeometry args={[w * 0.9, 0.04, 0.006]} />
-          <meshStandardMaterial {...matStainless} />
-        </mesh>
-      ))}
-      {/* Drive rollers at ends */}
+      {/* Infeed/outfeed transition lips */}
       {[-1, 1].map((sx, i) => (
-        <mesh key={`dr-${i}`} position={[sx * w * 0.44, beltH, 0]} rotation={[0, 0, Math.PI/2]}>
-          <cylinderGeometry args={[0.018, 0.018, frameD * 0.7, 10]} />
-          <meshStandardMaterial color="#999" metalness={0.8} roughness={0.2} />
+        <mesh key={`lip-${i}`} position={[sx * w * 0.44, beltH - 0.005, 0]} castShadow>
+          <boxGeometry args={[0.03, 0.01, frameD * 0.65]} />
+          <meshStandardMaterial {...matStainless} />
         </mesh>
       ))}
 
@@ -409,10 +381,10 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
         <meshStandardMaterial color="#e0e0e0" metalness={0.1} roughness={0.5} />
       </mesh>
 
-      {/* ── Label path (thin ribbon from roll to head) ── */}
+      {/* ── Label ribbon path (thin strip from roll to applicator) ── */}
       <mesh position={[0, beltH + 0.42, -frameD * 0.25]} rotation={[0.4, 0, 0]}>
-        <boxGeometry args={[0.05, 0.001, 0.2]} />
-        <meshStandardMaterial color="#f8f8f8" metalness={0} roughness={0.9} transparent opacity={0.8} />
+        <boxGeometry args={[0.04, 0.001, 0.15]} />
+        <meshStandardMaterial color="#f0f0e8" metalness={0} roughness={0.9} transparent opacity={0.6} />
       </mesh>
 
       {/* ── Control panel (side-mounted) ── */}

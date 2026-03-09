@@ -1,87 +1,122 @@
 /**
- * 3Dconnexion SpaceMouse / 3D Mouse Integration
+ * 3Dconnexion SpaceMouse Integration
  * 
- * Uses the Web Gamepad API to detect 3Dconnexion devices.
- * SpaceMouse devices expose as HID gamepads with 6 axes:
- *   axes[0] = X translation (pan left/right)
- *   axes[1] = Y translation (pan up/down)
- *   axes[2] = Z translation (zoom in/out)
- *   axes[3] = X rotation (tilt)
- *   axes[4] = Y rotation (spin/orbit)
- *   axes[5] = Z rotation (roll)
- *
- * Sensitivity and dead zones are configurable.
+ * Supports three navigation modes matching industry standard:
+ * 
+ * **Object Mode** (default): Rotate/pan around the scene center (orbit target).
+ *   - Push/pull: zoom in/out
+ *   - Tilt/twist: orbit around target
+ *   - Slide left/right/up/down: pan the view
+ *   - Feels like you're moving the world around the camera
+ * 
+ * **Camera Mode**: Move the camera itself through space.
+ *   - Push/pull: dolly forward/back
+ *   - Tilt: pitch camera up/down
+ *   - Twist: yaw camera left/right
+ *   - Slide: strafe left/right, crane up/down
+ *   - Orbit target follows camera
+ * 
+ * **Fly Mode**: Fly through the scene like a drone.
+ *   - Push/pull: fly forward/back at current heading
+ *   - Tilt: pitch
+ *   - Twist: yaw (turn)
+ *   - Slide left/right: strafe
+ *   - No orbit target constraint
+ *   - Smooth momentum with damping
+ * 
+ * Uses the Web Gamepad API. SpaceMouse devices expose 6 axes:
+ *   axes[0] = X translation, axes[1] = Y translation, axes[2] = Z translation
+ *   axes[3] = X rotation (pitch), axes[4] = Y rotation (yaw), axes[5] = Z rotation (roll)
  */
+
+export type SpaceMouseMode = 'object' | 'camera' | 'fly';
 
 export interface SpaceMouseState {
   connected: boolean;
-  /** Translation axes: [panX, panY, zoom] normalized -1..1 */
   translate: [number, number, number];
-  /** Rotation axes: [tiltX, orbitY, rollZ] normalized -1..1 */
   rotate: [number, number, number];
-  /** Any button pressed */
   buttons: boolean[];
 }
 
 export interface SpaceMouseConfig {
-  /** Dead zone threshold (0-1), axes below this are zeroed. Default 0.05 */
+  mode: SpaceMouseMode;
   deadZone: number;
-  /** Translation sensitivity multiplier. Default 1.0 */
-  translateSensitivity: number;
-  /** Rotation sensitivity multiplier. Default 1.0 */
-  rotateSensitivity: number;
-  /** Invert Y axis */
-  invertY: boolean;
-  /** Invert zoom */
+  translateSpeed: number;
+  rotateSpeed: number;
+  zoomSpeed: number;
+  invertPan: boolean;
   invertZoom: boolean;
+  /** Fly mode damping (0-1, lower = more momentum) */
+  flyDamping: number;
+  /** Dominant axis lock — only process the strongest axis */
+  dominantAxis: boolean;
 }
 
 const DEFAULT_CONFIG: SpaceMouseConfig = {
-  deadZone: 0.05,
-  translateSensitivity: 1.0,
-  rotateSensitivity: 1.0,
-  invertY: false,
+  mode: 'object',
+  deadZone: 0.08,
+  translateSpeed: 1.0,
+  rotateSpeed: 1.0,
+  zoomSpeed: 1.5,
+  invertPan: false,
   invertZoom: false,
+  flyDamping: 0.92,
+  dominantAxis: false,
 };
 
-/** Known 3Dconnexion vendor/product strings */
+/** Known 3Dconnexion identifiers */
 const SPACEMOUSE_IDS = [
   '3dconnexion', 'spacemouse', 'spacenavigator', 'spacepilot',
-  'spaceexplorer', 'spaceball', '046d', // Logitech (owns 3Dconnexion)
-  '256f', // 3Dconnexion USB vendor ID
+  'spaceexplorer', 'spaceball', '046d', '256f',
 ];
 
 function isSpaceMouseGamepad(gp: Gamepad): boolean {
   const id = gp.id.toLowerCase();
+  // Check known IDs or 6+ axes (characteristic of 3D mice)
   return SPACEMOUSE_IDS.some(s => id.includes(s)) || gp.axes.length >= 6;
 }
 
-function applyDeadZone(value: number, deadZone: number): number {
-  if (Math.abs(value) < deadZone) return 0;
-  // Remap so the dead zone edge maps to 0
+function applyDeadZone(value: number, dz: number): number {
+  if (Math.abs(value) < dz) return 0;
   const sign = value > 0 ? 1 : -1;
-  return sign * ((Math.abs(value) - deadZone) / (1 - deadZone));
+  return sign * ((Math.abs(value) - dz) / (1 - dz));
+}
+
+function applyDominantAxis(values: number[]): number[] {
+  let maxIdx = 0;
+  let maxVal = 0;
+  for (let i = 0; i < values.length; i++) {
+    if (Math.abs(values[i]) > maxVal) {
+      maxVal = Math.abs(values[i]);
+      maxIdx = i;
+    }
+  }
+  return values.map((v, i) => i === maxIdx ? v : 0);
 }
 
 export class SpaceMouseController {
-  private config: SpaceMouseConfig;
+  config: SpaceMouseConfig;
   private gamepadIndex: number | null = null;
-  private onConnectCb: ((connected: boolean) => void) | null = null;
+  private _onConnect: ((connected: boolean) => void) | null = null;
+
+  // Fly mode velocity (momentum)
+  flyVelocity: [number, number, number] = [0, 0, 0];
+  flyAngular: [number, number] = [0, 0]; // pitch, yaw
 
   constructor(config?: Partial<SpaceMouseConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.setupListeners();
+    this._setupListeners();
   }
 
-  private setupListeners() {
+  private _setupListeners() {
     if (typeof window === 'undefined') return;
 
     window.addEventListener('gamepadconnected', (e) => {
       const gp = (e as GamepadEvent).gamepad;
       if (isSpaceMouseGamepad(gp)) {
         this.gamepadIndex = gp.index;
-        console.log('[SpaceMouse] Connected:', gp.id);
-        this.onConnectCb?.(true);
+        console.log('[SpaceMouse] Connected:', gp.id, '| Axes:', gp.axes.length);
+        this._onConnect?.(true);
       }
     });
 
@@ -90,74 +125,85 @@ export class SpaceMouseController {
       if (gp.index === this.gamepadIndex) {
         this.gamepadIndex = null;
         console.log('[SpaceMouse] Disconnected');
-        this.onConnectCb?.(false);
+        this._onConnect?.(false);
       }
     });
   }
 
-  onConnectionChange(cb: (connected: boolean) => void) {
-    this.onConnectCb = cb;
+  onConnectionChange(cb: (connected: boolean) => void) { this._onConnect = cb; }
+
+  setMode(mode: SpaceMouseMode) { this.config.mode = mode; }
+
+  setConfig(cfg: Partial<SpaceMouseConfig>) {
+    this.config = { ...this.config, ...cfg };
   }
 
-  setConfig(config: Partial<SpaceMouseConfig>) {
-    this.config = { ...this.config, ...config };
-  }
+  isConnected(): boolean { return this.gamepadIndex !== null; }
 
-  /** Read current state. Call this in your animation loop (useFrame). */
-  getState(): SpaceMouseState {
+  /** Read raw state from the gamepad. Call every frame. */
+  poll(): SpaceMouseState {
     if (this.gamepadIndex === null) {
-      return {
-        connected: false,
-        translate: [0, 0, 0],
-        rotate: [0, 0, 0],
-        buttons: [],
-      };
+      return { connected: false, translate: [0, 0, 0], rotate: [0, 0, 0], buttons: [] };
     }
 
     const gamepads = navigator.getGamepads();
     const gp = gamepads[this.gamepadIndex];
     if (!gp) {
-      return {
-        connected: false,
-        translate: [0, 0, 0],
-        rotate: [0, 0, 0],
-        buttons: [],
-      };
+      return { connected: false, translate: [0, 0, 0], rotate: [0, 0, 0], buttons: [] };
     }
 
     const dz = this.config.deadZone;
-    const ts = this.config.translateSensitivity;
-    const rs = this.config.rotateSensitivity;
-    const iy = this.config.invertY ? -1 : 1;
-    const iz = this.config.invertZoom ? -1 : 1;
-
     const ax = (i: number) => gp.axes[i] !== undefined ? gp.axes[i] : 0;
+
+    let trans: [number, number, number] = [
+      applyDeadZone(ax(0), dz),
+      applyDeadZone(ax(1), dz),
+      applyDeadZone(ax(2), dz),
+    ];
+    let rot: [number, number, number] = [
+      applyDeadZone(ax(3), dz),
+      applyDeadZone(ax(4), dz),
+      applyDeadZone(ax(5), dz),
+    ];
+
+    // Dominant axis: only keep strongest
+    if (this.config.dominantAxis) {
+      const all = [...trans, ...rot];
+      const dominant = applyDominantAxis(all);
+      trans = [dominant[0], dominant[1], dominant[2]];
+      rot = [dominant[3], dominant[4], dominant[5]];
+    }
+
+    // Apply inversion
+    if (this.config.invertPan) { trans[0] *= -1; trans[1] *= -1; }
+    if (this.config.invertZoom) { trans[2] *= -1; }
 
     return {
       connected: true,
-      translate: [
-        applyDeadZone(ax(0), dz) * ts,
-        applyDeadZone(ax(1), dz) * ts * iy,
-        applyDeadZone(ax(2), dz) * ts * iz,
-      ],
-      rotate: [
-        applyDeadZone(ax(3), dz) * rs,
-        applyDeadZone(ax(4), dz) * rs,
-        applyDeadZone(ax(5), dz) * rs,
-      ],
+      translate: trans,
+      rotate: rot,
       buttons: Array.from(gp.buttons).map(b => b.pressed),
     };
   }
 
-  isConnected(): boolean {
-    return this.gamepadIndex !== null;
+  /** Update fly mode velocity with damping */
+  updateFlyMomentum(input: SpaceMouseState, dt: number) {
+    const d = this.config.flyDamping;
+    const ts = this.config.translateSpeed * 10;
+    const rs = this.config.rotateSpeed * 2;
+
+    this.flyVelocity[0] = this.flyVelocity[0] * d + input.translate[0] * ts * dt;
+    this.flyVelocity[1] = this.flyVelocity[1] * d + input.translate[1] * ts * dt;
+    this.flyVelocity[2] = this.flyVelocity[2] * d + input.translate[2] * ts * dt;
+    this.flyAngular[0] = this.flyAngular[0] * d + input.rotate[0] * rs * dt; // pitch
+    this.flyAngular[1] = this.flyAngular[1] * d + input.rotate[1] * rs * dt; // yaw
   }
 
   dispose() {
     this.gamepadIndex = null;
-    this.onConnectCb = null;
+    this._onConnect = null;
   }
 }
 
-/** Singleton instance */
+/** Singleton */
 export const spaceMouse = new SpaceMouseController();

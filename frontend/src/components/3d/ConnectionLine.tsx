@@ -39,10 +39,9 @@ const ConnectionLines: React.FC = () => {
           key={line.id}
           points={line.points}
           color="#06b6d4"
-          lineWidth={2}
-          dashed
-          dashSize={0.2}
-          gapSize={0.1}
+          lineWidth={1.5}
+          transparent
+          opacity={0.6}
         />
       ))}
     </group>
