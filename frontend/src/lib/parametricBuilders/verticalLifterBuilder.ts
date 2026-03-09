@@ -28,6 +28,7 @@ export function buildVerticalLifter(params: Record<string, any>): BuilderResult 
   const liftH   = (params.liftHeight     ?? 3000) / 1000;  // m
   const infeedH = (params.infeedHeight   ?? 0)    / 1000;  // m
   const outfeedH= (params.outfeedHeight  ?? params.liftHeight ?? 3000) / 1000;
+  const liftDir = params.liftDirection   ?? 'up';
   const loadDir = params.loadDirection   ?? 'front';
   const fenceOn = params.fenceEnabled    !== false;  // default ON
 
@@ -175,22 +176,24 @@ export function buildVerticalLifter(params: Record<string, any>): BuilderResult 
       { x:  (halfW + col + fenceOffset), z: 0, w: 0.01, d: pd + col * 2, ry: 0, skip: loadDir === 'right' },
     ];
 
+    const glassMat = () => new THREE.MeshPhysicalMaterial({
+      color: 0xe8f4f8, metalness: 0.0, roughness: 0.05,
+      transparent: true, opacity: 0.18,
+      transmission: 0.9, thickness: 0.5, ior: 1.5,
+      side: THREE.DoubleSide,
+    });
+    const trimMat = () => new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.8, roughness: 0.2 });
+
     for (const panel of fencePanels) {
       if (panel.skip) continue;
-      group.add(mesh(
-        new THREE.BoxGeometry(panel.w, fenceH, panel.d), fenceMat(),
-        [panel.x, fenceY, panel.z],
-        [0, panel.ry, 0]
-      ));
-      // Horizontal fence bars (3 bars per panel for realism)
-      for (let bi = 1; bi <= 3; bi++) {
-        const barY = baseH + fenceH * (bi / 4);
-        group.add(mesh(
-          new THREE.BoxGeometry(panel.w, 0.015, panel.d + 0.005),
-          steelLight(),
-          [panel.x, barY, panel.z]
-        ));
-      }
+      const gw = Math.max(panel.w, 0.02);
+      const gd = Math.max(panel.d, 0.02);
+      // Glass panel
+      group.add(mesh(new THREE.BoxGeometry(gw, fenceH, gd), glassMat(), [panel.x, fenceY, panel.z]));
+      // Top trim
+      group.add(mesh(new THREE.BoxGeometry(gw + 0.01, 0.02, gd + 0.01), trimMat(), [panel.x, fenceY + fenceH / 2, panel.z]));
+      // Bottom trim
+      group.add(mesh(new THREE.BoxGeometry(gw + 0.01, 0.02, gd + 0.01), trimMat(), [panel.x, fenceY - fenceH / 2, panel.z]));
     }
   }
 
@@ -211,16 +214,20 @@ export function buildVerticalLifter(params: Record<string, any>): BuilderResult 
   const unloadDir = loadDir === 'front' ? 'back' : loadDir === 'back' ? 'front' : loadDir === 'left' ? 'right' : 'left';
   const portDirOut = dirPortMap[unloadDir] || dirPortMap.back;
 
+  // When direction is 'down': infeed at top, outfeed at bottom
+  const inputY = liftDir === 'down' ? outfeedH : infeedH;
+  const outputY = liftDir === 'down' ? infeedH : outfeedH;
+
   const ports: ConnectionPort[] = [
     {
       id: 'input',
       type: 'input',
-      localPosition: [portDir.dx, infeedH + rollerTopOffset + baseH, portDir.dz],
+      localPosition: [portDir.dx, inputY + rollerTopOffset + baseH, portDir.dz],
     },
     {
       id: 'output',
       type: 'output',
-      localPosition: [portDirOut.dx, outfeedH + rollerTopOffset + baseH, portDirOut.dz],
+      localPosition: [portDirOut.dx, outputY + rollerTopOffset + baseH, portDirOut.dz],
     },
   ];
 

@@ -371,15 +371,14 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       const platD = (params?.platformDepth || 1000) / 1000;
       const infH  = (params?.infeedHeight  || 0) / 1000;
       const outH  = (params?.outfeedHeight || 3000) / 1000;
+      const liftDir = params?.liftDirection || 'up';
       const loadDir = params?.loadDirection || 'front';
-      const col = 0.06;
       const halfW = platW / 2;
       const halfD = platD / 2;
       const baseH = 0.05;
-      const rollerTop = 0.06; // platform base + roller radius
+      const rollerTop = 0.06;
       const portInset = 0.02;
 
-      // Port positions: right at the roller surface of the carriage
       const dirPortMap: Record<string, { dx: number; dz: number }> = {
         front: { dx: 0, dz: -(halfD - portInset) },
         back:  { dx: 0, dz:  (halfD - portInset) },
@@ -387,13 +386,16 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
         right: { dx:  (halfW - portInset), dz: 0 },
       };
       const pIn = dirPortMap[loadDir] || dirPortMap.front;
-      // Output on opposite side
       const unloadDir = loadDir === 'front' ? 'back' : loadDir === 'back' ? 'front' : loadDir === 'left' ? 'right' : 'left';
       const pOut = dirPortMap[unloadDir] || dirPortMap.back;
 
+      // When direction is 'down': infeed at top (outfeedHeight), outfeed at bottom (infeedHeight)
+      const inputY = liftDir === 'down' ? outH : infH;
+      const outputY = liftDir === 'down' ? infH : outH;
+
       return [
-        { id: 'input', type: 'input', localPosition: [pIn.dx, infH + rollerTop + baseH, pIn.dz] as [number, number, number] },
-        { id: 'output', type: 'output', localPosition: [pOut.dx, outH + rollerTop + baseH, pOut.dz] as [number, number, number] },
+        { id: 'input', type: 'input', localPosition: [pIn.dx, inputY + rollerTop + baseH, pIn.dz] as [number, number, number] },
+        { id: 'output', type: 'output', localPosition: [pOut.dx, outputY + rollerTop + baseH, pOut.dz] as [number, number, number] },
       ];
     }
     case 'sensor': {

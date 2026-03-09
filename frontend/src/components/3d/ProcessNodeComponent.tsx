@@ -667,24 +667,42 @@ const GenericModel: React.FC<{ type: string; isSelected: boolean; params: Record
             ));
           })()}
 
-          {/* Optional fence / guarding */}
+          {/* Optional glass guarding — clear transparent panels on all sides except load */}
           {fenceOn && fencePanels.filter(p => p.side !== loadDir).map((panel, i) => {
-            const fenceH = totalH * 0.9;
-            const fenceY = totalH / 2 + baseH;
+            const glassH = totalH * 0.9;
+            const glassY = totalH / 2 + baseH;
+            // Make glass panels thicker so they're visible
+            const glassW = Math.max(panel.w, 0.02);
+            const glassD = Math.max(panel.d, 0.02);
             return (
-              <group key={`fence-${i}`}>
-                <mesh position={[panel.x, fenceY, panel.z]}>
-                  <boxGeometry args={[panel.w, fenceH, panel.d]} />
-                  <meshStandardMaterial color="#cccccc" metalness={0.5} roughness={0.4}
-                    transparent opacity={0.35} wireframe />
+              <group key={`glass-${i}`}>
+                {/* Glass panel */}
+                <mesh position={[panel.x, glassY, panel.z]}>
+                  <boxGeometry args={[glassW, glassH, glassD]} />
+                  <meshPhysicalMaterial
+                    color="#e8f4f8"
+                    metalness={0.0}
+                    roughness={0.05}
+                    transparent
+                    opacity={0.18}
+                    transmission={0.9}
+                    thickness={0.5}
+                    ior={1.5}
+                    envMapIntensity={1.0}
+                    side={2 /* DoubleSide */}
+                  />
                 </mesh>
-                {/* Horizontal fence bars */}
-                {[1, 2, 3].map(bi => (
-                  <mesh key={`bar-${bi}`} position={[panel.x, baseH + fenceH * (bi / 4), panel.z]}>
-                    <boxGeometry args={[panel.w, 0.015, panel.d + 0.005]} />
-                    <meshStandardMaterial color="#888" metalness={0.8} roughness={0.3} />
-                  </mesh>
-                ))}
+                {/* Glass frame edges (thin aluminum trim) */}
+                {/* Top edge */}
+                <mesh position={[panel.x, glassY + glassH / 2, panel.z]}>
+                  <boxGeometry args={[glassW + 0.01, 0.02, glassD + 0.01]} />
+                  <meshStandardMaterial color="#b0b0b0" metalness={0.8} roughness={0.2} />
+                </mesh>
+                {/* Bottom edge */}
+                <mesh position={[panel.x, glassY - glassH / 2, panel.z]}>
+                  <boxGeometry args={[glassW + 0.01, 0.02, glassD + 0.01]} />
+                  <meshStandardMaterial color="#b0b0b0" metalness={0.8} roughness={0.2} />
+                </mesh>
               </group>
             );
           })}
