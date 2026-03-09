@@ -1,6 +1,7 @@
-import React, { useRef, Suspense } from 'react';
+import React, { useRef, Suspense, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useEditorStore } from '../../store/editorStore';
 import { ProcessNode } from '../../store/editorStore';
 import { getAssetById, ParametricAssetDef, StaticAssetDef } from '../../lib/assetManifest';
 import ParametricModel from './ParametricModel';
@@ -40,6 +41,76 @@ import {
 import FlowDirectionArrow from './overlays/FlowDirectionArrow';
 import SensorZoneOverlay from './overlays/SensorZoneOverlay';
 import StopperZoneOverlay from './overlays/StopperZoneOverlay';
+
+/** Animated vertical lift carriage — moves up/down during simulation */
+const VerticalLiftCarriage: React.FC<{
+  platW: number; platD: number;
+  infeedH: number; outfeedH: number;
+  baseH: number; cx: number; cz: number; col: number;
+  halfW: number; halfD: number;
+  emissive: string;
+}> = ({ platW, platD, infeedH, outfeedH, baseH, cx, cz, col, halfW, halfD, emissive }) => {
+  const carriageRef = useRef<THREE.Group>(null);
+  const isPlaying = useEditorStore(s => s.isPlaying);
+  const simSpeed = useEditorStore(s => s.simulationSpeed);
+
+  const lowY = Math.min(infeedH, outfeedH) + baseH;
+  const highY = Math.max(infeedH, outfeedH) + baseH;
+  const midY = (lowY + highY) / 2;
+  const numRollers = 6;
+
+  useFrame((state) => {
+    if (!carriageRef.current) return;
+    if (isPlaying) {
+      // Smooth up/down cycle: 6 second full cycle
+      const cycleTime = 6 / simSpeed;
+      const t = (state.clock.elapsedTime % cycleTime) / cycleTime;
+      const ease = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) / 2; // smooth sine
+      carriageRef.current.position.y = lowY + (highY - lowY) * ease;
+    } else {
+      carriageRef.current.position.y = midY;
+    }
+  });
+
+  const rollerPositions = useMemo(() => {
+    const arr: number[] = [];
+    for (let i = 0; i < numRollers; i++) {
+      arr.push(-platD / 2 + 0.08 + (platD - 0.16) * (i / (numRollers - 1)));
+    }
+    return arr;
+  }, [platD]);
+
+  return (
+    <group ref={carriageRef} position={[0, midY, 0]}>
+      {/* Platform base */}
+      <mesh castShadow>
+        <boxGeometry args={[platW - 0.02, 0.04, platD - 0.02]} />
+        <meshStandardMaterial color="#3b82f6" metalness={0.6} roughness={0.35} emissive={emissive} />
+      </mesh>
+      {/* Rollers */}
+      {rollerPositions.map((rz, ri) => (
+        <mesh key={`r-${ri}`} position={[0, 0.04, rz]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.018, 0.018, platW - 0.08, 8]} />
+          <meshStandardMaterial color="#aaa" metalness={0.85} roughness={0.15} />
+        </mesh>
+      ))}
+      {/* Side rails */}
+      {[-1, 1].map((side, i) => (
+        <mesh key={`rail-${i}`} position={[side * (halfW - 0.02), 0.03, 0]}>
+          <boxGeometry args={[0.02, 0.06, platD - 0.02]} />
+          <meshStandardMaterial color="#888" metalness={0.8} roughness={0.3} />
+        </mesh>
+      ))}
+      {/* Guide shoes on columns */}
+      {[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sx, sz], i) => (
+        <mesh key={`shoe-${i}`} position={[sx * cx * 0.92, 0, sz * cz * 0.92]}>
+          <boxGeometry args={[col * 0.6, 0.12, col * 0.6]} />
+          <meshStandardMaterial color="#5a5a5a" metalness={0.85} roughness={0.25} />
+        </mesh>
+      ))}
+    </group>
+  );
+};
 
 interface ProcessNodeComponentProps {
   node: ProcessNode;
@@ -488,77 +559,135 @@ const GenericModel: React.FC<{ type: string; isSelected: boolean; params: Record
     case 'vertical-lifter': {
       const lPW = (params.platformWidth || 1000) / 1000;
       const lPD = (params.platformDepth || 1000) / 1000;
-      const lH = (params.liftHeight || 3000) / 1000;
-      const colInset = 0.06;
-      const colSize = 0.08;
-      const corners: [number, number][] = [
-        [-lPW/2 + colInset, -lPD/2 + colInset],
-        [-lPW/2 + colInset, lPD/2 - colInset],
-        [lPW/2 - colInset, -lPD/2 + colInset],
-        [lPW/2 - colInset, lPD/2 - colInset],
+      const infH = (params.infeedHeight || 0) / 1000;
+      const outH = (params.outfeedHeight || 3000) / 1000;
+      const fenceOn = params.fenceEnabled !== false;
+      const loadDir = params.loadDirection || 'front';
+      const col = 0.06;
+      const halfW = lPW / 2;
+      const halfD = lPD / 2;
+      const cx = halfW + col / 2;
+      const cz = halfD + col / 2;
+      const totalH = Math.max(infH, outH) + 0.15;
+      const baseH = 0.05;
+      const corners: [number, number][] = [[-cx, -cz], [-cx, cz], [cx, -cz], [cx, cz]];
+
+      // Fence panels config (skip load side)
+      const fencePanels = [
+        { side: 'front', x: 0, z: -(halfD + col + 0.01), w: lPW + col * 2, d: 0.01 },
+        { side: 'back',  x: 0, z:  (halfD + col + 0.01), w: lPW + col * 2, d: 0.01 },
+        { side: 'left',  x: -(halfW + col + 0.01), z: 0, w: 0.01, d: lPD + col * 2 },
+        { side: 'right', x:  (halfW + col + 0.01), z: 0, w: 0.01, d: lPD + col * 2 },
       ];
+
       return (
         <group>
-          {/* Heavy base plate */}
-          <mesh position={[0, 0.025, 0]} castShadow receiveShadow>
-            <boxGeometry args={[lPW + 0.1, 0.05, lPD + 0.1]} />
-            <meshStandardMaterial color="#3a3a3a" metalness={0.8} roughness={0.25} emissive={em} />
+          {/* Base plate */}
+          <mesh position={[0, baseH / 2, 0]} castShadow receiveShadow>
+            <boxGeometry args={[lPW + col * 4, baseH, lPD + col * 4]} />
+            <meshStandardMaterial color="#3a3a3a" metalness={0.85} roughness={0.25} emissive={em} />
           </mesh>
-          {/* Floor anchor bolts */}
-          {corners.map(([cx, cz], i) => (
-            <mesh key={`bolt-${i}`} position={[cx, 0.005, cz]}>
-              <cylinderGeometry args={[0.02, 0.025, 0.01, 8]} />
-              <meshStandardMaterial color="#555" metalness={0.9} roughness={0.2} />
-            </mesh>
-          ))}
-          {/* Vertical columns (C-channel style) */}
-          {corners.map(([cx, cz], i) => (
+
+          {/* 4 Vertical columns */}
+          {corners.map(([x, z], i) => (
             <group key={`col-${i}`}>
-              <mesh position={[cx, lH / 2 + 0.05, cz]} castShadow>
-                <boxGeometry args={[colSize, lH, colSize]} />
-                <meshStandardMaterial color="#c0c0c0" metalness={0.75} roughness={0.3} emissive={em} />
+              <mesh position={[x, totalH / 2 + baseH, z]} castShadow>
+                <boxGeometry args={[col, totalH, col]} />
+                <meshStandardMaterial color="#c0c0c0" metalness={0.8} roughness={0.25} emissive={em} />
               </mesh>
-              {/* Column channel groove */}
-              <mesh position={[cx, lH / 2 + 0.05, cz]}>
-                <boxGeometry args={[colSize * 0.4, lH - 0.1, colSize + 0.002]} />
+              {/* Channel groove */}
+              <mesh position={[x * 0.92, totalH / 2 + baseH, z * 0.92]}>
+                <boxGeometry args={[col * 0.35, totalH - 0.05, col * 0.35]} />
                 <meshStandardMaterial color="#888" metalness={0.7} roughness={0.25} />
               </mesh>
             </group>
           ))}
-          {/* Top frame beam */}
-          <mesh position={[0, lH + 0.05 + colSize/2, 0]} castShadow>
-            <boxGeometry args={[lPW, colSize, lPD]} />
+
+          {/* Top cross beams */}
+          <mesh position={[0, totalH + baseH, 0]} castShadow>
+            <boxGeometry args={[lPW + col * 3, col, col * 0.8]} />
             <meshStandardMaterial color="#4a4a4a" metalness={0.75} roughness={0.3} emissive={em} />
           </mesh>
-          {/* Cross braces (X pattern on two sides) */}
-          {[[-lPW/2 + colInset, 0], [lPW/2 - colInset, 0]].map(([bx, _bz], i) => (
-            <mesh key={`brace-${i}`} position={[bx, lH * 0.5, 0]} rotation={[0, 0, Math.atan2(lH, lPD)]} castShadow>
-              <boxGeometry args={[0.02, Math.sqrt(lH*lH + lPD*lPD) * 0.7, 0.02]} />
+          <mesh position={[0, totalH + baseH, 0]} castShadow>
+            <boxGeometry args={[col * 0.8, col, lPD + col * 3]} />
+            <meshStandardMaterial color="#4a4a4a" metalness={0.75} roughness={0.3} emissive={em} />
+          </mesh>
+
+          {/* Flat belt drives on left & right */}
+          {[-1, 1].map((side, i) => (
+            <group key={`belt-${i}`}>
+              <mesh position={[side * (halfW + col + 0.02), totalH / 2 + baseH, 0]}>
+                <boxGeometry args={[0.03, totalH * 0.92, 0.06]} />
+                <meshStandardMaterial color="#2d2d2d" metalness={0.3} roughness={0.7} />
+              </mesh>
+              {/* Pulleys top + bottom */}
+              {[0.08, totalH - 0.02].map((yf, pi) => (
+                <mesh key={`pulley-${pi}`} position={[side * (halfW + col + 0.02), yf + baseH, 0]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.04, 0.04, 0.05, 12]} />
+                  <meshStandardMaterial color="#888" metalness={0.8} roughness={0.3} />
+                </mesh>
+              ))}
+            </group>
+          ))}
+
+          {/* Cross bracing on sides */}
+          {[-1, 1].map((side, i) => (
+            <mesh key={`brace-${i}`} position={[side * cx, totalH / 2 + baseH, 0]}
+              rotation={[0, 0, Math.atan2(lPD * 0.5, totalH * 0.6) * side]} castShadow>
+              <boxGeometry args={[0.015, Math.sqrt(totalH * totalH + lPD * lPD) * 0.6, 0.015]} />
               <meshStandardMaterial color="#999" metalness={0.6} roughness={0.4} />
             </mesh>
           ))}
-          {/* Platform (rides in the middle by default) */}
-          <mesh position={[0, lH * 0.5, 0]} castShadow>
-            <boxGeometry args={[lPW - 0.04, 0.04, lPD - 0.04]} />
-            <meshStandardMaterial color="#888888" metalness={0.7} roughness={0.3} emissive={em} />
-          </mesh>
-          {/* Platform roller conveyor surface */}
-          {Array.from({length: 5}).map((_, ri) => {
-            const rz = -lPD/2 + 0.1 + (lPD - 0.2) * (ri / 4);
-            return (
-              <mesh key={`roller-${ri}`} position={[0, lH * 0.5 + 0.03, rz]} rotation={[0, 0, Math.PI/2]}>
-                <cylinderGeometry args={[0.015, 0.015, lPW - 0.1, 8]} />
-                <meshStandardMaterial color="#aaa" metalness={0.85} roughness={0.15} />
+
+          {/* Animated carriage / platform */}
+          <VerticalLiftCarriage
+            platW={lPW} platD={lPD}
+            infeedH={infH} outfeedH={outH}
+            baseH={baseH} cx={cx} cz={cz} col={col}
+            halfW={halfW} halfD={halfD}
+            emissive={em}
+          />
+
+          {/* Warning stripes at load opening */}
+          {(() => {
+            const stripPos: Record<string, [number, number, number]> = {
+              front: [0, 0, -(halfD + col + 0.01)],
+              back:  [0, 0,  (halfD + col + 0.01)],
+              left:  [-(halfW + col + 0.01), 0, 0],
+              right: [ (halfW + col + 0.01), 0, 0],
+            };
+            const sp = stripPos[loadDir] || stripPos.front;
+            const sw = (loadDir === 'left' || loadDir === 'right') ? lPD : lPW;
+            const sr = (loadDir === 'left' || loadDir === 'right') ? Math.PI / 2 : 0;
+            return [baseH + 0.01, totalH + baseH - 0.01].map((h, si) => (
+              <mesh key={`strip-${si}`} position={[sp[0], h, sp[2]]} rotation={[0, sr, 0]}>
+                <boxGeometry args={[sw + 0.02, 0.03, 0.01]} />
+                <meshStandardMaterial color="#eab308" metalness={0.3} roughness={0.5} />
               </mesh>
+            ));
+          })()}
+
+          {/* Optional fence / guarding */}
+          {fenceOn && fencePanels.filter(p => p.side !== loadDir).map((panel, i) => {
+            const fenceH = totalH * 0.9;
+            const fenceY = totalH / 2 + baseH;
+            return (
+              <group key={`fence-${i}`}>
+                <mesh position={[panel.x, fenceY, panel.z]}>
+                  <boxGeometry args={[panel.w, fenceH, panel.d]} />
+                  <meshStandardMaterial color="#cccccc" metalness={0.5} roughness={0.4}
+                    transparent opacity={0.35} wireframe />
+                </mesh>
+                {/* Horizontal fence bars */}
+                {[1, 2, 3].map(bi => (
+                  <mesh key={`bar-${bi}`} position={[panel.x, baseH + fenceH * (bi / 4), panel.z]}>
+                    <boxGeometry args={[panel.w, 0.015, panel.d + 0.005]} />
+                    <meshStandardMaterial color="#888" metalness={0.8} roughness={0.3} />
+                  </mesh>
+                ))}
+              </group>
             );
           })}
-          {/* Safety guard rails */}
-          {[[-lPW/2 - 0.01, 0], [lPW/2 + 0.01, 0]].map(([gx, _gz], i) => (
-            <mesh key={`guard-${i}`} position={[gx, lH * 0.5 + 0.15, 0]}>
-              <boxGeometry args={[0.005, 0.3, lPD - 0.04]} />
-              <meshStandardMaterial color="#e8b710" metalness={0.3} roughness={0.5} />
-            </mesh>
-          ))}
         </group>
       );
     }

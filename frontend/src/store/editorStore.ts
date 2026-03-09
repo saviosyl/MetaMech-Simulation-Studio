@@ -321,30 +321,32 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     case 'vertical-lifter': {
       const platW = (params?.platformWidth || 1000) / 1000;
       const platD = (params?.platformDepth || 1000) / 1000;
-      const liftH = (params?.liftHeight || 3000) / 1000;
+      const infH  = (params?.infeedHeight  || 0) / 1000;
+      const outH  = (params?.outfeedHeight || 3000) / 1000;
       const loadDir = params?.loadDirection || 'front';
-      const liftDir = params?.liftDirection || 'up';
-      const groundY = 0.15;
-      const topY = liftH;
-      const dirMap: Record<string, [number, number]> = {
-        front: [0, -platD / 2],
-        back: [0, platD / 2],
-        left: [-platW / 2, 0],
-        right: [platW / 2, 0],
+      const col = 0.06;
+      const halfW = platW / 2;
+      const halfD = platD / 2;
+      const baseH = 0.05;
+      const rollerTop = 0.06; // platform base + roller radius
+      const portInset = 0.02;
+
+      // Port positions: right at the roller surface of the carriage
+      const dirPortMap: Record<string, { dx: number; dz: number }> = {
+        front: { dx: 0, dz: -(halfD - portInset) },
+        back:  { dx: 0, dz:  (halfD - portInset) },
+        left:  { dx: -(halfW - portInset), dz: 0 },
+        right: { dx:  (halfW - portInset), dz: 0 },
       };
-      const [offX, offZ] = dirMap[loadDir] || [0, -platD / 2];
-      if (liftDir === 'up') {
-        return [
-          { id: 'input', type: 'input', localPosition: [offX, groundY, offZ] as [number, number, number] },
-          { id: 'output', type: 'output', localPosition: [-offX, topY, -offZ] as [number, number, number] },
-        ];
-      } else {
-        // Down: infeed at top, outfeed at ground
-        return [
-          { id: 'input', type: 'input', localPosition: [offX, topY, offZ] as [number, number, number] },
-          { id: 'output', type: 'output', localPosition: [-offX, groundY, -offZ] as [number, number, number] },
-        ];
-      }
+      const pIn = dirPortMap[loadDir] || dirPortMap.front;
+      // Output on opposite side
+      const unloadDir = loadDir === 'front' ? 'back' : loadDir === 'back' ? 'front' : loadDir === 'left' ? 'right' : 'left';
+      const pOut = dirPortMap[unloadDir] || dirPortMap.back;
+
+      return [
+        { id: 'input', type: 'input', localPosition: [pIn.dx, infH + rollerTop + baseH, pIn.dz] as [number, number, number] },
+        { id: 'output', type: 'output', localPosition: [pOut.dx, outH + rollerTop + baseH, pOut.dz] as [number, number, number] },
+      ];
     }
     case 'sensor': {
       return [];
@@ -1205,7 +1207,7 @@ function getDefaultParameters(type: string): Record<string, any> {
     pusher: { enabled: true, side: 'right', stroke: 300, plateWidth: 250, plateHeight: 100, mountHeight: 800, extended: false, mountPosition: 0.5, heightOffset: 0, flip: false },
     sensor: { sensorType: 'through-beam', triggered: false, mountHeight: 800, sensorHeight: 80, beltWidth: 600, showBeam: true, mountPosition: 0.5, mountSide: 'center', heightOffset: 0, flip: false },
     'spiral-conveyor': { diameter: 2000, totalHeight: 5000, beltWidth: 500, direction: 'up', speed: 1 },
-    'vertical-lifter': { platformWidth: 1000, platformDepth: 1000, liftHeight: 3000, speed: 1, loadDirection: 'front', capacity: 4 },
+    'vertical-lifter': { platformWidth: 1000, platformDepth: 1000, infeedHeight: 0, outfeedHeight: 3000, liftDirection: 'up', speed: 20, loadDirection: 'front', fenceEnabled: true, capacity: 4 },
     'pick-and-place': { reach: 3, speed: 1.0 },
     palletizer: { palletSize: [1.2, 0.8], stackHeight: 1.5 },
     
