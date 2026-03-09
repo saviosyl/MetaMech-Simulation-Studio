@@ -194,7 +194,7 @@ interface ActorModelDef {
 }
 
 const ACTOR_MODELS: Record<string, ActorModelDef> = {
-  'operator-1': { url: '/models/operator-walking.glb', targetSize: 1.8, animated: true, modelRotY: Math.PI },
+  'operator-1': { url: '/models/operator-walking.glb', targetSize: 0.55, animated: true, modelRotY: Math.PI },
   'operator-2': { url: '/models/operator-2.glb', targetSize: 1.8, animated: false, modelRotY: Math.PI },
   'operator-3': { url: '/models/operator-3.glb', targetSize: 1.8, animated: false, modelRotY: Math.PI },
   'engineer':   { url: '/models/operator-1.glb', targetSize: 1.8, animated: false, modelRotY: Math.PI },
