@@ -35,10 +35,10 @@ const AnimatedGLBModel: React.FC<{
     // Center horizontally, sit on ground
     clone.position.set(-center.x, -box.min.y, -center.z);
 
-    // Scale to target size
-    const maxDim = Math.max(size.x, size.y, size.z);
-    if (maxDim > 0) {
-      const s = targetSize / maxDim;
+    // Scale by HEIGHT to targetSize (not maxDim) — ensures correct human height
+    const height = size.y > 0.001 ? size.y : Math.max(size.x, size.y, size.z);
+    if (height > 0) {
+      const s = targetSize / height;
       clone.scale.multiplyScalar(s);
       clone.position.multiplyScalar(s);
     }
@@ -105,9 +105,10 @@ const StaticGLBModel: React.FC<{
     box.getSize(size);
     box.getCenter(center);
     clone.position.set(-center.x, -box.min.y, -center.z);
-    const maxDim = Math.max(size.x, size.y, size.z);
-    if (maxDim > 0) {
-      const s = targetSize / maxDim;
+    // Scale by height to targetSize
+    const height = size.y > 0.001 ? size.y : Math.max(size.x, size.y, size.z);
+    if (height > 0) {
+      const s = targetSize / height;
       clone.scale.multiplyScalar(s);
       clone.position.multiplyScalar(s);
     }
@@ -194,10 +195,10 @@ interface ActorModelDef {
 }
 
 const ACTOR_MODELS: Record<string, ActorModelDef> = {
-  'operator-1': { url: '/models/operator-walking.glb', targetSize: 0.55, animated: true, modelRotY: Math.PI },
-  'operator-2': { url: '/models/operator-2.glb', targetSize: 1.8, animated: false, modelRotY: Math.PI },
-  'operator-3': { url: '/models/operator-3.glb', targetSize: 1.8, animated: false, modelRotY: Math.PI },
-  'engineer':   { url: '/models/operator-1.glb', targetSize: 1.8, animated: false, modelRotY: Math.PI },
+  'operator-1': { url: '/models/operator-walking.glb', targetSize: 1.75, animated: true, modelRotY: Math.PI },
+  'operator-2': { url: '/models/operator-2.glb', targetSize: 1.75, animated: false, modelRotY: Math.PI + Math.PI / 2 },
+  'operator-3': { url: '/models/operator-3.glb', targetSize: 1.75, animated: false, modelRotY: Math.PI + Math.PI / 2 },
+  'engineer':   { url: '/models/operator-1.glb', targetSize: 1.75, animated: false, modelRotY: Math.PI + Math.PI / 2 },
   'forklift':   { url: '/models/forklift.glb', targetSize: 3, animated: false, modelRotY: 0 },
   'agv':        { url: '/models/agv.glb', targetSize: 1.5, animated: false, modelRotY: 0 },
   'pallet-truck': { url: '/models/forklift.glb', targetSize: 2.5, animated: false, modelRotY: 0 },
