@@ -487,32 +487,7 @@ function buildDrive(p: BendConveyorParams): THREE.Group {
   const halfW = p.widthMm / 2000;
   const H = p.heightMm / 1000;
 
-  // Head roller at outfeed + tail roller at infeed
-  for (const [endA, headR] of [[p.bendAngleDeg, 0.028], [0, 0.022]] as [number, number][]) {
-    const [xi, zi] = arcXZ(endA, R - halfW + 0.005, p.bendDirection);
-    const [xo, zo] = arcXZ(endA, R + halfW - 0.005, p.bendDirection);
-    const rollerLen = Math.sqrt((xo - xi) ** 2 + (zo - zi) ** 2) + 0.01;
-    const ang = Math.atan2(xo - xi, zo - zi);
-
-    const roller = new THREE.Mesh(
-      new THREE.CylinderGeometry(headR, headR, rollerLen, 16),
-      matDarkSteel,
-    );
-    roller.position.set((xi + xo) / 2, H, (zi + zo) / 2);
-    roller.rotation.set(0, -ang, Math.PI / 2);
-    roller.castShadow = true;
-    group.add(roller);
-
-    // Bearing housings at each end
-    for (const [bx, bz] of [[xi, zi], [xo, zo]]) {
-      const bearing = new THREE.Mesh(
-        new THREE.BoxGeometry(0.03, 0.03, 0.03),
-        matDarkSteel,
-      );
-      bearing.position.set(bx, H, bz);
-      group.add(bearing);
-    }
-  }
+  // Drive rollers removed — clean belt surface only
 
   // Motor housing on outfeed side
   const motorSide = p.motorSide === 'inner' ? -1 : 1;
