@@ -1,6 +1,6 @@
 /**
  * SpiralConveyorModel — Premium procedural AmbaFlex SV-style spiral conveyor
- * Fully R3F, no GLB dependency. Realistic industrial appearance.
+ * Continuous helix ribbon geometry. R3F, no GLB dependency.
  */
 import React, { useMemo, useRef } from 'react';
 import * as THREE from 'three';
@@ -10,143 +10,230 @@ interface Props {
   isSelected: boolean;
 }
 
-/* ── Materials (shared via useMemo per component) ── */
-function useMaterials(isSelected: boolean, beltColor?: string, frameColor?: string) {
-  return useMemo(() => {
-    const emissive = isSelected ? '#1a1a2a' : '#000000';
-    const ei = isSelected ? 0.15 : 0;
-    return {
-      drumStainless: new THREE.MeshStandardMaterial({ color: '#a0a5ab', metalness: 0.6, roughness: 0.3, emissive, emissiveIntensity: ei }),
-      beltDark: new THREE.MeshStandardMaterial({ color: beltColor || '#1a1a1a', metalness: 0.02, roughness: 0.85, emissive, emissiveIntensity: ei }),
-      outerBand: new THREE.MeshStandardMaterial({ color: '#b8bec4', metalness: 0.65, roughness: 0.35, emissive, emissiveIntensity: ei }),
-      towerFrame: new THREE.MeshStandardMaterial({ color: frameColor || '#4a5568', metalness: 0.6, roughness: 0.4, emissive, emissiveIntensity: ei }),
-      motorBody: new THREE.MeshStandardMaterial({ color: '#2a2a2a', metalness: 0.6, roughness: 0.4, emissive, emissiveIntensity: ei }),
-      basePlate: new THREE.MeshStandardMaterial({ color: '#3a3a3a', metalness: 0.7, roughness: 0.3, emissive, emissiveIntensity: ei }),
-      rubber: new THREE.MeshStandardMaterial({ color: '#111111', metalness: 0.0, roughness: 0.95 }),
-      redLight: new THREE.MeshStandardMaterial({ color: '#cc2222', emissive: '#cc2222', emissiveIntensity: 0.4 }),
-      yellowLight: new THREE.MeshStandardMaterial({ color: '#ccaa22', emissive: '#ccaa22', emissiveIntensity: 0.6 }),
-      greenLight: new THREE.MeshStandardMaterial({ color: '#22cc44', emissive: '#22cc44', emissiveIntensity: 0.8 }),
-      eStop: new THREE.MeshStandardMaterial({ color: '#dd0000', metalness: 0.3, roughness: 0.5 }),
-      sensorGray: new THREE.MeshStandardMaterial({ color: '#666666', metalness: 0.5, roughness: 0.4 }),
-      seamDark: new THREE.MeshStandardMaterial({ color: '#707580', metalness: 0.5, roughness: 0.5 }),
-      guardCover: new THREE.MeshStandardMaterial({ color: '#5a6070', metalness: 0.5, roughness: 0.45 }),
-      cableDark: new THREE.MeshStandardMaterial({ color: '#222222', metalness: 0.1, roughness: 0.8 }),
-    };
-  }, [isSelected, beltColor, frameColor]);
+/* ── Module-level materials (shared, never recreated) ── */
+const matDrumStainless = new THREE.MeshStandardMaterial({ color: '#a0a5ab', metalness: 0.6, roughness: 0.3 });
+const matBeltDark = new THREE.MeshStandardMaterial({ color: '#1a1a1a', metalness: 0.02, roughness: 0.85 });
+const matOuterBand = new THREE.MeshStandardMaterial({ color: '#b8bec4', metalness: 0.65, roughness: 0.35 });
+const matTowerFrame = new THREE.MeshStandardMaterial({ color: '#4a5568', metalness: 0.6, roughness: 0.4 });
+const matMotorBody = new THREE.MeshStandardMaterial({ color: '#2a2a2a', metalness: 0.6, roughness: 0.4 });
+const matBasePlate = new THREE.MeshStandardMaterial({ color: '#3a3a3a', metalness: 0.7, roughness: 0.3 });
+const matRubber = new THREE.MeshStandardMaterial({ color: '#111111', metalness: 0.0, roughness: 0.95 });
+const matRedLight = new THREE.MeshStandardMaterial({ color: '#cc2222', emissive: new THREE.Color('#cc2222'), emissiveIntensity: 0.4 });
+const matYellowLight = new THREE.MeshStandardMaterial({ color: '#ccaa22', emissive: new THREE.Color('#ccaa22'), emissiveIntensity: 0.6 });
+const matGreenLight = new THREE.MeshStandardMaterial({ color: '#22cc44', emissive: new THREE.Color('#22cc44'), emissiveIntensity: 0.8 });
+const matEStop = new THREE.MeshStandardMaterial({ color: '#dd0000', metalness: 0.3, roughness: 0.5 });
+const matSensorGray = new THREE.MeshStandardMaterial({ color: '#666666', metalness: 0.5, roughness: 0.4 });
+const matSeamDark = new THREE.MeshStandardMaterial({ color: '#707580', metalness: 0.5, roughness: 0.5 });
+const matGuardCover = new THREE.MeshStandardMaterial({ color: '#5a6070', metalness: 0.5, roughness: 0.45 });
+const matCableDark = new THREE.MeshStandardMaterial({ color: '#222222', metalness: 0.1, roughness: 0.8 });
+
+/* ── Helix ribbon geometry builder ── */
+function buildHelixRibbon(
+  innerR: number,
+  outerR: number,
+  startAngle: number,
+  totalAngle: number,
+  startY: number,
+  endY: number,
+  segments: number,
+  thickness: number,
+): THREE.BufferGeometry {
+  const verts: number[] = [];
+  const indices: number[] = [];
+
+  const safeSegs = Math.max(segments, 2);
+
+  for (let i = 0; i <= safeSegs; i++) {
+    const t = i / safeSegs;
+    const angle = startAngle + t * totalAngle;
+    const y = startY + t * (endY - startY);
+
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    const xi = cosA * innerR;
+    const zi = sinA * innerR;
+    const xo = cosA * outerR;
+    const zo = sinA * outerR;
+
+    // Bottom inner, bottom outer, top inner, top outer
+    verts.push(xi, y, zi);
+    verts.push(xo, y, zo);
+    verts.push(xi, y + thickness, zi);
+    verts.push(xo, y + thickness, zo);
+
+    if (i < safeSegs) {
+      const b = i * 4;
+      const n = (i + 1) * 4;
+      // Top face
+      indices.push(b + 2, n + 2, b + 3, b + 3, n + 2, n + 3);
+      // Bottom face
+      indices.push(b, b + 1, n, b + 1, n + 1, n);
+      // Outer side
+      indices.push(b + 1, b + 3, n + 1, b + 3, n + 3, n + 1);
+      // Inner side
+      indices.push(b, n, b + 2, b + 2, n, n + 2);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/* ── Guide rail ribbon (thin vertical wall along helix) ── */
+function buildHelixGuide(
+  radius: number,
+  startAngle: number,
+  totalAngle: number,
+  startY: number,
+  endY: number,
+  segments: number,
+  guideHeight: number,
+  beltThickness: number,
+): THREE.BufferGeometry {
+  const verts: number[] = [];
+  const indices: number[] = [];
+  const safeSegs = Math.max(segments, 2);
+
+  for (let i = 0; i <= safeSegs; i++) {
+    const t = i / safeSegs;
+    const angle = startAngle + t * totalAngle;
+    const y = startY + t * (endY - startY) + beltThickness;
+
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+
+    // Bottom, top
+    verts.push(x, y, z);
+    verts.push(x, y + guideHeight, z);
+
+    if (i < safeSegs) {
+      const b = i * 2;
+      const n = (i + 1) * 2;
+      // Front face
+      indices.push(b, n, b + 1, b + 1, n, n + 1);
+      // Back face
+      indices.push(b, b + 1, n, b + 1, n + 1, n);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
 }
 
 /* ── Reusable sub-components ── */
-
-const Bolt: React.FC<{ position: [number, number, number]; mat: THREE.Material; size?: number }> = ({ position, mat, size = 0.006 }) => (
-  <group position={position}>
-    <mesh material={mat} castShadow>
-      <cylinderGeometry args={[size, size, size * 1.5, 6]} />
-    </mesh>
-  </group>
+const Bolt: React.FC<{ position: [number, number, number]; size?: number }> = ({ position, size = 0.006 }) => (
+  <mesh material={matDrumStainless} position={position} castShadow>
+    <cylinderGeometry args={[size, size, size * 1.5, 6]} />
+  </mesh>
 );
 
 /* ── Main Component ── */
 const SpiralConveyorModel: React.FC<Props> = ({ parameters, isSelected }) => {
   const groupRef = useRef<THREE.Group>(null);
-  const mats = useMaterials(isSelected, parameters.beltColor, parameters.frameColor);
 
   // ─── Extract params (mm → m) ───
   const direction = parameters.direction || 'up';
-  const beltWidthM = ((parameters.beltWidth || 400) / 1000);
-  const diameterM = ((parameters.diameter || 1800) / 1000);
-  const totalHeightM = ((parameters.totalHeight || 3000) / 1000);
-  const turns = parameters.turns || 3;
-  const risePerTurn = ((parameters.risePerTurn || 1000) / 1000);
+  const beltWidthM = (parameters.beltWidth || 400) / 1000;
+  const turns = Math.max(parameters.turns || 3, 0.5);
   const infeedAngle = ((parameters.infeedAngle || 0) * Math.PI) / 180;
-  const outfeedAngle = ((parameters.outfeedAngle || 0) * Math.PI) / 180;
+  const outfeedAngleDeg = parameters.outfeedAngle || 0;
   const sideGuides = parameters.sideGuides !== false;
-  const guideHeightM = ((parameters.guideHeight || 80) / 1000);
+  const guideHeightM = (parameters.guideHeight || 80) / 1000;
   const showLegs = parameters.showLegs !== false;
   const centerStructure = parameters.centerStructure || 'column';
 
+  // Height driven by infeedHeight / outfeedHeight
+  const infeedHeightM = (parameters.infeedHeight || 800) / 1000;
+  const outfeedHeightM = (parameters.outfeedHeight || 3800) / 1000;
+
+  const isDown = direction === 'down';
+
+  // For "up": belt starts at infeedHeight, ends at outfeedHeight
+  // For "down": belt starts at outfeedHeight (infeed at top), ends at infeedHeight
+  const bottomY = Math.min(infeedHeightM, outfeedHeightM);
+  const topY = Math.max(infeedHeightM, outfeedHeightM);
+  const effectiveHeight = topY - bottomY;
+
   // ─── Derived geometry ───
-  const drumRadius = 0.2; // 200mm fixed drum radius
-  const innerRadius = drumRadius + 0.02; // 20mm gap
+  const drumRadius = 0.2;
+  const innerRadius = drumRadius + 0.02;
   const outerRadius = innerRadius + beltWidthM;
   const midRadius = (innerRadius + outerRadius) / 2;
   const beltThickness = 0.015;
-  const effectiveHeight = Math.min(totalHeightM, turns * risePerTurn);
 
-  // Segments: ~50 per turn, capped at 600
-  const segsPerTurn = 50;
+  // Helix angles
+  const startAngle = infeedAngle;
+  const totalAngle = turns * Math.PI * 2;
+
+  // Segments: ~60 per turn, capped at 600
+  const segsPerTurn = 60;
   const totalSegs = Math.min(Math.ceil(turns * segsPerTurn), 600);
 
-  const isDown = direction === 'down';
-  const dirMult = isDown ? -1 : 1;
+  // Tangent section length
+  const tangentLength = 0.35;
 
-  // ─── Helical belt segments ───
-  const beltData = useMemo(() => {
-    const segments: { pos: [number, number, number]; rot: [number, number, number]; width: number; length: number }[] = [];
-    const outerGuidePositions: { pos: [number, number, number]; rot: [number, number, number] }[] = [];
-    const innerGuidePositions: { pos: [number, number, number]; rot: [number, number, number] }[] = [];
-    const bracketPositions: { pos: [number, number, number]; rot: number }[] = [];
+  // ─── Continuous helix geometries ───
+  const helixGeos = useMemo(() => {
+    const belt = buildHelixRibbon(
+      innerRadius, outerRadius,
+      startAngle, totalAngle,
+      0, effectiveHeight,
+      totalSegs, beltThickness,
+    );
 
-    const startAngle = infeedAngle;
-    const totalAngle = turns * Math.PI * 2;
-    const arcPerSeg = (midRadius * totalAngle) / totalSegs;
+    const support = buildHelixRibbon(
+      innerRadius + 0.005, outerRadius - 0.005,
+      startAngle, totalAngle,
+      -0.004, effectiveHeight - 0.004,
+      totalSegs, 0.004,
+    );
 
-    for (let i = 0; i < totalSegs; i++) {
-      const t = i / totalSegs;
-      const tNext = (i + 1) / totalSegs;
-      const angle = startAngle + t * totalAngle;
-      const angleNext = startAngle + tNext * totalAngle;
-      const midAngle = (angle + angleNext) / 2;
+    let outerGuide: THREE.BufferGeometry | null = null;
+    let innerGuide: THREE.BufferGeometry | null = null;
 
-      const y = t * effectiveHeight;
-      const yNext = tNext * effectiveHeight;
-      const midY = (y + yNext) / 2;
-
-      const x = Math.cos(midAngle) * midRadius;
-      const z = Math.sin(midAngle) * midRadius;
-
-      // Pitch angle (rise per arc segment)
-      const rise = yNext - y;
-      const arcLen = midRadius * (angleNext - angle);
-      const pitch = Math.atan2(rise, arcLen);
-
-      const segLength = arcPerSeg * 0.96;
-
-      segments.push({
-        pos: [x, midY, z],
-        rot: [pitch, -midAngle + Math.PI / 2, 0],
-        width: outerRadius - innerRadius,
-        length: segLength,
-      });
-
-      // Outer guide band
-      if (sideGuides) {
-        const ox = Math.cos(midAngle) * outerRadius;
-        const oz = Math.sin(midAngle) * outerRadius;
-        outerGuidePositions.push({
-          pos: [ox, midY + guideHeightM * 0.4, oz],
-          rot: [0, -midAngle + Math.PI / 2, 0],
-        });
-      }
-
-      // Inner guide rail
-      if (sideGuides && i % 2 === 0) {
-        const ix = Math.cos(midAngle) * (innerRadius - 0.003);
-        const iz = Math.sin(midAngle) * (innerRadius - 0.003);
-        innerGuidePositions.push({
-          pos: [ix, midY + 0.03, iz],
-          rot: [0, -midAngle + Math.PI / 2, 0],
-        });
-      }
-
-      // Support brackets every quarter-turn
-      if (i % Math.max(1, Math.floor(segsPerTurn / 4)) === 0) {
-        bracketPositions.push({ pos: [x, midY - 0.02, z], rot: midAngle });
-      }
+    if (sideGuides) {
+      outerGuide = buildHelixGuide(
+        outerRadius + 0.002,
+        startAngle, totalAngle,
+        0, effectiveHeight,
+        totalSegs, guideHeightM, beltThickness,
+      );
+      innerGuide = buildHelixGuide(
+        innerRadius - 0.003,
+        startAngle, totalAngle,
+        0, effectiveHeight,
+        Math.ceil(totalSegs / 2), guideHeightM * 0.6, beltThickness,
+      );
     }
-    return { segments, outerGuidePositions, innerGuidePositions, bracketPositions };
-  }, [turns, effectiveHeight, innerRadius, outerRadius, midRadius, totalSegs, infeedAngle, sideGuides, guideHeightM, segsPerTurn]);
 
-  // Drum seams positions
+    return { belt, support, outerGuide, innerGuide };
+  }, [innerRadius, outerRadius, startAngle, totalAngle, effectiveHeight, totalSegs, beltThickness, sideGuides, guideHeightM]);
+
+  // ─── Bracket positions (every quarter turn) ───
+  const bracketData = useMemo(() => {
+    const brackets: { x: number; y: number; z: number; angle: number }[] = [];
+    const step = Math.max(1, Math.floor(segsPerTurn / 4));
+    for (let i = 0; i <= totalSegs; i += step) {
+      const t = i / totalSegs;
+      const angle = startAngle + t * totalAngle;
+      const y = t * effectiveHeight;
+      brackets.push({
+        x: Math.cos(angle) * outerRadius,
+        y,
+        z: Math.sin(angle) * outerRadius,
+        angle,
+      });
+    }
+    return brackets;
+  }, [totalSegs, segsPerTurn, startAngle, totalAngle, effectiveHeight, outerRadius]);
+
+  // Drum seams — thin cylinder rings instead of torus
   const drumSeams = useMemo(() => {
     const seams: number[] = [];
     const seamSpacing = 0.5;
@@ -157,58 +244,59 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters, isSelected }) => {
   }, [effectiveHeight]);
 
   // Tower position (on the outfeed side)
-  const towerAngle = infeedAngle + turns * Math.PI * 2 + outfeedAngle;
+  const towerAngle = startAngle + totalAngle;
   const towerDist = outerRadius + 0.22;
   const towerX = Math.cos(towerAngle) * towerDist;
   const towerZ = Math.sin(towerAngle) * towerDist;
   const towerYaw = -towerAngle + Math.PI / 2;
 
-  // Infeed/Outfeed tangent section helpers
-  const tangentLength = 0.35;
-
-  const infeedEndAngle = infeedAngle;
-  const infeedDir = [Math.cos(infeedEndAngle + Math.PI / 2), Math.sin(infeedEndAngle + Math.PI / 2)] as const;
+  // Infeed/Outfeed tangent section positions
+  const infeedEndAngle = startAngle;
+  const infeedDirX = Math.cos(infeedEndAngle + Math.PI / 2);
+  const infeedDirZ = Math.sin(infeedEndAngle + Math.PI / 2);
   const infeedPos: [number, number, number] = [
-    Math.cos(infeedEndAngle) * midRadius + infeedDir[0] * tangentLength * 0.5,
+    Math.cos(infeedEndAngle) * midRadius + infeedDirX * tangentLength * 0.5,
     0,
-    Math.sin(infeedEndAngle) * midRadius + infeedDir[1] * tangentLength * 0.5,
+    Math.sin(infeedEndAngle) * midRadius + infeedDirZ * tangentLength * 0.5,
   ];
   const infeedYaw = -infeedEndAngle + Math.PI / 2;
 
-  const outfeedEndAngle = infeedAngle + turns * Math.PI * 2;
-  const outfeedDir = [Math.cos(outfeedEndAngle + Math.PI / 2), Math.sin(outfeedEndAngle + Math.PI / 2)] as const;
+  const outfeedEndAngle = startAngle + totalAngle;
+  const outfeedDirX = Math.cos(outfeedEndAngle + Math.PI / 2);
+  const outfeedDirZ = Math.sin(outfeedEndAngle + Math.PI / 2);
   const outfeedPos: [number, number, number] = [
-    Math.cos(outfeedEndAngle) * midRadius + outfeedDir[0] * tangentLength * 0.5,
+    Math.cos(outfeedEndAngle) * midRadius + outfeedDirX * tangentLength * 0.5,
     effectiveHeight,
-    Math.sin(outfeedEndAngle) * midRadius + outfeedDir[1] * tangentLength * 0.5,
+    Math.sin(outfeedEndAngle) * midRadius + outfeedDirZ * tangentLength * 0.5,
   ];
   const outfeedYaw = -outfeedEndAngle + Math.PI / 2;
 
   // Swap infeed/outfeed for down direction
-  const [infeedFinal, outfeedFinal] = isDown
-    ? [{ pos: outfeedPos, yaw: outfeedYaw, y: effectiveHeight }, { pos: infeedPos, yaw: infeedYaw, y: 0 }]
-    : [{ pos: infeedPos, yaw: infeedYaw, y: 0 }, { pos: outfeedPos, yaw: outfeedYaw, y: effectiveHeight }];
-
-  const outerSegLen = (outerRadius - innerRadius > 0.001) ? ((2 * Math.PI * midRadius) / segsPerTurn) * 0.96 : 0.05;
+  const infeedFinal = isDown
+    ? { pos: outfeedPos, yaw: outfeedYaw }
+    : { pos: infeedPos, yaw: infeedYaw };
+  const outfeedFinal = isDown
+    ? { pos: infeedPos, yaw: infeedYaw }
+    : { pos: outfeedPos, yaw: outfeedYaw };
 
   return (
-    <group ref={groupRef}>
-      {/* ═══ A1: Central Core/Drum ═══ */}
-      <mesh material={mats.drumStainless} position={[0, effectiveHeight / 2, 0]} castShadow receiveShadow>
+    <group ref={groupRef} position={[0, bottomY, 0]}>
+      {/* ═══ Central Core/Drum ═══ */}
+      <mesh material={matDrumStainless} position={[0, effectiveHeight / 2, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[drumRadius, drumRadius, effectiveHeight, 32]} />
       </mesh>
       {/* Top cap */}
-      <mesh material={mats.drumStainless} position={[0, effectiveHeight + 0.008, 0]} castShadow>
+      <mesh material={matDrumStainless} position={[0, effectiveHeight + 0.008, 0]} castShadow>
         <cylinderGeometry args={[drumRadius + 0.015, drumRadius + 0.015, 0.016, 32]} />
       </mesh>
       {/* Bottom flange */}
-      <mesh material={mats.drumStainless} position={[0, -0.01, 0]} castShadow>
+      <mesh material={matDrumStainless} position={[0, -0.01, 0]} castShadow>
         <cylinderGeometry args={[drumRadius + 0.025, drumRadius + 0.025, 0.02, 32]} />
       </mesh>
-      {/* Drum seam lines */}
+      {/* Drum seam lines — thin cylinder rings (safe replacement for torusGeometry) */}
       {drumSeams.map((y, i) => (
-        <mesh key={`seam-${i}`} material={mats.seamDark} position={[0, y, 0]}>
-          <torusGeometry args={[drumRadius + 0.001, 0.002, 4, 32]} />
+        <mesh key={`seam-${i}`} material={matSeamDark} position={[0, y, 0]}>
+          <cylinderGeometry args={[drumRadius + 0.003, drumRadius + 0.003, 0.003, 32, 1, true]} />
         </mesh>
       ))}
 
@@ -216,7 +304,7 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters, isSelected }) => {
       {centerStructure === 'framed-core' && (
         <group>
           {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((a, i) => (
-            <mesh key={`frame-vert-${i}`} material={mats.towerFrame}
+            <mesh key={`frame-vert-${i}`} material={matTowerFrame}
               position={[Math.cos(a) * (drumRadius - 0.04), effectiveHeight / 2, Math.sin(a) * (drumRadius - 0.04)]} castShadow>
               <boxGeometry args={[0.04, effectiveHeight, 0.04]} />
             </mesh>
@@ -224,182 +312,152 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters, isSelected }) => {
         </group>
       )}
 
-      {/* ═══ A2: Helical Belt Path ═══ */}
-      {beltData.segments.map((seg, i) => (
-        <group key={`belt-${i}`} position={seg.pos} rotation={seg.rot}>
-          {/* Belt surface */}
-          <mesh material={mats.beltDark} castShadow receiveShadow>
-            <boxGeometry args={[seg.length, beltThickness, seg.width]} />
-          </mesh>
-          {/* Under-belt support plate */}
-          <mesh material={mats.drumStainless} position={[0, -beltThickness * 0.7, 0]}>
-            <boxGeometry args={[seg.length, 0.004, seg.width * 0.9]} />
-          </mesh>
-        </group>
-      ))}
+      {/* ═══ Continuous Helical Belt ═══ */}
+      <mesh geometry={helixGeos.belt} material={matBeltDark} castShadow receiveShadow />
+      {/* Under-belt support plate */}
+      <mesh geometry={helixGeos.support} material={matDrumStainless} />
 
-      {/* ═══ A3: Outer Stainless Guide Band ═══ */}
-      {beltData.outerGuidePositions.map((g, i) => (
-        <mesh key={`outer-${i}`} material={mats.outerBand} position={g.pos} rotation={g.rot} castShadow>
-          <boxGeometry args={[outerSegLen, guideHeightM, 0.003]} />
-        </mesh>
-      ))}
+      {/* ═══ Continuous Outer Guide Band ═══ */}
+      {helixGeos.outerGuide && (
+        <mesh geometry={helixGeos.outerGuide} material={matOuterBand} castShadow />
+      )}
 
       {/* Support brackets every quarter-turn */}
-      {beltData.bracketPositions.map((b, i) => {
-        const bx = Math.cos(b.rot) * outerRadius;
-        const bz = Math.sin(b.rot) * outerRadius;
-        return (
-          <mesh key={`bracket-${i}`} material={mats.towerFrame}
-            position={[bx, b.pos[1] + guideHeightM * 0.2, bz]}
-            rotation={[0, -b.rot + Math.PI / 2, 0]} castShadow>
-            <boxGeometry args={[0.02, guideHeightM * 0.6, 0.015]} />
-          </mesh>
-        );
-      })}
-
-      {/* ═══ A4: Inner Guide Rail ═══ */}
-      {beltData.innerGuidePositions.map((g, i) => (
-        <mesh key={`inner-${i}`} material={mats.outerBand} position={g.pos} rotation={g.rot} castShadow>
-          <boxGeometry args={[outerSegLen * 0.8, 0.05, 0.003]} />
+      {bracketData.map((b, i) => (
+        <mesh key={`bracket-${i}`} material={matTowerFrame}
+          position={[b.x, b.y + guideHeightM * 0.2 + beltThickness, b.z]}
+          rotation={[0, -b.angle + Math.PI / 2, 0]} castShadow>
+          <boxGeometry args={[0.02, guideHeightM * 0.6, 0.015]} />
         </mesh>
       ))}
 
-      {/* ═══ A5: Side Drive Tower/Frame ═══ */}
+      {/* ═══ Continuous Inner Guide Rail ═══ */}
+      {helixGeos.innerGuide && (
+        <mesh geometry={helixGeos.innerGuide} material={matOuterBand} castShadow />
+      )}
+
+      {/* ═══ Side Drive Tower/Frame ═══ */}
       <group position={[towerX, 0, towerZ]} rotation={[0, towerYaw, 0]}>
         {/* Main vertical columns (2) */}
-        <mesh material={mats.towerFrame} position={[-0.06, effectiveHeight / 2, 0]} castShadow>
+        <mesh material={matTowerFrame} position={[-0.06, effectiveHeight / 2, 0]} castShadow>
           <boxGeometry args={[0.06, effectiveHeight + 0.1, 0.06]} />
         </mesh>
-        <mesh material={mats.towerFrame} position={[0.06, effectiveHeight / 2, 0]} castShadow>
+        <mesh material={matTowerFrame} position={[0.06, effectiveHeight / 2, 0]} castShadow>
           <boxGeometry args={[0.06, effectiveHeight + 0.1, 0.06]} />
         </mesh>
         {/* Cross braces every 0.6m */}
-        {Array.from({ length: Math.ceil(effectiveHeight / 0.6) }, (_, i) => (
-          <mesh key={`xbrace-${i}`} material={mats.towerFrame}
+        {Array.from({ length: Math.max(1, Math.ceil(effectiveHeight / 0.6)) }, (_, i) => (
+          <mesh key={`xbrace-${i}`} material={matTowerFrame}
             position={[0, 0.3 + i * 0.6, 0]} castShadow>
             <boxGeometry args={[0.15, 0.03, 0.04]} />
           </mesh>
         ))}
         {/* Depth braces */}
-        <mesh material={mats.towerFrame} position={[-0.06, effectiveHeight * 0.3, -0.08]} castShadow>
-          <boxGeometry args={[0.04, effectiveHeight * 0.4, 0.04]} />
+        <mesh material={matTowerFrame} position={[-0.06, effectiveHeight * 0.3, -0.08]} castShadow>
+          <boxGeometry args={[0.04, Math.max(0.01, effectiveHeight * 0.4), 0.04]} />
         </mesh>
-        <mesh material={mats.towerFrame} position={[0.06, effectiveHeight * 0.3, -0.08]} castShadow>
-          <boxGeometry args={[0.04, effectiveHeight * 0.4, 0.04]} />
+        <mesh material={matTowerFrame} position={[0.06, effectiveHeight * 0.3, -0.08]} castShadow>
+          <boxGeometry args={[0.04, Math.max(0.01, effectiveHeight * 0.4), 0.04]} />
         </mesh>
 
         {/* Connection arms to spiral — top */}
-        <mesh material={mats.towerFrame} position={[0, effectiveHeight - 0.05, 0.15]} castShadow>
+        <mesh material={matTowerFrame} position={[0, effectiveHeight - 0.05, 0.15]} castShadow>
           <boxGeometry args={[0.05, 0.05, 0.3]} />
         </mesh>
         {/* Connection arm — bottom */}
-        <mesh material={mats.towerFrame} position={[0, 0.05, 0.15]} castShadow>
+        <mesh material={matTowerFrame} position={[0, 0.05, 0.15]} castShadow>
           <boxGeometry args={[0.05, 0.05, 0.3]} />
         </mesh>
 
         {/* ── Motor/Gearbox assembly at top ── */}
         <group position={[0, effectiveHeight + 0.12, 0]}>
-          {/* Mounting bracket */}
-          <mesh material={mats.towerFrame} position={[0, -0.04, 0]} castShadow>
+          <mesh material={matTowerFrame} position={[0, -0.04, 0]} castShadow>
             <boxGeometry args={[0.18, 0.02, 0.16]} />
           </mesh>
-          {/* Gearbox */}
-          <mesh material={mats.basePlate} position={[0, 0.02, 0]} castShadow>
+          <mesh material={matBasePlate} position={[0, 0.02, 0]} castShadow>
             <boxGeometry args={[0.12, 0.1, 0.12]} />
           </mesh>
-          {/* Motor body */}
-          <mesh material={mats.motorBody} position={[0.14, 0.02, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+          <mesh material={matMotorBody} position={[0.14, 0.02, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
             <cylinderGeometry args={[0.075, 0.075, 0.2, 16]} />
           </mesh>
-          {/* Motor end cap */}
-          <mesh material={mats.basePlate} position={[0.25, 0.02, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+          <mesh material={matBasePlate} position={[0.25, 0.02, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
             <cylinderGeometry args={[0.04, 0.04, 0.02, 12]} />
           </mesh>
-          {/* Motor fan cover */}
-          <mesh material={mats.guardCover} position={[0.27, 0.02, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+          <mesh material={matGuardCover} position={[0.27, 0.02, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
             <cylinderGeometry args={[0.065, 0.06, 0.03, 12]} />
           </mesh>
-          {/* Guard cover over drive */}
-          <mesh material={mats.guardCover} position={[0, 0.1, 0]} castShadow>
+          <mesh material={matGuardCover} position={[0, 0.1, 0]} castShadow>
             <boxGeometry args={[0.22, 0.04, 0.18]} />
           </mesh>
         </group>
 
-        {/* Cable conduit down tower */}
-        <mesh material={mats.cableDark} position={[-0.09, effectiveHeight / 2, -0.04]} castShadow>
-          <cylinderGeometry args={[0.012, 0.012, effectiveHeight, 8]} />
+        {/* Cable conduit */}
+        <mesh material={matCableDark} position={[-0.09, effectiveHeight / 2, -0.04]} castShadow>
+          <cylinderGeometry args={[0.012, 0.012, Math.max(0.01, effectiveHeight), 8]} />
         </mesh>
 
         {/* Access panel */}
-        <mesh material={mats.guardCover} position={[0, effectiveHeight * 0.6, -0.05]} castShadow>
+        <mesh material={matGuardCover} position={[0, effectiveHeight * 0.6, -0.05]} castShadow>
           <boxGeometry args={[0.12, 0.2, 0.005]} />
         </mesh>
-        {/* Access panel bolts */}
-        <Bolt position={[-0.04, effectiveHeight * 0.6 + 0.07, -0.055]} mat={mats.drumStainless} />
-        <Bolt position={[0.04, effectiveHeight * 0.6 + 0.07, -0.055]} mat={mats.drumStainless} />
-        <Bolt position={[-0.04, effectiveHeight * 0.6 - 0.07, -0.055]} mat={mats.drumStainless} />
-        <Bolt position={[0.04, effectiveHeight * 0.6 - 0.07, -0.055]} mat={mats.drumStainless} />
+        <Bolt position={[-0.04, effectiveHeight * 0.6 + 0.07, -0.055]} />
+        <Bolt position={[0.04, effectiveHeight * 0.6 + 0.07, -0.055]} />
+        <Bolt position={[-0.04, effectiveHeight * 0.6 - 0.07, -0.055]} />
+        <Bolt position={[0.04, effectiveHeight * 0.6 - 0.07, -0.055]} />
 
         {/* Junction box */}
-        <mesh material={mats.basePlate} position={[0.08, effectiveHeight * 0.75, -0.04]} castShadow>
+        <mesh material={matBasePlate} position={[0.08, effectiveHeight * 0.75, -0.04]} castShadow>
           <boxGeometry args={[0.06, 0.08, 0.04]} />
         </mesh>
 
-        {/* ═══ A8: Tower Light (green/yellow/red) ═══ */}
+        {/* Tower Light (green/yellow/red) */}
         <group position={[0, effectiveHeight + 0.32, 0]}>
-          {/* Pole */}
-          <mesh material={mats.basePlate} position={[0, -0.06, 0]}>
+          <mesh material={matBasePlate} position={[0, -0.06, 0]}>
             <cylinderGeometry args={[0.008, 0.008, 0.1, 6]} />
           </mesh>
-          {/* Red */}
-          <mesh material={mats.redLight} position={[0, 0.04, 0]}>
+          <mesh material={matRedLight} position={[0, 0.04, 0]}>
             <cylinderGeometry args={[0.015, 0.015, 0.025, 8]} />
           </mesh>
-          {/* Yellow */}
-          <mesh material={mats.yellowLight} position={[0, 0.015, 0]}>
+          <mesh material={matYellowLight} position={[0, 0.015, 0]}>
             <cylinderGeometry args={[0.015, 0.015, 0.025, 8]} />
           </mesh>
-          {/* Green */}
-          <mesh material={mats.greenLight} position={[0, -0.01, 0]}>
+          <mesh material={matGreenLight} position={[0, -0.01, 0]}>
             <cylinderGeometry args={[0.015, 0.015, 0.025, 8]} />
           </mesh>
-          {/* Top cap */}
-          <mesh material={mats.basePlate} position={[0, 0.055, 0]}>
+          <mesh material={matBasePlate} position={[0, 0.055, 0]}>
             <cylinderGeometry args={[0.018, 0.018, 0.006, 8]} />
           </mesh>
         </group>
 
-        {/* E-stop near base */}
+        {/* E-stop */}
         <group position={[0.09, 0.4, 0.02]}>
-          <mesh material={mats.eStop}>
+          <mesh material={matEStop}>
             <cylinderGeometry args={[0.018, 0.018, 0.015, 12]} />
           </mesh>
-          {/* Yellow surround */}
-          <mesh material={mats.yellowLight} position={[0, -0.005, 0]}>
+          <mesh material={matYellowLight} position={[0, -0.005, 0]}>
             <cylinderGeometry args={[0.025, 0.025, 0.005, 12]} />
           </mesh>
         </group>
       </group>
 
-      {/* ═══ A6: Base Frame ═══ */}
+      {/* ═══ Base Frame ═══ */}
       {showLegs && (
-        <group>
+        <group position={[0, -bottomY, 0]}>
           {/* Center-to-tower base arm */}
-          <mesh material={mats.basePlate}
-            position={[towerX * 0.5, -0.025, towerZ * 0.5]}
+          <mesh material={matBasePlate}
+            position={[(towerX) * 0.5, bottomY - 0.025, (towerZ) * 0.5]}
             rotation={[0, towerYaw, 0]} castShadow>
-            <boxGeometry args={[Math.sqrt(towerX * towerX + towerZ * towerZ), 0.04, 0.08]} />
+            <boxGeometry args={[Math.max(0.01, Math.sqrt(towerX * towerX + towerZ * towerZ)), 0.04, 0.08]} />
           </mesh>
           {/* Opposite side arm */}
-          <mesh material={mats.basePlate}
-            position={[-towerX * 0.35, -0.025, -towerZ * 0.35]}
+          <mesh material={matBasePlate}
+            position={[-towerX * 0.35, bottomY - 0.025, -towerZ * 0.35]}
             rotation={[0, towerYaw, 0]} castShadow>
-            <boxGeometry args={[Math.sqrt(towerX * towerX + towerZ * towerZ) * 0.7, 0.04, 0.08]} />
+            <boxGeometry args={[Math.max(0.01, Math.sqrt(towerX * towerX + towerZ * towerZ) * 0.7), 0.04, 0.08]} />
           </mesh>
           {/* Cross bar at base */}
-          <mesh material={mats.basePlate}
-            position={[0, -0.025, 0]}
+          <mesh material={matBasePlate}
+            position={[0, bottomY - 0.025, 0]}
             rotation={[0, towerYaw + Math.PI / 2, 0]} castShadow>
             <boxGeometry args={[outerRadius * 1.5, 0.04, 0.06]} />
           </mesh>
@@ -411,96 +469,80 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters, isSelected }) => {
             [towerX * 0.9 + Math.cos(towerYaw + Math.PI / 2) * 0.15, towerZ * 0.9 + Math.sin(towerYaw + Math.PI / 2) * 0.15],
             [-towerX * 0.3 + Math.cos(towerYaw + Math.PI / 2) * 0.15, -towerZ * 0.3 + Math.sin(towerYaw + Math.PI / 2) * 0.15],
           ].map(([fx, fz], i) => (
-            <group key={`foot-${i}`} position={[fx as number, -0.05, fz as number]}>
-              {/* Threaded rod */}
-              <mesh material={mats.drumStainless}>
+            <group key={`foot-${i}`} position={[fx as number, bottomY - 0.05, fz as number]}>
+              <mesh material={matDrumStainless}>
                 <cylinderGeometry args={[0.008, 0.008, 0.03, 6]} />
               </mesh>
-              {/* Rubber pad */}
-              <mesh material={mats.rubber} position={[0, -0.02, 0]}>
+              <mesh material={matRubber} position={[0, -0.02, 0]}>
                 <cylinderGeometry args={[0.02, 0.022, 0.01, 8]} />
               </mesh>
             </group>
           ))}
-
-          {/* Gussets at base connections */}
-          <mesh material={mats.basePlate}
-            position={[towerX * 0.12, -0.01, towerZ * 0.12]}
-            rotation={[0, towerYaw, Math.PI / 4]} castShadow>
-            <boxGeometry args={[0.06, 0.06, 0.005]} />
-          </mesh>
         </group>
       )}
 
-      {/* ═══ A7: Infeed Tangent Section ═══ */}
-      <group position={infeedFinal.pos} rotation={[0, isDown ? outfeedYaw : infeedYaw, 0]}>
-        {/* Belt surface */}
-        <mesh material={mats.beltDark} position={[tangentLength * 0.5, 0, 0]} castShadow receiveShadow>
+      {/* ═══ Infeed Tangent Section ═══ */}
+      <group position={infeedFinal.pos} rotation={[0, infeedFinal.yaw, 0]}>
+        <mesh material={matBeltDark} position={[tangentLength * 0.5, 0, 0]} castShadow receiveShadow>
           <boxGeometry args={[tangentLength, beltThickness, beltWidthM]} />
         </mesh>
-        {/* Under-support */}
-        <mesh material={mats.drumStainless} position={[tangentLength * 0.5, -beltThickness * 0.7, 0]}>
+        <mesh material={matDrumStainless} position={[tangentLength * 0.5, -beltThickness * 0.7, 0]}>
           <boxGeometry args={[tangentLength, 0.004, beltWidthM * 0.9]} />
         </mesh>
-        {/* Side guides */}
         {sideGuides && (
           <>
-            <mesh material={mats.outerBand} position={[tangentLength * 0.5, guideHeightM * 0.4, beltWidthM / 2 + 0.003]}>
+            <mesh material={matOuterBand} position={[tangentLength * 0.5, guideHeightM * 0.4, beltWidthM / 2 + 0.003]}>
               <boxGeometry args={[tangentLength, guideHeightM, 0.003]} />
             </mesh>
-            <mesh material={mats.outerBand} position={[tangentLength * 0.5, guideHeightM * 0.4, -beltWidthM / 2 - 0.003]}>
+            <mesh material={matOuterBand} position={[tangentLength * 0.5, guideHeightM * 0.4, -beltWidthM / 2 - 0.003]}>
               <boxGeometry args={[tangentLength, guideHeightM, 0.003]} />
             </mesh>
           </>
         )}
         {/* Sensor mount at infeed */}
         <group position={[tangentLength + 0.02, 0.06, beltWidthM / 2 + 0.02]}>
-          <mesh material={mats.sensorGray}>
+          <mesh material={matSensorGray}>
             <boxGeometry args={[0.015, 0.04, 0.015]} />
           </mesh>
-          <mesh material={mats.sensorGray} position={[0, 0.025, -0.01]} rotation={[0, 0, 0]}>
+          <mesh material={matSensorGray} position={[0, 0.025, -0.01]}>
             <cylinderGeometry args={[0.005, 0.005, 0.015, 8]} />
           </mesh>
         </group>
       </group>
 
-      {/* ═══ A7: Outfeed Tangent Section ═══ */}
-      <group position={outfeedFinal.pos} rotation={[0, isDown ? infeedYaw : outfeedYaw, 0]}>
-        {/* Belt surface */}
-        <mesh material={mats.beltDark} position={[tangentLength * 0.5, 0, 0]} castShadow receiveShadow>
+      {/* ═══ Outfeed Tangent Section ═══ */}
+      <group position={outfeedFinal.pos} rotation={[0, outfeedFinal.yaw, 0]}>
+        <mesh material={matBeltDark} position={[tangentLength * 0.5, 0, 0]} castShadow receiveShadow>
           <boxGeometry args={[tangentLength, beltThickness, beltWidthM]} />
         </mesh>
-        {/* Under-support */}
-        <mesh material={mats.drumStainless} position={[tangentLength * 0.5, -beltThickness * 0.7, 0]}>
+        <mesh material={matDrumStainless} position={[tangentLength * 0.5, -beltThickness * 0.7, 0]}>
           <boxGeometry args={[tangentLength, 0.004, beltWidthM * 0.9]} />
         </mesh>
-        {/* Side guides */}
         {sideGuides && (
           <>
-            <mesh material={mats.outerBand} position={[tangentLength * 0.5, guideHeightM * 0.4, beltWidthM / 2 + 0.003]}>
+            <mesh material={matOuterBand} position={[tangentLength * 0.5, guideHeightM * 0.4, beltWidthM / 2 + 0.003]}>
               <boxGeometry args={[tangentLength, guideHeightM, 0.003]} />
             </mesh>
-            <mesh material={mats.outerBand} position={[tangentLength * 0.5, guideHeightM * 0.4, -beltWidthM / 2 - 0.003]}>
+            <mesh material={matOuterBand} position={[tangentLength * 0.5, guideHeightM * 0.4, -beltWidthM / 2 - 0.003]}>
               <boxGeometry args={[tangentLength, guideHeightM, 0.003]} />
             </mesh>
           </>
         )}
-        {/* Sensor mount at outfeed */}
         <group position={[tangentLength + 0.02, 0.06, -beltWidthM / 2 - 0.02]}>
-          <mesh material={mats.sensorGray}>
+          <mesh material={matSensorGray}>
             <boxGeometry args={[0.015, 0.04, 0.015]} />
           </mesh>
-          <mesh material={mats.sensorGray} position={[0, 0.025, 0.01]}>
+          <mesh material={matSensorGray} position={[0, 0.025, 0.01]}>
             <cylinderGeometry args={[0.005, 0.005, 0.015, 8]} />
           </mesh>
         </group>
       </group>
 
-      {/* ═══ A8: Bolt patterns on drum flanges ═══ */}
+      {/* ═══ Bolt patterns on drum flanges ═══ */}
       {[0, Math.PI / 3, (2 * Math.PI) / 3, Math.PI, (4 * Math.PI) / 3, (5 * Math.PI) / 3].map((a, i) => (
         <React.Fragment key={`dbolt-${i}`}>
-          <Bolt position={[Math.cos(a) * (drumRadius + 0.01), effectiveHeight + 0.017, Math.sin(a) * (drumRadius + 0.01)]} mat={mats.drumStainless} />
-          <Bolt position={[Math.cos(a) * (drumRadius + 0.015), -0.021, Math.sin(a) * (drumRadius + 0.015)]} mat={mats.drumStainless} />
+          <Bolt position={[Math.cos(a) * (drumRadius + 0.01), effectiveHeight + 0.017, Math.sin(a) * (drumRadius + 0.01)]} />
+          <Bolt position={[Math.cos(a) * (drumRadius + 0.015), -0.021, Math.sin(a) * (drumRadius + 0.015)]} />
         </React.Fragment>
       ))}
     </group>
