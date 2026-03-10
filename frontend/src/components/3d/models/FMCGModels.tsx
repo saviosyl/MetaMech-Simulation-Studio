@@ -100,41 +100,640 @@ function ControlPanel({ position, height = 0.3 }: { position: [number, number, n
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CARTON ERECTOR
+// CARTON ERECTOR — Premium Premier Tech CFS-style RSC Case Erector
+// Automatic case erector with magazine, pickup, forming, folding,
+// tape sealing, and discharge conveyor zones.
 // ═══════════════════════════════════════════════════════════════
+
+/** Hand-knob for adjustable guides */
+function HandKnob({ position, rotation }: { position: [number, number, number]; rotation?: [number, number, number] }) {
+  return (
+    <group position={position} rotation={rotation || [0, 0, 0]}>
+      <mesh castShadow>
+        <cylinderGeometry args={[0.012, 0.012, 0.008, 16]} />
+        <primitive object={matBlackPlastic} attach="material" />
+      </mesh>
+      <mesh position={[0, 0.006, 0]}>
+        <cylinderGeometry args={[0.015, 0.012, 0.005, 5]} />
+        <primitive object={matBlackPlastic} attach="material" />
+      </mesh>
+      {/* Threaded shaft */}
+      <mesh position={[0, -0.012, 0]}>
+        <cylinderGeometry args={[0.004, 0.004, 0.016, 6]} />
+        <primitive object={matStainlessBrushed} attach="material" />
+      </mesh>
+    </group>
+  );
+}
+
+/** Suction cup */
+function SuctionCup({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      {/* Cup body (bellows) */}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.015, 0.012, 0.012, 12]} />
+        <primitive object={matBlackPlastic} attach="material" />
+      </mesh>
+      {/* Fitting */}
+      <mesh position={[0, 0, -0.01]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.005, 0.005, 0.01, 8]} />
+        <primitive object={matStainlessBrushed} attach="material" />
+      </mesh>
+    </group>
+  );
+}
+
+/** Safety interlock switch housing */
+function InterlockSwitch({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      <mesh castShadow>
+        <boxGeometry args={[0.025, 0.04, 0.015]} />
+        <primitive object={matBlackPlastic} attach="material" />
+      </mesh>
+      {/* Actuator tab */}
+      <mesh position={[0, 0.025, 0]}>
+        <boxGeometry args={[0.015, 0.012, 0.004]} />
+        <primitive object={matStainlessSatin} attach="material" />
+      </mesh>
+    </group>
+  );
+}
+
+/** Tape roll on holder */
+function TapeRollHolder({ position, rotation }: { position: [number, number, number]; rotation?: [number, number, number] }) {
+  return (
+    <group position={position} rotation={rotation || [0, 0, 0]}>
+      {/* Spindle */}
+      <mesh rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[0.008, 0.008, 0.06, 8]} />
+        <primitive object={matStainlessBrushed} attach="material" />
+      </mesh>
+      {/* Tape roll (torus-like via cylinder with hole appearance) */}
+      <mesh rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.038, 0.038, 0.05, 16]} />
+        <meshStandardMaterial color={0xc4a882} metalness={0.05} roughness={0.6} />
+      </mesh>
+      {/* Core */}
+      <mesh rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.02, 0.02, 0.052, 12]} />
+        <meshStandardMaterial color={0x8B7355} metalness={0.05} roughness={0.7} />
+      </mesh>
+      {/* Retaining knob */}
+      <mesh position={[0.035, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.012, 0.012, 0.006, 8]} />
+        <primitive object={matBlackPlastic} attach="material" />
+      </mesh>
+    </group>
+  );
+}
+
+/** Pneumatic cylinder */
+function PneumaticCylinder({ position, rotation, length = 0.12 }: { position: [number, number, number]; rotation?: [number, number, number]; length?: number }) {
+  return (
+    <group position={position} rotation={rotation || [0, 0, 0]}>
+      {/* Cylinder body */}
+      <mesh castShadow>
+        <cylinderGeometry args={[0.016, 0.016, length, 12]} />
+        <primitive object={matAluminum} attach="material" />
+      </mesh>
+      {/* End caps */}
+      {[-1, 1].map((s, i) => (
+        <mesh key={i} position={[0, s * (length / 2 + 0.004), 0]}>
+          <cylinderGeometry args={[0.019, 0.019, 0.008, 12]} />
+          <primitive object={matAluminum} attach="material" />
+        </mesh>
+      ))}
+      {/* Piston rod */}
+      <mesh position={[0, length / 2 + 0.03, 0]}>
+        <cylinderGeometry args={[0.005, 0.005, 0.06, 8]} />
+        <primitive object={matStainlessBrushed} attach="material" />
+      </mesh>
+      {/* Fittings */}
+      {[-1, 1].map((s, i) => (
+        <mesh key={`fit-${i}`} position={[0.018, s * length * 0.3, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.004, 0.004, 0.012, 6]} />
+          <primitive object={matBlackPlastic} attach="material" />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 export const CartonErectorModel: React.FC<ModelProps> = ({ params }) => {
-  const w = (params?.width || 1200) / 1000;
-  const d = (params?.depth || 800) / 1000;
-  const h = (params?.height || 1800) / 1000;
+  const machineL = (params?.width || 3000) / 1000;   // machine length along X
+  const machineW = (params?.depth || 1450) / 1000;    // machine width along Z
+  const eqH = (params?.height || 2160) / 1000;
+  const beltH = params?.infeedHeight ? (params.infeedHeight / 1000) : (eqH * 0.42);
+
+  const tubeSize = 0.04;
+  const halfL = machineL / 2;
+  const halfW = machineW / 2;
+  const frameTopY = eqH;
+  const legH = beltH - 0.05; // legs support the bed
+  const bedY = beltH;
+
+  // Zone boundaries (fractions of machineL, left = -X, right = +X)
+  const z1Start = -halfL;                     // magazine start
+  const z1End = z1Start + machineL * 0.30;    // magazine end
+  const z2End = z1End + machineL * 0.20;      // pickup end
+  const z3End = z2End + machineL * 0.15;      // forming end
+  const z4End = z3End + machineL * 0.15;      // folder end
+  const z5End = z4End + machineL * 0.10;      // sealing end
+  const z6End = halfL;                         // discharge end
+
+  // Zone centers
+  const z1cx = (z1Start + z1End) / 2;
+  const z2cx = (z1End + z2End) / 2;
+  const z3cx = (z2End + z3End) / 2;
+  const z4cx = (z3End + z4End) / 2;
+  const z5cx = (z4End + z5End) / 2;
+  const z6cx = (z5End + z6End) / 2;
+
+  // Post positions (at zone boundaries)
+  const postXPositions = [z1Start + 0.02, z1End, z2End, z3End, z4End, z5End, z6End - 0.02];
+
+  // Guard door section width
+  const guardDoorW = 0.50;
+  const guardDoorH = eqH * 0.5;
+  const guardBottomY = bedY + 0.02;
 
   return (
     <group>
-      <MachineFrame width={w} depth={d} height={h * 0.5} />
-      {/* Main body enclosure */}
-      <mesh position={[0, h * 0.65, 0]} castShadow>
-        <boxGeometry args={[w * 0.9, h * 0.5, d * 0.9]} />
-        <meshStandardMaterial {...matPanel} />
-      </mesh>
-      {/* Safety guard panels (yellow transparent) */}
+      {/* ═══ FRAME AND STRUCTURE ═══ */}
+
+      {/* Vertical posts (front and rear) */}
+      {postXPositions.map((px, i) =>
+        [-1, 1].map((sz, j) => (
+          <mesh key={`post-${i}-${j}`} position={[px, frameTopY / 2, sz * (halfW - tubeSize / 2)]} castShadow>
+            <boxGeometry args={[tubeSize, frameTopY, tubeSize]} />
+            <primitive object={matFrame} attach="material" />
+          </mesh>
+        ))
+      )}
+
+      {/* Upper portal beams (longitudinal, front & rear) */}
       {[-1, 1].map((sz, i) => (
-        <mesh key={i} position={[0, h * 0.65, sz * (d / 2 + 0.01)]}>
-          <boxGeometry args={[w * 0.85, h * 0.45, 0.003]} />
-          <meshStandardMaterial {...matGuard} />
+        <mesh key={`upper-long-${i}`} position={[0, frameTopY - tubeSize / 2, sz * (halfW - tubeSize / 2)]} castShadow>
+          <boxGeometry args={[machineL, tubeSize, tubeSize]} />
+          <primitive object={matFrame} attach="material" />
         </mesh>
       ))}
-      {/* Infeed/outfeed belt sections */}
-      {[-1, 1].map((sx, i) => (
-        <mesh key={`belt-${i}`} position={[sx * (w / 2 + 0.15), h * 0.5, 0]} castShadow>
-          <boxGeometry args={[0.3, 0.02, d * 0.6]} />
-          <meshStandardMaterial {...matBelt} />
+
+      {/* Upper cross beams (connecting front to rear at each post) */}
+      {postXPositions.map((px, i) => (
+        <mesh key={`upper-cross-${i}`} position={[px, frameTopY - tubeSize / 2, 0]} castShadow>
+          <boxGeometry args={[tubeSize, tubeSize, machineW]} />
+          <primitive object={matFrame} attach="material" />
         </mesh>
       ))}
-      {/* Flat carton magazine on top */}
-      <mesh position={[0, h * 0.95, -d * 0.2]} castShadow>
-        <boxGeometry args={[w * 0.5, 0.4, 0.1]} />
-        <meshStandardMaterial {...matStainless} />
+
+      {/* Lower cross braces */}
+      {postXPositions.map((px, i) => (
+        <mesh key={`lower-cross-${i}`} position={[px, legH * 0.3, 0]} castShadow>
+          <boxGeometry args={[tubeSize, tubeSize, machineW - tubeSize * 2]} />
+          <primitive object={matFrame} attach="material" />
+        </mesh>
+      ))}
+
+      {/* Lower longitudinal braces (front & rear) */}
+      {[-1, 1].map((sz, i) => (
+        <mesh key={`lower-long-${i}`} position={[0, legH * 0.3, sz * (halfW - tubeSize / 2)]} castShadow>
+          <boxGeometry args={[machineL, tubeSize, tubeSize]} />
+          <primitive object={matFrame} attach="material" />
+        </mesh>
+      ))}
+
+      {/* Machine bed plate (full length) */}
+      <mesh position={[0, bedY, 0]} castShadow>
+        <boxGeometry args={[machineL, 0.008, machineW * 0.85]} />
+        <primitive object={matStainlessSatin} attach="material" />
       </mesh>
-      <ControlPanel position={[w / 2 + 0.14, h * 0.7, d * 0.3]} />
+
+      {/* Leveling feet (6 along length) */}
+      {[-0.4, -0.15, 0.1, 0.25, 0.38, 0.48].map((frac, i) => (
+        <React.Fragment key={`feet-${i}`}>
+          <LevelingFoot position={[z1Start + machineL * (frac + 0.5), 0, halfW - tubeSize]} />
+          <LevelingFoot position={[z1Start + machineL * (frac + 0.5), 0, -(halfW - tubeSize)]} />
+        </React.Fragment>
+      ))}
+
+
+      {/* ═══ ZONE 1: BLANK MAGAZINE ═══ */}
+      <group>
+        {/* Magazine frame rails (horizontal, support the blank stack) */}
+        {[-1, 1].map((sz, i) => (
+          <mesh key={`mag-rail-${i}`} position={[z1cx, bedY + 0.01, sz * 0.18]} castShadow>
+            <boxGeometry args={[(z1End - z1Start) * 0.85, 0.015, 0.025]} />
+            <primitive object={matStainlessBrushed} attach="material" />
+          </mesh>
+        ))}
+
+        {/* Feed support rails underneath stack */}
+        {[-0.08, 0, 0.08].map((dz, i) => (
+          <mesh key={`feed-rail-${i}`} position={[z1cx, bedY + 0.002, dz]} castShadow>
+            <boxGeometry args={[(z1End - z1Start) * 0.8, 0.006, 0.015]} />
+            <primitive object={matAluminum} attach="material" />
+          </mesh>
+        ))}
+
+        {/* Flat blank stack (the recognizable feature — thick slab of cardboard blanks) */}
+        <mesh position={[z1cx, bedY + 0.045, 0]} castShadow>
+          <boxGeometry args={[0.40, 0.05, 0.30]} />
+          <meshStandardMaterial color={0xb8956a} metalness={0.02} roughness={0.8} />
+        </mesh>
+
+        {/* Stack line markings (individual blank edges) */}
+        {Array.from({ length: 6 }).map((_, i) => (
+          <mesh key={`blank-line-${i}`} position={[z1cx, bedY + 0.022 + i * 0.008, 0.151]} castShadow>
+            <boxGeometry args={[0.39, 0.002, 0.001]} />
+            <meshStandardMaterial color={0x9a7b5a} roughness={0.9} />
+          </mesh>
+        ))}
+
+        {/* Side guide rails (adjustable) */}
+        {[-1, 1].map((sz, i) => (
+          <group key={`guide-${i}`}>
+            <mesh position={[z1cx, bedY + 0.06, sz * 0.20]} castShadow>
+              <boxGeometry args={[0.42, 0.08, 0.005]} />
+              <primitive object={matStainlessBrushed} attach="material" />
+            </mesh>
+            {/* Adjustment slot (visual) */}
+            <mesh position={[z1cx, bedY + 0.02, sz * 0.20]} castShadow>
+              <boxGeometry args={[0.08, 0.004, 0.008]} />
+              <primitive object={matAluminum} attach="material" />
+            </mesh>
+            {/* Hand knobs for adjustment */}
+            <HandKnob position={[z1cx - 0.12, bedY + 0.02, sz * 0.215]} />
+            <HandKnob position={[z1cx + 0.12, bedY + 0.02, sz * 0.215]} />
+          </group>
+        ))}
+
+        {/* Rear backstop plate */}
+        <mesh position={[z1Start + 0.06, bedY + 0.06, 0]} castShadow>
+          <boxGeometry args={[0.005, 0.10, 0.32]} />
+          <primitive object={matStainlessBrushed} attach="material" />
+        </mesh>
+
+        {/* Magazine loading ramp (angled plate at rear) */}
+        <mesh position={[z1Start + 0.04, bedY + 0.11, 0]} rotation={[0, 0, 0.2]} castShadow>
+          <boxGeometry args={[0.003, 0.06, 0.30]} />
+          <primitive object={matAluminum} attach="material" />
+        </mesh>
+
+        {/* Front retainer bar */}
+        <mesh position={[z1End - 0.04, bedY + 0.04, 0]} castShadow>
+          <boxGeometry args={[0.006, 0.06, 0.28]} />
+          <primitive object={matStainlessBrushed} attach="material" />
+        </mesh>
+      </group>
+
+
+      {/* ═══ ZONE 2: BLANK PICKUP & OPENING ═══ */}
+      <group>
+        {/* Linear slide rail (horizontal, along X) */}
+        <mesh position={[z2cx, bedY + 0.22, 0]} castShadow>
+          <boxGeometry args={[(z2End - z1End) * 0.8, 0.02, 0.03]} />
+          <primitive object={matAluminum} attach="material" />
+        </mesh>
+
+        {/* Slide carriage */}
+        <mesh position={[z2cx - 0.05, bedY + 0.22, 0]} castShadow>
+          <boxGeometry args={[0.08, 0.04, 0.06]} />
+          <primitive object={matAluminum} attach="material" />
+        </mesh>
+
+        {/* Vacuum pickup plate */}
+        <mesh position={[z2cx - 0.05, bedY + 0.16, 0]} castShadow>
+          <boxGeometry args={[0.12, 0.008, 0.20]} />
+          <primitive object={matAluminum} attach="material" />
+        </mesh>
+
+        {/* 4 suction cups on the plate */}
+        {[[-0.04, -0.06], [-0.04, 0.06], [0.04, -0.06], [0.04, 0.06]].map(([dx, dz], i) => (
+          <SuctionCup key={`sc-${i}`} position={[z2cx - 0.05 + dx, bedY + 0.14, dz]} />
+        ))}
+
+        {/* Vertical arm connecting slide to plate */}
+        <mesh position={[z2cx - 0.05, bedY + 0.19, 0]} castShadow>
+          <boxGeometry args={[0.015, 0.06, 0.015]} />
+          <primitive object={matAluminum} attach="material" />
+        </mesh>
+
+        {/* Pneumatic cylinder (drives the pickup arm) */}
+        <PneumaticCylinder position={[z2cx + 0.08, bedY + 0.25, 0.15]} rotation={[0, 0, Math.PI / 2]} length={0.10} />
+
+        {/* Case opening guides (angled plates on both sides) */}
+        {[-1, 1].map((sz, i) => (
+          <mesh key={`open-guide-${i}`} position={[z2cx + 0.05, bedY + 0.08, sz * 0.16]} rotation={[sz * 0.3, 0, 0]} castShadow>
+            <boxGeometry args={[0.10, 0.06, 0.003]} />
+            <primitive object={matStainlessBrushed} attach="material" />
+          </mesh>
+        ))}
+
+        {/* Second pneumatic cylinder (opening assistance) */}
+        <PneumaticCylinder position={[z2cx, bedY + 0.28, -0.15]} rotation={[Math.PI / 2, 0, 0]} length={0.08} />
+
+        {/* Vacuum line manifold */}
+        <mesh position={[z2cx - 0.05, bedY + 0.26, 0.12]} castShadow>
+          <boxGeometry args={[0.04, 0.02, 0.02]} />
+          <primitive object={matBlackPlastic} attach="material" />
+        </mesh>
+      </group>
+
+
+      {/* ═══ ZONE 3: SQUARING/FORMING SECTION ═══ */}
+      <group>
+        {/* Side squaring guides (vertical plates) */}
+        {[-1, 1].map((sz, i) => (
+          <mesh key={`sq-guide-${i}`} position={[z3cx, bedY + 0.10, sz * 0.18]} castShadow>
+            <boxGeometry args={[(z3End - z2End) * 0.7, 0.18, 0.004]} />
+            <primitive object={matStainlessBrushed} attach="material" />
+          </mesh>
+        ))}
+
+        {/* Bottom support rail bed */}
+        {[-0.06, 0, 0.06].map((dz, i) => (
+          <mesh key={`form-rail-${i}`} position={[z3cx, bedY + 0.003, dz]} castShadow>
+            <boxGeometry args={[(z3End - z2End) * 0.8, 0.008, 0.02]} />
+            <primitive object={matStainlessBrushed} attach="material" />
+          </mesh>
+        ))}
+
+        {/* Flap control fingers (small angled plates, 4 total) */}
+        {[-1, 1].map((sz) =>
+          [-1, 1].map((sx, i) => (
+            <mesh key={`flap-${sz}-${i}`} position={[z3cx + sx * 0.06, bedY + 0.04, sz * 0.14]} rotation={[sz * 0.4, 0, 0]} castShadow>
+              <boxGeometry args={[0.04, 0.025, 0.003]} />
+              <primitive object={matStainlessBrushed} attach="material" />
+            </mesh>
+          ))
+        )}
+
+        {/* Guide channels (lower rails converging) */}
+        {[-1, 1].map((sz, i) => (
+          <mesh key={`ch-${i}`} position={[z3cx, bedY + 0.01, sz * 0.12]} castShadow>
+            <boxGeometry args={[(z3End - z2End) * 0.6, 0.015, 0.006]} />
+            <primitive object={matAluminum} attach="material" />
+          </mesh>
+        ))}
+
+        {/* Upper forming bar */}
+        <mesh position={[z3cx, bedY + 0.24, 0]} castShadow>
+          <boxGeometry args={[(z3End - z2End) * 0.5, 0.015, 0.25]} />
+          <primitive object={matAluminum} attach="material" />
+        </mesh>
+      </group>
+
+
+      {/* ═══ ZONE 4: BOTTOM FLAP FOLDER ═══ */}
+      <group>
+        {/* Fixed plows (angled plates — 2 per side, front & rear) */}
+        {[-1, 1].map((sz) =>
+          [-1, 1].map((sx, i) => (
+            <mesh key={`plow-${sz}-${i}`}
+              position={[z4cx + sx * 0.08, bedY + 0.04, sz * 0.16]}
+              rotation={[sz * 0.5, sx * 0.15, 0]} castShadow>
+              <boxGeometry args={[0.06, 0.04, 0.003]} />
+              <primitive object={matStainlessBrushed} attach="material" />
+            </mesh>
+          ))
+        )}
+
+        {/* Folding fingers (narrower, steeper angle) */}
+        {[-1, 1].map((sz, i) => (
+          <mesh key={`fold-finger-${i}`} position={[z4cx, bedY + 0.02, sz * 0.13]} rotation={[sz * 0.7, 0, 0]} castShadow>
+            <boxGeometry args={[0.05, 0.02, 0.003]} />
+            <primitive object={matStainlessBrushed} attach="material" />
+          </mesh>
+        ))}
+
+        {/* Lower belt bed for case transport */}
+        <mesh position={[z4cx, bedY + 0.005, 0]} castShadow>
+          <boxGeometry args={[(z4End - z3End) * 0.85, 0.012, machineW * 0.4]} />
+          <primitive object={matBeltRubber} attach="material" />
+        </mesh>
+
+        {/* Transport rollers */}
+        {[-0.08, 0, 0.08].map((dx, i) => (
+          <Roller key={`fold-roller-${i}`} position={[z4cx + dx, bedY - 0.01, 0]} length={machineW * 0.38} radius={0.018} />
+        ))}
+
+        {/* Timing rails (top, hold case down) */}
+        {[-1, 1].map((sz, i) => (
+          <mesh key={`timing-${i}`} position={[z4cx, bedY + 0.20, sz * 0.10]} castShadow>
+            <boxGeometry args={[(z4End - z3End) * 0.7, 0.008, 0.012]} />
+            <primitive object={matAluminum} attach="material" />
+          </mesh>
+        ))}
+      </group>
+
+
+      {/* ═══ ZONE 5: TAPE SEALING STATION ═══ */}
+      <group>
+        {/* Tape sealing head bracket (portal overhead) */}
+        <mesh position={[z5cx, bedY + 0.30, 0]} castShadow>
+          <boxGeometry args={[0.04, 0.12, machineW * 0.5]} />
+          <primitive object={matStainlessBrushed} attach="material" />
+        </mesh>
+
+        {/* Top tape head assembly */}
+        <mesh position={[z5cx, bedY + 0.26, 0]} castShadow>
+          <boxGeometry args={[0.06, 0.04, 0.08]} />
+          <primitive object={matAluminum} attach="material" />
+        </mesh>
+
+        {/* Bottom tape head assembly */}
+        <mesh position={[z5cx, bedY - 0.02, 0]} castShadow>
+          <boxGeometry args={[0.06, 0.04, 0.08]} />
+          <primitive object={matAluminum} attach="material" />
+        </mesh>
+
+        {/* Tape roll holders (top — 2 rolls) */}
+        <TapeRollHolder position={[z5cx - 0.04, bedY + 0.35, 0.08]} />
+        <TapeRollHolder position={[z5cx - 0.04, bedY + 0.35, -0.08]} />
+
+        {/* Bottom tape roll (single) */}
+        <TapeRollHolder position={[z5cx - 0.04, bedY - 0.06, 0]} />
+
+        {/* Pressure rollers (top & bottom) */}
+        {[1, -1].map((sy, i) => (
+          <mesh key={`press-roller-${i}`} position={[z5cx + 0.04, bedY + sy * 0.15, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+            <cylinderGeometry args={[0.015, 0.015, 0.06, 12]} />
+            <primitive object={matBlackPlastic} attach="material" />
+          </mesh>
+        ))}
+
+        {/* Spring-loaded compression frame (side arms) */}
+        {[-1, 1].map((sz, i) => (
+          <mesh key={`comp-frame-${i}`} position={[z5cx, bedY + 0.15, sz * 0.20]} castShadow>
+            <boxGeometry args={[0.06, 0.30, 0.008]} />
+            <primitive object={matFrame} attach="material" />
+          </mesh>
+        ))}
+
+        {/* Safety cover over sealing area */}
+        <GuardPanel
+          position={[z5cx, bedY + 0.38, 0]}
+          size={[0.12, 0.08, machineW * 0.45]}
+        />
+
+        {/* Belt through sealer */}
+        <mesh position={[z5cx, bedY + 0.005, 0]} castShadow>
+          <boxGeometry args={[(z5End - z4End) * 0.8, 0.010, machineW * 0.35]} />
+          <primitive object={matBeltRubber} attach="material" />
+        </mesh>
+      </group>
+
+
+      {/* ═══ ZONE 6: DISCHARGE CONVEYOR ═══ */}
+      <group>
+        <ConveyorSection
+          position={[z6cx, bedY + 0.008, 0]}
+          beltWidth={machineW * 0.45}
+          beltLength={(z6End - z5End) * 0.9}
+          rollerCount={2}
+          sideRailHeight={0.04}
+        />
+
+        {/* Drive motor */}
+        <MotorGearbox position={[z6End - 0.08, bedY - 0.06, halfW - 0.08]} rotation={[0, Math.PI / 2, 0]} />
+
+        {/* Discharge side guides (taller, for alignment) */}
+        {[-1, 1].map((sz, i) => (
+          <mesh key={`disch-guide-${i}`} position={[z6cx, bedY + 0.04, sz * (machineW * 0.25)]} castShadow>
+            <boxGeometry args={[(z6End - z5End) * 0.85, 0.06, 0.004]} />
+            <primitive object={matStainlessBrushed} attach="material" />
+          </mesh>
+        ))}
+      </group>
+
+
+      {/* ═══ GUARDING — OPERATOR SIDE (FRONT, +Z) ═══ */}
+      {/* 3 guard door sections along the front */}
+      {Array.from({ length: 3 }).map((_, i) => {
+        const doorX = z1End + 0.05 + i * (guardDoorW + 0.06);
+        return (
+          <group key={`guard-door-${i}`}>
+            <GuardPanel
+              position={[doorX, guardBottomY + guardDoorH / 2, halfW - 0.01]}
+              size={[guardDoorW, guardDoorH, 0.005]}
+            />
+            {/* Hinge blocks */}
+            {[-1, 1].map((sy, j) => (
+              <mesh key={`hinge-${i}-${j}`} position={[doorX - guardDoorW / 2 + 0.01, guardBottomY + guardDoorH / 2 + sy * guardDoorH * 0.35, halfW + 0.005]}>
+                <boxGeometry args={[0.02, 0.03, 0.015]} />
+                <primitive object={matStainlessSatin} attach="material" />
+              </mesh>
+            ))}
+            {/* Handle */}
+            <mesh position={[doorX + guardDoorW / 2 - 0.04, guardBottomY + guardDoorH / 2, halfW + 0.01]} castShadow>
+              <boxGeometry args={[0.008, 0.06, 0.012]} />
+              <primitive object={matStainlessBrushed} attach="material" />
+            </mesh>
+            {/* Safety interlock switch */}
+            <InterlockSwitch position={[doorX - guardDoorW / 2 + 0.01, guardBottomY + guardDoorH * 0.85, halfW + 0.015]} />
+          </group>
+        );
+      })}
+
+      {/* Rear panels (polycarbonate, fixed) — 2 large sections */}
+      {[-0.3, 0.3].map((frac, i) => (
+        <GuardPanel
+          key={`rear-panel-${i}`}
+          position={[frac * machineL * 0.5, guardBottomY + guardDoorH / 2, -(halfW - 0.01)]}
+          size={[machineL * 0.42, guardDoorH, 0.005]}
+        />
+      ))}
+
+      {/* Magazine area side panel (left end) */}
+      <GuardPanel
+        position={[z1Start + 0.01, guardBottomY + guardDoorH / 2, 0]}
+        size={[0.005, guardDoorH, machineW * 0.6]}
+        rotation={[0, 0, 0]}
+      />
+
+
+      {/* ═══ HMI AND CONTROLS ═══ */}
+
+      {/* HMI touchscreen on articulated arm (near magazine, operator side) */}
+      <HMIPanel position={[z1cx + 0.15, bedY + 0.55, halfW + 0.08]} rotation={[0, 0, 0]} />
+
+      {/* E-Stop button near HMI */}
+      <EStopButton position={[z1cx + 0.30, bedY + 0.35, halfW + 0.04]} />
+
+      {/* Tower light (top corner, discharge end) */}
+      <TowerLight position={[z6End - 0.06, frameTopY + 0.01, halfW - 0.06]} />
+
+      {/* Control cabinet (rear of frame, near center) */}
+      <group position={[z3cx, bedY + 0.30, -(halfW + 0.16)]}>
+        {/* Cabinet body */}
+        <mesh castShadow>
+          <boxGeometry args={[0.40, 0.60, 0.30]} />
+          <primitive object={matStainlessBrushed} attach="material" />
+        </mesh>
+        {/* Door seam */}
+        <mesh position={[0, 0, 0.151]}>
+          <boxGeometry args={[0.37, 0.57, 0.001]} />
+          <primitive object={matStainlessSatin} attach="material" />
+        </mesh>
+        {/* Handle */}
+        <mesh position={[0.15, 0, 0.16]} castShadow>
+          <boxGeometry args={[0.008, 0.06, 0.008]} />
+          <primitive object={matStainlessBrushed} attach="material" />
+        </mesh>
+        {/* Cabinet latch */}
+        <mesh position={[0.15, 0.05, 0.157]}>
+          <cylinderGeometry args={[0.006, 0.006, 0.008, 8]} />
+          <primitive object={matStainlessSatin} attach="material" />
+        </mesh>
+        {/* Cable glands (bottom) */}
+        {[-0.10, -0.05, 0, 0.05, 0.10].map((dx, i) => (
+          <mesh key={`gland-${i}`} position={[dx, -0.31, 0]} castShadow>
+            <cylinderGeometry args={[0.008, 0.008, 0.02, 8]} />
+            <primitive object={matBlackPlastic} attach="material" />
+          </mesh>
+        ))}
+        {/* Ventilation louvers */}
+        {[-0.08, -0.04, 0, 0.04, 0.08].map((dy, i) => (
+          <mesh key={`louver-${i}`} position={[-0.201, dy + 0.12, 0]} castShadow>
+            <boxGeometry args={[0.002, 0.012, 0.20]} />
+            <primitive object={matFrame} attach="material" />
+          </mesh>
+        ))}
+      </group>
+
+      {/* Cable conduit (from cabinet along frame to zones) */}
+      <mesh position={[0, frameTopY - tubeSize - 0.015, -(halfW - tubeSize)]} castShadow>
+        <boxGeometry args={[machineL * 0.7, 0.025, 0.025]} />
+        <primitive object={matCable} attach="material" />
+      </mesh>
+
+      {/* Secondary conduit (lower, to motors) */}
+      <mesh position={[z4cx, legH * 0.5, -(halfW - tubeSize)]} castShadow>
+        <boxGeometry args={[machineL * 0.35, 0.018, 0.018]} />
+        <primitive object={matCable} attach="material" />
+      </mesh>
+
+      {/* Junction boxes along conduit */}
+      <JunctionBox position={[z2cx, frameTopY - tubeSize - 0.015, -(halfW - tubeSize - 0.04)]} size={[0.08, 0.06, 0.04]} />
+      <JunctionBox position={[z4cx, frameTopY - tubeSize - 0.015, -(halfW - tubeSize - 0.04)]} size={[0.08, 0.06, 0.04]} />
+
+      {/* Bolts at frame joints (decorative, select locations) */}
+      {postXPositions.slice(0, 4).map((px, i) => (
+        <React.Fragment key={`bolts-${i}`}>
+          <BoltHead position={[px, frameTopY - tubeSize, halfW - tubeSize / 2]} rotation={[Math.PI / 2, 0, 0]} />
+          <BoltHead position={[px, legH * 0.3 + tubeSize / 2, halfW - tubeSize / 2]} rotation={[Math.PI / 2, 0, 0]} />
+        </React.Fragment>
+      ))}
+
+      {/* Access panel on rear (near magazine) */}
+      <AccessPanel
+        position={[z1cx, bedY + 0.30, -(halfW - 0.005)]}
+        size={[0.35, 0.30]}
+        rotation={[0, Math.PI, 0]}
+      />
     </group>
   );
 };

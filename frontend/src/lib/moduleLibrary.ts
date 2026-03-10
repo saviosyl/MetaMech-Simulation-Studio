@@ -1143,9 +1143,9 @@ export const moduleLibrary: ModuleDefinition[] = [
     icon: Package,
     description: 'Automatic carton forming and erecting machine',
     parameters: {
-      width: { type: 'number', label: 'Width (mm)', default: 1200, min: 800, max: 2000, step: 50 },
-      depth: { type: 'number', label: 'Depth (mm)', default: 800, min: 500, max: 1500, step: 50 },
-      height: { type: 'number', label: 'Height (mm)', default: 1800, min: 1200, max: 2500, step: 50 },
+      width: { type: 'number', label: 'Length (mm)', default: 3000, min: 2000, max: 4000, step: 50 },
+      depth: { type: 'number', label: 'Width (mm)', default: 1450, min: 1000, max: 2000, step: 50 },
+      height: { type: 'number', label: 'Height (mm)', default: 2160, min: 1500, max: 2500, step: 50 },
       cycleTime: { type: 'number', label: 'Cycle Time (s)', default: 3, min: 0.5, max: 30, step: 0.5 },
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 0, min: 0, max: 3000, step: 50 },
