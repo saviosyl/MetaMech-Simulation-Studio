@@ -1318,8 +1318,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   loadScene: (data) => {
+    // Migrate old spiral-conveyor params to new format
+    const nodes = data.processNodes || [];
+    for (const n of nodes) {
+      if (n.type === 'spiral-conveyor' && n.parameters) {
+        const p = n.parameters;
+        if ((p.diameter || p.totalHeight || p.infeedAngle !== undefined) && !p.outfeedAngle) {
+          p.infeedHeight = p.infeedHeight || 800;
+          p.outfeedHeight = p.outfeedHeight || ((p.totalHeight || 3000) + (p.infeedHeight || 800));
+          p.outfeedAngle = p.outfeedAngle || 180;
+          delete p.diameter;
+          delete p.totalHeight;
+          delete p.risePerTurn;
+          delete p.infeedAngle;
+        }
+      }
+    }
     set({
-      processNodes: data.processNodes || [],
+      processNodes: nodes,
       environmentAssets: data.environmentAssets || [],
       actors: data.actors || [],
       edges: data.edges || [],
