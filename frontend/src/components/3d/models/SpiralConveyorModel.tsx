@@ -209,7 +209,6 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters, isSelected }) => {
       {drumSeams.map((y, i) => (
         <mesh key={`seam-${i}`} material={mats.seamDark} position={[0, y, 0]}>
           <torusGeometry args={[drumRadius + 0.001, 0.002, 4, 32]} />
-          <meshStandardMaterial color="#707580" metalness={0.5} roughness={0.5} />
         </mesh>
       ))}
 

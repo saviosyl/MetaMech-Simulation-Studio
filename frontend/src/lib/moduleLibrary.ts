@@ -241,11 +241,10 @@ export const moduleLibrary: ModuleDefinition[] = [
       supportStyle: { type: 'select', label: 'Support Style', default: 'standard', options: ['standard', 'heavy-duty'] },
       baseType: { type: 'select', label: 'Base Type', default: 'reinforced', options: ['compact', 'reinforced'] },
       centerStructure: { type: 'select', label: 'Center Structure', default: 'column', options: ['column', 'framed-core'] },
-    },
-  
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
     },
+  },
   {
     id: 'stopper',
     name: 'Stopper',

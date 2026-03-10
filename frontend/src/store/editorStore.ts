@@ -339,15 +339,42 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       ];
     }
     case 'spiral-conveyor': {
-      const sR = (params?.diameter || 1800) / 2000;
-      const sH = (params?.totalHeight || 3000) / 1000;
-      const startA = ((params?.infeedAngle || 0) * Math.PI) / 180;
-      const endA = startA + (params?.turns || 3) * Math.PI * 2;
-      const infY = params?.direction === 'down' ? sH : 0;
-      const outY = params?.direction === 'down' ? 0 : sH;
+      const sDiam = (params?.diameter || 1800) / 1000;
+      const sBeltW = (params?.beltWidth || 400) / 1000;
+      const sTurns = params?.turns || 3;
+      const sRisePerTurn = (params?.risePerTurn || 1000) / 1000;
+      const sTotalH = (params?.totalHeight || 3000) / 1000;
+      const sEffH = Math.min(sTotalH, sTurns * sRisePerTurn);
+      const sDrumR = 0.2; // matches model
+      const sInnerR = sDrumR + 0.02;
+      const sOuterR = sInnerR + sBeltW;
+      const sMidR = (sInnerR + sOuterR) / 2;
+      const sTangentLen = 0.35; // matches model tangent length
+      const sStartA = ((params?.infeedAngle || 0) * Math.PI) / 180;
+      const sEndA = sStartA + sTurns * Math.PI * 2;
+      const sIsDown = params?.direction === 'down';
+
+      // Infeed tangent end (where conveyor connects) — at end of tangent section
+      const infeedDirX = Math.cos(sStartA + Math.PI / 2);
+      const infeedDirZ = Math.sin(sStartA + Math.PI / 2);
+      const infeedX = Math.cos(sStartA) * sMidR + infeedDirX * sTangentLen;
+      const infeedZ = Math.sin(sStartA) * sMidR + infeedDirZ * sTangentLen;
+
+      // Outfeed tangent end
+      const outfeedDirX = Math.cos(sEndA + Math.PI / 2);
+      const outfeedDirZ = Math.sin(sEndA + Math.PI / 2);
+      const outfeedX = Math.cos(sEndA) * sMidR + outfeedDirX * sTangentLen;
+      const outfeedZ = Math.sin(sEndA) * sMidR + outfeedDirZ * sTangentLen;
+
+      if (sIsDown) {
+        return [
+          { id: 'input', type: 'input', localPosition: [outfeedX, sEffH, outfeedZ] as [number, number, number] },
+          { id: 'output', type: 'output', localPosition: [infeedX, 0, infeedZ] as [number, number, number] },
+        ];
+      }
       return [
-        { id: 'input', type: 'input', localPosition: [Math.cos(startA) * sR, infY, Math.sin(startA) * sR] },
-        { id: 'output', type: 'output', localPosition: [Math.cos(endA) * sR, outY, Math.sin(endA) * sR] },
+        { id: 'input', type: 'input', localPosition: [infeedX, 0, infeedZ] as [number, number, number] },
+        { id: 'output', type: 'output', localPosition: [outfeedX, sEffH, outfeedZ] as [number, number, number] },
       ];
     }
     case 'stopper': {
