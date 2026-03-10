@@ -15,6 +15,7 @@ import {
   matModularBelt as matModular,
   matDarkSteel as matDrive,
   matIndustrialBlue as matMotor,
+  buildSEWMotor,
   matCleatRubber as matCleat,
   matSidewall,
 } from '../premiumMaterials';
@@ -239,19 +240,14 @@ function buildDriveAssembly(params: ConveyorParams): THREE.Group {
   roller.castShadow = true;
   group.add(roller);
 
-  // Motor housing
-  const motorW = 0.12;
-  const motorH = 0.1;
-  const motorD = 0.15;
-  const motorGeo = new THREE.BoxGeometry(motorD, motorH, motorW);
-  const motor = new THREE.Mesh(motorGeo, matMotor);
-
+  // SEW-style geared motor
+  const sewMotor = buildSEWMotor(1.0);
   const motorSideZ = params.motorSide === 'right'
-    ? widthM / 2 + 0.04 + motorW / 2
-    : -(widthM / 2 + 0.04 + motorW / 2);
-  motor.position.set(driveX, heightM - motorH / 2, motorSideZ);
-  motor.castShadow = true;
-  group.add(motor);
+    ? widthM / 2 + 0.06
+    : -(widthM / 2 + 0.06);
+  sewMotor.position.set(driveX, heightM - 0.05, motorSideZ);
+  sewMotor.rotation.set(0, params.motorSide === 'right' ? -Math.PI / 2 : Math.PI / 2, 0);
+  group.add(sewMotor);
 
   // Tail/deflection roller (only for end drive)
   if (params.driveType === 'end') {

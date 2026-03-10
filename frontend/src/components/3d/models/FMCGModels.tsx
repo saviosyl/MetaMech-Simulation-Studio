@@ -856,39 +856,93 @@ function PhotoeyeSensor({ position, rotation }: { position: [number, number, num
   );
 }
 
-/** Motor/gearbox assembly */
-function MotorGearbox({ position, rotation }: { position: [number, number, number]; rotation?: [number, number, number] }) {
+/** SEW-style geared motor — detailed industrial motor with cooling fins,
+ *  terminal box, right-angle gearbox, output shaft with keyway, nameplate.
+ *  Motor body along X, output shaft pointing +X. */
+const matSEWBlue = new THREE.MeshStandardMaterial({ color: 0x2b5e94, metalness: 0.3, roughness: 0.5 });
+const matGalvanized = new THREE.MeshStandardMaterial({ color: 0xa8a8a8, metalness: 0.65, roughness: 0.35 });
+const matChromeFMCG = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, metalness: 0.95, roughness: 0.08 });
+
+function MotorGearbox({ position, rotation, scale = 1 }: { position: [number, number, number]; rotation?: [number, number, number]; scale?: number }) {
+  const s = scale;
   return (
     <group position={position} rotation={rotation || [0, 0, 0]}>
-      {/* Motor body */}
+      {/* ── Motor body (cylindrical, SEW blue) ── */}
       <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.05, 0.05, 0.15, 16]} />
-        <primitive object={matMotor} attach="material" />
+        <cylinderGeometry args={[0.05 * s, 0.05 * s, 0.14 * s, 16]} />
+        <primitive object={matSEWBlue} attach="material" />
       </mesh>
-      {/* Motor end cap */}
-      <mesh position={[0.08, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-        <cylinderGeometry args={[0.042, 0.05, 0.01, 16]} />
-        <primitive object={matMotor} attach="material" />
-      </mesh>
-      {/* Fan cover (rear) */}
-      <mesh position={[-0.08, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.052, 0.052, 0.02, 16]} />
+      {/* Cooling fins (6 raised rings) */}
+      {Array.from({ length: 6 }).map((_, i) => (
+        <mesh key={`fin-${i}`} position={[-0.055 * s + i * 0.018 * s, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.053 * s, 0.053 * s, 0.004 * s, 16]} />
+          <primitive object={matSEWBlue} attach="material" />
+        </mesh>
+      ))}
+      {/* ── Fan cover (rear, black plastic) ── */}
+      <mesh position={[-0.082 * s, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[0.054 * s, 0.054 * s, 0.025 * s, 16]} />
         <primitive object={matBlackPlastic} attach="material" />
       </mesh>
-      {/* Gearbox */}
-      <mesh position={[0.1, 0, 0]} castShadow>
-        <boxGeometry args={[0.06, 0.08, 0.08]} />
+      {/* Fan grille slots */}
+      {[-1, 0, 1].map((i) => (
+        <mesh key={`grille-${i}`} position={[-0.095 * s, i * 0.018 * s, 0]}>
+          <boxGeometry args={[0.002 * s, 0.025 * s, 0.06 * s]} />
+          <primitive object={matDarkSteel} attach="material" />
+        </mesh>
+      ))}
+      {/* ── Terminal box (top of motor) ── */}
+      <mesh position={[-0.01 * s, 0.055 * s, 0]} castShadow>
+        <boxGeometry args={[0.05 * s, 0.025 * s, 0.04 * s]} />
+        <primitive object={matSEWBlue} attach="material" />
+      </mesh>
+      {/* Terminal box lid seam */}
+      <mesh position={[-0.01 * s, 0.068 * s, 0]}>
+        <boxGeometry args={[0.048 * s, 0.001 * s, 0.038 * s]} />
+        <primitive object={matDarkSteel} attach="material" />
+      </mesh>
+      {/* Cable gland */}
+      <mesh position={[-0.01 * s, 0.068 * s, 0.022 * s]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.006 * s, 0.006 * s, 0.015 * s, 6]} />
+        <primitive object={matBlackPlastic} attach="material" />
+      </mesh>
+      {/* ── Right-angle gearbox (cast aluminum) ── */}
+      <mesh position={[0.1 * s, -0.005 * s, 0]} castShadow>
+        <boxGeometry args={[0.065 * s, 0.09 * s, 0.09 * s]} />
         <primitive object={matAluminum} attach="material" />
       </mesh>
-      {/* Output shaft */}
-      <mesh position={[0.14, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.012, 0.012, 0.02, 8]} />
-        <primitive object={matStainlessBrushed} attach="material" />
+      {/* Gearbox bottom chamfer */}
+      <mesh position={[0.1 * s, -0.055 * s, 0]}>
+        <boxGeometry args={[0.063 * s, 0.01 * s, 0.088 * s]} />
+        <primitive object={matGalvanized} attach="material" />
       </mesh>
-      {/* Mounting bolts */}
-      {[[-0.04, 0.04], [-0.04, -0.04], [0.04, 0.04], [0.04, -0.04]].map(([dy, dz], i) => (
-        <BoltHead key={i} position={[-0.076, dy * 0.8, dz * 0.8]} rotation={[0, 0, Math.PI / 2]} />
+      {/* Gearbox mounting flange */}
+      <mesh position={[0.065 * s, -0.005 * s, 0]}>
+        <boxGeometry args={[0.008 * s, 0.1 * s, 0.1 * s]} />
+        <primitive object={matAluminum} attach="material" />
+      </mesh>
+      {/* Flange bolts (4) */}
+      {[[-0.035, -0.035], [-0.035, 0.035], [0.035, -0.035], [0.035, 0.035]].map(([dy, dz], i) => (
+        <mesh key={`fb-${i}`} position={[0.06 * s, dy * s, dz * s]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.004 * s, 0.004 * s, 0.006 * s, 6]} />
+          <primitive object={matDarkSteel} attach="material" />
+        </mesh>
       ))}
+      {/* ── Output shaft (chrome, with keyway) ── */}
+      <mesh position={[0.145 * s, -0.005 * s, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[0.014 * s, 0.014 * s, 0.03 * s, 12]} />
+        <primitive object={matChromeFMCG} attach="material" />
+      </mesh>
+      {/* Keyway slot */}
+      <mesh position={[0.145 * s, 0.007 * s, 0]}>
+        <boxGeometry args={[0.028 * s, 0.005 * s, 0.005 * s]} />
+        <primitive object={matDarkSteel} attach="material" />
+      </mesh>
+      {/* ── Nameplate ── */}
+      <mesh position={[0, 0, 0.051 * s]}>
+        <boxGeometry args={[0.035 * s, 0.02 * s, 0.001 * s]} />
+        <primitive object={matGalvanized} attach="material" />
+      </mesh>
     </group>
   );
 }

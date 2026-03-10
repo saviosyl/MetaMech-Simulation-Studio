@@ -31,6 +31,7 @@ import {
   matDarkSteel,
   matFootPad,
   matIndustrialBlue,
+  buildSEWMotor,
 } from '../premiumMaterials';
 
 // ─── Arc Helpers ───────────────────────────────────────────────
@@ -489,29 +490,17 @@ function buildDrive(p: BendConveyorParams): THREE.Group {
 
   // Drive rollers removed — clean belt surface only
 
-  // Motor housing on outfeed side
+  // SEW-style geared motor on outfeed side
   const motorSide = p.motorSide === 'inner' ? -1 : 1;
   const motorR = R + motorSide * (halfW + 0.08);
   const [mx, mz] = arcXZ(p.bendAngleDeg, motorR, p.bendDirection);
+  const motorAng = (p.bendAngleDeg * Math.PI) / 180;
+  const motorYaw = p.bendDirection === 'right' ? -motorAng : motorAng;
 
-  const motor = new THREE.Mesh(
-    new THREE.BoxGeometry(0.08, 0.1, 0.12),
-    matIndustrialBlue,
-  );
-  motor.position.set(mx, H - 0.06, mz);
-  motor.castShadow = true;
-  group.add(motor);
-
-  // Motor shaft
-  const [shx, shz] = arcXZ(p.bendAngleDeg, R + motorSide * halfW, p.bendDirection);
-  const shaftLen = Math.sqrt((mx - shx) ** 2 + (mz - shz) ** 2);
-  const shaftAng = Math.atan2(mx - shx, mz - shz);
-  const shaft = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.008, 0.008, shaftLen, 8),
-    matDarkSteel,
-  );
-  shaft.position.set((mx + shx) / 2, H, (mz + shz) / 2);
-  shaft.rotation.set(0, -shaftAng, Math.PI / 2);
+  const sewMotor = buildSEWMotor(0.9);
+  sewMotor.position.set(mx, H - 0.05, mz);
+  sewMotor.rotation.set(0, motorYaw + (motorSide > 0 ? -Math.PI / 2 : Math.PI / 2), 0);
+  group.add(sewMotor);
   group.add(shaft);
 
   return group;

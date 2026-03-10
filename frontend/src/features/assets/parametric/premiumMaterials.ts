@@ -197,6 +197,149 @@ export const matReflector = new THREE.MeshStandardMaterial({
   envMapIntensity: 2.0,
 });
 
+// ─── SEW-Style Geared Motor Builder ────────────────────────────
+
+/** SEW Eurodrive-style geared motor — reusable across all conveyor types.
+ *  Builds at origin, motor body along X axis, output shaft pointing +X.
+ *  Scale factor allows smaller/larger variants (default 1.0).
+ */
+export function buildSEWMotor(scale = 1.0): THREE.Group {
+  const g = new THREE.Group();
+  g.name = 'sew-geared-motor';
+  const s = scale;
+
+  // ── Motor body (cylindrical, SEW blue) ──
+  const motorBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05 * s, 0.05 * s, 0.14 * s, 16),
+    matIndustrialBlue,
+  );
+  motorBody.rotation.set(0, 0, Math.PI / 2);
+  motorBody.castShadow = true;
+  g.add(motorBody);
+
+  // Motor cooling fins (ribs along body — 6 raised rings)
+  for (let i = 0; i < 6; i++) {
+    const finX = -0.055 * s + i * 0.018 * s;
+    const fin = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.053 * s, 0.053 * s, 0.004 * s, 16),
+      matIndustrialBlue,
+    );
+    fin.rotation.set(0, 0, Math.PI / 2);
+    fin.position.set(finX, 0, 0);
+    g.add(fin);
+  }
+
+  // ── Fan cover (rear end, black plastic) ──
+  const fanCover = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.054 * s, 0.054 * s, 0.025 * s, 16),
+    matFootPad, // dark plastic
+  );
+  fanCover.rotation.set(0, 0, Math.PI / 2);
+  fanCover.position.set(-0.082 * s, 0, 0);
+  fanCover.castShadow = true;
+  g.add(fanCover);
+
+  // Fan cover grille (3 horizontal slots)
+  for (let i = -1; i <= 1; i++) {
+    const slot = new THREE.Mesh(
+      new THREE.BoxGeometry(0.002 * s, 0.025 * s, 0.06 * s),
+      matDarkSteel,
+    );
+    slot.position.set(-0.095 * s, i * 0.018 * s, 0);
+    g.add(slot);
+  }
+
+  // ── Terminal box (top of motor, junction box) ──
+  const termBox = new THREE.Mesh(
+    new THREE.BoxGeometry(0.05 * s, 0.025 * s, 0.04 * s),
+    matIndustrialBlue,
+  );
+  termBox.position.set(-0.01 * s, 0.055 * s, 0);
+  termBox.castShadow = true;
+  g.add(termBox);
+
+  // Terminal box lid line
+  const lidLine = new THREE.Mesh(
+    new THREE.BoxGeometry(0.048 * s, 0.001 * s, 0.038 * s),
+    matDarkSteel,
+  );
+  lidLine.position.set(-0.01 * s, 0.068 * s, 0);
+  g.add(lidLine);
+
+  // Cable gland on terminal box
+  const gland = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.006 * s, 0.006 * s, 0.015 * s, 6),
+    matDarkSteel,
+  );
+  gland.position.set(-0.01 * s, 0.068 * s, 0.022 * s);
+  gland.rotation.set(Math.PI / 2, 0, 0);
+  g.add(gland);
+
+  // ── Gearbox (right-angle, cast aluminum look) ──
+  const gearbox = new THREE.Mesh(
+    new THREE.BoxGeometry(0.065 * s, 0.09 * s, 0.09 * s),
+    matAluminum,
+  );
+  gearbox.position.set(0.1 * s, -0.005 * s, 0);
+  gearbox.castShadow = true;
+  g.add(gearbox);
+
+  // Gearbox chamfered edge (visual detail — small angled strip)
+  const chamfer = new THREE.Mesh(
+    new THREE.BoxGeometry(0.063 * s, 0.01 * s, 0.088 * s),
+    matGalvanized,
+  );
+  chamfer.position.set(0.1 * s, -0.055 * s, 0);
+  g.add(chamfer);
+
+  // Gearbox mounting flange (where it bolts to frame)
+  const flange = new THREE.Mesh(
+    new THREE.BoxGeometry(0.008 * s, 0.1 * s, 0.1 * s),
+    matAluminum,
+  );
+  flange.position.set(0.065 * s, -0.005 * s, 0);
+  g.add(flange);
+
+  // Mounting bolt pattern on flange (4 bolts)
+  for (const [dy, dz] of [[-0.035, -0.035], [-0.035, 0.035], [0.035, -0.035], [0.035, 0.035]]) {
+    const bolt = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.004 * s, 0.004 * s, 0.006 * s, 6),
+      matDarkSteel,
+    );
+    bolt.rotation.set(0, 0, Math.PI / 2);
+    bolt.position.set(0.06 * s, dy * s, dz * s);
+    g.add(bolt);
+  }
+
+  // ── Output shaft (hollow shaft / keyed) ──
+  const outputShaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.014 * s, 0.014 * s, 0.03 * s, 12),
+    matChrome,
+  );
+  outputShaft.rotation.set(0, 0, Math.PI / 2);
+  outputShaft.position.set(0.145 * s, -0.005 * s, 0);
+  outputShaft.castShadow = true;
+  g.add(outputShaft);
+
+  // Shaft keyway (dark slot)
+  const keyway = new THREE.Mesh(
+    new THREE.BoxGeometry(0.028 * s, 0.005 * s, 0.005 * s),
+    matDarkSteel,
+  );
+  keyway.position.set(0.145 * s, 0.007 * s, 0);
+  g.add(keyway);
+
+  // ── Nameplate (small rectangle on motor side) ──
+  const nameplate = new THREE.Mesh(
+    new THREE.BoxGeometry(0.035 * s, 0.02 * s, 0.001 * s),
+    matGalvanized,
+  );
+  nameplate.position.set(0, 0, 0.051 * s);
+  g.add(nameplate);
+
+  return g;
+}
+
 // ─── Cable / Wiring ────────────────────────────────────────────
 export const matCable = new THREE.MeshStandardMaterial({
   color: 0x1a1a1a,
