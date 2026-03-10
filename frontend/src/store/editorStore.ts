@@ -341,33 +341,30 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     case 'spiral-conveyor': {
       const sBeltW = (params?.beltWidth || 400) / 1000;
       const sTurns = Math.max(params?.turns || 3, 0.5);
+      const sOutAngleDeg = params?.outfeedAngle || 180;
+      const sOutAngleRad = (sOutAngleDeg * Math.PI) / 180;
       const sInfeedH = (params?.infeedHeight || 800) / 1000;
       const sOutfeedH = (params?.outfeedHeight || 3800) / 1000;
-      const sBottomY = Math.min(sInfeedH, sOutfeedH);
-      const sEffH = Math.abs(sOutfeedH - sInfeedH);
       const sDrumR = 0.2;
       const sInnerR = sDrumR + 0.02;
       const sOuterR = sInnerR + sBeltW;
       const sMidR = (sInnerR + sOuterR) / 2;
       const sTangentLen = 0.35;
-      const sStartA = ((params?.infeedAngle || 0) * Math.PI) / 180;
-      const sEndA = sStartA + sTurns * Math.PI * 2;
       const sIsDown = params?.direction === 'down';
 
-      // Infeed tangent end (at end of tangent section)
-      const infeedDirX = Math.cos(sStartA + Math.PI / 2);
-      const infeedDirZ = Math.sin(sStartA + Math.PI / 2);
-      const infeedX = Math.cos(sStartA) * sMidR + infeedDirX * sTangentLen;
-      const infeedZ = Math.sin(sStartA) * sMidR + infeedDirZ * sTangentLen;
+      // Infeed is FIXED at angle 0 (positive Z). Tangent at angle 0 is along +X.
+      // Infeed tangent end = midRadius point + tangent direction * length
+      const infeedX = Math.cos(0) * sMidR - Math.sin(0) * sTangentLen;
+      const infeedZ = Math.sin(0) * sMidR + Math.cos(0) * sTangentLen;
 
-      // Outfeed tangent end
-      const outfeedDirX = Math.cos(sEndA + Math.PI / 2);
-      const outfeedDirZ = Math.sin(sEndA + Math.PI / 2);
-      const outfeedX = Math.cos(sEndA) * sMidR + outfeedDirX * sTangentLen;
-      const outfeedZ = Math.sin(sEndA) * sMidR + outfeedDirZ * sTangentLen;
+      // Outfeed: total helix angle = turns * 2π + outfeedAngle
+      const sTotalAngle = sTurns * Math.PI * 2 + sOutAngleRad;
+      const outTanX = -Math.sin(sTotalAngle);
+      const outTanZ = Math.cos(sTotalAngle);
+      const outfeedX = Math.cos(sTotalAngle) * sMidR + outTanX * sTangentLen;
+      const outfeedZ = Math.sin(sTotalAngle) * sMidR + outTanZ * sTangentLen;
 
-      // Port Y positions: model group is offset by bottomY, ports are relative to group
-      // Infeed at Y=0 (bottom of helix), outfeed at Y=effectiveHeight (top)
+      // Heights are from ground (absolute)
       if (sIsDown) {
         return [
           { id: 'input', type: 'input', localPosition: [outfeedX, sOutfeedH, outfeedZ] as [number, number, number] },
@@ -1379,7 +1376,7 @@ function getDefaultParameters(type: string): Record<string, any> {
     stopper: { enabled: true, engaged: true, width: 400, bladeHeight: 80, mountHeight: 800, mountPosition: 0.5, mountSide: 'center', heightOffset: 0, flip: false, stopperMode: 'sensor-triggered', triggerSensorTag: '', stopCondition: 'any-product', releaseCondition: 'timed', holdTime: 3, releaseCount: 1, releaseDelay: 0, stopCount: 0 },
     pusher: { enabled: true, side: 'right', stroke: 300, plateWidth: 250, plateHeight: 100, mountHeight: 800, extended: false, mountPosition: 0.5, heightOffset: 0, flip: false },
     sensor: { sensorType: 'through-beam', triggered: false, mountHeight: 800, sensorHeight: 80, beltWidth: 600, showBeam: true, mountPosition: 0.5, mountSide: 'center', heightOffset: 0, flip: false },
-    'spiral-conveyor': { beltWidth: 400, turns: 3, infeedHeight: 800, outfeedHeight: 3800, infeedAngle: 0, outfeedAngle: 0, direction: 'up', speed: 1, sideGuides: true, guideHeight: 80, showLegs: true, centerStructure: 'column' },
+    'spiral-conveyor': { beltWidth: 400, turns: 3, infeedHeight: 800, outfeedHeight: 3800, outfeedAngle: 180, direction: 'up', speed: 1, sideGuides: true, guideHeight: 80, showLegs: true, centerStructure: 'column' },
     'vertical-lifter': { platformWidth: 1000, platformDepth: 1000, infeedHeight: 0, outfeedHeight: 3000, liftDirection: 'up', speed: 20, loadDirection: 'front', fenceEnabled: true, capacity: 4 },
     'pick-and-place': { reach: 3, speed: 1.0 },
     palletizer: { palletSize: [1.2, 0.8], stackHeight: 1.5 },

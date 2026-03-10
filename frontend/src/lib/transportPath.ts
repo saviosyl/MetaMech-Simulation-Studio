@@ -158,44 +158,59 @@ export class CurvedPath implements TransportPath {
 
 export class SpiralPath implements TransportPath {
   length: number;
-  private radiusM: number;
-  private totalHeightM: number;
-  private turns: number;
+  private midRadius: number;
+  private infeedHeightM: number;
+  private outfeedHeightM: number;
+  private totalAngle: number;
   private direction: 'up' | 'down';
-  private startAngleRad: number;
+  private bottomY: number;
+  private effectiveHeight: number;
 
   constructor(
-    diameterMm: number, totalHeightMm: number, turns: number,
-    direction: 'up' | 'down', infeedAngleDeg: number = 0,
+    beltWidthMm: number, turns: number,
+    outfeedAngleDeg: number,
+    infeedHeightMm: number, outfeedHeightMm: number,
+    direction: 'up' | 'down',
   ) {
-    this.radiusM = diameterMm / 2000;
-    this.totalHeightM = totalHeightMm / 1000;
-    this.turns = turns;
+    const beltW = beltWidthMm / 1000;
+    const drumR = 0.2;
+    const innerR = drumR + 0.02;
+    const outerR = innerR + beltW;
+    this.midRadius = (innerR + outerR) / 2;
+    this.infeedHeightM = infeedHeightMm / 1000;
+    this.outfeedHeightM = outfeedHeightMm / 1000;
     this.direction = direction;
-    this.startAngleRad = (infeedAngleDeg * Math.PI) / 180;
+    this.bottomY = Math.min(this.infeedHeightM, this.outfeedHeightM);
+    this.effectiveHeight = Math.abs(this.outfeedHeightM - this.infeedHeightM);
 
-    // Helical path length
-    const circumference = 2 * Math.PI * this.radiusM;
-    const spiralLen = Math.sqrt((circumference * turns) ** 2 + this.totalHeightM ** 2);
-    this.length = spiralLen;
+    // Total angle: full turns + outfeed angle offset. Infeed always at angle 0.
+    const outAngleRad = (outfeedAngleDeg * Math.PI) / 180;
+    this.totalAngle = turns * Math.PI * 2 + outAngleRad;
+
+    // Helical path length along midRadius
+    const arcLen = this.midRadius * this.totalAngle;
+    this.length = Math.sqrt(arcLen * arcLen + this.effectiveHeight * this.effectiveHeight);
   }
 
   getLocalPosition(t: number): Vec3 {
-    const angle = this.startAngleRad + t * this.turns * 2 * Math.PI;
-    const x = Math.cos(angle) * this.radiusM;
-    const z = Math.sin(angle) * this.radiusM;
-    const yBase = this.direction === 'up' ? 0 : this.totalHeightM;
-    const yDelta = this.direction === 'up' ? t * this.totalHeightM : -t * this.totalHeightM;
-    return [x, yBase + yDelta, z];
+    // Product travels along the belt centerline (midRadius)
+    const angle = t * this.totalAngle; // starts at 0
+    const x = Math.cos(angle) * this.midRadius;
+    const z = Math.sin(angle) * this.midRadius;
+
+    // Y position: model group is at bottomY, so local Y goes 0→effectiveHeight
+    const yProgress = this.direction === 'up' ? t : (1 - t);
+    const y = this.bottomY + yProgress * this.effectiveHeight;
+    return [x, y, z];
   }
 
   getLocalTangent(t: number): Vec3 {
-    const angle = this.startAngleRad + t * this.turns * 2 * Math.PI;
-    const dAdT = this.turns * 2 * Math.PI;
-    const tx = -Math.sin(angle) * this.radiusM * dAdT;
-    const tz = Math.cos(angle) * this.radiusM * dAdT;
-    const ty = this.direction === 'up' ? this.totalHeightM : -this.totalHeightM;
-    const mag = Math.sqrt(tx * tx + ty * ty + tz * tz);
+    const angle = t * this.totalAngle;
+    const dAdT = this.totalAngle;
+    const tx = -Math.sin(angle) * this.midRadius * dAdT;
+    const tz = Math.cos(angle) * this.midRadius * dAdT;
+    const ty = this.direction === 'up' ? this.effectiveHeight : -this.effectiveHeight;
+    const mag = Math.sqrt(tx * tx + ty * ty + tz * tz) || 1;
     return [tx / mag, ty / mag, tz / mag];
   }
 
@@ -245,12 +260,13 @@ export function createTransportPath(type: string, params: Record<string, any>): 
     }
 
     case 'spiral-conveyor': {
-      const diameter = params.diameter || params.diameterMm || 1800;
-      const totalHeight = params.totalHeight || params.totalHeightMm || 3000;
+      const beltWidth = params.beltWidth || 400;
       const turns = params.turns || 3;
+      const outfeedAngle = params.outfeedAngle || 180;
+      const infeedHeight = params.infeedHeight || 800;
+      const outfeedHeight = params.outfeedHeight || 3800;
       const direction = params.direction || 'up';
-      const infeedAngle = params.infeedAngle || params.infeedAngleDeg || 0;
-      return new SpiralPath(diameter, totalHeight, turns, direction, infeedAngle);
+      return new SpiralPath(beltWidth, turns, outfeedAngle, infeedHeight, outfeedHeight, direction);
     }
 
     default:
