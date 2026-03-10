@@ -203,7 +203,7 @@ export function createSpiralScenario(): Scenario {
     nodes: [
       { id: sourceId, type: 'source', position: [-4, 0, 0], rotation: [0, 0, 0], parameters: { spawnRate: 10, productType: 'tote', productColor: 'blue', productLength: 400, productWidth: 300, productHeight: 200 }, name: 'Source' },
       { id: conv1Id, type: 'belt-conveyor', position: [-1.5, 0, 0], rotation: [0, 0, 0], parameters: { length: 2000, width: 500, height: 800, beltSpeed: 10 }, name: 'Ground Infeed' },
-      { id: spiralId, type: 'spiral-conveyor', position: [1.5, 0, 0], rotation: [0, 0, 0], parameters: { diameter: 2000, totalHeight: 4000, beltWidth: 500, direction: 'up', speed: 8, turns: 3 }, name: 'Spiral Up' },
+      { id: spiralId, type: 'spiral-conveyor', position: [1.5, 0, 0], rotation: [0, 0, 0], parameters: { beltWidth: 500, direction: 'up', speed: 8, turns: 3, outfeedAngle: 180, infeedHeight: 800, outfeedHeight: 3800 }, name: 'Spiral Up' },
       { id: conv2Id, type: 'belt-conveyor', position: [4.5, 0, 0], rotation: [0, 0, 0], parameters: { length: 2000, width: 500, height: 4800, beltSpeed: 10 }, name: 'Upper Outfeed' },
       { id: sinkId, type: 'sink', position: [7, 0, 0], rotation: [0, 0, 0], parameters: {}, name: 'Upper Output' },
     ],

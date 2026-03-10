@@ -1,4 +1,21 @@
-import React, { useRef, Suspense, useMemo } from 'react';
+import React, { useRef, Suspense, useMemo, Component, ErrorInfo, ReactNode } from 'react';
+
+/** Error boundary to prevent individual 3D model crashes from taking down the whole app */
+class Model3DErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('3D Model render error:', error, info.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <mesh><boxGeometry args={[0.5, 0.5, 0.5]} /><meshStandardMaterial color="red" wireframe /></mesh>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useEditorStore } from '../../store/editorStore';
@@ -194,11 +211,13 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { document.body.style.cursor = 'auto'; }}
       >
-        <Suspense fallback={
-          <mesh castShadow><cylinderGeometry args={[0.8, 0.8, 3, 16]} /><meshStandardMaterial color="#666" wireframe /></mesh>
-        }>
-          <SpiralConveyorModel parameters={node.parameters} isSelected={isSelected} />
-        </Suspense>
+        <Model3DErrorBoundary>
+          <Suspense fallback={
+            <mesh castShadow><cylinderGeometry args={[0.8, 0.8, 3, 16]} /><meshStandardMaterial color="#666" wireframe /></mesh>
+          }>
+            <SpiralConveyorModel parameters={node.parameters} isSelected={isSelected} />
+          </Suspense>
+        </Model3DErrorBoundary>
         {isSelected && (
           <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[1.5, 1.7, 32]} />

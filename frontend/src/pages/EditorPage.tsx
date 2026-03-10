@@ -62,9 +62,31 @@ const EditorPage: React.FC = () => {
       if (saved) {
         try {
           const data = JSON.parse(saved);
-          loadScene(data.scene || data);
+          // Migrate old spiral-conveyor params to new format
+          const scene = data.scene || data;
+          const nodes = scene.processNodes || scene.nodes || [];
+          for (const n of nodes) {
+            if (n.type === 'spiral-conveyor' && n.parameters) {
+              const p = n.parameters;
+              // Migrate old params: diameter/totalHeight/infeedAngle → new params
+              if (p.diameter && !p.infeedHeight) {
+                p.infeedHeight = 800;
+                p.outfeedHeight = (p.totalHeight || 3000) + 800;
+                p.outfeedAngle = p.outfeedAngle || 180;
+                delete p.diameter;
+                delete p.totalHeight;
+                delete p.risePerTurn;
+                delete p.infeedAngle;
+              }
+            }
+          }
+          loadScene(scene);
           if (savedName) setProjectName(savedName);
-        } catch { loadScene({}); }
+        } catch {
+          localStorage.removeItem('metamech_autosave');
+          localStorage.removeItem('metamech_autosave_name');
+          loadScene({});
+        }
       } else {
         loadScene({});
       }
