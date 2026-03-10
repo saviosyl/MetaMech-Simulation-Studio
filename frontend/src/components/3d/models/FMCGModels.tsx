@@ -534,15 +534,21 @@ function AccessPanel({ position, size, rotation }: { position: [number, number, 
 // ═══════════════════════════════════════════════════════════════
 export const CheckweigherModel: React.FC<ModelProps> = ({ params }) => {
   const w = (params?.width || 800) / 1000;
-  const h = (params?.height || 900) / 1000;
-  const beltH = 0.5; // Belt height from ground ~500mm
-  const frameD = 0.45; // Depth of machine
-  const tubeSize = 0.04; // 40mm square tube
+  const eqH = (params?.height || 900) / 1000;
+  const beltH = params?.infeedHeight ? (params.infeedHeight / 1000) : (eqH * 0.55);
+  const frameD = 0.45;
+  const tubeSize = 0.04;
   const infeedLen = w * 0.3;
   const weighLen = w * 0.28;
   const outfeedLen = w * 0.3;
   const beltWidth = frameD * 0.65;
   const gapBetween = 0.02;
+  const sideRailH = 0.03;
+
+  // Derived frame levels
+  const lowerCrossY = beltH * 0.2;
+  const midCrossY = beltH * 0.55;
+  const upperRailY = beltH - 0.025;
 
   // Conveyor X positions (centered)
   const totalLen = infeedLen + weighLen + outfeedLen + gapBetween * 2;
@@ -550,61 +556,69 @@ export const CheckweigherModel: React.FC<ModelProps> = ({ params }) => {
   const weighX = infeedX + infeedLen / 2 + gapBetween + weighLen / 2;
   const outfeedX = weighX + weighLen / 2 + gapBetween + outfeedLen / 2;
 
+  // Leg positions
+  const legPositions: [number, number][] = useMemo(() => [
+    [-totalLen / 2 + 0.04, -frameD / 2 + 0.04],
+    [-totalLen / 2 + 0.04, frameD / 2 - 0.04],
+    [totalLen / 2 - 0.04, -frameD / 2 + 0.04],
+    [totalLen / 2 - 0.04, frameD / 2 - 0.04],
+  ], [totalLen, frameD]);
+
+  // Loadcell support column: extends from loadcell housing down to lower crossmember
+  const loadcellHousingY = beltH - 0.035;
+  const supportColTop = loadcellHousingY - 0.045; // bottom of isolation mounts
+  const supportColBottom = lowerCrossY;
+  const supportColHeight = supportColTop - supportColBottom;
+  const supportColCenterY = supportColBottom + supportColHeight / 2;
+
   return (
     <group>
       {/* ═══ FRAME — Tubular stainless steel ═══ */}
-      {/* Four vertical legs */}
-      {useMemo(() => {
-        const legs: [number, number][] = [
-          [-totalLen / 2 + 0.04, -frameD / 2 + 0.04],
-          [-totalLen / 2 + 0.04, frameD / 2 - 0.04],
-          [totalLen / 2 - 0.04, -frameD / 2 + 0.04],
-          [totalLen / 2 - 0.04, frameD / 2 - 0.04],
-        ];
-        return legs;
-      }, [totalLen, frameD]).map(([lx, lz], i) => (
+      {/* Four vertical legs (ground to beltH) */}
+      {legPositions.map(([lx, lz], i) => (
         <group key={`leg-${i}`}>
-          {/* Vertical tube */}
           <mesh position={[lx, beltH / 2, lz]} castShadow>
             <boxGeometry args={[tubeSize, beltH, tubeSize]} />
             <primitive object={matStainlessBrushed} attach="material" />
           </mesh>
-          {/* Leveling foot */}
           <LevelingFoot position={[lx, 0, lz]} />
         </group>
       ))}
 
       {/* Lower horizontal crossmembers (front/back) */}
       {[-1, 1].map((sz, i) => (
-        <mesh key={`lower-cross-${i}`} position={[0, 0.1, sz * (frameD / 2 - 0.04)]} castShadow>
+        <mesh key={`lower-cross-${i}`} position={[0, lowerCrossY, sz * (frameD / 2 - 0.04)]} castShadow>
           <boxGeometry args={[totalLen - 0.08, tubeSize * 0.6, tubeSize * 0.6]} />
           <primitive object={matStainlessBrushed} attach="material" />
         </mesh>
       ))}
       {/* Lower side crossmembers */}
       {[-1, 1].map((sx, i) => (
-        <mesh key={`side-cross-${i}`} position={[sx * (totalLen / 2 - 0.04), 0.1, 0]} castShadow>
+        <mesh key={`side-cross-${i}`} position={[sx * (totalLen / 2 - 0.04), lowerCrossY, 0]} castShadow>
           <boxGeometry args={[tubeSize * 0.6, tubeSize * 0.6, frameD - 0.08]} />
           <primitive object={matStainlessBrushed} attach="material" />
         </mesh>
       ))}
 
+      {/* Mid-level crossmembers */}
+      {[-1, 1].map((sz, i) => (
+        <mesh key={`mid-cross-${i}`} position={[0, midCrossY, sz * (frameD / 2 - 0.04)]} castShadow>
+          <boxGeometry args={[totalLen - 0.08, tubeSize * 0.5, tubeSize * 0.5]} />
+          <primitive object={matStainlessSatin} attach="material" />
+        </mesh>
+      ))}
+
       {/* Upper frame rails (belt support level) */}
       {[-1, 1].map((sz, i) => (
-        <mesh key={`upper-rail-${i}`} position={[0, beltH - 0.03, sz * (frameD / 2 - 0.04)]} castShadow>
+        <mesh key={`upper-rail-${i}`} position={[0, upperRailY, sz * (frameD / 2 - 0.04)]} castShadow>
           <boxGeometry args={[totalLen - 0.08, tubeSize * 0.65, tubeSize * 0.65]} />
           <primitive object={matStainlessBrushed} attach="material" />
         </mesh>
       ))}
 
-      {/* Diagonal gussets at leg tops (triangular bracing, 4 corners) */}
-      {[
-        [-totalLen / 2 + 0.06, -frameD / 2 + 0.06],
-        [-totalLen / 2 + 0.06, frameD / 2 - 0.06],
-        [totalLen / 2 - 0.06, -frameD / 2 + 0.06],
-        [totalLen / 2 - 0.06, frameD / 2 - 0.06],
-      ].map(([gx, gz], i) => (
-        <mesh key={`gusset-${i}`} position={[gx, beltH - 0.08, gz]} rotation={[0, 0, Math.PI / 4]} castShadow>
+      {/* Diagonal gussets at leg tops */}
+      {legPositions.map(([gx, gz], i) => (
+        <mesh key={`gusset-${i}`} position={[gx, beltH - 0.06, gz]} rotation={[0, 0, Math.PI / 4]} castShadow>
           <boxGeometry args={[0.06, 0.005, 0.03]} />
           <primitive object={matStainlessSatin} attach="material" />
         </mesh>
@@ -615,30 +629,30 @@ export const CheckweigherModel: React.FC<ModelProps> = ({ params }) => {
         position={[infeedX, beltH, 0]}
         beltWidth={beltWidth}
         beltLength={infeedLen}
-        rollerCount={2}
+        rollerCount={0}
+        sideRailHeight={sideRailH}
       />
-      {/* Infeed motor/gearbox (underneath, side-mounted) */}
       <MotorGearbox
         position={[infeedX, beltH - 0.08, -frameD / 2 + 0.02]}
         rotation={[0, Math.PI / 2, 0]}
       />
 
-      {/* ═══ PRECISION WEIGHING CONVEYOR (visually distinct) ═══ */}
+      {/* ═══ PRECISION WEIGHING CONVEYOR — clean flat belt, no rollers ═══ */}
       <group position={[weighX, beltH, 0]}>
-        {/* Weigh belt — slightly elevated, more refined */}
+        {/* Weigh belt */}
         <mesh position={[0, 0.002, 0]} castShadow>
           <boxGeometry args={[weighLen, 0.01, beltWidth]} />
           <primitive object={matBeltRubber} attach="material" />
         </mesh>
-        {/* Weigh belt bed plate (precision machined) */}
+        {/* Precision bed plate */}
         <mesh position={[0, -0.006, 0]} castShadow>
           <boxGeometry args={[weighLen, 0.004, beltWidth + 0.008]} />
           <primitive object={matAluminum} attach="material" />
         </mesh>
-        {/* End rollers */}
-        <Roller position={[-weighLen / 2 + 0.012, -0.003, 0]} length={beltWidth + 0.015} radius={0.02} />
-        <Roller position={[weighLen / 2 - 0.012, -0.003, 0]} length={beltWidth + 0.015} radius={0.02} />
-        {/* Side rails (thinner, more precise) */}
+        {/* Tiny nose rollers at ends (radius 0.01 — not visible bars) */}
+        <Roller position={[-weighLen / 2 + 0.008, -0.002, 0]} length={beltWidth + 0.015} radius={0.01} />
+        <Roller position={[weighLen / 2 - 0.008, -0.002, 0]} length={beltWidth + 0.015} radius={0.01} />
+        {/* Side rails (thinner, precision) */}
         {[-1, 1].map((sz, i) => (
           <mesh key={`wr-${i}`} position={[0, 0.02, sz * (beltWidth / 2 + 0.004)]} castShadow>
             <boxGeometry args={[weighLen, 0.025, 0.003]} />
@@ -648,81 +662,117 @@ export const CheckweigherModel: React.FC<ModelProps> = ({ params }) => {
       </group>
 
       {/* ═══ LOADCELL HOUSING / WEIGH MODULE ═══ */}
-      <group position={[weighX, beltH - 0.035, 0]}>
+      <group position={[weighX, loadcellHousingY, 0]}>
         {/* Main loadcell housing */}
         <mesh castShadow>
           <boxGeometry args={[weighLen * 0.85, 0.04, beltWidth * 0.5]} />
           <primitive object={matAluminum} attach="material" />
         </mesh>
-        {/* Protective cover (dark, precision look) */}
+        {/* Protective cover */}
         <mesh position={[0, -0.025, 0]} castShadow>
           <boxGeometry args={[weighLen * 0.9, 0.015, beltWidth * 0.6]} />
           <meshStandardMaterial color="#1a1a2a" metalness={0.8} roughness={0.15} />
         </mesh>
-        {/* Isolation mounts (rubber dampeners, 4 corners) */}
+        {/* Isolation mounts */}
         {[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sx, sz], i) => (
           <mesh key={`iso-${i}`} position={[sx * weighLen * 0.35, -0.04, sz * beltWidth * 0.2]}>
             <cylinderGeometry args={[0.008, 0.008, 0.012, 8]} />
             <primitive object={matBlackPlastic} attach="material" />
           </mesh>
         ))}
-        {/* Weigh module support column */}
-        <mesh position={[0, -0.08, 0]} castShadow>
-          <boxGeometry args={[0.06, 0.12, 0.06]} />
-          <primitive object={matStainlessBrushed} attach="material" />
-        </mesh>
       </group>
+      {/* Support column — extends from loadcell down to lower crossmember */}
+      {supportColHeight > 0.01 && (
+        <group>
+          <mesh position={[weighX, supportColCenterY, 0]} castShadow>
+            <boxGeometry args={[0.06, supportColHeight, 0.06]} />
+            <primitive object={matStainlessBrushed} attach="material" />
+          </mesh>
+          {/* Horizontal bracket connecting column base to lower crossmember */}
+          <mesh position={[weighX, lowerCrossY, -(frameD / 2 - 0.04) / 2]} castShadow>
+            <boxGeometry args={[0.06, tubeSize * 0.5, frameD / 2 - 0.04]} />
+            <primitive object={matStainlessSatin} attach="material" />
+          </mesh>
+        </group>
+      )}
 
       {/* ═══ OUTFEED CONVEYOR SECTION ═══ */}
       <ConveyorSection
         position={[outfeedX, beltH, 0]}
         beltWidth={beltWidth}
         beltLength={outfeedLen}
-        rollerCount={2}
+        rollerCount={0}
+        sideRailHeight={sideRailH}
       />
-      {/* Outfeed motor */}
       <MotorGearbox
         position={[outfeedX, beltH - 0.08, frameD / 2 - 0.02]}
         rotation={[0, -Math.PI / 2, 0]}
       />
 
-      {/* ═══ PHOTOEYE SENSORS (infeed & outfeed) ═══ */}
-      {/* Infeed sensor pair */}
-      <PhotoeyeSensor position={[infeedX - infeedLen * 0.3, beltH + 0.05, -beltWidth / 2 - 0.02]} rotation={[0, 0, 0]} />
-      <PhotoeyeSensor position={[infeedX - infeedLen * 0.3, beltH + 0.05, beltWidth / 2 + 0.02]} rotation={[0, Math.PI, 0]} />
+      {/* ═══ PHOTOEYE SENSORS with L-brackets ═══ */}
+      {/* Infeed sensor pair — mounted on side rails */}
+      {[-1, 1].map((sz, i) => (
+        <group key={`infeed-sensor-${i}`}>
+          <PhotoeyeSensor
+            position={[infeedX - infeedLen * 0.3, beltH + sideRailH + 0.015, sz * (beltWidth / 2 + 0.01)]}
+            rotation={[0, sz < 0 ? 0 : Math.PI, 0]}
+          />
+          {/* L-bracket connecting sensor to side rail */}
+          <mesh position={[infeedX - infeedLen * 0.3, beltH + sideRailH * 0.5 + 0.006, sz * (beltWidth / 2 + 0.008)]} castShadow>
+            <boxGeometry args={[0.015, sideRailH + 0.01, 0.003]} />
+            <primitive object={matStainlessSatin} attach="material" />
+          </mesh>
+        </group>
+      ))}
       {/* Outfeed sensor pair */}
-      <PhotoeyeSensor position={[outfeedX + outfeedLen * 0.3, beltH + 0.05, -beltWidth / 2 - 0.02]} rotation={[0, 0, 0]} />
-      <PhotoeyeSensor position={[outfeedX + outfeedLen * 0.3, beltH + 0.05, beltWidth / 2 + 0.02]} rotation={[0, Math.PI, 0]} />
+      {[-1, 1].map((sz, i) => (
+        <group key={`outfeed-sensor-${i}`}>
+          <PhotoeyeSensor
+            position={[outfeedX + outfeedLen * 0.3, beltH + sideRailH + 0.015, sz * (beltWidth / 2 + 0.01)]}
+            rotation={[0, sz < 0 ? 0 : Math.PI, 0]}
+          />
+          <mesh position={[outfeedX + outfeedLen * 0.3, beltH + sideRailH * 0.5 + 0.006, sz * (beltWidth / 2 + 0.008)]} castShadow>
+            <boxGeometry args={[0.015, sideRailH + 0.01, 0.003]} />
+            <primitive object={matStainlessSatin} attach="material" />
+          </mesh>
+        </group>
+      ))}
 
-      {/* ═══ HMI TOUCHSCREEN ═══ */}
+      {/* ═══ HMI TOUCHSCREEN — arm base at rear-right leg ═══ */}
       <HMIPanel
-        position={[totalLen / 2 - 0.06, beltH + 0.28, frameD / 2 - 0.04]}
+        position={[totalLen / 2 - 0.04, beltH + 0.15, frameD / 2 - 0.04]}
         rotation={[0, -0.3, 0]}
       />
 
-      {/* ═══ TOWER LIGHT ═══ */}
-      <TowerLight position={[totalLen / 2 - 0.06, beltH + 0.45, frameD / 2 - 0.06]} />
+      {/* ═══ TOWER LIGHT — post mounted on upper frame rail ═══ */}
+      <group position={[totalLen / 2 - 0.04, upperRailY, frameD / 2 - 0.04]}>
+        {/* Vertical post from upper rail */}
+        <mesh position={[0, 0.06, 0]} castShadow>
+          <cylinderGeometry args={[0.01, 0.01, 0.12, 8]} />
+          <primitive object={matStainlessBrushed} attach="material" />
+        </mesh>
+      </group>
+      <TowerLight position={[totalLen / 2 - 0.04, upperRailY + 0.12, frameD / 2 - 0.04]} />
 
-      {/* ═══ E-STOP BUTTON ═══ */}
-      <EStopButton position={[totalLen / 2 - 0.04, beltH + 0.04, frameD / 2 + 0.005]} />
+      {/* ═══ E-STOP BUTTON — mounted on upper frame rail face ═══ */}
+      <EStopButton position={[totalLen / 2 - 0.04, upperRailY + 0.015, frameD / 2 - 0.015]} />
 
-      {/* ═══ JUNCTION BOX ═══ */}
-      <JunctionBox position={[-totalLen / 2 + 0.1, beltH * 0.5, -frameD / 2 + 0.01]} />
+      {/* ═══ JUNCTION BOX — mounted ON rear-left leg ═══ */}
+      <JunctionBox position={[-totalLen / 2 + 0.04, midCrossY, -frameD / 2 + 0.04]} />
 
-      {/* ═══ ACCESS PANELS ═══ */}
+      {/* ═══ ACCESS PANELS — positioned between lower and upper frame ═══ */}
       <AccessPanel
-        position={[0, beltH * 0.55, frameD / 2]}
-        size={[totalLen * 0.5, beltH * 0.45]}
+        position={[0, (lowerCrossY + upperRailY) / 2, frameD / 2]}
+        size={[totalLen * 0.5, upperRailY - lowerCrossY - 0.04]}
         rotation={[0, 0, 0]}
       />
       <AccessPanel
-        position={[0, beltH * 0.55, -frameD / 2]}
-        size={[totalLen * 0.5, beltH * 0.45]}
+        position={[0, (lowerCrossY + upperRailY) / 2, -frameD / 2]}
+        size={[totalLen * 0.5, upperRailY - lowerCrossY - 0.04]}
         rotation={[0, Math.PI, 0]}
       />
 
       {/* ═══ POLYCARBONATE GUARDS ═══ */}
-      {/* Side guards above belt level */}
       <GuardPanel
         position={[0, beltH + 0.08, frameD / 2 + 0.008]}
         size={[totalLen * 0.85, 0.12, 0.003]}
@@ -732,27 +782,23 @@ export const CheckweigherModel: React.FC<ModelProps> = ({ params }) => {
         size={[totalLen * 0.85, 0.12, 0.003]}
       />
 
-      {/* ═══ CABLE CONDUIT (side run) ═══ */}
-      <mesh position={[-totalLen / 2 + 0.04, beltH * 0.35, -frameD / 2 + 0.04]} castShadow>
-        <boxGeometry args={[0.025, beltH * 0.4, 0.025]} />
+      {/* ═══ CABLE CONDUIT — runs along rear lower crossmember ═══ */}
+      {/* Vertical run along rear-left leg */}
+      <mesh position={[-totalLen / 2 + 0.04, (lowerCrossY + midCrossY) / 2, -frameD / 2 + 0.06]} castShadow>
+        <boxGeometry args={[0.025, midCrossY - lowerCrossY, 0.025]} />
         <primitive object={matCable} attach="material" />
       </mesh>
-      {/* Horizontal cable tray */}
-      <mesh position={[0, 0.06, -frameD / 2 + 0.04]} castShadow>
+      {/* Horizontal cable tray along lower rear crossmember */}
+      <mesh position={[0, lowerCrossY + 0.02, -frameD / 2 + 0.06]} castShadow>
         <boxGeometry args={[totalLen * 0.7, 0.02, 0.03]} />
         <primitive object={matCable} attach="material" />
       </mesh>
 
-      {/* ═══ FRAME BOLTS (decorative, at key joints) ═══ */}
-      {[
-        [-totalLen / 2 + 0.04, beltH, -frameD / 2 + 0.04],
-        [-totalLen / 2 + 0.04, beltH, frameD / 2 - 0.04],
-        [totalLen / 2 - 0.04, beltH, -frameD / 2 + 0.04],
-        [totalLen / 2 - 0.04, beltH, frameD / 2 - 0.04],
-      ].map(([bx, by, bz], i) => (
+      {/* ═══ FRAME BOLTS ═══ */}
+      {legPositions.map(([bx, bz], i) => (
         <group key={`bolt-cluster-${i}`}>
-          <BoltHead position={[bx - 0.015, by - 0.015, bz > 0 ? bz + 0.021 : bz - 0.021]} rotation={[Math.PI / 2, 0, 0]} />
-          <BoltHead position={[bx + 0.015, by - 0.015, bz > 0 ? bz + 0.021 : bz - 0.021]} rotation={[Math.PI / 2, 0, 0]} />
+          <BoltHead position={[bx - 0.015, upperRailY - 0.015, bz > 0 ? bz + 0.021 : bz - 0.021]} rotation={[Math.PI / 2, 0, 0]} />
+          <BoltHead position={[bx + 0.015, upperRailY - 0.015, bz > 0 ? bz + 0.021 : bz - 0.021]} rotation={[Math.PI / 2, 0, 0]} />
         </group>
       ))}
     </group>
@@ -808,35 +854,44 @@ export const MetalDetectorModel: React.FC<ModelProps> = ({ params }) => {
 // ═══════════════════════════════════════════════════════════════
 export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
   const w = (params?.width || 600) / 1000;
-  const h = (params?.height || 1200) / 1000;
-  const beltH = 0.55; // Belt height ~550mm
+  const eqH = (params?.height || 1200) / 1000;
+  const beltH = params?.infeedHeight ? (params.infeedHeight / 1000) : (eqH * 0.55);
   const frameD = 0.42;
   const tubeSize = 0.04;
   const beltWidth = frameD * 0.6;
   const beltLength = w * 0.85;
+  const sideRailH = 0.03;
 
-  // Label tower is rear-mounted (negative Z side)
+  // Derived frame levels
+  const lowerCrossY = beltH * 0.2;
+  const midCrossY = beltH * 0.55;
+  const upperRailY = beltH - 0.025;
+
+  // Leg positions
+  const legPositions: [number, number][] = [
+    [-w / 2 + 0.04, -frameD / 2 + 0.04],
+    [-w / 2 + 0.04, frameD / 2 - 0.04],
+    [w / 2 - 0.04, -frameD / 2 + 0.04],
+    [w / 2 - 0.04, frameD / 2 - 0.04],
+  ];
+
+  // Label tower — rear-mounted, base sits ON the rear upper frame rail
   const towerZ = -frameD / 2 - 0.06;
-  const towerBaseY = beltH;
-  const towerTopY = h * 0.92;
+  const towerBaseY = upperRailY; // sits on frame rail
+  const towerTopY = eqH * 0.92;
   const towerHeight = towerTopY - towerBaseY;
 
   // Reel positions
   const unwindY = towerTopY - 0.08;
   const rewindY = towerBaseY + 0.12;
-  const unwindR = 0.1; // 200mm diameter / 2
-  const rewindR = 0.04; // 80mm diameter / 2
+  const unwindR = 0.1;
+  const rewindR = 0.04;
 
   return (
     <group>
       {/* ═══ FRAME — Tubular stainless steel ═══ */}
-      {/* Four vertical legs */}
-      {[
-        [-w / 2 + 0.04, -frameD / 2 + 0.04],
-        [-w / 2 + 0.04, frameD / 2 - 0.04],
-        [w / 2 - 0.04, -frameD / 2 + 0.04],
-        [w / 2 - 0.04, frameD / 2 - 0.04],
-      ].map(([lx, lz], i) => (
+      {/* Four vertical legs (ground to beltH) */}
+      {legPositions.map(([lx, lz], i) => (
         <group key={`leg-${i}`}>
           <mesh position={[lx, beltH / 2, lz]} castShadow>
             <boxGeometry args={[tubeSize, beltH, tubeSize]} />
@@ -848,13 +903,13 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
 
       {/* Lower crossmembers */}
       {[-1, 1].map((sz, i) => (
-        <mesh key={`lc-${i}`} position={[0, 0.1, sz * (frameD / 2 - 0.04)]} castShadow>
+        <mesh key={`lc-${i}`} position={[0, lowerCrossY, sz * (frameD / 2 - 0.04)]} castShadow>
           <boxGeometry args={[w - 0.08, tubeSize * 0.6, tubeSize * 0.6]} />
           <primitive object={matStainlessBrushed} attach="material" />
         </mesh>
       ))}
       {[-1, 1].map((sx, i) => (
-        <mesh key={`ls-${i}`} position={[sx * (w / 2 - 0.04), 0.1, 0]} castShadow>
+        <mesh key={`ls-${i}`} position={[sx * (w / 2 - 0.04), lowerCrossY, 0]} castShadow>
           <boxGeometry args={[tubeSize * 0.6, tubeSize * 0.6, frameD - 0.08]} />
           <primitive object={matStainlessBrushed} attach="material" />
         </mesh>
@@ -862,7 +917,7 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
 
       {/* Mid-level crossmembers */}
       {[-1, 1].map((sz, i) => (
-        <mesh key={`mc-${i}`} position={[0, beltH * 0.55, sz * (frameD / 2 - 0.04)]} castShadow>
+        <mesh key={`mc-${i}`} position={[0, midCrossY, sz * (frameD / 2 - 0.04)]} castShadow>
           <boxGeometry args={[w - 0.08, tubeSize * 0.5, tubeSize * 0.5]} />
           <primitive object={matStainlessSatin} attach="material" />
         </mesh>
@@ -870,20 +925,15 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
 
       {/* Upper frame rails at belt level */}
       {[-1, 1].map((sz, i) => (
-        <mesh key={`ur-${i}`} position={[0, beltH - 0.025, sz * (frameD / 2 - 0.04)]} castShadow>
+        <mesh key={`ur-${i}`} position={[0, upperRailY, sz * (frameD / 2 - 0.04)]} castShadow>
           <boxGeometry args={[w - 0.06, tubeSize * 0.65, tubeSize * 0.65]} />
           <primitive object={matStainlessBrushed} attach="material" />
         </mesh>
       ))}
 
       {/* Gussets */}
-      {[
-        [-w / 2 + 0.06, -frameD / 2 + 0.06],
-        [-w / 2 + 0.06, frameD / 2 - 0.06],
-        [w / 2 - 0.06, -frameD / 2 + 0.06],
-        [w / 2 - 0.06, frameD / 2 - 0.06],
-      ].map(([gx, gz], i) => (
-        <mesh key={`gus-${i}`} position={[gx, beltH - 0.07, gz]} rotation={[0, 0, Math.PI / 4]} castShadow>
+      {legPositions.map(([gx, gz], i) => (
+        <mesh key={`gus-${i}`} position={[gx, beltH - 0.06, gz]} rotation={[0, 0, Math.PI / 4]} castShadow>
           <boxGeometry args={[0.05, 0.004, 0.025]} />
           <primitive object={matStainlessSatin} attach="material" />
         </mesh>
@@ -895,7 +945,7 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
         beltWidth={beltWidth}
         beltLength={beltLength}
         rollerCount={4}
-        sideRailHeight={0.03}
+        sideRailHeight={sideRailH}
       />
 
       {/* Conveyor motor (side-mounted) */}
@@ -911,14 +961,14 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
         <primitive object={matStainlessBrushed} attach="material" />
       </mesh>
 
-      {/* Tower base mounting plate */}
-      <mesh position={[0, towerBaseY - 0.01, towerZ + 0.02]} castShadow>
+      {/* Tower base mounting plate — sits ON the rear upper frame rail */}
+      <mesh position={[0, upperRailY + 0.008, -frameD / 2 + 0.04]} castShadow>
         <boxGeometry args={[0.12, 0.015, 0.1]} />
         <primitive object={matStainlessBrushed} attach="material" />
       </mesh>
-      {/* Mounting bolts */}
+      {/* Mounting bolts on base plate */}
       {[[-0.04, -0.03], [-0.04, 0.03], [0.04, -0.03], [0.04, 0.03]].map(([bx, bz], i) => (
-        <BoltHead key={`tb-${i}`} position={[bx, towerBaseY, towerZ + 0.02 + bz]} />
+        <BoltHead key={`tb-${i}`} position={[bx, upperRailY + 0.016, -frameD / 2 + 0.04 + bz]} />
       ))}
 
       {/* Adjustable bracket / slide assembly */}
@@ -926,7 +976,7 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
         <boxGeometry args={[0.08, 0.18, 0.04]} />
         <primitive object={matStainlessSatin} attach="material" />
       </mesh>
-      {/* Slide rail (dovetail visual) */}
+      {/* Slide rails */}
       <mesh position={[0.045, beltH + 0.35, towerZ + 0.01]} castShadow>
         <boxGeometry args={[0.012, 0.15, 0.035]} />
         <primitive object={matAluminum} attach="material" />
@@ -936,14 +986,13 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
         <primitive object={matAluminum} attach="material" />
       </mesh>
 
-      {/* Hand knobs for adjustment (2 on bracket) */}
+      {/* Hand knobs */}
       {[0.12, 0.2].map((dy, i) => (
         <group key={`knob-${i}`} position={[0.055, beltH + dy + 0.2, towerZ + 0.01]}>
           <mesh rotation={[0, 0, Math.PI / 2]} castShadow>
             <cylinderGeometry args={[0.012, 0.012, 0.025, 12]} />
             <primitive object={matBlackPlastic} attach="material" />
           </mesh>
-          {/* Knob star shape (simplified) */}
           <mesh position={[0.015, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.016, 0.016, 0.006, 5]} />
             <primitive object={matBlackPlastic} attach="material" />
@@ -962,26 +1011,23 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
         <boxGeometry args={[0.16, 0.12, 0.14]} />
         <primitive object={matStainlessBrushed} attach="material" />
       </mesh>
-      {/* Label head bottom plate (applicator surface) */}
       <mesh position={[0, beltH + 0.255, -0.04]} castShadow>
         <boxGeometry args={[0.12, 0.008, 0.1]} />
         <primitive object={matAluminum} attach="material" />
       </mesh>
 
-      {/* ═══ PEEL PLATE (key detail) ═══ */}
+      {/* ═══ PEEL PLATE ═══ */}
       <mesh position={[0, beltH + 0.25, -0.1]} castShadow>
         <boxGeometry args={[0.08, 0.003, 0.02]} />
         <primitive object={matAluminum} attach="material" />
       </mesh>
-      {/* Peel plate tip (angled) */}
       <mesh position={[0, beltH + 0.248, -0.088]} rotation={[0.3, 0, 0]}>
         <boxGeometry args={[0.08, 0.002, 0.01]} />
         <primitive object={matAluminum} attach="material" />
       </mesh>
 
-      {/* ═══ LABEL UNWIND REEL (large spool) ═══ */}
+      {/* ═══ LABEL UNWIND REEL ═══ */}
       <group position={[0, unwindY, towerZ]}>
-        {/* Spool flanges */}
         <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
           <cylinderGeometry args={[unwindR + 0.01, unwindR + 0.01, 0.004, 24]} />
           <primitive object={matStainlessSatin} attach="material" />
@@ -990,24 +1036,21 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
           <cylinderGeometry args={[unwindR + 0.01, unwindR + 0.01, 0.004, 24]} />
           <primitive object={matStainlessSatin} attach="material" />
         </mesh>
-        {/* Label roll (visible label material) */}
         <mesh position={[0, 0, 0.028]} rotation={[Math.PI / 2, 0, 0]} castShadow>
           <cylinderGeometry args={[unwindR, unwindR, 0.05, 24]} />
           <primitive object={matLabelRoll} attach="material" />
         </mesh>
-        {/* Core (inner tube) */}
         <mesh position={[0, 0, 0.028]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.025, 0.025, 0.055, 12]} />
           <primitive object={matStainlessSatin} attach="material" />
         </mesh>
-        {/* Spool shaft */}
         <mesh position={[0, 0, 0.028]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.01, 0.01, 0.08, 8]} />
           <primitive object={matStainlessBrushed} attach="material" />
         </mesh>
       </group>
 
-      {/* ═══ REWIND REEL (smaller, below) ═══ */}
+      {/* ═══ REWIND REEL ═══ */}
       <group position={[0, rewindY, towerZ]}>
         <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
           <cylinderGeometry args={[rewindR + 0.005, rewindR + 0.005, 0.004, 16]} />
@@ -1027,65 +1070,74 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
         </mesh>
       </group>
 
-      {/* ═══ TENSION / GUIDE ROLLERS in label web path ═══ */}
-      {/* Roller 1: top of tower, exiting unwind */}
+      {/* ═══ TENSION / GUIDE ROLLERS ═══ */}
       <Roller position={[0, unwindY - unwindR - 0.02, towerZ + 0.06]} length={0.05} radius={0.012} />
-      {/* Roller 2: mid-tower redirect */}
       <Roller position={[0, (unwindY + beltH + 0.32) / 2, towerZ + 0.06]} length={0.05} radius={0.012} />
-      {/* Roller 3: near label head entry */}
       <Roller position={[0, beltH + 0.38, towerZ + 0.08]} length={0.05} radius={0.01} />
-      {/* Roller 4: after peel plate, back to rewind */}
       <Roller position={[0, beltH + 0.2, towerZ + 0.06]} length={0.05} radius={0.012} />
-      {/* Roller 5: redirect to rewind reel */}
       <Roller position={[0, rewindY + rewindR + 0.025, towerZ + 0.06]} length={0.05} radius={0.01} />
 
-      {/* ═══ LABEL WEB PATH (thin strip connecting rollers) ═══ */}
-      {/* From unwind to roller 1 */}
+      {/* ═══ LABEL WEB PATH ═══ */}
       <mesh position={[0, unwindY - unwindR / 2 - 0.01, towerZ + 0.04]}>
         <boxGeometry args={[0.045, 0.001, 0.03]} />
         <meshStandardMaterial color="#f5f5f0" metalness={0} roughness={0.9} transparent opacity={0.5} />
       </mesh>
-      {/* Down the tower */}
       <mesh position={[0, (unwindY + beltH + 0.35) / 2, towerZ + 0.065]}>
         <boxGeometry args={[0.045, unwindY - beltH - 0.15, 0.001]} />
         <meshStandardMaterial color="#f5f5f0" metalness={0} roughness={0.9} transparent opacity={0.5} />
       </mesh>
-      {/* To label head */}
       <mesh position={[0, beltH + 0.35, (towerZ + 0.06 + -0.04) / 2]} rotation={[0.15, 0, 0]}>
         <boxGeometry args={[0.045, 0.001, Math.abs(towerZ + 0.06 - (-0.04))]} />
         <meshStandardMaterial color="#f5f5f0" metalness={0} roughness={0.9} transparent opacity={0.5} />
       </mesh>
 
-      {/* ═══ PRODUCT TRIGGER SENSOR (before application point) ═══ */}
-      <PhotoeyeSensor
-        position={[-beltLength * 0.25, beltH + 0.05, -beltWidth / 2 - 0.015]}
-        rotation={[0, 0, 0]}
-      />
-      <PhotoeyeSensor
-        position={[-beltLength * 0.25, beltH + 0.05, beltWidth / 2 + 0.015]}
-        rotation={[0, Math.PI, 0]}
-      />
+      {/* ═══ SENSORS — with L-brackets to side rails ═══ */}
+      {/* Product trigger sensor pair */}
+      {[-1, 1].map((sz, i) => (
+        <group key={`trigger-sensor-${i}`}>
+          <PhotoeyeSensor
+            position={[-beltLength * 0.25, beltH + sideRailH + 0.015, sz * (beltWidth / 2 + 0.01)]}
+            rotation={[0, sz < 0 ? 0 : Math.PI, 0]}
+          />
+          {/* L-bracket */}
+          <mesh position={[-beltLength * 0.25, beltH + sideRailH * 0.5 + 0.006, sz * (beltWidth / 2 + 0.008)]} castShadow>
+            <boxGeometry args={[0.015, sideRailH + 0.01, 0.003]} />
+            <primitive object={matStainlessSatin} attach="material" />
+          </mesh>
+        </group>
+      ))}
 
-      {/* ═══ LABEL DETECTION SENSOR (on label head) ═══ */}
+      {/* Label detection sensor (on label head) */}
       <PhotoeyeSensor
         position={[0.06, beltH + 0.28, -0.08]}
         rotation={[0, -Math.PI / 2, 0]}
       />
 
-      {/* ═══ HMI PANEL ═══ */}
+      {/* ═══ HMI PANEL — arm base at front-right leg ═══ */}
       <HMIPanel
-        position={[w / 2 + 0.02, beltH + 0.2, frameD * 0.2]}
+        position={[w / 2 - 0.04, beltH + 0.15, frameD / 2 - 0.04]}
         rotation={[0, -Math.PI / 4, 0]}
       />
 
-      {/* ═══ TOWER LIGHT ═══ */}
-      <TowerLight position={[-w / 2 + 0.04, beltH + 0.38, frameD / 2 - 0.04]} />
+      {/* ═══ TOWER LIGHT — short post from upper frame rail ═══ */}
+      <group position={[-w / 2 + 0.04, upperRailY, frameD / 2 - 0.04]}>
+        <mesh position={[0, 0.06, 0]} castShadow>
+          <cylinderGeometry args={[0.01, 0.01, 0.12, 8]} />
+          <primitive object={matStainlessBrushed} attach="material" />
+        </mesh>
+      </group>
+      <TowerLight position={[-w / 2 + 0.04, upperRailY + 0.12, frameD / 2 - 0.04]} />
 
-      {/* ═══ E-STOP ═══ */}
-      <EStopButton position={[w / 2 - 0.04, beltH + 0.04, frameD / 2 + 0.005]} />
+      {/* ═══ E-STOP — on upper frame rail ═══ */}
+      <EStopButton position={[w / 2 - 0.04, upperRailY + 0.015, frameD / 2 - 0.015]} />
 
-      {/* ═══ CONTROL ENCLOSURE (side-mounted) ═══ */}
-      <group position={[w / 2 + 0.04, beltH * 0.6, -frameD * 0.15]}>
+      {/* ═══ CONTROL ENCLOSURE — mounted to right-side mid crossmember ═══ */}
+      <group position={[w / 2 - 0.04, midCrossY, -frameD * 0.15]}>
+        {/* Mounting bracket to frame leg */}
+        <mesh position={[0.04, 0, (frameD * 0.15 - frameD / 2 + 0.04) / 2]} castShadow>
+          <boxGeometry args={[0.006, 0.08, 0.06]} />
+          <primitive object={matStainlessSatin} attach="material" />
+        </mesh>
         {/* Enclosure body */}
         <mesh castShadow>
           <boxGeometry args={[0.08, 0.2, 0.18]} />
@@ -1117,55 +1169,46 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
         ))}
       </group>
 
-      {/* ═══ CABLE ROUTING / CONDUIT ═══ */}
+      {/* ═══ CABLE ROUTING / CONDUIT — frame-mounted ═══ */}
       {/* Vertical conduit on tower post */}
       <mesh position={[0.04, (towerBaseY + towerTopY) / 2, towerZ]} castShadow>
         <boxGeometry args={[0.02, towerHeight * 0.8, 0.02]} />
         <primitive object={matCable} attach="material" />
       </mesh>
-      {/* Horizontal run to control enclosure */}
-      <mesh position={[w / 4, beltH * 0.5, towerZ + 0.03]} castShadow>
+      {/* Horizontal run along rear lower crossmember to control enclosure */}
+      <mesh position={[w / 4, lowerCrossY + 0.02, -frameD / 2 + 0.06]} castShadow>
         <boxGeometry args={[w / 2, 0.02, 0.02]} />
+        <primitive object={matCable} attach="material" />
+      </mesh>
+      {/* Vertical drop from tower base to rear lower crossmember */}
+      <mesh position={[0.04, (towerBaseY + lowerCrossY) / 2, -frameD / 2 + 0.06]} castShadow>
+        <boxGeometry args={[0.02, towerBaseY - lowerCrossY, 0.02]} />
         <primitive object={matCable} attach="material" />
       </mesh>
 
       {/* ═══ ACCESS PANELS ═══ */}
       <AccessPanel
-        position={[0, beltH * 0.5, frameD / 2]}
-        size={[w * 0.55, beltH * 0.5]}
+        position={[0, (lowerCrossY + upperRailY) / 2, frameD / 2]}
+        size={[w * 0.55, upperRailY - lowerCrossY - 0.04]}
       />
 
       {/* ═══ POLYCARBONATE GUARDS ═══ */}
-      {/* Front guard */}
       <GuardPanel
         position={[0, beltH + 0.07, frameD / 2 + 0.008]}
         size={[beltLength * 0.9, 0.1, 0.003]}
       />
-      {/* End guards (infeed/outfeed) */}
-      {[-1, 1].map((sx, i) => (
-        <GuardPanel
-          key={`eg-${i}`}
-          position={[sx * (beltLength / 2 + 0.006), beltH + 0.07, 0]}
-          size={[0.003, 0.1, frameD * 0.7]}
-        />
-      ))}
 
-      {/* ═══ JUNCTION BOX ═══ */}
+      {/* ═══ JUNCTION BOX — mounted ON rear-left leg ═══ */}
       <JunctionBox
-        position={[-w / 2 + 0.06, beltH * 0.45, -frameD / 2 + 0.01]}
+        position={[-w / 2 + 0.04, midCrossY, -frameD / 2 + 0.04]}
         size={[0.1, 0.08, 0.05]}
       />
 
       {/* ═══ DECORATIVE BOLTS ═══ */}
-      {[
-        [-w / 2 + 0.04, beltH - 0.01, frameD / 2 - 0.04],
-        [w / 2 - 0.04, beltH - 0.01, frameD / 2 - 0.04],
-        [-w / 2 + 0.04, beltH - 0.01, -frameD / 2 + 0.04],
-        [w / 2 - 0.04, beltH - 0.01, -frameD / 2 + 0.04],
-      ].map(([bx, by, bz], i) => (
+      {legPositions.map(([bx, bz], i) => (
         <group key={`bolt-g-${i}`}>
-          <BoltHead position={[bx - 0.012, by, bz > 0 ? bz + 0.021 : bz - 0.021]} rotation={[Math.PI / 2, 0, 0]} />
-          <BoltHead position={[bx + 0.012, by, bz > 0 ? bz + 0.021 : bz - 0.021]} rotation={[Math.PI / 2, 0, 0]} />
+          <BoltHead position={[bx - 0.012, upperRailY, bz > 0 ? bz + 0.021 : bz - 0.021]} rotation={[Math.PI / 2, 0, 0]} />
+          <BoltHead position={[bx + 0.012, upperRailY, bz > 0 ? bz + 0.021 : bz - 0.021]} rotation={[Math.PI / 2, 0, 0]} />
         </group>
       ))}
     </group>
