@@ -438,8 +438,8 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       const infeedH = params?.infeedHeight ? (params.infeedHeight / 1000) : (eqH * 0.55);
       const outfeedH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : infeedH;
       return [
-        { id: 'input', type: 'input', localPosition: [-eqW / 2 - 0.15, infeedH, 0] as [number, number, number] },
-        { id: 'output', type: 'output', localPosition: [eqW / 2 + 0.15, outfeedH, 0] as [number, number, number] },
+        { id: 'input', type: 'input', localPosition: [-eqW / 2 - 0.005, infeedH, 0] as [number, number, number] },
+        { id: 'output', type: 'output', localPosition: [eqW / 2 + 0.005, outfeedH, 0] as [number, number, number] },
       ];
     }
     case 'accumulation-table': {
