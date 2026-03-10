@@ -1025,7 +1025,7 @@ function HMIPanel({ position, rotation }: { position: [number, number, number]; 
 
 /** Conveyor section — belt with rollers and side rails */
 function ConveyorSection({
-  position, beltWidth, beltLength, beltHeight = 0.012, rollerCount = 3, sideRailHeight = 0.03
+  position, beltWidth, beltLength, beltHeight = 0.012, rollerCount = 3, sideRailHeight = 0.03, showEndRollers = true
 }: {
   position: [number, number, number];
   beltWidth: number;
@@ -1033,6 +1033,7 @@ function ConveyorSection({
   beltHeight?: number;
   rollerCount?: number;
   sideRailHeight?: number;
+  showEndRollers?: boolean;
 }) {
   const rollerSpacing = beltLength / (rollerCount + 1);
   return (
@@ -1047,9 +1048,9 @@ function ConveyorSection({
         <boxGeometry args={[beltLength, beltHeight, beltWidth]} />
         <primitive object={matBeltRubber} attach="material" />
       </mesh>
-      {/* End rollers */}
-      <Roller position={[-beltLength / 2 + 0.015, -0.005, 0]} length={beltWidth + 0.02} />
-      <Roller position={[beltLength / 2 - 0.015, -0.005, 0]} length={beltWidth + 0.02} />
+      {/* End rollers (optional — hidden on machines where they look like center bars) */}
+      {showEndRollers && <Roller position={[-beltLength / 2 + 0.015, -0.005, 0]} length={beltWidth + 0.02} />}
+      {showEndRollers && <Roller position={[beltLength / 2 - 0.015, -0.005, 0]} length={beltWidth + 0.02} />}
       {/* Intermediate rollers */}
       {Array.from({ length: rollerCount }).map((_, i) => (
         <Roller key={i} position={[-beltLength / 2 + rollerSpacing * (i + 1), -0.005, 0]} length={beltWidth + 0.02} radius={0.018} />
@@ -1230,6 +1231,7 @@ export const CheckweigherModel: React.FC<ModelProps> = ({ params }) => {
         beltLength={infeedLen}
         rollerCount={0}
         sideRailHeight={sideRailH}
+        showEndRollers={false}
       />
       <MotorGearbox
         position={[infeedX, beltH - 0.08, -frameD / 2 + 0.02]}
@@ -1248,9 +1250,7 @@ export const CheckweigherModel: React.FC<ModelProps> = ({ params }) => {
           <boxGeometry args={[weighLen, 0.004, beltWidth + 0.008]} />
           <primitive object={matAluminum} attach="material" />
         </mesh>
-        {/* Tiny nose rollers at ends (radius 0.01 — not visible bars) */}
-        <Roller position={[-weighLen / 2 + 0.008, -0.002, 0]} length={beltWidth + 0.015} radius={0.01} />
-        <Roller position={[weighLen / 2 - 0.008, -0.002, 0]} length={beltWidth + 0.015} radius={0.01} />
+        {/* No rollers in weigh zone — clean flat belt only */}
         {/* Side rails (thinner, precision) */}
         {[-1, 1].map((sz, i) => (
           <mesh key={`wr-${i}`} position={[0, 0.02, sz * (beltWidth / 2 + 0.004)]} castShadow>
@@ -1302,6 +1302,7 @@ export const CheckweigherModel: React.FC<ModelProps> = ({ params }) => {
         beltLength={outfeedLen}
         rollerCount={0}
         sideRailHeight={sideRailH}
+        showEndRollers={false}
       />
       <MotorGearbox
         position={[outfeedX, beltH - 0.08, frameD / 2 - 0.02]}
@@ -1543,8 +1544,9 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
         position={[0, beltH, 0]}
         beltWidth={beltWidth}
         beltLength={beltLength}
-        rollerCount={4}
+        rollerCount={0}
         sideRailHeight={sideRailH}
+        showEndRollers={false}
       />
 
       {/* Conveyor motor (side-mounted) */}
