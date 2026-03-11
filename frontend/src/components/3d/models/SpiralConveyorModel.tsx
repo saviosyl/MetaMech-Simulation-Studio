@@ -134,7 +134,7 @@ const Bolt: React.FC<{ position: [number, number, number]; size?: number }> = ({
 );
 
 /* ── Main Component ── */
-const SpiralConveyorModel: React.FC<Props> = ({ parameters, isSelected }) => {
+const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
   const groupRef = useRef<THREE.Group>(null);
 
   // ─── Extract params (mm → m) ───
@@ -255,31 +255,49 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters, isSelected }) => {
   const endAngle = totalAngle;
   const endTanX = -Math.sin(endAngle);
   const endTanZ = Math.cos(endAngle);
-  const startX = Math.cos(startAngle) * midRadius;
-  const startZ = Math.sin(startAngle) * midRadius;
-  const endX = Math.cos(endAngle) * midRadius;
-  const endZ = Math.sin(endAngle) * midRadius;
+  const startAnchor: [number, number, number] = [
+    Math.cos(startAngle) * midRadius,
+    0,
+    Math.sin(startAngle) * midRadius,
+  ];
+  const endAnchor: [number, number, number] = [
+    Math.cos(endAngle) * midRadius,
+    effectiveHeight,
+    Math.sin(endAngle) * midRadius,
+  ];
 
-  // Build tangent sections from the same flow convention as spiral ports/path.
-  // Input section points TOWARD the helix anchor, output section points AWAY from it.
-  const infeedFinal = isDown
-    ? {
-        pos: [endX + endTanX * (tangentLength * 0.5), effectiveHeight, endZ + endTanZ * (tangentLength * 0.5)] as [number, number, number],
-        yaw: tangentYaw(-endTanX, -endTanZ),
-      }
-    : {
-        pos: [startX - startTanX * (tangentLength * 0.5), 0, startZ - startTanZ * (tangentLength * 0.5)] as [number, number, number],
-        yaw: tangentYaw(startTanX, startTanZ),
-      };
-  const outfeedFinal = isDown
-    ? {
-        pos: [startX + (-startTanX) * (tangentLength * 0.5), 0, startZ + (-startTanZ) * (tangentLength * 0.5)] as [number, number, number],
-        yaw: tangentYaw(-startTanX, -startTanZ),
-      }
-    : {
-        pos: [endX + endTanX * (tangentLength * 0.5), effectiveHeight, endZ + endTanZ * (tangentLength * 0.5)] as [number, number, number],
-        yaw: tangentYaw(endTanX, endTanZ),
-      };
+  // Physical flow direction on the belt at each anchor (horizontal projection).
+  const startFlow: [number, number, number] = isDown
+    ? [-startTanX, 0, -startTanZ]
+    : [startTanX, 0, startTanZ];
+  const endFlow: [number, number, number] = isDown
+    ? [-endTanX, 0, -endTanZ]
+    : [endTanX, 0, endTanZ];
+
+  // Logical node role swap for down-spiral:
+  // - up: input at start, output at end
+  // - down: input at end, output at start
+  const inputAnchor = isDown ? endAnchor : startAnchor;
+  const inputFlow = isDown ? endFlow : startFlow;
+  const outputAnchor = isDown ? startAnchor : endAnchor;
+  const outputFlow = isDown ? startFlow : endFlow;
+
+  // Tangent section placement:
+  // - Input section runs from external connection point -> anchor (toward spiral)
+  // - Output section runs from anchor -> external connection point
+  const infeedPortPos: [number, number, number] = [
+    inputAnchor[0] - inputFlow[0] * tangentLength,
+    inputAnchor[1],
+    inputAnchor[2] - inputFlow[2] * tangentLength,
+  ];
+  const infeedFinal = {
+    pos: infeedPortPos,
+    yaw: tangentYaw(inputFlow[0], inputFlow[2]),
+  };
+  const outfeedFinal = {
+    pos: outputAnchor,
+    yaw: tangentYaw(outputFlow[0], outputFlow[2]),
+  };
 
   return (
     <group ref={groupRef} position={[0, bottomY, 0]}>
@@ -551,6 +569,43 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters, isSelected }) => {
             <cylinderGeometry args={[0.005, 0.005, 0.015, 8]} />
           </mesh>
         </group>
+      </group>
+
+      {/* ═══ Chain Return Unit (rebuilt) ═══ */}
+      <group position={[
+        outputAnchor[0] + outputFlow[0] * 0.18,
+        outputAnchor[1] - 0.09,
+        outputAnchor[2] + outputFlow[2] * 0.18,
+      ]} rotation={[0, outfeedFinal.yaw, 0]}>
+        {/* Return cassette body */}
+        <mesh material={matBasePlate} position={[0.18, 0.03, 0]} castShadow>
+          <boxGeometry args={[0.36, 0.06, beltWidthM * 0.82]} />
+        </mesh>
+        {/* Stainless top cover */}
+        <mesh material={matDrumStainless} position={[0.18, 0.062, 0]} castShadow>
+          <boxGeometry args={[0.34, 0.006, beltWidthM * 0.78]} />
+        </mesh>
+        {/* Return sprockets/idlers */}
+        {[0.04, 0.32].map((x, i) => (
+          <group key={`ret-idler-${i}`} position={[x, 0.065, 0]}>
+            <mesh material={matDrumStainless} rotation={[Math.PI / 2, 0, 0]} castShadow>
+              <cylinderGeometry args={[0.032, 0.032, beltWidthM * 0.76, 14]} />
+            </mesh>
+            <mesh material={matSeamDark} rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.024, 0.024, beltWidthM * 0.78, 12]} />
+            </mesh>
+          </group>
+        ))}
+        {/* Return chain/belt run */}
+        <mesh material={matBeltDark} position={[0.18, 0.065, 0]}>
+          <boxGeometry args={[0.28, 0.012, beltWidthM * 0.62]} />
+        </mesh>
+        {/* Side guards */}
+        {[-1, 1].map((sz, i) => (
+          <mesh key={`ret-guard-${i}`} material={matGuardCover} position={[0.18, 0.09, sz * (beltWidthM * 0.42)]}>
+            <boxGeometry args={[0.34, 0.045, 0.01]} />
+          </mesh>
+        ))}
       </group>
 
       {/* ═══ Bolt patterns on drum flanges ═══ */}
