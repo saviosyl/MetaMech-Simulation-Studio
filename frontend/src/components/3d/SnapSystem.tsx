@@ -87,14 +87,16 @@ function getSpiralHeightAdjustments(
   fixedNode: ProcessNode,
   fixedPort: ConnectionPort,
 ): { movingParams: Record<string, any> | null; fixedParams: Record<string, any> | null } {
-  // If moving node mates to a spiral endpoint, move the non-spiral side's belt heights
-  // so port alignment can happen at Y=0 node placement (grounded equipment).
+  // If moving node mates to a spiral endpoint, update only the matched side height
+  // so node ports and transport path endpoints stay aligned end-to-end.
   if (fixedNode.type === 'spiral-conveyor' && isHeightAdjustableForSpiralMate(movingNode.type)) {
     const h = getPortHeightMm(fixedPort);
+    const currentIn = movingNode.parameters?.infeedHeight;
+    const currentOut = movingNode.parameters?.outfeedHeight;
     return {
       movingParams: {
-        infeedHeight: h,
-        outfeedHeight: h,
+        infeedHeight: movingPort.type === 'input' ? h : (currentIn ?? h),
+        outfeedHeight: movingPort.type === 'output' ? h : (currentOut ?? (currentIn ?? h)),
       },
       fixedParams: null,
     };
@@ -103,11 +105,13 @@ function getSpiralHeightAdjustments(
   // If moving node is spiral, adjust the fixed non-spiral side.
   if (movingNode.type === 'spiral-conveyor' && isHeightAdjustableForSpiralMate(fixedNode.type)) {
     const h = getPortHeightMm(movingPort);
+    const currentIn = fixedNode.parameters?.infeedHeight;
+    const currentOut = fixedNode.parameters?.outfeedHeight;
     return {
       movingParams: null,
       fixedParams: {
-        infeedHeight: h,
-        outfeedHeight: h,
+        infeedHeight: fixedPort.type === 'input' ? h : (currentIn ?? h),
+        outfeedHeight: fixedPort.type === 'output' ? h : (currentOut ?? (currentIn ?? h)),
       },
     };
   }
@@ -233,17 +237,7 @@ const SnapSystem: React.FC = () => {
             myPortUpdated.direction,
             node.scale,
           );
-
-          const shouldGroundMovingNode =
-            cat === 'process' &&
-            targetCat === 'process' &&
-            (node as ProcessNode).type !== 'spiral-conveyor' &&
-            (bestMatch.targetNode as ProcessNode).type === 'spiral-conveyor';
-          const groundedPosition: [number, number, number] = shouldGroundMovingNode
-            ? [mate.position[0], 0, mate.position[2]]
-            : mate.position;
-
-          const updates: Record<string, any> = { position: groundedPosition, rotation: mate.rotation };
+          const updates: Record<string, any> = { position: mate.position, rotation: mate.rotation };
           if (extraParams) {
             updates.parameters = { ...node.parameters, ...extraParams };
           }
@@ -378,16 +372,8 @@ const SnapSystem: React.FC = () => {
             secondPortForMate.direction,
             secondNode.scale,
           );
-          const shouldGroundSecondNode =
-            firstCat === 'process' &&
-            secondCat === 'process' &&
-            (secondNode as ProcessNode).type !== 'spiral-conveyor' &&
-            (firstNode as ProcessNode).type === 'spiral-conveyor';
-          const groundedPosition: [number, number, number] = shouldGroundSecondNode
-            ? [mate.position[0], 0, mate.position[2]]
-            : mate.position;
           const updates: Record<string, any> = {
-            position: groundedPosition,
+            position: mate.position,
             rotation: mate.rotation,
           };
           if (secondParamsUpdate) {
@@ -546,15 +532,11 @@ export function checkSnap(
               adjustedDp.direction,
               draggedNode.scale,
             );
-            const groundedPosition: [number, number, number] =
-              otherNode.type === 'spiral-conveyor' && draggedNode.type !== 'spiral-conveyor'
-                ? [mate.position[0], 0, mate.position[2]]
-                : mate.position;
             return {
               targetNodeId: otherNode.id,
               targetPortId: op.id,
               dragPortId: dp.id,
-              snapPosition: groundedPosition,
+              snapPosition: mate.position,
               snapRotation: mate.rotation,
               snapParameters,
             };

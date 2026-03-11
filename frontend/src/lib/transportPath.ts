@@ -14,6 +14,7 @@
  */
 
 import { localToWorld } from './nodeTransform';
+import { computeSpiralTransferGeometry } from './spiralTransfer';
 
 type Vec3 = [number, number, number];
 
@@ -50,36 +51,34 @@ export interface TransportPath {
 export class StraightPath implements TransportPath {
   length: number;
   private halfLength: number;
-  private heightM: number;
-  private angleRad: number;
+  private infeedHeightM: number;
+  private outfeedHeightM: number;
+  private tangentLocal: Vec3;
 
-  constructor(lengthMm: number, heightMm: number, angleDeg: number = 0) {
-    this.heightM = heightMm / 1000;
-    this.angleRad = (angleDeg * Math.PI) / 180;
-    // Path length along the incline
-    this.length = (lengthMm / 1000) / Math.cos(this.angleRad);
-    this.halfLength = (lengthMm / 1000) / 2;
+  constructor(lengthMm: number, infeedHeightMm: number, outfeedHeightMm: number) {
+    const lengthM = lengthMm / 1000;
+    this.halfLength = lengthM / 2;
+    this.infeedHeightM = infeedHeightMm / 1000;
+    this.outfeedHeightM = outfeedHeightMm / 1000;
+    const dy = this.outfeedHeightM - this.infeedHeightM;
+    this.length = Math.sqrt(lengthM * lengthM + dy * dy);
+    const tanX = lengthM;
+    const mag = Math.sqrt(tanX * tanX + dy * dy) || 1;
+    this.tangentLocal = [tanX / mag, dy / mag, 0];
   }
 
   getLocalPosition(t: number): Vec3 {
     const x = -this.halfLength + t * (2 * this.halfLength);
-    const elevationGain = Math.sin(this.angleRad) * (t * 2 * this.halfLength);
-    const y = this.heightM + elevationGain;
+    const y = this.infeedHeightM + (this.outfeedHeightM - this.infeedHeightM) * t;
     return [x, y, 0];
   }
 
   getLocalTangent(_t: number): Vec3 {
-    // Tangent along the incline
-    const cosA = Math.cos(this.angleRad);
-    const sinA = Math.sin(this.angleRad);
-    return [cosA, sinA, 0];
+    return this.tangentLocal;
   }
 
   getLocalUp(_t: number): Vec3 {
-    // Up perpendicular to incline surface
-    const cosA = Math.cos(this.angleRad);
-    const sinA = Math.sin(this.angleRad);
-    return [-sinA, cosA, 0];
+    return [0, 1, 0];
   }
 
   getWorldPosition(t: number, nodePosition: Vec3, nodeRotation: Vec3, nodeScale?: Vec3): Vec3 {
@@ -159,12 +158,19 @@ export class CurvedPath implements TransportPath {
 export class SpiralPath implements TransportPath {
   length: number;
   private midRadius: number;
-  private infeedHeightM: number;
-  private outfeedHeightM: number;
   private totalAngle: number;
-  private direction: 'up' | 'down';
+  private isDown: boolean;
+  private tangentLength: number;
   private bottomY: number;
+  private topY: number;
   private effectiveHeight: number;
+  private inputPort: Vec3;
+  private inputFlow: Vec3;
+  private outputAnchor: Vec3;
+  private outputFlow: Vec3;
+  private infeedTangentLen: number;
+  private helixLen: number;
+  private outfeedTangentLen: number;
 
   constructor(
     beltWidthMm: number, turns: number,
@@ -172,47 +178,81 @@ export class SpiralPath implements TransportPath {
     infeedHeightMm: number, outfeedHeightMm: number,
     direction: 'up' | 'down',
   ) {
-    const beltW = beltWidthMm / 1000;
-    const drumR = 0.2;
-    const innerR = drumR + 0.02;
-    const outerR = innerR + beltW;
-    this.midRadius = (innerR + outerR) / 2;
-    this.infeedHeightM = infeedHeightMm / 1000;
-    this.outfeedHeightM = outfeedHeightMm / 1000;
-    this.direction = direction;
-    this.bottomY = Math.min(this.infeedHeightM, this.outfeedHeightM);
-    this.effectiveHeight = Math.abs(this.outfeedHeightM - this.infeedHeightM);
+    this.tangentLength = 0.35;
+    const spiral = computeSpiralTransferGeometry(
+      {
+        beltWidth: beltWidthMm,
+        turns,
+        outfeedAngle: outfeedAngleDeg,
+        infeedHeight: infeedHeightMm,
+        outfeedHeight: outfeedHeightMm,
+        direction,
+      },
+      this.tangentLength,
+    );
+    this.isDown = spiral.isDown;
+    this.midRadius = spiral.midRadius;
+    this.totalAngle = spiral.totalAngle;
+    this.bottomY = spiral.bottomY;
+    this.topY = spiral.topY;
+    this.effectiveHeight = spiral.effectiveHeight;
+    this.inputPort = spiral.input.port;
+    this.inputFlow = spiral.input.flow;
+    this.outputAnchor = spiral.output.anchor;
+    this.outputFlow = spiral.output.flow;
 
-    // Total angle: full turns + outfeed angle offset. Infeed always at angle 0.
-    const outAngleRad = (outfeedAngleDeg * Math.PI) / 180;
-    this.totalAngle = turns * Math.PI * 2 + outAngleRad;
-
-    // Helical path length along midRadius
+    this.infeedTangentLen = this.tangentLength;
     const arcLen = this.midRadius * this.totalAngle;
-    this.length = Math.sqrt(arcLen * arcLen + this.effectiveHeight * this.effectiveHeight);
+    this.helixLen = Math.sqrt(arcLen * arcLen + this.effectiveHeight * this.effectiveHeight);
+    this.outfeedTangentLen = this.tangentLength;
+    this.length = this.infeedTangentLen + this.helixLen + this.outfeedTangentLen;
   }
 
   getLocalPosition(t: number): Vec3 {
-    // Product travels along the belt centerline (midRadius)
-    const angle = this.direction === 'up'
-      ? t * this.totalAngle
-      : (1 - t) * this.totalAngle;
-    const x = Math.cos(angle) * this.midRadius;
-    const z = Math.sin(angle) * this.midRadius;
+    const s = Math.max(0, Math.min(1, t)) * this.length;
 
-    // Y position: model group is at bottomY, so local Y goes 0→effectiveHeight
-    const yProgress = this.direction === 'up' ? t : (1 - t);
-    const y = this.bottomY + yProgress * this.effectiveHeight;
-    return [x, y, z];
+    if (s <= this.infeedTangentLen) {
+      return [
+        this.inputPort[0] + this.inputFlow[0] * s,
+        this.inputPort[1],
+        this.inputPort[2] + this.inputFlow[2] * s,
+      ];
+    }
+
+    if (s <= this.infeedTangentLen + this.helixLen) {
+      const u = (s - this.infeedTangentLen) / this.helixLen;
+      const angle = this.isDown ? (1 - u) * this.totalAngle : u * this.totalAngle;
+      const x = Math.cos(angle) * this.midRadius;
+      const z = Math.sin(angle) * this.midRadius;
+      const y = this.isDown
+        ? this.topY - u * this.effectiveHeight
+        : this.bottomY + u * this.effectiveHeight;
+      return [x, y, z];
+    }
+
+    const sOut = s - this.infeedTangentLen - this.helixLen;
+    return [
+      this.outputAnchor[0] + this.outputFlow[0] * sOut,
+      this.outputAnchor[1],
+      this.outputAnchor[2] + this.outputFlow[2] * sOut,
+    ];
   }
 
   getLocalTangent(t: number): Vec3 {
-    const isUp = this.direction === 'up';
-    const angle = isUp ? t * this.totalAngle : (1 - t) * this.totalAngle;
-    const dAdT = isUp ? this.totalAngle : -this.totalAngle;
-    const tx = -Math.sin(angle) * this.midRadius * dAdT;
-    const tz = Math.cos(angle) * this.midRadius * dAdT;
-    const ty = this.direction === 'up' ? this.effectiveHeight : -this.effectiveHeight;
+    const s = Math.max(0, Math.min(1, t)) * this.length;
+    if (s <= this.infeedTangentLen) {
+      return this.inputFlow;
+    }
+    if (s > this.infeedTangentLen + this.helixLen) {
+      return this.outputFlow;
+    }
+
+    const u = (s - this.infeedTangentLen) / this.helixLen;
+    const angle = this.isDown ? (1 - u) * this.totalAngle : u * this.totalAngle;
+    const dAdU = this.isDown ? -this.totalAngle : this.totalAngle;
+    const tx = -Math.sin(angle) * this.midRadius * dAdU;
+    const tz = Math.cos(angle) * this.midRadius * dAdU;
+    const ty = this.isDown ? -this.effectiveHeight : this.effectiveHeight;
     const mag = Math.sqrt(tx * tx + ty * ty + tz * tz) || 1;
     return [tx / mag, ty / mag, tz / mag];
   }
@@ -249,9 +289,13 @@ export function createTransportPath(type: string, params: Record<string, any>): 
     case 'belt-conveyor':
     case 'roller-conveyor': {
       const length = params.length || 3000;
-      const height = params.height || 800;
-      const angle = params.inclineAngle || params.angleDeg || params.angle || 0;
-      return new StraightPath(length, height, angle);
+      const baseHeight = params.height ?? 800;
+      const angleDeg = params.inclineAngle ?? params.angleDeg ?? params.angle ?? 0;
+      const angleRad = (angleDeg * Math.PI) / 180;
+      const inferredOutfeed = baseHeight + Math.tan(angleRad) * (length / 1000) * 1000;
+      const infeedHeight = params.infeedHeight ?? baseHeight;
+      const outfeedHeight = params.outfeedHeight ?? inferredOutfeed;
+      return new StraightPath(length, infeedHeight, outfeedHeight);
     }
 
     case 'bend-conveyor': {
@@ -263,12 +307,12 @@ export function createTransportPath(type: string, params: Record<string, any>): 
     }
 
     case 'spiral-conveyor': {
-      const beltWidth = params.beltWidth || 400;
-      const turns = params.turns || 3;
-      const outfeedAngle = params.outfeedAngle || 180;
+      const beltWidth = params.beltWidth ?? 400;
+      const turns = params.turns ?? 3;
+      const outfeedAngle = params.outfeedAngle ?? 180;
       const infeedHeight = params.infeedHeight ?? 800;
       const outfeedHeight = params.outfeedHeight ?? 3800;
-      const direction = params.direction || 'up';
+      const direction = params.direction ?? 'up';
       return new SpiralPath(beltWidth, turns, outfeedAngle, infeedHeight, outfeedHeight, direction);
     }
 
