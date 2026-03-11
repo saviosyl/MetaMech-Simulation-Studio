@@ -109,9 +109,13 @@ const DraggableObject: React.FC<{
 
               const nextPosition = snap?.snapPosition ?? currentSnapTarget.position;
               const nextRotation = snap?.snapRotation ?? node.rotation;
+              const nextParameters = snap?.snapParameters
+                ? { ...node.parameters, ...snap.snapParameters }
+                : node.parameters;
               updateObject(id, objectType, {
                 position: nextPosition,
                 rotation: nextRotation,
+                parameters: nextParameters,
               });
               if (groupRef.current) {
                 groupRef.current.position.set(...nextPosition);
@@ -119,7 +123,7 @@ const DraggableObject: React.FC<{
               }
 
               // Create edge - figure out direction
-              const dragPorts = getConnectionPorts(node.type, node.parameters);
+              const dragPorts = getConnectionPorts(node.type, nextParameters);
               // Use the stored snap info to create connection
               if (snap) {
                 const dragPort = dragPorts.find(p => p.id === snap.dragPortId);

@@ -75,6 +75,46 @@ function getMachineConveyorHeightAdjustments(
   return { movingParams: null, fixedParams: null };
 }
 
+function isHeightAdjustableForSpiralMate(nodeType: string): boolean {
+  // Exclude spiral itself; the non-spiral counterpart should adapt to the spiral endpoint.
+  if (nodeType === 'spiral-conveyor') return false;
+  return CONVEYOR_TYPES_SET.has(nodeType) || MACHINE_TYPES.has(nodeType);
+}
+
+function getSpiralHeightAdjustments(
+  movingNode: ProcessNode,
+  movingPort: ConnectionPort,
+  fixedNode: ProcessNode,
+  fixedPort: ConnectionPort,
+): { movingParams: Record<string, any> | null; fixedParams: Record<string, any> | null } {
+  // If moving node mates to a spiral endpoint, move the non-spiral side's belt heights
+  // so port alignment can happen at Y=0 node placement (grounded equipment).
+  if (fixedNode.type === 'spiral-conveyor' && isHeightAdjustableForSpiralMate(movingNode.type)) {
+    const h = getPortHeightMm(fixedPort);
+    return {
+      movingParams: {
+        infeedHeight: h,
+        outfeedHeight: h,
+      },
+      fixedParams: null,
+    };
+  }
+
+  // If moving node is spiral, adjust the fixed non-spiral side.
+  if (movingNode.type === 'spiral-conveyor' && isHeightAdjustableForSpiralMate(fixedNode.type)) {
+    const h = getPortHeightMm(movingPort);
+    return {
+      movingParams: null,
+      fixedParams: {
+        infeedHeight: h,
+        outfeedHeight: h,
+      },
+    };
+  }
+
+  return { movingParams: null, fixedParams: null };
+}
+
 /** Unified node shape that both ProcessNode and EnvironmentAsset satisfy */
 type AnyNode = ProcessNode | EnvironmentAsset;
 
@@ -134,7 +174,13 @@ const SnapSystem: React.FC = () => {
               const dx = mpWorld[0] - opWorld[0];
               const dy = mpWorld[1] - opWorld[1];
               const dz = mpWorld[2] - opWorld[2];
-              const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+              const planarDist = Math.sqrt(dx * dx + dz * dz);
+              const dist3d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+              const spiralPair = node.type === 'spiral-conveyor' || other.type === 'spiral-conveyor';
+              const usePlanarDist =
+                spiralPair &&
+                (isHeightAdjustableForSpiralMate(node.type) || isHeightAdjustableForSpiralMate(other.type));
+              const dist = usePlanarDist ? planarDist : dist3d;
               if (dist < bestDist) {
                 bestDist = dist;
                 const opWorldDir = localDirToWorld(op.direction, other.rotation);
@@ -151,12 +197,21 @@ const SnapSystem: React.FC = () => {
           if (cat === 'process' && targetCat === 'process') {
             const targetAsProcess = bestMatch.targetNode as ProcessNode;
             const nodeAsProcess = node as ProcessNode;
-            const { movingParams, fixedParams } = getMachineConveyorHeightAdjustments(
+            const spiralAdjust = getSpiralHeightAdjustments(
               nodeAsProcess,
               bestMatch.myPort,
               targetAsProcess,
               bestMatch.targetPort,
             );
+            const baseAdjust = spiralAdjust.movingParams || spiralAdjust.fixedParams
+              ? spiralAdjust
+              : getMachineConveyorHeightAdjustments(
+                  nodeAsProcess,
+                  bestMatch.myPort,
+                  targetAsProcess,
+                  bestMatch.targetPort,
+                );
+            const { movingParams, fixedParams } = baseAdjust;
             if (movingParams) {
               extraParams = movingParams;
             }
@@ -179,7 +234,16 @@ const SnapSystem: React.FC = () => {
             node.scale,
           );
 
-          const updates: Record<string, any> = { position: mate.position, rotation: mate.rotation };
+          const shouldGroundMovingNode =
+            cat === 'process' &&
+            targetCat === 'process' &&
+            (node as ProcessNode).type !== 'spiral-conveyor' &&
+            (bestMatch.targetNode as ProcessNode).type === 'spiral-conveyor';
+          const groundedPosition: [number, number, number] = shouldGroundMovingNode
+            ? [mate.position[0], 0, mate.position[2]]
+            : mate.position;
+
+          const updates: Record<string, any> = { position: groundedPosition, rotation: mate.rotation };
           if (extraParams) {
             updates.parameters = { ...node.parameters, ...extraParams };
           }
@@ -275,12 +339,21 @@ const SnapSystem: React.FC = () => {
           if (firstCat === 'process' && secondCat === 'process') {
             const firstAsProcess = firstNode as ProcessNode;
             const secondAsProcess = secondNode as ProcessNode;
-            const { movingParams, fixedParams } = getMachineConveyorHeightAdjustments(
+            const spiralAdjust = getSpiralHeightAdjustments(
               secondAsProcess,
               secondPort,
               firstAsProcess,
               firstPort,
             );
+            const baseAdjust = spiralAdjust.movingParams || spiralAdjust.fixedParams
+              ? spiralAdjust
+              : getMachineConveyorHeightAdjustments(
+                  secondAsProcess,
+                  secondPort,
+                  firstAsProcess,
+                  firstPort,
+                );
+            const { movingParams, fixedParams } = baseAdjust;
             if (movingParams) {
               secondParamsUpdate = movingParams;
               const recomputedPorts = getConnectionPorts(
@@ -305,8 +378,16 @@ const SnapSystem: React.FC = () => {
             secondPortForMate.direction,
             secondNode.scale,
           );
+          const shouldGroundSecondNode =
+            firstCat === 'process' &&
+            secondCat === 'process' &&
+            (secondNode as ProcessNode).type !== 'spiral-conveyor' &&
+            (firstNode as ProcessNode).type === 'spiral-conveyor';
+          const groundedPosition: [number, number, number] = shouldGroundSecondNode
+            ? [mate.position[0], 0, mate.position[2]]
+            : mate.position;
           const updates: Record<string, any> = {
-            position: mate.position,
+            position: groundedPosition,
             rotation: mate.rotation,
           };
           if (secondParamsUpdate) {
@@ -397,14 +478,13 @@ export function checkSnap(
   dragPortId: string;
   snapPosition: [number, number, number];
   snapRotation?: [number, number, number];
+  snapParameters?: Record<string, any>;
 } | null {
-  const dragPorts = getConnectionPorts(draggedNode.type, draggedNode.parameters);
-
   for (const otherNode of allNodes) {
     if (otherNode.id === draggedNode.id) continue;
     const otherPorts = getConnectionPorts(otherNode.type, otherNode.parameters);
 
-    for (const dp of dragPorts) {
+    for (const dp of getConnectionPorts(draggedNode.type, draggedNode.parameters)) {
       const dpWorld = getPortWorldPosition(dp.localPosition, draggedNode);
 
       for (const op of otherPorts) {
@@ -422,30 +502,61 @@ export function checkSnap(
 
         const dist = Math.sqrt(
           (dpWorld[0] - opWorld[0]) ** 2 +
+          (dpWorld[2] - opWorld[2]) ** 2
+        );
+        const spiralPair =
+          draggedNode.type === 'spiral-conveyor' || otherNode.type === 'spiral-conveyor';
+        const fullDist = Math.sqrt(
+          (dpWorld[0] - opWorld[0]) ** 2 +
           (dpWorld[1] - opWorld[1]) ** 2 +
           (dpWorld[2] - opWorld[2]) ** 2
         );
+        const usePlanarDist =
+          spiralPair &&
+          (isHeightAdjustableForSpiralMate(draggedNode.type) || isHeightAdjustableForSpiralMate(otherNode.type));
+        const effectiveDist = usePlanarDist ? dist : fullDist;
 
-        if (dist < SNAP_THRESHOLD) {
+        if (effectiveDist < SNAP_THRESHOLD) {
           const spiralConnection =
             draggedNode.type === 'spiral-conveyor' || otherNode.type === 'spiral-conveyor';
 
           // Spiral connections should align inline with the spiral tangent direction.
           if (spiralConnection) {
+            let adjustedDp = dp;
+            let snapParameters: Record<string, any> | undefined;
+            const spiralAdjust = getSpiralHeightAdjustments(
+              draggedNode,
+              dp,
+              otherNode,
+              op,
+            );
+            if (spiralAdjust.movingParams) {
+              snapParameters = spiralAdjust.movingParams;
+              const updatedPorts = getConnectionPorts(
+                draggedNode.type,
+                { ...draggedNode.parameters, ...spiralAdjust.movingParams },
+              );
+              adjustedDp = updatedPorts.find(p => p.id === dp.id) || dp;
+            }
             const opWorldDir = localDirToWorld(op.direction, otherNode.rotation);
             const mate = solveMateTransform(
               opWorld,
               opWorldDir,
-              dp.localPosition,
-              dp.direction,
+              adjustedDp.localPosition,
+              adjustedDp.direction,
               draggedNode.scale,
             );
+            const groundedPosition: [number, number, number] =
+              otherNode.type === 'spiral-conveyor' && draggedNode.type !== 'spiral-conveyor'
+                ? [mate.position[0], 0, mate.position[2]]
+                : mate.position;
             return {
               targetNodeId: otherNode.id,
               targetPortId: op.id,
               dragPortId: dp.id,
-              snapPosition: mate.position,
+              snapPosition: groundedPosition,
               snapRotation: mate.rotation,
+              snapParameters,
             };
           }
 
