@@ -31,10 +31,10 @@ export async function getClient() {
     );
   }, 5000);
   
-  client.query = (...args: any[]) => {
+  client.query = ((...args: any[]) => {
     (client as any).lastQuery = args;
-    return query.apply(client, args);
-  };
+    return (query as any).apply(client, args);
+  }) as typeof client.query;
   
   client.release = () => {
     clearTimeout(timeout);
