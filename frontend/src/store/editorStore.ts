@@ -247,8 +247,8 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       const pL = ((params?.length || 3000) / 1000);
       const pH = ((params?.height || 800) / 1000);
       const portInset = 0.02;
-      const pInH = params?.infeedHeight ? (params.infeedHeight / 1000) : pH;
-      const pOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : pH;
+      const pInH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : pH;
+      const pOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : pH;
       return [
         { id: 'input', type: 'input', localPosition: [-pL / 2 + portInset, pInH, 0] },
         { id: 'output', type: 'output', localPosition: [pL / 2 - portInset, pOutH, 0] },
@@ -258,8 +258,8 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     case 'modular-conveyor-45-curve':
     case 'bend-conveyor': {
       const bendDefH = ((params?.height || 800) / 1000);
-      const pH = params?.infeedHeight ? (params.infeedHeight / 1000) : bendDefH;
-      const pOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : bendDefH;
+      const pH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : bendDefH;
+      const pOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : bendDefH;
       const cAngle = (params?.bendAngle || params?.curveAngle || 90) * Math.PI / 180;
       const cRadius = (params?.radius || params?.curveRadius || 1000) / 1000;
       const dir = params?.bendDirection || 'right';
@@ -292,24 +292,24 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       ];
     }
     case 'buffer': {
-      const bufInH = params?.infeedHeight ? (params.infeedHeight / 1000) : 0.4;
-      const bufOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : 0.4;
+      const bufInH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : 0.4;
+      const bufOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : 0.4;
       return [
         { id: 'input', type: 'input', localPosition: [-1, bufInH, 0] },
         { id: 'output', type: 'output', localPosition: [1, bufOutH, 0] },
       ];
     }
     case 'machine': {
-      const machInH = params?.infeedHeight ? (params.infeedHeight / 1000) : 0.75;
-      const machOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : machInH;
+      const machInH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : 0.75;
+      const machOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : machInH;
       return [
         { id: 'input', type: 'input', localPosition: [-1, machInH, 0] },
         { id: 'output', type: 'output', localPosition: [1, machOutH, 0] },
       ];
     }
     case 'palletizer': {
-      const palInH = params?.infeedHeight ? (params.infeedHeight / 1000) : 1.25;
-      const palOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : 1.25;
+      const palInH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : 1.25;
+      const palOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : 1.25;
       return [
         { id: 'input', type: 'input', localPosition: [-1.5, palInH, 0] },
         { id: 'output', type: 'output', localPosition: [1.5, palOutH, 0] },
@@ -321,8 +321,8 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
         { id: 'output', type: 'output', localPosition: [1.5, 0, 0] },
       ];
     case 'router': {
-      const rtrInH = params?.infeedHeight ? (params.infeedHeight / 1000) : 0.25;
-      const rtrOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : 0.25;
+      const rtrInH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : 0.25;
+      const rtrOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : 0.25;
       return [
         { id: 'input', type: 'input', localPosition: [-1, rtrInH, 0] },
         { id: 'output1', type: 'output', localPosition: [1, rtrOutH, 0] },
@@ -334,8 +334,8 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       const sTurns = Math.max(params?.turns || 3, 0.5);
       const sOutAngleDeg = params?.outfeedAngle || 180;
       const sOutAngleRad = (sOutAngleDeg * Math.PI) / 180;
-      const sInfeedH = (params?.infeedHeight || 800) / 1000;
-      const sOutfeedH = (params?.outfeedHeight || 3800) / 1000;
+      const sInfeedH = ((params?.infeedHeight ?? 800)) / 1000;
+      const sOutfeedH = ((params?.outfeedHeight ?? 3800)) / 1000;
       const sDrumR = 0.2;
       const sInnerR = sDrumR + 0.02;
       const sOuterR = sInnerR + sBeltW;
@@ -386,8 +386,8 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     case 'vertical-lifter': {
       const platW = (params?.platformWidth || 1000) / 1000;
       const platD = (params?.platformDepth || 1000) / 1000;
-      const infH  = (params?.infeedHeight  || 0) / 1000;
-      const outH  = (params?.outfeedHeight || 3000) / 1000;
+      const infH  = (params?.infeedHeight  ?? 0) / 1000;
+      const outH  = (params?.outfeedHeight ?? 3000) / 1000;
       const liftDir = params?.liftDirection || 'up';
       const loadDir = params?.loadDirection || 'front';
       const halfW = platW / 2;
@@ -452,8 +452,8 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       const eqW = (params?.width || 800) / 1000;
       const eqH = (params?.height || 900) / 1000;
       // Auto-match conveyor belt top height if infeedHeight is set (from mate auto-height)
-      const infeedH = params?.infeedHeight ? (params.infeedHeight / 1000) : (eqH * 0.55);
-      const outfeedH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : infeedH;
+      const infeedH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : (eqH * 0.55);
+      const outfeedH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : infeedH;
       return [
         { id: 'input', type: 'input', localPosition: [-eqW / 2 - 0.005, infeedH, 0] as [number, number, number] },
         { id: 'output', type: 'output', localPosition: [eqW / 2 + 0.005, outfeedH, 0] as [number, number, number] },
@@ -462,8 +462,8 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     case 'accumulation-table': {
       const tW = (params?.width || 2000) / 1000;
       const tH = (params?.height || 800) / 1000;
-      const atInH = params?.infeedHeight ? (params.infeedHeight / 1000) : (tH + 0.03);
-      const atOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : (tH + 0.03);
+      const atInH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : (tH + 0.03);
+      const atOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : (tH + 0.03);
       return [
         { id: 'input', type: 'input', localPosition: [-tW / 2, atInH, 0] as [number, number, number] },
         { id: 'output', type: 'output', localPosition: [tW / 2, atOutH, 0] as [number, number, number] },
@@ -472,24 +472,24 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     case 'pallet-conveyor': {
       const pcL = (params?.length || 3000) / 1000;
       const pcH = (params?.height || 500) / 1000;
-      const pcInH = params?.infeedHeight ? (params.infeedHeight / 1000) : pcH;
-      const pcOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : pcH;
+      const pcInH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : pcH;
+      const pcOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : pcH;
       return [
         { id: 'input', type: 'input', localPosition: [-pcL / 2, pcInH, 0] as [number, number, number] },
         { id: 'output', type: 'output', localPosition: [pcL / 2, pcOutH, 0] as [number, number, number] },
       ];
     }
     case 'stretch-wrapper': {
-      const swInH = params?.infeedHeight ? (params.infeedHeight / 1000) : 0.1;
-      const swOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : 0.1;
+      const swInH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : 0.1;
+      const swOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : 0.1;
       return [
         { id: 'input', type: 'input', localPosition: [-0.8, swInH, 0] as [number, number, number] },
         { id: 'output', type: 'output', localPosition: [0.8, swOutH, 0] as [number, number, number] },
       ];
     }
     case 'packing-station': {
-      const psInH = params?.infeedHeight ? (params.infeedHeight / 1000) : 0.9;
-      const psOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : 0.9;
+      const psInH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : 0.9;
+      const psOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : 0.9;
       return [
         { id: 'input', type: 'input', localPosition: [-0.75, psInH, 0.3] as [number, number, number] },
         { id: 'output', type: 'output', localPosition: [0.75, psOutH, 0.3] as [number, number, number] },
@@ -501,8 +501,8 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     case 'stainless-conveyor': {
       const txL = (params?.length || 1500) / 1000;
       const txH = (params?.height || 850) / 1000;
-      const txInH = params?.infeedHeight ? (params.infeedHeight / 1000) : txH;
-      const txOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : txH;
+      const txInH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : txH;
+      const txOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : txH;
       return [
         { id: 'input', type: 'input', localPosition: [-txL / 2, txInH, 0] as [number, number, number] },
         { id: 'output', type: 'output', localPosition: [txL / 2, txOutH, 0] as [number, number, number] },
@@ -511,8 +511,8 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     case 'merge-divert': {
       const mdL = (params?.length || 2000) / 1000;
       const mdH = (params?.height || 850) / 1000;
-      const mdInH = params?.infeedHeight ? (params.infeedHeight / 1000) : mdH;
-      const mdOutH = params?.outfeedHeight ? (params.outfeedHeight / 1000) : mdH;
+      const mdInH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : mdH;
+      const mdOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : mdH;
       return [
         { id: 'input', type: 'input', localPosition: [-mdL / 2, mdInH, 0] as [number, number, number] },
         { id: 'output', type: 'output', localPosition: [mdL / 2, mdOutH, 0] as [number, number, number] },

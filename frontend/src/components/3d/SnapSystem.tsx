@@ -15,12 +15,64 @@ const MACHINE_TYPES = new Set([
 const CONVEYOR_TYPES_SET = new Set([
   'conveyor', 'belt-conveyor', 'roller-conveyor', 'modular-conveyor-straight',
   'modular-conveyor-90-curve', 'modular-conveyor-45-curve', 'incline-conveyor',
-  'pallet-conveyor',
+  'pallet-conveyor', 'bend-conveyor', 'spiral-conveyor',
+  'transfer-bridge', 'popup-transfer', 'pusher-transfer', 'merge-divert', 'stainless-conveyor',
 ]);
 
-/** Get the belt top height of a conveyor in mm */
-function getConveyorBeltTopMm(node: ProcessNode): number {
-  return node.parameters?.height || 800; // height param is already belt top height in mm
+/** Use the actual matched connection port height as the auto-height source. */
+function getPortHeightMm(port: ConnectionPort): number {
+  return port.localPosition[1] * 1000;
+}
+
+function getMachineConveyorHeightAdjustments(
+  movingNode: ProcessNode,
+  movingPort: ConnectionPort,
+  fixedNode: ProcessNode,
+  fixedPort: ConnectionPort,
+): { movingParams: Record<string, any> | null; fixedParams: Record<string, any> | null } {
+  // Machine connecting to conveyor: update moving machine infeed/outfeed to matched conveyor port height.
+  if (MACHINE_TYPES.has(movingNode.type) && CONVEYOR_TYPES_SET.has(fixedNode.type)) {
+    const beltTopMm = getPortHeightMm(fixedPort);
+    if (movingPort.id === 'input') {
+      return {
+        movingParams: {
+          infeedHeight: beltTopMm,
+          outfeedHeight: movingNode.parameters?.outfeedHeight ?? beltTopMm,
+        },
+        fixedParams: null,
+      };
+    }
+    return {
+      movingParams: {
+        outfeedHeight: beltTopMm,
+        infeedHeight: movingNode.parameters?.infeedHeight ?? beltTopMm,
+      },
+      fixedParams: null,
+    };
+  }
+
+  // Conveyor connecting to machine: update fixed machine side height to moving conveyor matched port height.
+  if (MACHINE_TYPES.has(fixedNode.type) && CONVEYOR_TYPES_SET.has(movingNode.type)) {
+    const beltTopMm = getPortHeightMm(movingPort);
+    if (fixedPort.id === 'input') {
+      return {
+        movingParams: null,
+        fixedParams: {
+          infeedHeight: beltTopMm,
+          outfeedHeight: fixedNode.parameters?.outfeedHeight ?? beltTopMm,
+        },
+      };
+    }
+    return {
+      movingParams: null,
+      fixedParams: {
+        outfeedHeight: beltTopMm,
+        infeedHeight: fixedNode.parameters?.infeedHeight ?? beltTopMm,
+      },
+    };
+  }
+
+  return { movingParams: null, fixedParams: null };
 }
 
 /** Unified node shape that both ProcessNode and EnvironmentAsset satisfy */
@@ -99,27 +151,17 @@ const SnapSystem: React.FC = () => {
           if (cat === 'process' && targetCat === 'process') {
             const targetAsProcess = bestMatch.targetNode as ProcessNode;
             const nodeAsProcess = node as ProcessNode;
-            // Machine connecting to conveyor
-            if (MACHINE_TYPES.has(nodeAsProcess.type) && CONVEYOR_TYPES_SET.has(targetAsProcess.type)) {
-              const beltTopMm = getConveyorBeltTopMm(targetAsProcess);
-              if (bestMatch.myPort.id === 'input') {
-                extraParams = { infeedHeight: beltTopMm, outfeedHeight: nodeAsProcess.parameters?.outfeedHeight || beltTopMm };
-              } else {
-                extraParams = { outfeedHeight: beltTopMm, infeedHeight: nodeAsProcess.parameters?.infeedHeight || beltTopMm };
-              }
+            const { movingParams, fixedParams } = getMachineConveyorHeightAdjustments(
+              nodeAsProcess,
+              bestMatch.myPort,
+              targetAsProcess,
+              bestMatch.targetPort,
+            );
+            if (movingParams) {
+              extraParams = movingParams;
             }
-            // Conveyor connecting to machine — set the machine's height to match
-            if (MACHINE_TYPES.has(targetAsProcess.type) && CONVEYOR_TYPES_SET.has(nodeAsProcess.type)) {
-              const beltTopMm = getConveyorBeltTopMm(nodeAsProcess);
-              const tParams: Record<string, any> = {};
-              if (bestMatch.targetPort.id === 'input') {
-                tParams.infeedHeight = beltTopMm;
-                if (!targetAsProcess.parameters?.outfeedHeight) tParams.outfeedHeight = beltTopMm;
-              } else {
-                tParams.outfeedHeight = beltTopMm;
-                if (!targetAsProcess.parameters?.infeedHeight) tParams.infeedHeight = beltTopMm;
-              }
-              updateObject(targetAsProcess.id, 'process', { parameters: { ...targetAsProcess.parameters, ...tParams } });
+            if (fixedParams) {
+              updateObject(targetAsProcess.id, 'process', { parameters: { ...targetAsProcess.parameters, ...fixedParams } });
             }
           }
 
@@ -221,11 +263,37 @@ const SnapSystem: React.FC = () => {
       const firstNode = allNodes.find(n => n.id === selectedPort.nodeId);
       const secondNode = allNodes.find(n => n.id === pv.nodeId);
       if (secondNode && firstNode) {
+        const firstCat = nodeCategory(selectedPort.nodeId, processNodes, environmentAssets);
+        const secondCat = nodeCategory(pv.nodeId, processNodes, environmentAssets);
         const firstPorts = getConnectionPorts(firstNode.type, firstNode.parameters, (firstNode as any).assetId);
         const firstPort = firstPorts.find(p => p.id === selectedPort.portId);
         const secondPorts = getConnectionPorts(secondNode.type, secondNode.parameters, (secondNode as any).assetId);
         const secondPort = secondPorts.find(p => p.id === pv.portId);
         if (firstPort && secondPort) {
+          let secondPortForMate = secondPort;
+          let secondParamsUpdate: Record<string, any> | null = null;
+          if (firstCat === 'process' && secondCat === 'process') {
+            const firstAsProcess = firstNode as ProcessNode;
+            const secondAsProcess = secondNode as ProcessNode;
+            const { movingParams, fixedParams } = getMachineConveyorHeightAdjustments(
+              secondAsProcess,
+              secondPort,
+              firstAsProcess,
+              firstPort,
+            );
+            if (movingParams) {
+              secondParamsUpdate = movingParams;
+              const recomputedPorts = getConnectionPorts(
+                secondNode.type,
+                { ...secondNode.parameters, ...movingParams },
+                (secondNode as any).assetId,
+              );
+              secondPortForMate = recomputedPorts.find(p => p.id === pv.portId) || secondPort;
+            }
+            if (fixedParams) {
+              updateObject(firstAsProcess.id, 'process', { parameters: { ...firstAsProcess.parameters, ...fixedParams } });
+            }
+          }
           const firstWorldDir = localDirToWorld(
             firstPort.direction,
             firstNode.rotation,
@@ -233,15 +301,18 @@ const SnapSystem: React.FC = () => {
           const mate = solveMateTransform(
             selectedPort.worldPosition,
             firstWorldDir,
-            secondPort.localPosition,
-            secondPort.direction,
+            secondPortForMate.localPosition,
+            secondPortForMate.direction,
             secondNode.scale,
           );
-          const secondCat = nodeCategory(secondNode.id, processNodes, environmentAssets);
-          updateObject(pv.nodeId, secondCat, {
+          const updates: Record<string, any> = {
             position: mate.position,
             rotation: mate.rotation,
-          });
+          };
+          if (secondParamsUpdate) {
+            updates.parameters = { ...secondNode.parameters, ...secondParamsUpdate };
+          }
+          updateObject(pv.nodeId, secondCat, updates);
         }
       }
 
