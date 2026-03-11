@@ -4,7 +4,7 @@
  */
 import React, { useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { computeSpiralTransferGeometry } from '../../../lib/spiralTransfer';
+import { computeSpiralTransferGeometry, toSpiralBodyLocal } from '../../../lib/spiralTransfer';
 
 interface Props {
   parameters: Record<string, any>;
@@ -245,23 +245,24 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
   const towerYaw = -towerAngle + Math.PI / 2;
 
   const tangentYaw = (tx: number, tz: number) => Math.atan2(-tz, tx);
-  const outputAnchor = output.anchor;
+  const inputPortBody = toSpiralBodyLocal(input.port, bottomY);
+  const outputAnchorBody = toSpiralBodyLocal(output.anchor, bottomY);
+  const outputPortBody = toSpiralBodyLocal(output.port, bottomY);
   const outputFlow = output.flow;
-  const outputPort = output.port;
 
   const infeedFinal = {
-    pos: input.port,
+    pos: inputPortBody,
     yaw: tangentYaw(input.flow[0], input.flow[2]),
   };
   const outfeedFinal = {
-    pos: outputAnchor,
+    pos: outputAnchorBody,
     yaw: tangentYaw(outputFlow[0], outputFlow[2]),
   };
   const outputSideNormal: [number, number, number] = [-outputFlow[2], 0, outputFlow[0]];
   const returnUnitPos: [number, number, number] = [
-    outputPort[0] + outputFlow[0] * 0.08 + outputSideNormal[0] * (beltWidthM * 0.58),
-    outputPort[1] - 0.11,
-    outputPort[2] + outputFlow[2] * 0.08 + outputSideNormal[2] * (beltWidthM * 0.58),
+    outputPortBody[0] + outputFlow[0] * 0.08 + outputSideNormal[0] * (beltWidthM * 0.58),
+    outputPortBody[1] - 0.11,
+    outputPortBody[2] + outputFlow[2] * 0.08 + outputSideNormal[2] * (beltWidthM * 0.58),
   ];
 
   return (

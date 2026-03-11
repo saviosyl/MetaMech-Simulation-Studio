@@ -1,4 +1,4 @@
-type Vec3 = [number, number, number];
+export type Vec3 = [number, number, number];
 
 export interface SpiralTransferSide {
   /** Belt anchor on the helix centerline */
@@ -96,4 +96,12 @@ export function computeSpiralTransferGeometry(
       direction: outputFlow,
     },
   };
+}
+
+/**
+ * Convert a ground-referenced spiral point (node-local) into the model-body frame
+ * used by SpiralConveyorModel's inner group positioned at +bottomY.
+ */
+export function toSpiralBodyLocal(point: Vec3, bottomY: number): Vec3 {
+  return [point[0], point[1] - bottomY, point[2]];
 }
