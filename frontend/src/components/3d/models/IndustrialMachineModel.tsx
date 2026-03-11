@@ -31,6 +31,9 @@ const IndustrialMachineModel: React.FC<Props> = ({ parameters, isSelected }) => 
   const mH = (parameters.machineHeight || 1800) / 1000;
   const em = isSelected ? new THREE.Color('#222') : new THREE.Color('#000');
   const baseH = 0.1;
+  const defaultPortH = baseH + mH * 0.35;
+  const inputOpeningH = parameters.infeedHeight != null ? (parameters.infeedHeight / 1000) : defaultPortH;
+  const outputOpeningH = parameters.outfeedHeight != null ? (parameters.outfeedHeight / 1000) : inputOpeningH;
 
   return (
     <group>
@@ -64,14 +67,14 @@ const IndustrialMachineModel: React.FC<Props> = ({ parameters, isSelected }) => 
         <meshStandardMaterial {...matFrame} />
       </mesh>
 
-      {/* Infeed opening (right side, lower) */}
-      <mesh position={[mL / 2 + 0.001, baseH + mH * 0.35, 0]}>
+      {/* Output opening (right side) */}
+      <mesh position={[mL / 2 + 0.001, outputOpeningH, 0]}>
         <boxGeometry args={[0.01, mH * 0.25, mW * 0.5]} />
         <meshStandardMaterial color={0x111111} metalness={0.9} roughness={0.1} emissive={em} />
       </mesh>
 
-      {/* Outfeed opening (left side, lower) */}
-      <mesh position={[-mL / 2 - 0.001, baseH + mH * 0.35, 0]}>
+      {/* Input opening (left side) */}
+      <mesh position={[-mL / 2 - 0.001, inputOpeningH, 0]}>
         <boxGeometry args={[0.01, mH * 0.25, mW * 0.5]} />
         <meshStandardMaterial color={0x111111} metalness={0.9} roughness={0.1} emissive={em} />
       </mesh>

@@ -224,7 +224,7 @@ export const CartonErectorModel: React.FC<ModelProps> = ({ params }) => {
   const machineL = (params?.width || 3000) / 1000;   // machine length along X
   const machineW = (params?.depth || 1450) / 1000;    // machine width along Z
   const eqH = (params?.height || 2160) / 1000;
-  const beltH = params?.infeedHeight ? (params.infeedHeight / 1000) : (eqH * 0.42);
+  const beltH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : (eqH * 0.42);
 
   const tubeSize = 0.04;
   const halfL = machineL / 2;
@@ -1188,7 +1188,7 @@ function AccessPanel({ position, size, rotation }: { position: [number, number, 
 export const CheckweigherModel: React.FC<ModelProps> = ({ params }) => {
   const w = (params?.width || 800) / 1000;
   const eqH = (params?.height || 900) / 1000;
-  const beltH = params?.infeedHeight ? (params.infeedHeight / 1000) : (eqH * 0.55);
+  const beltH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : (eqH * 0.55);
   const frameD = 0.45;
   const tubeSize = 0.04;
   const infeedLen = w * 0.3;
@@ -1466,6 +1466,12 @@ export const MetalDetectorModel: React.FC<ModelProps> = ({ params }) => {
   const h = (params?.height || 900) / 1000;
   const apertureH = 0.25;
   const apertureW = w * 0.7;
+  const beltLen = w * 0.9;
+  const defaultBeltH = h * 0.5;
+  const infeedH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : defaultBeltH;
+  const outfeedH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : infeedH;
+  const beltH = (infeedH + outfeedH) / 2;
+  const beltTiltZ = Math.atan2(outfeedH - infeedH, beltLen);
 
   return (
     <group>
@@ -1488,8 +1494,8 @@ export const MetalDetectorModel: React.FC<ModelProps> = ({ params }) => {
         <meshStandardMaterial {...matAccent} />
       </mesh>
       {/* Belt through aperture */}
-      <mesh position={[0, h * 0.5, 0]} castShadow>
-        <boxGeometry args={[w * 0.9, 0.015, 0.35]} />
+      <mesh position={[0, beltH, 0]} rotation={[0, 0, beltTiltZ]} castShadow>
+        <boxGeometry args={[beltLen, 0.015, 0.35]} />
         <meshStandardMaterial {...matBelt} />
       </mesh>
       {/* Status light */}
@@ -1508,7 +1514,7 @@ export const MetalDetectorModel: React.FC<ModelProps> = ({ params }) => {
 export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
   const w = (params?.width || 600) / 1000;
   const eqH = (params?.height || 1200) / 1000;
-  const beltH = params?.infeedHeight ? (params.infeedHeight / 1000) : (eqH * 0.55);
+  const beltH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : (eqH * 0.55);
   const frameD = 0.42;
   const tubeSize = 0.04;
   const beltWidth = frameD * 0.6;
@@ -1875,36 +1881,45 @@ export const LabelerModel: React.FC<ModelProps> = ({ params }) => {
 export const SealingStationModel: React.FC<ModelProps> = ({ params }) => {
   const w = (params?.width || 700) / 1000;
   const h = (params?.height || 1000) / 1000;
+  const defaultBeltH = h * 0.52;
+  const infeedH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : defaultBeltH;
+  const outfeedH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : infeedH;
+  const beltLen = w * 0.85;
+  const beltH = (infeedH + outfeedH) / 2;
+  const beltTiltZ = Math.atan2(outfeedH - infeedH, beltLen);
+  const frameH = Math.max(beltH - 0.04, 0.2);
+  const archCenterY = beltH + h * 0.2;
+  const archTopY = beltH + h * 0.4;
 
   return (
     <group>
       {/* Frame */}
-      <MachineFrame width={w} depth={0.5} height={h * 0.5} />
+      <MachineFrame width={w} depth={0.5} height={frameH} />
       {/* Belt */}
-      <mesh position={[0, h * 0.52, 0]} castShadow>
-        <boxGeometry args={[w * 0.85, 0.015, 0.4]} />
+      <mesh position={[0, beltH, 0]} rotation={[0, 0, beltTiltZ]} castShadow>
+        <boxGeometry args={[beltLen, 0.015, 0.4]} />
         <meshStandardMaterial {...matBelt} />
       </mesh>
       {/* Sealing arch */}
-      <mesh position={[0, h * 0.72, -0.22]} castShadow>
+      <mesh position={[0, archCenterY, -0.22]} castShadow>
         <boxGeometry args={[0.06, h * 0.4, 0.06]} />
         <meshStandardMaterial {...matFrame} />
       </mesh>
-      <mesh position={[0, h * 0.72, 0.22]} castShadow>
+      <mesh position={[0, archCenterY, 0.22]} castShadow>
         <boxGeometry args={[0.06, h * 0.4, 0.06]} />
         <meshStandardMaterial {...matFrame} />
       </mesh>
-      <mesh position={[0, h * 0.92, 0]} castShadow>
+      <mesh position={[0, archTopY, 0]} castShadow>
         <boxGeometry args={[0.06, 0.06, 0.5]} />
         <meshStandardMaterial {...matFrame} />
       </mesh>
       {/* Tape head */}
-      <mesh position={[0, h * 0.72, 0]} castShadow>
+      <mesh position={[0, archCenterY, 0]} castShadow>
         <boxGeometry args={[0.15, 0.1, 0.08]} />
         <meshStandardMaterial {...matDarkSteel} />
       </mesh>
       {/* Tape roll */}
-      <mesh position={[0.12, h * 0.72, 0]} castShadow rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={[0.12, archCenterY, 0]} castShadow rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[0.04, 0.015, 8, 16]} />
         <meshStandardMaterial color="#d4a574" metalness={0.1} roughness={0.7} />
       </mesh>
@@ -1918,7 +1933,12 @@ export const SealingStationModel: React.FC<ModelProps> = ({ params }) => {
 export const RejectStationModel: React.FC<ModelProps> = ({ params }) => {
   const w = (params?.width || 600) / 1000;
   const h = (params?.height || 900) / 1000;
-  const beltH = h * 0.52;
+  const defaultBeltH = h * 0.52;
+  const infeedH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : defaultBeltH;
+  const outfeedH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : infeedH;
+  const beltH = (infeedH + outfeedH) / 2;
+  const mainBeltLen = w * 0.88;
+  const beltTiltZ = Math.atan2(outfeedH - infeedH, mainBeltLen);
   const frameD = 0.42;
   const rejectSide = params?.side === 'left' ? -1 : 1;
 
@@ -1940,12 +1960,12 @@ export const RejectStationModel: React.FC<ModelProps> = ({ params }) => {
       ))}
 
       {/* ── Main conveyor belt ── */}
-      <mesh position={[0, beltH - 0.02, 0]} castShadow>
+      <mesh position={[0, beltH - 0.02, 0]} rotation={[0, 0, beltTiltZ]} castShadow>
         <boxGeometry args={[w * 0.92, 0.04, frameD * 0.78]} />
         <meshStandardMaterial {...matStainless} />
       </mesh>
-      <mesh position={[0, beltH, 0]} castShadow>
-        <boxGeometry args={[w * 0.88, 0.015, frameD * 0.72]} />
+      <mesh position={[0, beltH, 0]} rotation={[0, 0, beltTiltZ]} castShadow>
+        <boxGeometry args={[mainBeltLen, 0.015, frameD * 0.72]} />
         <meshStandardMaterial {...matBelt} />
       </mesh>
       {/* Side guides (with opening on reject side) */}
