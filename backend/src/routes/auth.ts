@@ -7,6 +7,16 @@ import { authenticateToken } from '../middleware/auth';
 import { JWTPayload } from '../types';
 
 const router = Router();
+type JwtExpiresIn = NonNullable<jwt.SignOptions['expiresIn']>;
+
+function resolveJwtExpiresIn(): JwtExpiresIn {
+  const raw = (process.env.JWT_EXPIRES_IN || '7d').trim();
+  // Accept numeric seconds or compact duration strings supported by jsonwebtoken/ms.
+  if (!/^\d+(ms|s|m|h|d|w|y)?$/i.test(raw)) {
+    throw new Error(`Invalid JWT_EXPIRES_IN value: ${raw}`);
+  }
+  return raw as Extract<JwtExpiresIn, string>;
+}
 
 // Validation schemas
 const registerSchema = z.object({
@@ -54,8 +64,9 @@ router.post('/register', async (req, res) => {
 
     // Create JWT token
     const payload: JWTPayload = { userId: user.id, email: user.email };
+    const expiresIn = resolveJwtExpiresIn();
     const token = jwt.sign(payload, process.env.JWT_SECRET!, {
-      expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+      expiresIn
     });
 
     // Set HTTP-only cookie
@@ -110,8 +121,9 @@ router.post('/login', async (req, res) => {
 
     // Create JWT token
     const payload: JWTPayload = { userId: user.id, email: user.email };
+    const expiresIn = resolveJwtExpiresIn();
     const token = jwt.sign(payload, process.env.JWT_SECRET!, {
-      expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+      expiresIn
     });
 
     // Set HTTP-only cookie
