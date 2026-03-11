@@ -34,7 +34,6 @@ const matAluminum = new THREE.MeshStandardMaterial({ color: 0xd4d8dc, metalness:
 const matBlackPlastic = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.05, roughness: 0.7 });
 const matBeltRubber = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.02, roughness: 0.85 });
 const matPolycarb = new THREE.MeshStandardMaterial({ color: 0xe8edf2, metalness: 0.1, roughness: 0.15, transparent: true, opacity: 0.3 });
-const matMotor = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.6, roughness: 0.4 });
 const matCable = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.1, roughness: 0.8 });
 const matLabelRoll = new THREE.MeshStandardMaterial({ color: 0xf5f5f0, metalness: 0.05, roughness: 0.6 });
 const matScreen = new THREE.MeshStandardMaterial({ color: 0x0a0a1a, emissive: new THREE.Color(0x06b6d4), emissiveIntensity: 0.3 });
@@ -90,8 +89,8 @@ function ControlPanel({ position, height = 0.3 }: { position: [number, number, n
       </mesh>
       {/* Buttons */}
       {[[-0.05, -0.08], [0.05, -0.08]].map(([x, y], i) => (
-        <mesh key={i} position={[x, y, 0.042]}>
-          <cylinderGeometry args={[0.012, 0.012, 0.008, 8]} rotation={[Math.PI / 2, 0, 0]} />
+        <mesh key={i} position={[x, y, 0.042]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.012, 0.012, 0.008, 8]} />
           <meshStandardMaterial {...(i === 0 ? matGreen : matRed)} />
         </mesh>
       ))}

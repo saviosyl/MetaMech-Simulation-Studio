@@ -30,7 +30,6 @@ import {
   matAluminum,
   matDarkSteel,
   matFootPad,
-  matIndustrialBlue,
   buildSEWMotor,
 } from '../premiumMaterials';
 
@@ -501,7 +500,6 @@ function buildDrive(p: BendConveyorParams): THREE.Group {
   sewMotor.position.set(mx, H - 0.05, mz);
   sewMotor.rotation.set(0, motorYaw + (motorSide > 0 ? -Math.PI / 2 : Math.PI / 2), 0);
   group.add(sewMotor);
-  group.add(shaft);
 
   return group;
 }
