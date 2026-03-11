@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Play, Pause, Square, Save, Download, Upload, Video,
@@ -74,6 +74,8 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   const [showAIBuilder, setShowAIBuilder] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const recordingModeRef = useRef<'manual' | 'camera-path' | null>(null);
+  const renderBoostRef = useRef<{ gl: any; prevDpr: number; width: number; height: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const {
@@ -84,6 +86,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     measureActive, setMeasureActive,
     activeTool, setActiveTool,
     setShowShortcuts,
+    isCameraPathPlaying,
   } = useEditorStore();
 
   const speedOptions = [
@@ -94,11 +97,34 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     { value: 4, label: '4×' },
   ];
 
+  const boostViewportCaptureQuality = useCallback((canvas: HTMLCanvasElement) => {
+    // @ts-ignore — R3F store reference is attached to canvas at runtime
+    const r3f = (canvas as any).__r3f;
+    const state = r3f?.store?.getState?.();
+    const gl = state?.gl;
+    const size = state?.size;
+    if (!gl || !size) return;
+    const prevDpr = gl.getPixelRatio?.() ?? 1;
+    const targetDpr = Math.max(1, Math.min(2, Math.max(prevDpr, 2)));
+    gl.setPixelRatio?.(targetDpr);
+    gl.setSize?.(size.width, size.height, false);
+    renderBoostRef.current = { gl, prevDpr, width: size.width, height: size.height };
+  }, []);
+
+  const restoreViewportCaptureQuality = useCallback(() => {
+    const boost = renderBoostRef.current;
+    if (!boost) return;
+    boost.gl.setPixelRatio?.(boost.prevDpr);
+    boost.gl.setSize?.(boost.width, boost.height, false);
+    renderBoostRef.current = null;
+  }, []);
+
   // ─── Record Video (high quality) ───
-  const startRecording = useCallback(() => {
+  const startRecording = useCallback((mode: 'manual' | 'camera-path' = 'manual') => {
     const canvas = document.querySelector('canvas');
     if (!canvas) { alert('No 3D viewport found'); return; }
     try {
+      boostViewportCaptureQuality(canvas as HTMLCanvasElement);
       // Capture at 60fps for smoother output
       const stream = canvas.captureStream(60);
 
@@ -113,7 +139,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
 
       const recorder = new MediaRecorder(stream, {
         mimeType,
-        videoBitsPerSecond: 20_000_000, // 20 Mbps — high quality
+        videoBitsPerSecond: 35_000_000, // 35 Mbps — clearer edges/less blockiness
       });
 
       chunksRef.current = [];
@@ -126,16 +152,20 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         a.download = `${projectName.replace(/\s+/g, '_')}_recording.webm`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        restoreViewportCaptureQuality();
+        recordingModeRef.current = null;
       };
       // Larger timeslice = fewer chunks = cleaner encoding
       recorder.start(1000);
       mediaRecorderRef.current = recorder;
+      recordingModeRef.current = mode;
       setIsRecording(true);
     } catch (err) {
       console.error('Recording failed:', err);
+      restoreViewportCaptureQuality();
       alert('Recording not supported in this browser');
     }
-  }, [projectName]);
+  }, [projectName, boostViewportCaptureQuality, restoreViewportCaptureQuality]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -145,6 +175,14 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     // Stop camera path playback too
     useEditorStore.getState().setIsCameraPathPlaying(false);
   }, []);
+
+  // Auto-stop camera-path recordings when non-loop path playback completes
+  useEffect(() => {
+    if (!isRecording) return;
+    if (recordingModeRef.current !== 'camera-path') return;
+    if (isCameraPathPlaying) return;
+    stopRecording();
+  }, [isRecording, isCameraPathPlaying, stopRecording]);
 
   // Record with camera path: starts recording + plays the active camera path
   const startRecordingWithCameraPath = useCallback(() => {
@@ -158,16 +196,14 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
       }
       setActiveCameraPathId(validPath.id);
     }
-    // Start recording first
-    startRecording();
-    // Then start camera path playback
-    setTimeout(() => {
-      useEditorStore.getState().setIsCameraPathPlaying(true);
-      // Also start simulation if not already playing
-      if (!useEditorStore.getState().isPlaying) {
-        useEditorStore.getState().play();
-      }
-    }, 100);
+    // Start path first, then recording on next frame to avoid static lead-in.
+    useEditorStore.getState().setIsCameraPathPlaying(true);
+    if (!useEditorStore.getState().isPlaying) {
+      useEditorStore.getState().play();
+    }
+    requestAnimationFrame(() => {
+      startRecording('camera-path');
+    });
   }, [startRecording]);
 
   const handleExport = () => {
@@ -299,7 +335,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           <div style={{ width: 1, height: 28, background: 'var(--mm-border)' }} />
 
           {/* Record */}
-          <button onClick={isRecording ? stopRecording : startRecording}
+          <button onClick={isRecording ? stopRecording : () => startRecording()}
             style={{
               ...S.simBtn(isRecording ? '#ef4444' : '#8b5cf6'),
               animation: isRecording ? 'pulse 1.5s ease-in-out infinite' : undefined,

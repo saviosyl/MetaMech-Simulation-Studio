@@ -32,14 +32,34 @@ const CameraPathPlayer: React.FC = () => {
 
   const elapsedRef = useRef(0);
   const wasPlayingRef = useRef(false);
+  const segmentStartTimesRef = useRef<number[]>([]);
+  const totalDurationRef = useRef(0);
+
+  const rebuildTimeline = (kfs: { duration: number; pause?: number }[]) => {
+    // Timeline consists of:
+    // - optional pause at keyframe i
+    // - travel from keyframe i -> i+1 using keyframe i duration
+    const starts: number[] = [];
+    let t = 0;
+    for (let i = 0; i < kfs.length - 1; i++) {
+      const pause = Math.max(0, kfs[i].pause ?? 0);
+      t += pause;
+      starts.push(t);
+      t += Math.max(0, kfs[i].duration);
+    }
+    segmentStartTimesRef.current = starts;
+    totalDurationRef.current = t;
+  };
 
   // Reset elapsed when starting
   useEffect(() => {
     if (isCameraPathPlaying && !wasPlayingRef.current) {
       elapsedRef.current = 0;
+      const path = cameraPaths.find(p => p.id === activeCameraPathId);
+      if (path) rebuildTimeline(path.keyframes);
     }
     wasPlayingRef.current = isCameraPathPlaying;
-  }, [isCameraPathPlaying]);
+  }, [isCameraPathPlaying, activeCameraPathId, cameraPaths]);
 
   useFrame((state, delta) => {
     if (!isCameraPathPlaying || !activeCameraPathId) return;
@@ -53,8 +73,18 @@ const CameraPathPlayer: React.FC = () => {
     const kfs = path.keyframes;
     elapsedRef.current += delta;
 
-    // Compute total duration
-    const totalDuration = kfs.reduce((sum, kf) => sum + kf.duration, 0);
+    // Rebuild timeline lazily if missing/outdated
+    if (segmentStartTimesRef.current.length !== Math.max(0, kfs.length - 1)) {
+      rebuildTimeline(kfs);
+    }
+    const totalDuration = totalDurationRef.current;
+    if (totalDuration <= 0) {
+      const last = kfs[kfs.length - 1];
+      camera.position.set(...last.position);
+      camera.lookAt(new THREE.Vector3(...last.target));
+      setIsCameraPathPlaying(false);
+      return;
+    }
     let t = elapsedRef.current;
 
     // Handle loop / end
@@ -80,20 +110,21 @@ const CameraPathPlayer: React.FC = () => {
       }
     }
 
-    // Find current segment
-    let segStart = 0;
-    let segIdx = 0;
-    for (let i = 0; i < kfs.length - 1; i++) {
-      if (t >= segStart && t < segStart + kfs[i].duration) {
+    // Find current segment (pause-aware timeline)
+    const starts = segmentStartTimesRef.current;
+    let segIdx = starts.length - 1;
+    for (let i = 0; i < starts.length; i++) {
+      const segDuration = Math.max(0, kfs[i].duration);
+      if (t >= starts[i] && t < starts[i] + segDuration) {
         segIdx = i;
         break;
       }
-      segStart += kfs[i].duration;
-      if (i === kfs.length - 2) segIdx = i;
     }
+    const segStart = starts[Math.max(0, segIdx)] ?? 0;
 
     const segDuration = kfs[segIdx].duration;
-    const segT = segDuration > 0 ? (t - segStart) / segDuration : 0;
+    const rawSegT = segDuration > 0 ? (t - segStart) / segDuration : 0;
+    const segT = Math.min(1, Math.max(0, rawSegT));
     const easedT = kfs[segIdx].easing === 'ease-in-out' ? easeInOut(segT) : segT;
 
     // Get 4 keyframe positions for Catmull-Rom (clamp at edges)
