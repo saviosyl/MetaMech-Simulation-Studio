@@ -16,7 +16,7 @@ interface AILayoutBuilderProps {
 const AILayoutBuilder: React.FC<AILayoutBuilderProps> = ({ onClose }) => {
   const [input, setInput] = useState<LayoutInput>({ ...DEFAULT_LAYOUT_INPUT });
   const [result, setResult] = useState<LayoutOutput | null>(null);
-  const { loadScene, processNodes, edges } = useEditorStore();
+  const { loadScene, processNodes } = useEditorStore();
 
   const handleGenerate = () => {
     const output = generateLayout(input);

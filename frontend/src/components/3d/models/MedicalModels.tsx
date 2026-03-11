@@ -25,7 +25,6 @@ const matWhitePanel = new THREE.MeshStandardMaterial({ color: 0xf8f8f8, metalnes
 const matGlass = new THREE.MeshStandardMaterial({ color: 0xc8e0ff, metalness: 0.1, roughness: 0.05, transparent: true, opacity: 0.3 });
 const matHEPA = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, metalness: 0.05, roughness: 0.8 });
 const matCleanBelt = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, metalness: 0.1, roughness: 0.5 });
-const matBlueAccent = new THREE.MeshStandardMaterial({ color: 0x3b82f6, metalness: 0.3, roughness: 0.4 });
 const matSafetyYellow = new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.2, roughness: 0.5 });
 const matRedLight = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: new THREE.Color(0xef4444), emissiveIntensity: 0.5 });
 

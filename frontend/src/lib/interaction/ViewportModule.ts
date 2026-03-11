@@ -12,12 +12,10 @@ import { ModeManager } from '../ModeManager';
 
 // Module-level camera ref for drop raycast (accessible outside Canvas)
 let _threeCamera: THREE.Camera | null = null;
-let _canvasSize: { width: number; height: number } = { width: 1, height: 1 };
 let _canvasRect: DOMRect | null = null;
 
-export function setCamera(camera: THREE.Camera, size: { width: number; height: number }) {
+export function setCamera(camera: THREE.Camera, _size: { width: number; height: number }) {
   _threeCamera = camera;
-  _canvasSize = size;
 }
 
 export function setCanvasRect(rect: DOMRect) {

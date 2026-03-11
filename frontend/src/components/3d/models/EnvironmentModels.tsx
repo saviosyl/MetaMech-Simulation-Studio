@@ -7,10 +7,8 @@ import * as THREE from 'three';
 
 const steel = { color: '#4a4a4a', metalness: 0.8, roughness: 0.3 };
 const yellow = { color: '#f5c518', metalness: 0.4, roughness: 0.5 };
-const gray = { color: '#888888', metalness: 0.5, roughness: 0.5 };
 const white = { color: '#e8e8e8', metalness: 0.2, roughness: 0.7 };
 const blue = { color: '#2563eb', metalness: 0.3, roughness: 0.6 };
-const green = { color: '#16a34a', metalness: 0.3, roughness: 0.6 };
 const orange = { color: '#ea580c', metalness: 0.4, roughness: 0.5 };
 
 // ─── Wall Panel ────────────────────────────────────────
@@ -235,7 +233,7 @@ export const OperatorStationModel: React.FC<{ params: Record<string,any>; isSele
 };
 
 // ─── Electrical Cabinet ────────────────────────────────
-export const ElectricalCabinetModel: React.FC<{ params: Record<string,any>; isSelected: boolean }> = ({ params, isSelected }) => {
+export const ElectricalCabinetModel: React.FC<{ params: Record<string,any>; isSelected: boolean }> = ({ isSelected }) => {
   const em = isSelected ? '#222' : '#000';
   return (
     <group>
@@ -347,7 +345,7 @@ export const StretchWrapperModel: React.FC<{ isSelected: boolean }> = ({ isSelec
 };
 
 // ─── Floor Zone Marking ────────────────────────────────
-export const FloorZoneModel: React.FC<{ params: Record<string,any>; isSelected: boolean }> = ({ params, isSelected }) => {
+export const FloorZoneModel: React.FC<{ params: Record<string,any>; isSelected: boolean }> = ({ params }) => {
   const w = (params.width || 4000) / 1000;
   const d = (params.depth || 4000) / 1000;
   const zoneColor = params.zoneColor || 'yellow';

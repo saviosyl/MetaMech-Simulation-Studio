@@ -51,7 +51,7 @@ const CustomModelObject: React.FC<{
   isSelected: boolean;
   orbitRef: React.RefObject<any>;
 }> = ({ model, isSelected, orbitRef }) => {
-  const { updateCustomModel, setSelectedObject, transformMode, activeTool, setIsDragging } = useEditorStore();
+  const { updateCustomModel, setSelectedObject, activeTool, setIsDragging } = useEditorStore();
   const groupRef = useRef<THREE.Group>(null!);
   const transformRef = useRef<any>(null);
 
