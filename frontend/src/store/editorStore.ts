@@ -214,6 +214,17 @@ export function getConnectionPorts(type: string, params?: Record<string, any>, a
 }
 
 function _getConnectionPortsRaw(type: string, params?: Record<string, any>, assetId?: string): Partial<ConnectionPort>[] {
+  // Spiral ports must always come from the shared spiral transfer geometry so
+  // markers, snapping, and visible model endpoints stay in the same frame.
+  // Do this before asset-builder lookup (spiral builder ports use a different schema).
+  if (type === 'spiral-conveyor') {
+    const spiral = computeSpiralTransferGeometry(params ?? {}, 0.35);
+    return [
+      { id: 'input', type: 'input', localPosition: spiral.input.port, direction: spiral.input.direction },
+      { id: 'output', type: 'output', localPosition: spiral.output.port, direction: spiral.output.direction },
+    ];
+  }
+
   // Check asset manifest first
   if (assetId) {
     const assetDef = getAssetById(assetId);
@@ -328,13 +339,6 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
         { id: 'input', type: 'input', localPosition: [-1, rtrInH, 0] },
         { id: 'output1', type: 'output', localPosition: [1, rtrOutH, 0] },
         { id: 'output2', type: 'output', localPosition: [0, rtrOutH, 1] },
-      ];
-    }
-    case 'spiral-conveyor': {
-      const spiral = computeSpiralTransferGeometry(params ?? {}, 0.35);
-      return [
-        { id: 'input', type: 'input', localPosition: spiral.input.port, direction: spiral.input.direction },
-        { id: 'output', type: 'output', localPosition: spiral.output.port, direction: spiral.output.direction },
       ];
     }
     case 'stopper': {
