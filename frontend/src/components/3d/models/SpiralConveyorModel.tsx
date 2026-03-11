@@ -4,6 +4,7 @@
  */
 import React, { useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { computeSpiralTransferGeometry } from '../../../lib/spiralTransfer';
 
 interface Props {
   parameters: Record<string, any>;
@@ -138,44 +139,38 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
   const groupRef = useRef<THREE.Group>(null);
 
   // ─── Extract params (mm → m) ───
-  const direction = parameters.direction || 'up';
   const beltWidthM = (parameters.beltWidth ?? 400) / 1000;
-  const turns = Math.max(parameters.turns ?? 3, 0.5);
-  // Infeed is ALWAYS fixed at angle 0 (positive Z). Outfeed angle is configurable.
-  const outfeedAngleDeg = parameters.outfeedAngle ?? 180;
-  const outfeedAngleRad = (outfeedAngleDeg * Math.PI) / 180;
   const sideGuides = parameters.sideGuides !== false;
   const guideHeightM = (parameters.guideHeight ?? 80) / 1000;
   const showLegs = parameters.showLegs !== false;
   const centerStructure = parameters.centerStructure || 'column';
+  const tangentLength = 0.35;
 
-  // Height from ground — these are absolute floor-referenced heights
-  const infeedHeightM = (parameters.infeedHeight ?? 800) / 1000;
-  const outfeedHeightM = (parameters.outfeedHeight ?? 3800) / 1000;
-
-  const isDown = direction === 'down';
-
-  const bottomY = Math.min(infeedHeightM, outfeedHeightM);
-  const topY = Math.max(infeedHeightM, outfeedHeightM);
-  const effectiveHeight = Math.max(topY - bottomY, 0.1);
+  // Shared transfer/port math (same source used by editorStore ports)
+  const spiral = useMemo(
+    () => computeSpiralTransferGeometry(parameters, tangentLength),
+    [parameters],
+  );
+  const {
+    innerRadius,
+    outerRadius,
+    totalAngle,
+    bottomY,
+    effectiveHeight,
+    input,
+    output,
+  } = spiral;
 
   // ─── Derived geometry ───
   const drumRadius = 0.2;
-  const innerRadius = drumRadius + 0.02;
-  const outerRadius = innerRadius + beltWidthM;
-  const midRadius = (innerRadius + outerRadius) / 2;
   const beltThickness = 0.015;
 
-  // Helix angles: infeed fixed at 0, total angle = full turns + outfeed angle offset
-  const startAngle = 0; // infeed always at angle 0
-  const totalAngle = turns * Math.PI * 2 + outfeedAngleRad;
+  // Helix angles: infeed fixed at 0
+  const startAngle = 0;
 
   // Segments: ~60 per turn, capped at 600
   const segsPerTurn = 60;
   const totalSegs = Math.min(Math.ceil((totalAngle / (Math.PI * 2)) * segsPerTurn), 600);
-
-  // Tangent section length
-  const tangentLength = 0.35;
 
   // ─── Continuous helix geometries ───
   const helixGeos = useMemo(() => {
@@ -250,54 +245,24 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
   const towerYaw = -towerAngle + Math.PI / 2;
 
   const tangentYaw = (tx: number, tz: number) => Math.atan2(-tz, tx);
-  const startTanX = -Math.sin(startAngle);
-  const startTanZ = Math.cos(startAngle);
-  const endAngle = totalAngle;
-  const endTanX = -Math.sin(endAngle);
-  const endTanZ = Math.cos(endAngle);
-  const startAnchor: [number, number, number] = [
-    Math.cos(startAngle) * midRadius,
-    0,
-    Math.sin(startAngle) * midRadius,
-  ];
-  const endAnchor: [number, number, number] = [
-    Math.cos(endAngle) * midRadius,
-    effectiveHeight,
-    Math.sin(endAngle) * midRadius,
-  ];
+  const outputAnchor = output.anchor;
+  const outputFlow = output.flow;
+  const outputPort = output.port;
 
-  // Physical flow direction on the belt at each anchor (horizontal projection).
-  const startFlow: [number, number, number] = isDown
-    ? [-startTanX, 0, -startTanZ]
-    : [startTanX, 0, startTanZ];
-  const endFlow: [number, number, number] = isDown
-    ? [-endTanX, 0, -endTanZ]
-    : [endTanX, 0, endTanZ];
-
-  // Logical node role swap for down-spiral:
-  // - up: input at start, output at end
-  // - down: input at end, output at start
-  const inputAnchor = isDown ? endAnchor : startAnchor;
-  const inputFlow = isDown ? endFlow : startFlow;
-  const outputAnchor = isDown ? startAnchor : endAnchor;
-  const outputFlow = isDown ? startFlow : endFlow;
-
-  // Tangent section placement:
-  // - Input section runs from external connection point -> anchor (toward spiral)
-  // - Output section runs from anchor -> external connection point
-  const infeedPortPos: [number, number, number] = [
-    inputAnchor[0] - inputFlow[0] * tangentLength,
-    inputAnchor[1],
-    inputAnchor[2] - inputFlow[2] * tangentLength,
-  ];
   const infeedFinal = {
-    pos: infeedPortPos,
-    yaw: tangentYaw(inputFlow[0], inputFlow[2]),
+    pos: input.port,
+    yaw: tangentYaw(input.flow[0], input.flow[2]),
   };
   const outfeedFinal = {
     pos: outputAnchor,
     yaw: tangentYaw(outputFlow[0], outputFlow[2]),
   };
+  const outputSideNormal: [number, number, number] = [-outputFlow[2], 0, outputFlow[0]];
+  const returnUnitPos: [number, number, number] = [
+    outputPort[0] + outputFlow[0] * 0.08 + outputSideNormal[0] * (beltWidthM * 0.58),
+    outputPort[1] - 0.11,
+    outputPort[2] + outputFlow[2] * 0.08 + outputSideNormal[2] * (beltWidthM * 0.58),
+  ];
 
   return (
     <group ref={groupRef} position={[0, bottomY, 0]}>
@@ -571,39 +536,44 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
         </group>
       </group>
 
-      {/* ═══ Chain Return Unit (rebuilt) ═══ */}
-      <group position={[
-        outputAnchor[0] + outputFlow[0] * 0.18,
-        outputAnchor[1] - 0.09,
-        outputAnchor[2] + outputFlow[2] * 0.18,
-      ]} rotation={[0, outfeedFinal.yaw, 0]}>
-        {/* Return cassette body */}
-        <mesh material={matBasePlate} position={[0.18, 0.03, 0]} castShadow>
-          <boxGeometry args={[0.36, 0.06, beltWidthM * 0.82]} />
+      {/* ═══ Chain Return Unit (clearly visible industrial cassette) ═══ */}
+      <group position={returnUnitPos} rotation={[0, outfeedFinal.yaw, 0]}>
+        {/* Main welded frame */}
+        <mesh material={matTowerFrame} position={[0.2, 0.03, 0]} castShadow>
+          <boxGeometry args={[0.4, 0.06, beltWidthM * 0.9]} />
         </mesh>
-        {/* Stainless top cover */}
-        <mesh material={matDrumStainless} position={[0.18, 0.062, 0]} castShadow>
-          <boxGeometry args={[0.34, 0.006, beltWidthM * 0.78]} />
+        {/* Service cover */}
+        <mesh material={matDrumStainless} position={[0.2, 0.072, 0]} castShadow>
+          <boxGeometry args={[0.38, 0.008, beltWidthM * 0.82]} />
         </mesh>
-        {/* Return sprockets/idlers */}
-        {[0.04, 0.32].map((x, i) => (
-          <group key={`ret-idler-${i}`} position={[x, 0.065, 0]}>
+        {/* Front/rear sprocket shafts */}
+        {[0.05, 0.35].map((x, i) => (
+          <group key={`ret-sprocket-${i}`} position={[x, 0.075, 0]}>
             <mesh material={matDrumStainless} rotation={[Math.PI / 2, 0, 0]} castShadow>
-              <cylinderGeometry args={[0.032, 0.032, beltWidthM * 0.76, 14]} />
+              <cylinderGeometry args={[0.038, 0.038, beltWidthM * 0.86, 16]} />
             </mesh>
             <mesh material={matSeamDark} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.024, 0.024, beltWidthM * 0.78, 12]} />
+              <cylinderGeometry args={[0.028, 0.028, beltWidthM * 0.88, 14]} />
             </mesh>
           </group>
         ))}
-        {/* Return chain/belt run */}
-        <mesh material={matBeltDark} position={[0.18, 0.065, 0]}>
-          <boxGeometry args={[0.28, 0.012, beltWidthM * 0.62]} />
+        {/* Return chain runs */}
+        <mesh material={matBeltDark} position={[0.2, 0.094, 0]}>
+          <boxGeometry args={[0.3, 0.012, beltWidthM * 0.64]} />
         </mesh>
-        {/* Side guards */}
+        <mesh material={matRubber} position={[0.2, 0.055, 0]}>
+          <boxGeometry args={[0.3, 0.01, beltWidthM * 0.58]} />
+        </mesh>
+        {/* Side guards with visible profile */}
         {[-1, 1].map((sz, i) => (
-          <mesh key={`ret-guard-${i}`} material={matGuardCover} position={[0.18, 0.09, sz * (beltWidthM * 0.42)]}>
-            <boxGeometry args={[0.34, 0.045, 0.01]} />
+          <mesh key={`ret-guard-${i}`} material={matGuardCover} position={[0.2, 0.102, sz * (beltWidthM * 0.45)]} castShadow>
+            <boxGeometry args={[0.38, 0.05, 0.014]} />
+          </mesh>
+        ))}
+        {/* Mounting feet */}
+        {[0.06, 0.34].map((x, i) => (
+          <mesh key={`ret-foot-${i}`} material={matBasePlate} position={[x, -0.005, 0]} castShadow>
+            <boxGeometry args={[0.05, 0.01, beltWidthM * 0.72]} />
           </mesh>
         ))}
       </group>

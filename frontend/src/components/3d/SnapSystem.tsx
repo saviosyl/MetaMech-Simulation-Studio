@@ -391,7 +391,13 @@ export function checkSnap(
   draggedNode: ProcessNode,
   allNodes: ProcessNode[],
   edges: { from: string; to: string; fromPort: string; toPort: string }[]
-): { targetNodeId: string; targetPortId: string; dragPortId: string; snapPosition: [number, number, number] } | null {
+): {
+  targetNodeId: string;
+  targetPortId: string;
+  dragPortId: string;
+  snapPosition: [number, number, number];
+  snapRotation?: [number, number, number];
+} | null {
   const dragPorts = getConnectionPorts(draggedNode.type, draggedNode.parameters);
 
   for (const otherNode of allNodes) {
@@ -421,7 +427,29 @@ export function checkSnap(
         );
 
         if (dist < SNAP_THRESHOLD) {
-          // Calculate snap position: move dragged node so ports align (rotation-aware)
+          const spiralConnection =
+            draggedNode.type === 'spiral-conveyor' || otherNode.type === 'spiral-conveyor';
+
+          // Spiral connections should align inline with the spiral tangent direction.
+          if (spiralConnection) {
+            const opWorldDir = localDirToWorld(op.direction, otherNode.rotation);
+            const mate = solveMateTransform(
+              opWorld,
+              opWorldDir,
+              dp.localPosition,
+              dp.direction,
+              draggedNode.scale,
+            );
+            return {
+              targetNodeId: otherNode.id,
+              targetPortId: op.id,
+              dragPortId: dp.id,
+              snapPosition: mate.position,
+              snapRotation: mate.rotation,
+            };
+          }
+
+          // Non-spiral behavior stays unchanged (position-only snap).
           const snapPos = alignNodeToPort(dp.localPosition, opWorld, draggedNode.rotation, draggedNode.scale);
 
           return {

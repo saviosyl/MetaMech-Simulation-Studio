@@ -99,18 +99,27 @@ const DraggableObject: React.FC<{
           if (node) {
             const currentSnapTarget = useEditorStore.getState().snapTarget;
             if (currentSnapTarget) {
-              // Snap position
-              updateObject(id, objectType, { position: currentSnapTarget.position });
-              if (groupRef.current) {
-                groupRef.current.position.set(...currentSnapTarget.position);
-              }
-              // Create edge - figure out direction
-              const dragPorts = getConnectionPorts(node.type, node.parameters);
+              // Re-evaluate snap at drop using the snapped position so we can
+              // apply spiral inline orientation and then create the edge.
               const snap = checkSnap(
                 { ...node, position: currentSnapTarget.position },
                 processNodes.filter(n => n.id !== id),
                 edges
               );
+
+              const nextPosition = snap?.snapPosition ?? currentSnapTarget.position;
+              const nextRotation = snap?.snapRotation ?? node.rotation;
+              updateObject(id, objectType, {
+                position: nextPosition,
+                rotation: nextRotation,
+              });
+              if (groupRef.current) {
+                groupRef.current.position.set(...nextPosition);
+                groupRef.current.rotation.set(...nextRotation);
+              }
+
+              // Create edge - figure out direction
+              const dragPorts = getConnectionPorts(node.type, node.parameters);
               // Use the stored snap info to create connection
               if (snap) {
                 const dragPort = dragPorts.find(p => p.id === snap.dragPortId);

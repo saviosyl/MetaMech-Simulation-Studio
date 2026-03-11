@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AssetDef, getAssetManifest, getAssetById, ParametricAssetDef } from '../lib/assetManifest';
 import { runBuilder } from '../lib/parametricBuilders';
 import { getPortWorldPosition, getWorldPorts as computeWorldPorts } from '../lib/nodeTransform';
+import { computeSpiralTransferGeometry } from '../lib/spiralTransfer';
 
 // Types
 export interface ProcessNode {
@@ -330,63 +331,10 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       ];
     }
     case 'spiral-conveyor': {
-      const sBeltW = (params?.beltWidth || 400) / 1000;
-      const sTurns = Math.max(params?.turns || 3, 0.5);
-      const sOutAngleDeg = params?.outfeedAngle || 180;
-      const sOutAngleRad = (sOutAngleDeg * Math.PI) / 180;
-      const sInfeedH = ((params?.infeedHeight ?? 800)) / 1000;
-      const sOutfeedH = ((params?.outfeedHeight ?? 3800)) / 1000;
-      const sDrumR = 0.2;
-      const sInnerR = sDrumR + 0.02;
-      const sOuterR = sInnerR + sBeltW;
-      const sMidR = (sInnerR + sOuterR) / 2;
-      const sTangentLen = 0.35;
-      const sIsDown = params?.direction === 'down';
-
-      // Helix anchors and tangents at start/end.
-      // Parametric convention: x = cos(a) * r, z = sin(a) * r
-      // Tangent along increasing angle: t = [-sin(a), 0, cos(a)]
-      const sTotalAngle = sTurns * Math.PI * 2 + sOutAngleRad;
-      const startX = Math.cos(0) * sMidR;
-      const startZ = Math.sin(0) * sMidR;
-      const startTanX = -Math.sin(0);
-      const startTanZ = Math.cos(0);
-      const endX = Math.cos(sTotalAngle) * sMidR;
-      const endZ = Math.sin(sTotalAngle) * sMidR;
-      const endTanX = -Math.sin(sTotalAngle);
-      const endTanZ = Math.cos(sTotalAngle);
-
-      // Heights are absolute ground-referenced values.
-      // Port directions are explicit tangents to avoid radial fallback direction inference.
-      if (sIsDown) {
-        const inPos: [number, number, number] = [
-          endX + endTanX * sTangentLen,
-          sOutfeedH,
-          endZ + endTanZ * sTangentLen,
-        ];
-        const outPos: [number, number, number] = [
-          startX - startTanX * sTangentLen,
-          sInfeedH,
-          startZ - startTanZ * sTangentLen,
-        ];
-        return [
-          { id: 'input', type: 'input', localPosition: inPos, direction: [endTanX, 0, endTanZ] as [number, number, number] },
-          { id: 'output', type: 'output', localPosition: outPos, direction: [-startTanX, 0, -startTanZ] as [number, number, number] },
-        ];
-      }
-      const inPos: [number, number, number] = [
-        startX - startTanX * sTangentLen,
-        sInfeedH,
-        startZ - startTanZ * sTangentLen,
-      ];
-      const outPos: [number, number, number] = [
-        endX + endTanX * sTangentLen,
-        sOutfeedH,
-        endZ + endTanZ * sTangentLen,
-      ];
+      const spiral = computeSpiralTransferGeometry(params ?? {}, 0.35);
       return [
-        { id: 'input', type: 'input', localPosition: inPos, direction: [-startTanX, 0, -startTanZ] as [number, number, number] },
-        { id: 'output', type: 'output', localPosition: outPos, direction: [endTanX, 0, endTanZ] as [number, number, number] },
+        { id: 'input', type: 'input', localPosition: spiral.input.port, direction: spiral.input.direction },
+        { id: 'output', type: 'output', localPosition: spiral.output.port, direction: spiral.output.direction },
       ];
     }
     case 'stopper': {
