@@ -343,28 +343,50 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       const sTangentLen = 0.35;
       const sIsDown = params?.direction === 'down';
 
-      // Infeed is FIXED at angle 0 (positive Z). Tangent at angle 0 is along +X.
-      // Infeed tangent end = midRadius point + tangent direction * length
-      const infeedX = Math.cos(0) * sMidR - Math.sin(0) * sTangentLen;
-      const infeedZ = Math.sin(0) * sMidR + Math.cos(0) * sTangentLen;
-
-      // Outfeed: total helix angle = turns * 2π + outfeedAngle
+      // Helix anchors and tangents at start/end.
+      // Parametric convention: x = cos(a) * r, z = sin(a) * r
+      // Tangent along increasing angle: t = [-sin(a), 0, cos(a)]
       const sTotalAngle = sTurns * Math.PI * 2 + sOutAngleRad;
-      const outTanX = -Math.sin(sTotalAngle);
-      const outTanZ = Math.cos(sTotalAngle);
-      const outfeedX = Math.cos(sTotalAngle) * sMidR + outTanX * sTangentLen;
-      const outfeedZ = Math.sin(sTotalAngle) * sMidR + outTanZ * sTangentLen;
+      const startX = Math.cos(0) * sMidR;
+      const startZ = Math.sin(0) * sMidR;
+      const startTanX = -Math.sin(0);
+      const startTanZ = Math.cos(0);
+      const endX = Math.cos(sTotalAngle) * sMidR;
+      const endZ = Math.sin(sTotalAngle) * sMidR;
+      const endTanX = -Math.sin(sTotalAngle);
+      const endTanZ = Math.cos(sTotalAngle);
 
-      // Heights are from ground (absolute)
+      // Heights are absolute ground-referenced values.
+      // Port directions are explicit tangents to avoid radial fallback direction inference.
       if (sIsDown) {
+        const inPos: [number, number, number] = [
+          endX + endTanX * sTangentLen,
+          sOutfeedH,
+          endZ + endTanZ * sTangentLen,
+        ];
+        const outPos: [number, number, number] = [
+          startX - startTanX * sTangentLen,
+          sInfeedH,
+          startZ - startTanZ * sTangentLen,
+        ];
         return [
-          { id: 'input', type: 'input', localPosition: [outfeedX, sOutfeedH, outfeedZ] as [number, number, number] },
-          { id: 'output', type: 'output', localPosition: [infeedX, sInfeedH, infeedZ] as [number, number, number] },
+          { id: 'input', type: 'input', localPosition: inPos, direction: [endTanX, 0, endTanZ] as [number, number, number] },
+          { id: 'output', type: 'output', localPosition: outPos, direction: [-startTanX, 0, -startTanZ] as [number, number, number] },
         ];
       }
+      const inPos: [number, number, number] = [
+        startX - startTanX * sTangentLen,
+        sInfeedH,
+        startZ - startTanZ * sTangentLen,
+      ];
+      const outPos: [number, number, number] = [
+        endX + endTanX * sTangentLen,
+        sOutfeedH,
+        endZ + endTanZ * sTangentLen,
+      ];
       return [
-        { id: 'input', type: 'input', localPosition: [infeedX, sInfeedH, infeedZ] as [number, number, number] },
-        { id: 'output', type: 'output', localPosition: [outfeedX, sOutfeedH, outfeedZ] as [number, number, number] },
+        { id: 'input', type: 'input', localPosition: inPos, direction: [-startTanX, 0, -startTanZ] as [number, number, number] },
+        { id: 'output', type: 'output', localPosition: outPos, direction: [endTanX, 0, endTanZ] as [number, number, number] },
       ];
     }
     case 'stopper': {

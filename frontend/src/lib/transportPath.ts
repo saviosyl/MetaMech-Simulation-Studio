@@ -194,7 +194,9 @@ export class SpiralPath implements TransportPath {
 
   getLocalPosition(t: number): Vec3 {
     // Product travels along the belt centerline (midRadius)
-    const angle = t * this.totalAngle; // starts at 0
+    const angle = this.direction === 'up'
+      ? t * this.totalAngle
+      : (1 - t) * this.totalAngle;
     const x = Math.cos(angle) * this.midRadius;
     const z = Math.sin(angle) * this.midRadius;
 
@@ -205,8 +207,9 @@ export class SpiralPath implements TransportPath {
   }
 
   getLocalTangent(t: number): Vec3 {
-    const angle = t * this.totalAngle;
-    const dAdT = this.totalAngle;
+    const isUp = this.direction === 'up';
+    const angle = isUp ? t * this.totalAngle : (1 - t) * this.totalAngle;
+    const dAdT = isUp ? this.totalAngle : -this.totalAngle;
     const tx = -Math.sin(angle) * this.midRadius * dAdT;
     const tz = Math.cos(angle) * this.midRadius * dAdT;
     const ty = this.direction === 'up' ? this.effectiveHeight : -this.effectiveHeight;
@@ -263,8 +266,8 @@ export function createTransportPath(type: string, params: Record<string, any>): 
       const beltWidth = params.beltWidth || 400;
       const turns = params.turns || 3;
       const outfeedAngle = params.outfeedAngle || 180;
-      const infeedHeight = params.infeedHeight || 800;
-      const outfeedHeight = params.outfeedHeight || 3800;
+      const infeedHeight = params.infeedHeight ?? 800;
+      const outfeedHeight = params.outfeedHeight ?? 3800;
       const direction = params.direction || 'up';
       return new SpiralPath(beltWidth, turns, outfeedAngle, infeedHeight, outfeedHeight, direction);
     }

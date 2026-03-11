@@ -139,19 +139,19 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters, isSelected }) => {
 
   // ─── Extract params (mm → m) ───
   const direction = parameters.direction || 'up';
-  const beltWidthM = (parameters.beltWidth || 400) / 1000;
-  const turns = Math.max(parameters.turns || 3, 0.5);
+  const beltWidthM = (parameters.beltWidth ?? 400) / 1000;
+  const turns = Math.max(parameters.turns ?? 3, 0.5);
   // Infeed is ALWAYS fixed at angle 0 (positive Z). Outfeed angle is configurable.
-  const outfeedAngleDeg = parameters.outfeedAngle || 180;
+  const outfeedAngleDeg = parameters.outfeedAngle ?? 180;
   const outfeedAngleRad = (outfeedAngleDeg * Math.PI) / 180;
   const sideGuides = parameters.sideGuides !== false;
-  const guideHeightM = (parameters.guideHeight || 80) / 1000;
+  const guideHeightM = (parameters.guideHeight ?? 80) / 1000;
   const showLegs = parameters.showLegs !== false;
   const centerStructure = parameters.centerStructure || 'column';
 
   // Height from ground — these are absolute floor-referenced heights
-  const infeedHeightM = (parameters.infeedHeight || 800) / 1000;
-  const outfeedHeightM = (parameters.outfeedHeight || 3800) / 1000;
+  const infeedHeightM = (parameters.infeedHeight ?? 800) / 1000;
+  const outfeedHeightM = (parameters.outfeedHeight ?? 3800) / 1000;
 
   const isDown = direction === 'down';
 
@@ -249,35 +249,37 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters, isSelected }) => {
   const towerZ = Math.sin(towerAngle) * towerDist;
   const towerYaw = -towerAngle + Math.PI / 2;
 
-  // Infeed tangent — always at angle 0 (positive Z direction)
-  // The tangent direction at angle 0 on a circle is along +X (perpendicular to radius)
-  const infeedTangentDir = Math.PI / 2; // tangent at angle 0
-  const infeedPos: [number, number, number] = [
-    Math.cos(0) * midRadius - Math.sin(0) * tangentLength * 0.5,
-    0,
-    Math.sin(0) * midRadius + Math.cos(0) * tangentLength * 0.5,
-  ];
-  // Yaw: the tangent faces outward from the spiral — for infeed, product enters along -tangent
-  const infeedYaw = Math.PI; // faces -Z so product enters toward spiral
+  const tangentYaw = (tx: number, tz: number) => Math.atan2(-tz, tx);
+  const startTanX = -Math.sin(startAngle);
+  const startTanZ = Math.cos(startAngle);
+  const endAngle = totalAngle;
+  const endTanX = -Math.sin(endAngle);
+  const endTanZ = Math.cos(endAngle);
+  const startX = Math.cos(startAngle) * midRadius;
+  const startZ = Math.sin(startAngle) * midRadius;
+  const endX = Math.cos(endAngle) * midRadius;
+  const endZ = Math.sin(endAngle) * midRadius;
 
-  // Outfeed tangent — at the end of the helix (startAngle + totalAngle)
-  const outfeedEndAngle = totalAngle; // since startAngle = 0
-  const outfeedTanX = -Math.sin(outfeedEndAngle);
-  const outfeedTanZ = Math.cos(outfeedEndAngle);
-  const outfeedPos: [number, number, number] = [
-    Math.cos(outfeedEndAngle) * midRadius + outfeedTanX * tangentLength * 0.5,
-    effectiveHeight,
-    Math.sin(outfeedEndAngle) * midRadius + outfeedTanZ * tangentLength * 0.5,
-  ];
-  const outfeedYaw = -outfeedEndAngle + Math.PI / 2;
-
-  // For down direction: infeed is at the top, outfeed at the bottom
+  // Build tangent sections from the same flow convention as spiral ports/path.
+  // Input section points TOWARD the helix anchor, output section points AWAY from it.
   const infeedFinal = isDown
-    ? { pos: [outfeedPos[0], effectiveHeight, outfeedPos[2]] as [number, number, number], yaw: outfeedYaw }
-    : { pos: infeedPos, yaw: infeedYaw };
+    ? {
+        pos: [endX + endTanX * (tangentLength * 0.5), effectiveHeight, endZ + endTanZ * (tangentLength * 0.5)] as [number, number, number],
+        yaw: tangentYaw(-endTanX, -endTanZ),
+      }
+    : {
+        pos: [startX - startTanX * (tangentLength * 0.5), 0, startZ - startTanZ * (tangentLength * 0.5)] as [number, number, number],
+        yaw: tangentYaw(startTanX, startTanZ),
+      };
   const outfeedFinal = isDown
-    ? { pos: [infeedPos[0], 0, infeedPos[2]] as [number, number, number], yaw: infeedYaw }
-    : { pos: outfeedPos, yaw: outfeedYaw };
+    ? {
+        pos: [startX + (-startTanX) * (tangentLength * 0.5), 0, startZ + (-startTanZ) * (tangentLength * 0.5)] as [number, number, number],
+        yaw: tangentYaw(-startTanX, -startTanZ),
+      }
+    : {
+        pos: [endX + endTanX * (tangentLength * 0.5), effectiveHeight, endZ + endTanZ * (tangentLength * 0.5)] as [number, number, number],
+        yaw: tangentYaw(endTanX, endTanZ),
+      };
 
   return (
     <group ref={groupRef} position={[0, bottomY, 0]}>
