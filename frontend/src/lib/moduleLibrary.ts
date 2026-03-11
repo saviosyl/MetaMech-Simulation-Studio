@@ -183,11 +183,10 @@ export const moduleLibrary: ModuleDefinition[] = [
       cleatStyle: { type: 'select', label: 'Cleat Style', default: 'straight', options: ['straight', 'chevron', 'angled'] },
       sidewallEnabled: { type: 'boolean', label: 'Sidewalls', default: false },
       sidewallHeight: { type: 'number', label: 'Sidewall Height (mm)', default: 80, min: 30, max: 200, step: 10 },
-    },
-  
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
     },
+  },
   {
     id: 'bend-conveyor',
     name: 'Bend Conveyor',
@@ -211,11 +210,10 @@ export const moduleLibrary: ModuleDefinition[] = [
       supportType: { type: 'select', label: 'Support Type', default: 'floor', options: ['floor', 'overhang', 'cantilever', 'ceiling-hanger'] },
       supportSpacing: { type: 'number', label: 'Support Spacing (°)', default: 45, min: 15, max: 90, step: 15 },
       adjustableFeetEnabled: { type: 'boolean', label: 'Adjustable Feet', default: true },
-    },
-  
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
     },
+  },
   {
     id: 'spiral-conveyor',
     name: 'Spiral Conveyor',
@@ -421,11 +419,10 @@ export const moduleLibrary: ModuleDefinition[] = [
         max: 4,
         step: 1,
       },
-    },
-  
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
     },
+  },
   {
     id: 'transfer-bridge',
     name: 'Transfer Bridge',
@@ -437,11 +434,10 @@ export const moduleLibrary: ModuleDefinition[] = [
       width: { type: 'number', label: 'Width (mm)', default: 600, min: 300, max: 1200, step: 50 },
       length: { type: 'number', label: 'Length (mm)', default: 1000, min: 200, max: 2000, step: 50 },
       height: { type: 'number', label: 'Height (mm)', default: 800, min: 300, max: 1500, step: 50 },
-    },
-  
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
     },
+  },
   {
     id: 'popup-transfer',
     name: 'Pop-Up Transfer',
@@ -456,11 +452,10 @@ export const moduleLibrary: ModuleDefinition[] = [
       popupHeight: { type: 'number', label: 'Popup Height (mm)', default: 200, min: 100, max: 500, step: 10 },
       speed: { type: 'number', label: 'Speed (m/min)', default: 20, min: 1, max: 100, step: 1 },
       direction: { type: 'select', label: 'Direction', default: 'left', options: ['left', 'right'] },
-    },
-  
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
     },
+  },
   {
     id: 'pusher-transfer',
     name: 'Pusher Transfer',
@@ -475,11 +470,10 @@ export const moduleLibrary: ModuleDefinition[] = [
       pushAngle: { type: 'number', label: 'Push Angle (°)', default: 90, min: 30, max: 180, step: 5 },
       pushForce: { type: 'number', label: 'Push Force', default: 1, min: 0.1, max: 5, step: 0.1 },
       pushSide: { type: 'select', label: 'Push Side', default: 'left', options: ['left', 'right'] },
-    },
-  
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
     },
+  },
   {
     id: 'merge-divert',
     name: 'Merge/Divert',
@@ -595,11 +589,10 @@ export const moduleLibrary: ModuleDefinition[] = [
         max: 10.0,
         step: 0.5,
       },
-    },
-  
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
     },
+  },
 
   // Environment Modules
   {
@@ -1240,11 +1233,10 @@ export const moduleLibrary: ModuleDefinition[] = [
       width: { type: 'number', label: 'Width (mm)', default: 2000, min: 1000, max: 4000, step: 100 },
       depth: { type: 'number', label: 'Depth (mm)', default: 1500, min: 800, max: 3000, step: 100 },
       height: { type: 'number', label: 'Height (mm)', default: 800, min: 500, max: 1200, step: 50 },
-    },
-  
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
     },
+  },
   {
     id: 'stretch-wrapper',
     name: 'Stretch Wrapper',
@@ -1267,11 +1259,10 @@ export const moduleLibrary: ModuleDefinition[] = [
       width: { type: 'number', label: 'Width (mm)', default: 1500, min: 1000, max: 2500, step: 100 },
       depth: { type: 'number', label: 'Depth (mm)', default: 800, min: 600, max: 1200, step: 50 },
       height: { type: 'number', label: 'Height (mm)', default: 900, min: 700, max: 1100, step: 50 },
-    },
-  
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
     },
+  },
   {
     id: 'pallet-conveyor',
     name: 'Pallet Conveyor',
@@ -1283,11 +1274,10 @@ export const moduleLibrary: ModuleDefinition[] = [
       width: { type: 'number', label: 'Width (mm)', default: 1200, min: 800, max: 1600, step: 100 },
       height: { type: 'number', label: 'Height (mm)', default: 500, min: 300, max: 800, step: 50 },
       speed: { type: 'number', label: 'Speed (m/min)', default: 8, min: 1, max: 20, step: 1 },
-    },
-  
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
     },
+  },
   {
     id: 'forklift',
     name: 'Forklift',
@@ -1309,11 +1299,10 @@ export const moduleLibrary: ModuleDefinition[] = [
       width: { type: 'number', label: 'Width (mm)', default: 400, min: 200, max: 800, step: 50 },
       height: { type: 'number', label: 'Height (mm)', default: 800, min: 300, max: 1200, step: 50 },
       speed: { type: 'number', label: 'Speed (m/min)', default: 10, min: 1, max: 40, step: 1 },
-    },
-  
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
     },
+  },
   {
     id: 'laminar-flow-hood',
     name: 'Laminar Flow Hood',
