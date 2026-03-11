@@ -87,35 +87,13 @@ function getSpiralHeightAdjustments(
   fixedNode: ProcessNode,
   fixedPort: ConnectionPort,
 ): { movingParams: Record<string, any> | null; fixedParams: Record<string, any> | null } {
-  // If moving node mates to a spiral endpoint, update only the matched side height
-  // so node ports and transport path endpoints stay aligned end-to-end.
-  if (fixedNode.type === 'spiral-conveyor' && isHeightAdjustableForSpiralMate(movingNode.type)) {
-    const h = getPortHeightMm(fixedPort);
-    const currentIn = movingNode.parameters?.infeedHeight;
-    const currentOut = movingNode.parameters?.outfeedHeight;
-    return {
-      movingParams: {
-        infeedHeight: movingPort.type === 'input' ? h : (currentIn ?? h),
-        outfeedHeight: movingPort.type === 'output' ? h : (currentOut ?? (currentIn ?? h)),
-      },
-      fixedParams: null,
-    };
-  }
-
-  // If moving node is spiral, adjust the fixed non-spiral side.
-  if (movingNode.type === 'spiral-conveyor' && isHeightAdjustableForSpiralMate(fixedNode.type)) {
-    const h = getPortHeightMm(movingPort);
-    const currentIn = fixedNode.parameters?.infeedHeight;
-    const currentOut = fixedNode.parameters?.outfeedHeight;
-    return {
-      movingParams: null,
-      fixedParams: {
-        infeedHeight: fixedPort.type === 'input' ? h : (currentIn ?? h),
-        outfeedHeight: fixedPort.type === 'output' ? h : (currentOut ?? (currentIn ?? h)),
-      },
-    };
-  }
-
+  // Spiral mating should be transform-driven (position + rotation solve) only.
+  // Forcing non-spiral infeed/outfeedHeight here can double-apply height:
+  // once via node world Y and again via local port Y.
+  void movingNode;
+  void movingPort;
+  void fixedNode;
+  void fixedPort;
   return { movingParams: null, fixedParams: null };
 }
 
