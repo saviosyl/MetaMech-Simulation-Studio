@@ -82,7 +82,6 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
 
   let cursorX = 0; // current X position in meters
   let cursorZ = 0;
-  let currentRotation: [number, number, number] = [0, 0, 0];
 
   // ── Source ──
   const source = n('source', [cursorX, 0, cursorZ], {

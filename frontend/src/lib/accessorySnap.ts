@@ -12,8 +12,7 @@
  * - Persistent mount data for save/load
  */
 
-import { createTransportPath, TransportPath } from './transportPath';
-import { localToWorld } from './nodeTransform';
+import { createTransportPath } from './transportPath';
 
 type Vec3 = [number, number, number];
 

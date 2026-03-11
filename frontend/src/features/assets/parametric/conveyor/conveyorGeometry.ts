@@ -14,7 +14,6 @@ import {
   matChrome as matRoller,
   matModularBelt as matModular,
   matDarkSteel as matDrive,
-  matIndustrialBlue as matMotor,
   buildSEWMotor,
   matCleatRubber as matCleat,
   matSidewall,

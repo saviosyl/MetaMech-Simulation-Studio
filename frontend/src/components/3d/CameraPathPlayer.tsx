@@ -5,7 +5,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useEditorStore, CameraKeyframe } from '../../store/editorStore';
+import { useEditorStore } from '../../store/editorStore';
 
 /** Smooth ease-in-out (cubic) */
 function easeInOut(t: number): number {

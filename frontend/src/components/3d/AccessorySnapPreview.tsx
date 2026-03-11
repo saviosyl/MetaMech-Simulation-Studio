@@ -5,7 +5,7 @@
  * accessory will snap to. Only visible when dragging an accessory
  * near a conveyor.
  */
-import React, { useMemo } from 'react';
+import React from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useEditorStore } from '../../store/editorStore';
@@ -14,7 +14,6 @@ import { findNearestConveyorSnap, isAccessoryType, isConveyorType, AccessorySnap
 const AccessorySnapPreview: React.FC = () => {
   const { processNodes, selectedObjectId, isDragging } = useEditorStore();
   const ringRef = React.useRef<THREE.Mesh>(null);
-  const lineRef = React.useRef<THREE.Line>(null);
   const [snapResult, setSnapResult] = React.useState<AccessorySnapResult | null>(null);
 
   useFrame(() => {

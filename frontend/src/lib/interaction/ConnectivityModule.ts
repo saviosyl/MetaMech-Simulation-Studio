@@ -7,7 +7,6 @@
  * Active when ModeManager.isActive('connectivity').
  */
 
-import * as THREE from 'three';
 import { ModeManager } from '../ModeManager';
 
 export interface MateCandidate {
