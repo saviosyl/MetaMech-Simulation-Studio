@@ -262,7 +262,6 @@ export class SimulationEngine {
         case 'palletizer': this.tickPalletizer(node, stats, elapsed); break;
         case 'stopper': this.tickStopper(node, stats, elapsed); break;
         case 'pusher': this.tickPusher(node, stats, elapsed); break;
-        case 'sensor': /* handled in pass 1 */ break;
         case 'vertical-lifter': this.tickLift(node, stats, elapsed); break;
         default: {
           // Unknown node type: pass products through to output

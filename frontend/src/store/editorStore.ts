@@ -12,11 +12,17 @@ export interface ProcessNode {
         'spiral-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
         'belt-conveyor' | 'roller-conveyor' | 'industrial-robot' | 'machine-static' |
         'stopper' | 'pusher' | 'bend-conveyor' | 'sensor' |
+        'modular-conveyor-straight' | 'modular-conveyor-90-curve' | 'modular-conveyor-45-curve' | 'incline-conveyor' |
         'cartesian-robot' | 'cobot' | 'robot-5axis' | 'robot-6axis' |
         'eur-pallet' | 'standard-pallet' | 'custom-pallet' |
         'carton-erector' | 'case-packer' | 'checkweigher' | 'metal-detector' |
         'labeler' | 'sealing-station' | 'reject-station' | 'accumulation-table' |
-        'stretch-wrapper' | 'packing-station' | 'pallet-conveyor' | 'forklift';
+        'stretch-wrapper' | 'packing-station' | 'pallet-conveyor' | 'forklift' |
+        'stainless-conveyor' | 'laminar-flow-hood' | 'clean-bench' | 'pass-through-hatch' |
+        'cleanroom-cart' | 'guard-partition' | 'light-curtain' | 'inspection-station' | 'machine-enclosure' |
+        'wall' | 'window' | 'safety-rail' | 'fence' | 'fence-gate' | 'door' | 'pallet-rack' |
+        'bollard' | 'operator-station' | 'electrical-cabinet' | 'tower-light' | 'pallet-stack' |
+        'floor-zone' | 'hmi-stand' | 'pallet-truck' | 'cardboard-box';
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -112,27 +118,12 @@ export interface CameraKeyframe {
   /** Duration in seconds to travel FROM this keyframe to the next */
   duration: number;
   /** Optional pause at this keyframe before moving (seconds) */
-  pause: number;
+  pause?: number;
+  /** Easing: 'linear' | 'ease-in-out' */
+  easing?: 'linear' | 'ease-in-out';
 }
 
 /** Camera path for automated recording */
-export interface CameraPath {
-  id: string;
-  name: string;
-  keyframes: CameraKeyframe[];
-  loop: boolean;
-}
-
-/** Camera keyframe for cinematic camera paths */
-export interface CameraKeyframe {
-  position: [number, number, number];
-  target: [number, number, number];
-  /** Duration in seconds to travel FROM this keyframe to the next */
-  duration: number;
-  /** Easing: 'linear' | 'ease-in-out' */
-  easing: 'linear' | 'ease-in-out';
-}
-
 export interface CameraPath {
   id: string;
   name: string;
