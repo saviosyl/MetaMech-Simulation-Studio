@@ -27,8 +27,6 @@ interface ValidationIssue {
   nodeName?: string;
 }
 
-const CONVEYOR_TYPES = ['conveyor', 'belt-conveyor', 'roller-conveyor', 'bend-conveyor', 'modular-conveyor-straight', 'modular-conveyor-90-curve', 'modular-conveyor-45-curve', 'spiral-conveyor', 'incline-conveyor'];
-
 function validateScene(nodes: any[], edges: any[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
@@ -195,13 +193,13 @@ const severityConfig: Record<Severity, { icon: any; color: string; bg: string; b
 };
 
 const ValidationPanel: React.FC = () => {
-  const { processNodes, edges, selectObject } = useEditorStore();
+  const { processNodes, edges, setSelectedObject } = useEditorStore();
   const [isOpen, setIsOpen] = useState(false);
 
   const handleIssueClick = (issue: ValidationIssue) => {
     if (!issue.nodeId) return;
     // Select the problem node to highlight it
-    selectObject(issue.nodeId, 'process');
+    setSelectedObject(issue.nodeId, 'process');
     // Dispatch a custom event so the viewport can zoom to it
     window.dispatchEvent(new CustomEvent('metamech:focus-node', { detail: { nodeId: issue.nodeId } }));
   };

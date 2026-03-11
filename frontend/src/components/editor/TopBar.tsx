@@ -2,9 +2,9 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Play, Pause, Square, Save, Download, Upload, Video,
-  ArrowLeft, Gauge, Undo2, Redo2, Check, AlertCircle,
+  ArrowLeft, Undo2, Redo2, Check, AlertCircle,
   Loader2, Grid3X3, Ruler, HelpCircle, MousePointer, Move, RotateCcw,
-  Link2, Magnet, GitBranch, Sun, Moon, Maximize2,
+  Link2, Magnet, Sun, Moon, Maximize2,
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuth } from '../../contexts/AuthContext';
@@ -77,14 +77,13 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const {
-    isPlaying, isPaused, simulationSpeed,
+    isPlaying, simulationSpeed,
     play, pause, reset, setSimulationSpeed,
     getSceneData, loadScene,
     gridSnap, setGridSnap,
     measureActive, setMeasureActive,
-    transformMode, setTransformMode, activeTool, setActiveTool,
+    activeTool, setActiveTool,
     setShowShortcuts,
-    selectObject,
   } = useEditorStore();
 
   const speedOptions = [
@@ -149,7 +148,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
 
   // Record with camera path: starts recording + plays the active camera path
   const startRecordingWithCameraPath = useCallback(() => {
-    const { activeCameraPathId, cameraPaths, setIsCameraPathPlaying, setActiveCameraPathId } = useEditorStore.getState();
+    const { activeCameraPathId, cameraPaths, setActiveCameraPathId } = useEditorStore.getState();
     if (!activeCameraPathId) {
       // Find first path with >=2 keyframes
       const validPath = cameraPaths.find(p => p.keyframes.length >= 2);

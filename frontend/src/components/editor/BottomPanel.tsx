@@ -7,8 +7,8 @@
  */
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  BarChart3, AlertTriangle, Activity, ChevronUp, ChevronDown,
-  GripHorizontal, Shield, Zap, CheckCircle2, XCircle, Info,
+  BarChart3, AlertTriangle, ChevronUp, ChevronDown,
+  CheckCircle2, XCircle, Info,
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { simulationEngine } from '../../simulation/SimulationEngine';
@@ -129,7 +129,7 @@ const sevColors: Record<string, string> = { error: '#ef4444', warning: '#f59e0b'
 const sevIcons: Record<string, any> = { error: XCircle, warning: AlertTriangle, info: Info, success: CheckCircle2 };
 
 const BottomPanel: React.FC = () => {
-  const { isPlaying, processNodes, edges, selectObject } = useEditorStore();
+  const { isPlaying, processNodes, edges, setSelectedObject } = useEditorStore();
   const [height, setHeight] = useState(DEFAULT_HEIGHT);
   const [collapsed, setCollapsed] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -184,10 +184,11 @@ const BottomPanel: React.FC = () => {
   const errorCount = issues.filter(i => i.severity === 'error').length;
   const warnCount = issues.filter(i => i.severity === 'warning').length;
   const realIssueCount = errorCount + warnCount;
+  const blockedConveyors = stats ? stats.flowStates.filter(s => s.state === 'blocked').length : 0;
 
   const handleIssueClick = (issue: ValidationIssue) => {
     if (!issue.nodeId) return;
-    selectObject(issue.nodeId, 'process');
+    setSelectedObject(issue.nodeId, 'process');
     window.dispatchEvent(new CustomEvent('metamech:focus-node', { detail: { nodeId: issue.nodeId } }));
   };
 
@@ -272,9 +273,9 @@ const BottomPanel: React.FC = () => {
               <div style={S.kpiCard}><span style={S.kpiValue}>{stats.productCount}</span><span style={S.kpiLabel}>PRODUCTS</span></div>
               <div style={S.kpiCard}><span style={S.kpiValue}>{stats.throughputPerMin.toFixed(1)}</span><span style={S.kpiLabel}>TPM</span></div>
               <div style={S.kpiCard}><span style={S.kpiValue}>{formatTime(stats.simTime)}</span><span style={S.kpiLabel}>SIM TIME</span></div>
-              <div style={S.kpiCard}><span style={S.kpiValue}>{stats.activeProducts}</span><span style={S.kpiLabel}>ACTIVE</span></div>
-              <div style={S.kpiCard}><span style={S.kpiValue}>{stats.completedProducts}</span><span style={S.kpiLabel}>COMPLETE</span></div>
-              <div style={S.kpiCard}><span style={S.kpiValue}>{stats.blockedProducts}</span><span style={S.kpiLabel}>BLOCKED</span></div>
+              <div style={S.kpiCard}><span style={S.kpiValue}>{stats.completedCount}</span><span style={S.kpiLabel}>COMPLETED</span></div>
+              <div style={S.kpiCard}><span style={S.kpiValue}>{blockedConveyors}</span><span style={S.kpiLabel}>BLOCKED</span></div>
+              <div style={S.kpiCard}><span style={S.kpiValue}>{stats.activeRules}</span><span style={S.kpiLabel}>RULES</span></div>
             </div>
           )}
           {activeTab === 'overview' && !stats && (
@@ -285,29 +286,51 @@ const BottomPanel: React.FC = () => {
 
           {activeTab === 'flow' && stats && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {stats.nodeDetails && Object.entries(stats.nodeDetails).map(([nodeId, detail]: [string, any]) => (
-                <div key={nodeId} style={{
+              {stats.machineUtils.map((m) => (
+                <div key={m.nodeId} style={{
                   display: 'flex', justifyContent: 'space-between', padding: '4px 8px',
                   background: 'var(--mm-bg-surface)', borderRadius: 6, fontSize: 11,
                 }}>
-                  <span style={{ color: 'var(--mm-text-primary)', fontWeight: 600 }}>{detail.name || nodeId.slice(0, 8)}</span>
+                  <span style={{ color: 'var(--mm-text-primary)', fontWeight: 600 }}>{m.name}</span>
                   <span style={{ color: 'var(--mm-text-tertiary)' }}>
-                    Q:{detail.queueSize || 0} | T:{detail.throughput || 0} | U:{((detail.utilization || 0) * 100).toFixed(0)}%
+                    Utilization: {(m.utilization * 100).toFixed(0)}%
                   </span>
                 </div>
               ))}
-              {(!stats.nodeDetails || Object.keys(stats.nodeDetails).length === 0) && (
-                <span style={{ color: 'var(--mm-text-tertiary)' }}>No node data yet.</span>
+              {stats.bufferLevels.map((b) => (
+                <div key={b.nodeId} style={{
+                  display: 'flex', justifyContent: 'space-between', padding: '4px 8px',
+                  background: 'var(--mm-bg-surface)', borderRadius: 6, fontSize: 11,
+                }}>
+                  <span style={{ color: 'var(--mm-text-primary)', fontWeight: 600 }}>{b.name}</span>
+                  <span style={{ color: 'var(--mm-text-tertiary)' }}>
+                    Queue: {b.level}/{b.capacity}
+                  </span>
+                </div>
+              ))}
+              {stats.flowStates.map((f) => (
+                <div key={f.nodeId} style={{
+                  display: 'flex', justifyContent: 'space-between', padding: '4px 8px',
+                  background: 'var(--mm-bg-surface)', borderRadius: 6, fontSize: 11,
+                }}>
+                  <span style={{ color: 'var(--mm-text-primary)', fontWeight: 600 }}>{f.name}</span>
+                  <span style={{ color: 'var(--mm-text-tertiary)' }}>
+                    {f.state} | B:{f.blockedPct.toFixed(0)}% | S:{f.starvedPct.toFixed(0)}%
+                  </span>
+                </div>
+              ))}
+              {stats.machineUtils.length === 0 && stats.bufferLevels.length === 0 && stats.flowStates.length === 0 && (
+                <span style={{ color: 'var(--mm-text-tertiary)' }}>No flow data yet.</span>
               )}
             </div>
           )}
 
           {activeTab === 'kpi' && stats && (
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <div style={S.kpiCard}><span style={{ ...S.kpiValue, color: '#10b981' }}>{((stats.oee || 0) * 100).toFixed(1)}%</span><span style={S.kpiLabel}>OEE</span></div>
-              <div style={S.kpiCard}><span style={{ ...S.kpiValue, color: '#06b6d4' }}>{((stats.availability || 0) * 100).toFixed(1)}%</span><span style={S.kpiLabel}>AVAILABILITY</span></div>
-              <div style={S.kpiCard}><span style={{ ...S.kpiValue, color: '#8b5cf6' }}>{((stats.performance || 0) * 100).toFixed(1)}%</span><span style={S.kpiLabel}>PERFORMANCE</span></div>
-              <div style={S.kpiCard}><span style={{ ...S.kpiValue, color: '#f59e0b' }}>{((stats.quality || 0) * 100).toFixed(1)}%</span><span style={S.kpiLabel}>QUALITY</span></div>
+              <div style={S.kpiCard}><span style={{ ...S.kpiValue, color: '#10b981' }}>{stats.oee.toFixed(1)}%</span><span style={S.kpiLabel}>OEE</span></div>
+              <div style={S.kpiCard}><span style={{ ...S.kpiValue, color: '#06b6d4' }}>{stats.avgAvailability.toFixed(1)}%</span><span style={S.kpiLabel}>AVAILABILITY</span></div>
+              <div style={S.kpiCard}><span style={{ ...S.kpiValue, color: '#8b5cf6' }}>{stats.avgUtilization.toFixed(1)}%</span><span style={S.kpiLabel}>UTILIZATION</span></div>
+              <div style={S.kpiCard}><span style={{ ...S.kpiValue, color: '#f59e0b' }}>{stats.totalThroughput}</span><span style={S.kpiLabel}>THROUGHPUT</span></div>
               <div style={S.kpiCard}><span style={S.kpiValue}>{(stats.avgCycleTime || 0).toFixed(1)}s</span><span style={S.kpiLabel}>AVG CYCLE</span></div>
             </div>
           )}
