@@ -552,34 +552,6 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
         </group>
       </group>
 
-      {/* ═══ Outfeed Tangent Section ═══ */}
-      <group position={outfeedFinal.pos} rotation={[0, outfeedFinal.yaw, 0]}>
-        <mesh material={matBeltDark} position={[tangentLength * 0.5, 0, 0]} castShadow receiveShadow>
-          <boxGeometry args={[tangentLength, beltThickness, beltWidthM]} />
-        </mesh>
-        <mesh material={matDrumStainless} position={[tangentLength * 0.5, -beltThickness * 0.7, 0]}>
-          <boxGeometry args={[tangentLength, 0.004, beltWidthM * 0.9]} />
-        </mesh>
-        {sideGuides && (
-          <>
-            <mesh material={matOuterBand} position={[tangentLength * 0.5, guideHeightM * 0.4, beltWidthM / 2 + 0.003]}>
-              <boxGeometry args={[tangentLength, guideHeightM, 0.003]} />
-            </mesh>
-            <mesh material={matOuterBand} position={[tangentLength * 0.5, guideHeightM * 0.4, -beltWidthM / 2 - 0.003]}>
-              <boxGeometry args={[tangentLength, guideHeightM, 0.003]} />
-            </mesh>
-          </>
-        )}
-        <group position={[tangentLength + 0.02, 0.06, -beltWidthM / 2 - 0.02]}>
-          <mesh material={matSensorGray}>
-            <boxGeometry args={[0.015, 0.04, 0.015]} />
-          </mesh>
-          <mesh material={matSensorGray} position={[0, 0.025, 0.01]}>
-            <cylinderGeometry args={[0.005, 0.005, 0.015, 8]} />
-          </mesh>
-        </group>
-      </group>
-
       {/* ═══ Chain Return Unit (clearly visible industrial cassette) ═══ */}
       <group position={returnUnitPos} rotation={[0, outfeedFinal.yaw, 0]}>
         {/* Main welded frame */}
