@@ -104,34 +104,15 @@ export class SimulationEngine {
         };
         const rState = createRobotState(config);
         const reach = (node.parameters.reach || node.parameters.reachX || 1400) / 1000;
-        const pickH = (node.parameters.pickHeight || 800) / 1000;
-        const placeH = (node.parameters.placeHeight || 800) / 1000;
-
-        // Find pick source: input edge → source node position, or default to left side of robot
-        const inEdges = edges.filter(e => e.to === node.id);
-        const outEdges = edges.filter(e => e.from === node.id);
-        if (inEdges.length > 0) {
-          const srcNode = nodes.find(n => n.id === inEdges[0].from);
-          if (srcNode) {
-            rState.pickPosition = [srcNode.position[0], pickH, srcNode.position[2]];
-          }
-        }
-        if (!rState.pickPosition) {
-          // Default: pick from left side at reach distance
-          rState.pickPosition = [node.position[0] - reach * 0.4, pickH, node.position[2]];
-        }
-
-        // Find place target: output edge → target node position, or default to right side
-        if (outEdges.length > 0) {
-          const tgtNode = nodes.find(n => n.id === outEdges[0].to);
-          if (tgtNode) {
-            rState.placePosition = [tgtNode.position[0], placeH, tgtNode.position[2]];
-          }
-        }
-        if (!rState.placePosition) {
-          // Default: place to right side at reach distance
-          rState.placePosition = [node.position[0] + reach * 0.4, placeH, node.position[2]];
-        }
+        const ports = getConnectionPorts(node.type, node.parameters);
+        const pickPort = ports.find(p => p.id === 'pick') || ports.find(p => p.type === 'input');
+        const placePort = ports.find(p => p.id === 'place') || ports.find(p => p.type === 'output');
+        rState.pickPosition = pickPort
+          ? getPortWorldPosition(pickPort.localPosition, node)
+          : [node.position[0] - reach * 0.4, node.position[1] + (node.parameters.pickHeight || 800) / 1000, node.position[2]];
+        rState.placePosition = placePort
+          ? getPortWorldPosition(placePort.localPosition, node)
+          : [node.position[0] + reach * 0.4, node.position[1] + (node.parameters.placeHeight || 800) / 1000, node.position[2]];
 
         this.robotStates.set(node.id, rState);
       }
@@ -939,13 +920,31 @@ export class SimulationEngine {
       homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
     };
 
+    // Keep robot pick/place anchors bound to the robot's real infeed/outfeed ports.
+    const ports = getConnectionPorts(node.type, node.parameters);
+    const pickPort = ports.find(p => p.id === 'pick') || ports.find(p => p.type === 'input');
+    const placePort = ports.find(p => p.id === 'place') || ports.find(p => p.type === 'output');
+    const reach = (node.parameters.reach || node.parameters.reachX || 1400) / 1000;
+    const pickFallback: [number, number, number] = [
+      node.position[0] - reach * 0.4,
+      node.position[1] + (node.parameters.pickHeight || 800) / 1000,
+      node.position[2],
+    ];
+    const placeFallback: [number, number, number] = [
+      node.position[0] + reach * 0.4,
+      node.position[1] + (node.parameters.placeHeight || 800) / 1000,
+      node.position[2],
+    ];
+    rState.pickPosition = pickPort ? getPortWorldPosition(pickPort.localPosition, node) : pickFallback;
+    rState.placePosition = placePort ? getPortWorldPosition(placePort.localPosition, node) : placeFallback;
+
     // Find available product at pick source — accept arriving products into queue
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
       if (!stats.queue.includes(product.id)) {
         product.state = 'queued';
+        product.currentPosition = [...rState.pickPosition];
         stats.queue.push(product.id);
-        console.log(`[ROBOT] ${node.name} queued product ${product.id.slice(0,8)}, queue=${stats.queue.length}`);
       }
     }
 
@@ -953,17 +952,11 @@ export class SimulationEngine {
     let availableProductId: string | null = null;
     if (stats.queue.length > 0 && rState.phase === 'idle') {
       availableProductId = stats.queue[0];
-      console.log(`[ROBOT] ${node.name} idle, offering product ${availableProductId?.slice(0,8)}, pickPos=${JSON.stringify(rState.pickPosition)}`);
     }
     // Also pass the in-flight target so pick phase can confirm it
     const targetId = (rState as any)._targetProductId as string | undefined;
     if (targetId && !availableProductId) {
       availableProductId = targetId;
-    }
-
-    // Log robot phase every ~1 second
-    if (Math.floor(this.simTime * 2) !== Math.floor((this.simTime - dt) * 2)) {
-      console.log(`[ROBOT-STATE] ${node.name} t=${this.simTime.toFixed(1)} phase=${rState.phase} prog=${rState.phaseProgress.toFixed(2)} held=${rState.heldProductId?.slice(0,8)||'none'} queue=${stats.queue.length} pick=${JSON.stringify(rState.pickPosition)} place=${JSON.stringify(rState.placePosition)}`);
     }
 
     // Tick the motion controller
@@ -993,13 +986,17 @@ export class SimulationEngine {
     if (rState.heldProductId && GRIP_PHASES.includes(rState.phase)) {
       const held = this.products.find(p => p.id === rState.heldProductId);
       if (held) {
-        held.currentPosition = [...rState.toolCenterPoint];
+        const heldHalfHeight = (held.size?.[2] || 0.2) * 0.5;
+        held.currentPosition = [
+          rState.toolCenterPoint[0],
+          rState.toolCenterPoint[1] - heldHalfHeight,
+          rState.toolCenterPoint[2],
+        ];
       }
     }
 
     // If robot just placed a product
     if (placedId) {
-      console.log(`[ROBOT-PLACE] ${node.name} placed product ${placedId.slice(0,8)}`);
       const placed = this.products.find(p => p.id === placedId);
       if (placed) {
         // Check if place target is a pallet
@@ -1028,14 +1025,18 @@ export class SimulationEngine {
         }
         if (!placedOnPallet) {
           // Send to next node — could be a conveyor, buffer, or other target
+          placed.currentPosition = [...rState.placePosition];
+          placed.currentNodeId = node.id;
+          placed.currentEdgeId = null;
           if (outEdges.length > 0) {
+            placed.state = 'at-node';
             placed.pathPosition = 0;  // Start at beginning of destination
             placed.conveyorEntryTime = null;
             this.sendProductAlongEdge(placed, outEdges[0]);
           } else {
             // No output edge — place at robot's place position
             placed.state = 'completed';
-            placed.currentPosition = [...rState.toolCenterPoint];
+            placed.currentPosition = [...rState.placePosition];
           }
         }
         stats.throughput++;
