@@ -400,10 +400,13 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       const rReach = (params?.reach || params?.reachX || 1400) / 1000;
       const rBase = (params?.baseHeight || 500) / 1000;
       const pedH = params?.pedestalEnabled ? (params?.pedestalHeight || 0) / 1000 : 0;
-      const rH = rBase + pedH;
+      const defaultH = rBase + pedH;
+      const pickH = params?.pickHeight != null ? (params.pickHeight / 1000) : defaultH;
+      const placeH = params?.placeHeight != null ? (params.placeHeight / 1000) : pickH;
+      const span = rReach * 0.4;
       return [
-        { id: 'pick', type: 'input', localPosition: [-rReach * 0.4, rH, 0] as [number, number, number] },
-        { id: 'place', type: 'output', localPosition: [rReach * 0.4, rH, 0] as [number, number, number] },
+        { id: 'pick', type: 'input', localPosition: [0, pickH, -span] as [number, number, number] },
+        { id: 'place', type: 'output', localPosition: [0, placeH, span] as [number, number, number] },
       ];
     }
     case 'eur-pallet':

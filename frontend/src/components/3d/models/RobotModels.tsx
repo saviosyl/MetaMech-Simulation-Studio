@@ -486,6 +486,7 @@ export const CartesianRobotModel: React.FC<RobotProps> = ({ parameters, isSelect
 export const CobotModel: React.FC<RobotProps> = ({ parameters, isSelected, nodeId }) => {
   const j1Ref = useRef<THREE.Group>(null);
   const j2Ref = useRef<THREE.Group>(null);
+  const toolPitchRef = useRef<THREE.Group>(null);
 
   const reach = (parameters.reach || 850) / 1000;
   const bH = (parameters.baseHeight || 200) / 1000;
@@ -518,10 +519,14 @@ export const CobotModel: React.FC<RobotProps> = ({ parameters, isSelected, nodeI
       }
       if (j1Ref.current) j1Ref.current.rotation.z += (j1z - j1Ref.current.rotation.z) * 0.12;
       if (j2Ref.current) j2Ref.current.rotation.z += (j2z - j2Ref.current.rotation.z) * 0.12;
+      const downPhases = ['approach-pick', 'pick', 'approach-place', 'place'];
+      const targetToolPitch = downPhases.includes(simState.phase) ? -Math.PI / 2 : -Math.PI * 0.35;
+      if (toolPitchRef.current) toolPitchRef.current.rotation.x += (targetToolPitch - toolPitchRef.current.rotation.x) * 0.15;
     } else {
       const t = clock.getElapsedTime() * 0.4;
       if (j1Ref.current) j1Ref.current.rotation.z = Math.sin(t) * 0.35;
       if (j2Ref.current) j2Ref.current.rotation.z = Math.sin(t * 1.2 + 1) * 0.5 - 0.25;
+      if (toolPitchRef.current) toolPitchRef.current.rotation.x += (-Math.PI * 0.35 - toolPitchRef.current.rotation.x) * 0.08;
     }
   });
 
@@ -616,7 +621,7 @@ export const CobotModel: React.FC<RobotProps> = ({ parameters, isSelected, nodeI
                   </mesh>
 
                   {/* ── J4: Wrist rotation ── */}
-                  <group position={[0, 0.055, 0]}>
+                  <group ref={toolPitchRef} position={[0, 0.055, 0]}>
                     <mesh castShadow>
                       <cylinderGeometry args={[jointR * 0.45, jointR * 0.45, 0.02, 16]} />
                       <meshStandardMaterial {...matMechanical} emissive={em} />
@@ -642,6 +647,7 @@ export const CobotModel: React.FC<RobotProps> = ({ parameters, isSelected, nodeI
 export const Robot5AxisModel: React.FC<RobotProps> = ({ parameters, isSelected, nodeId }) => {
   const turretRef = useRef<THREE.Group>(null);
   const armRef = useRef<THREE.Group>(null);
+  const toolPitchRef = useRef<THREE.Group>(null);
 
   const reach = (parameters.reach || 1400) / 1000;
   const bH = (parameters.baseHeight || 400) / 1000;
@@ -674,9 +680,13 @@ export const Robot5AxisModel: React.FC<RobotProps> = ({ parameters, isSelected, 
       }
       if (turretRef.current) turretRef.current.rotation.y += (tY - turretRef.current.rotation.y) * 0.12;
       if (armRef.current) armRef.current.rotation.z += (aZ - armRef.current.rotation.z) * 0.12;
+      const downPhases = ['approach-pick', 'pick', 'approach-place', 'place'];
+      const targetToolPitch = downPhases.includes(simState.phase) ? -Math.PI / 2 : -Math.PI * 0.4;
+      if (toolPitchRef.current) toolPitchRef.current.rotation.x += (targetToolPitch - toolPitchRef.current.rotation.x) * 0.15;
     } else {
       if (turretRef.current) turretRef.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.35) * 0.7;
       if (armRef.current) armRef.current.rotation.z = Math.sin(clock.getElapsedTime() * 0.5 + 0.5) * 0.4 - 0.15;
+      if (toolPitchRef.current) toolPitchRef.current.rotation.x += (-Math.PI * 0.4 - toolPitchRef.current.rotation.x) * 0.08;
     }
   });
 
@@ -757,7 +767,7 @@ export const Robot5AxisModel: React.FC<RobotProps> = ({ parameters, isSelected, 
                 </mesh>
 
                 {/* ── J5: Wrist bend ── */}
-                <group position={[0, 0.04, 0]}>
+                <group ref={toolPitchRef} position={[0, 0.04, 0]}>
                   <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
                     <cylinderGeometry args={[0.035, 0.035, 0.045, 16]} />
                     <meshStandardMaterial {...matMechanical} emissive={em} />
