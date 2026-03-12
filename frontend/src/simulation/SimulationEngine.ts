@@ -1004,19 +1004,19 @@ export class SimulationEngine {
           }
         }
         if (!placedOnPallet) {
-          // Send to next node — could be a conveyor, buffer, or other target
+          // Place exactly at resolved outfeed target.
           placed.currentPosition = [...rState.placePosition];
-          placed.currentNodeId = node.id;
           placed.currentEdgeId = null;
           if (anchors.preferredOutEdge) {
+            // Transfer directly onto connected downstream node at its true input node.
             placed.state = 'at-node';
-            placed.pathPosition = 0;  // Start at beginning of destination
+            placed.currentNodeId = anchors.preferredOutEdge.to;
+            placed.pathPosition = 0;
             placed.conveyorEntryTime = null;
-            this.sendProductAlongEdge(placed, anchors.preferredOutEdge);
           } else {
-            // No output edge — place at robot's place position
+            // No output edge — keep at placed location as completed.
             placed.state = 'completed';
-            placed.currentPosition = [...rState.placePosition];
+            placed.currentNodeId = node.id;
           }
         }
         stats.throughput++;
@@ -1062,11 +1062,38 @@ export class SimulationEngine {
       node.position[2],
     ];
 
-    const pickPosition = pickPort ? getPortWorldPosition(pickPort.localPosition, node) : pickFallback;
-    const placePosition = placePort ? getPortWorldPosition(placePort.localPosition, node) : placeFallback;
-    const preferredOutEdge = placePort
-      ? (outEdges.find(e => e.fromPort === placePort!.id) || outEdges[0] || null)
-      : (outEdges[0] || null);
+    const pickPortWorld = pickPort ? getPortWorldPosition(pickPort.localPosition, node) : pickFallback;
+    const placePortWorld = placePort ? getPortWorldPosition(placePort.localPosition, node) : placeFallback;
+
+    // Use true connected node endpoints as source of truth where possible.
+    // This removes generic side-offset behavior and forces node-to-node transfer.
+    let pickPosition: [number, number, number] = pickPortWorld;
+    if (inEdges.length > 0) {
+      const edge = inEdges[0];
+      const fromNode = this.nodes.find(n => n.id === edge.from);
+      if (fromNode) {
+        const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters);
+        const fromPort = fromPorts.find(p => p.id === edge.fromPort) || fromPorts.find(p => p.type === 'output');
+        if (fromPort) {
+          pickPosition = getPortWorldPosition(fromPort.localPosition, fromNode);
+        }
+      }
+    }
+
+    let placePosition: [number, number, number] = placePortWorld;
+    let preferredOutEdge: ProcessEdge | null = null;
+    if (outEdges.length > 0) {
+      preferredOutEdge = outEdges[0];
+      const edge = preferredOutEdge;
+      const toNode = this.nodes.find(n => n.id === edge.to);
+      if (toNode) {
+        const toPorts = getConnectionPorts(toNode.type, toNode.parameters);
+        const toPort = toPorts.find(p => p.id === edge.toPort) || toPorts.find(p => p.type === 'input');
+        if (toPort) {
+          placePosition = getPortWorldPosition(toPort.localPosition, toNode);
+        }
+      }
+    }
 
     return { pickPosition, placePosition, preferredOutEdge };
   }
