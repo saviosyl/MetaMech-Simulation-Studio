@@ -268,8 +268,10 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
     const cosY = Math.cos(towerYaw);
     const sinY = Math.sin(towerYaw);
     const localFeet: [number, number][] = [
-      [-0.06, 0],
-      [0.06, 0],
+      [-0.09, -0.055],
+      [0.09, -0.055],
+      [-0.09, 0.055],
+      [0.09, 0.055],
     ];
     return localFeet.map(([lx, lz]) => [
       towerX + lx * cosY + lz * sinY,
@@ -277,22 +279,30 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
     ]);
   }, [towerX, towerZ, towerYaw]);
   const drumBaseFeet: [number, number][] = useMemo(() => {
-    const r = outerRadius * 0.82;
-    const a0 = towerAngle + Math.PI * 0.92;
-    const a1 = towerAngle + Math.PI * 1.08;
+    const a = towerAngle + Math.PI;
+    const radial: [number, number] = [Math.cos(a), Math.sin(a)];
+    const tangent: [number, number] = [-radial[1], radial[0]];
+    const c: [number, number] = [radial[0] * outerRadius * 0.8, radial[1] * outerRadius * 0.8];
+    const halfAlong = 0.17;
+    const halfAcross = Math.max(0.11, beltWidthM * 0.45);
     return [
-      [Math.cos(a0) * r, Math.sin(a0) * r],
-      [Math.cos(a1) * r, Math.sin(a1) * r],
+      [c[0] - radial[0] * halfAlong - tangent[0] * halfAcross, c[1] - radial[1] * halfAlong - tangent[1] * halfAcross],
+      [c[0] + radial[0] * halfAlong - tangent[0] * halfAcross, c[1] + radial[1] * halfAlong - tangent[1] * halfAcross],
+      [c[0] - radial[0] * halfAlong + tangent[0] * halfAcross, c[1] - radial[1] * halfAlong + tangent[1] * halfAcross],
+      [c[0] + radial[0] * halfAlong + tangent[0] * halfAcross, c[1] + radial[1] * halfAlong + tangent[1] * halfAcross],
     ];
-  }, [outerRadius, towerAngle]);
+  }, [outerRadius, towerAngle, beltWidthM]);
   const supportFeet = [...towerBaseFeet, ...drumBaseFeet] as [number, number][];
   const mainBaseBeamLength = Math.max(0.2, Math.sqrt(towerX * towerX + towerZ * towerZ));
   const mainBaseBeamYaw = Math.atan2(-towerZ, towerX);
-  const mainBaseBeamCenter: [number, number, number] = [towerX * 0.5, -bottomY + 0.09, towerZ * 0.5];
+  const mainBaseBeamCenter: [number, number, number] = [towerX * 0.5, -bottomY + 0.095, towerZ * 0.5];
   const legHeight = Math.max(0.01, bottomY);
-  const legRadius = 0.024;
-  const footPlateY = -bottomY - 0.007;
+  const legTubeW = 0.056;
+  const legTubeD = 0.044;
+  const footPlateY = -bottomY - 0.008;
   const floorContactY = -bottomY - 0.012;
+  const frameRailSpan = Math.max(0.24, outerRadius * 0.9);
+  const frameRailLength = Math.max(0.5, mainBaseBeamLength + 0.38);
 
   return (
     <group ref={groupRef} position={[0, bottomY, 0]}>
@@ -375,14 +385,31 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
           <boxGeometry args={[0.04, Math.max(0.01, effectiveHeight * 0.4), 0.04]} />
         </mesh>
 
-        {/* Connection arms to spiral — top */}
-        <mesh material={matTowerFrame} position={[0, effectiveHeight - 0.05, 0.15]} castShadow>
-          <boxGeometry args={[0.05, 0.05, 0.3]} />
+        {/* Connection yoke to spiral body */}
+        <mesh material={matTowerFrame} position={[0, effectiveHeight - 0.06, 0.145]} castShadow>
+          <boxGeometry args={[0.16, 0.04, 0.28]} />
         </mesh>
-        {/* Connection arm — bottom */}
-        <mesh material={matTowerFrame} position={[0, 0.05, 0.15]} castShadow>
-          <boxGeometry args={[0.05, 0.05, 0.3]} />
+        <mesh material={matTowerFrame} position={[0, 0.08, 0.145]} castShadow>
+          <boxGeometry args={[0.16, 0.04, 0.28]} />
         </mesh>
+        {/* Twin upper link arms */}
+        {[-1, 1].map((sx, i) => (
+          <mesh key={`top-link-${i}`} material={matTowerFrame} position={[sx * 0.055, effectiveHeight - 0.045, 0.22]} rotation={[-0.24, 0, 0]} castShadow>
+            <boxGeometry args={[0.03, 0.03, 0.18]} />
+          </mesh>
+        ))}
+        {/* Twin lower link arms */}
+        {[-1, 1].map((sx, i) => (
+          <mesh key={`bot-link-${i}`} material={matTowerFrame} position={[sx * 0.055, 0.09, 0.22]} rotation={[0.24, 0, 0]} castShadow>
+            <boxGeometry args={[0.03, 0.03, 0.18]} />
+          </mesh>
+        ))}
+        {/* Gusset plates */}
+        {[-1, 1].map((sx, i) => (
+          <mesh key={`yoke-gusset-${i}`} material={matBasePlate} position={[sx * 0.08, effectiveHeight * 0.5, 0.11]} rotation={[0, 0, sx * 0.12]} castShadow>
+            <boxGeometry args={[0.01, effectiveHeight * 0.9, 0.11]} />
+          </mesh>
+        ))}
 
         {/* ── Motor/Gearbox assembly at top ── */}
         <group position={[0, effectiveHeight + 0.12, 0]}>
@@ -458,20 +485,24 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
       {/* ═══ Base Frame — extends from ground (Y=0 in world = Y=-bottomY in group) to spiral bottom ═══ */}
       {showLegs && (
         <group>
-          {/* Support legs: two at drive tower base + two opposite under drum */}
+          {/* Support legs: fabricated square-tube columns on anchor plates */}
           {supportFeet.map(([lx, lz], i) => (
             <group key={`leg-${i}`}>
-              {/* Tubular leg post */}
+              {/* Square tube column */}
               <mesh material={matTowerFrame} position={[lx, -bottomY / 2, lz]} castShadow>
-                <cylinderGeometry args={[legRadius, legRadius * 1.05, legHeight, 14]} />
+                <boxGeometry args={[legTubeW, legHeight, legTubeD]} />
               </mesh>
-              {/* Clamp collar near lower section */}
+              {/* Head plate */}
+              <mesh material={matBasePlate} position={[lx, 0.01, lz]} castShadow>
+                <boxGeometry args={[legTubeW * 1.22, 0.012, legTubeD * 1.22]} />
+              </mesh>
+              {/* Stiffener collar */}
               <mesh material={matBasePlate} position={[lx, -bottomY * 0.72, lz]} castShadow>
-                <cylinderGeometry args={[legRadius * 1.18, legRadius * 1.18, 0.018, 12]} />
+                <boxGeometry args={[legTubeW * 1.18, 0.018, legTubeD * 1.18]} />
               </mesh>
               {/* Floor mounting plate */}
               <mesh material={matBasePlate} position={[lx, footPlateY, lz]} castShadow>
-                <boxGeometry args={[0.11, 0.014, 0.1]} />
+                <boxGeometry args={[0.12, 0.014, 0.11]} />
               </mesh>
               {/* Elastomer floor contact */}
               <mesh material={matRubber} position={[lx, floorContactY, lz]}>
@@ -490,14 +521,26 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
               ))}
             </group>
           ))}
-          {/* Primary lower base beam between drum and tower supports */}
-          <mesh material={matBasePlate} position={mainBaseBeamCenter} rotation={[0, mainBaseBeamYaw, 0]} castShadow>
-            <boxGeometry args={[mainBaseBeamLength, 0.05, 0.1]} />
-          </mesh>
-          {/* Cross beam tying the two drum-side feet */}
-          <mesh material={matBasePlate} position={[0, -bottomY + 0.085, 0]} rotation={[0, towerYaw + Math.PI / 2, 0]} castShadow>
-            <boxGeometry args={[outerRadius * 1.68, 0.045, 0.072]} />
-          </mesh>
+          {/* Welded ladder-style base frame */}
+          <group position={mainBaseBeamCenter} rotation={[0, mainBaseBeamYaw, 0]}>
+            <mesh material={matBasePlate} position={[0, 0, frameRailSpan / 2]} castShadow>
+              <boxGeometry args={[frameRailLength, 0.048, 0.072]} />
+            </mesh>
+            <mesh material={matBasePlate} position={[0, 0, -frameRailSpan / 2]} castShadow>
+              <boxGeometry args={[frameRailLength, 0.048, 0.072]} />
+            </mesh>
+            {[-0.44, 0, 0.44].map((s, i) => (
+              <mesh key={`base-cross-${i}`} material={matBasePlate} position={[frameRailLength * s, 0, 0]} castShadow>
+                <boxGeometry args={[0.08, 0.042, frameRailSpan + 0.02]} />
+              </mesh>
+            ))}
+            <mesh material={matTowerFrame} position={[0, 0.055, 0]} rotation={[0, 0, Math.PI / 18]} castShadow>
+              <boxGeometry args={[frameRailLength * 0.94, 0.018, 0.022]} />
+            </mesh>
+            <mesh material={matTowerFrame} position={[0, 0.055, 0]} rotation={[0, 0, -Math.PI / 18]} castShadow>
+              <boxGeometry args={[frameRailLength * 0.94, 0.018, 0.022]} />
+            </mesh>
+          </group>
           {/* Mid-height brace (if tall enough) */}
           {bottomY > 0.5 && (
             <>
@@ -508,11 +551,11 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
                 <mesh
                   key={`leg-strut-${i}`}
                   material={matTowerFrame}
-                  position={[lx * 0.5, -bottomY * 0.63, lz * 0.5]}
-                  rotation={[Math.PI * 0.13, Math.atan2(-lz, lx), 0]}
+                  position={[lx * 0.5, -bottomY * 0.6, lz * 0.5]}
+                  rotation={[Math.PI * 0.11, Math.atan2(-lz, lx), 0]}
                   castShadow
                 >
-                  <boxGeometry args={[Math.sqrt(lx * lx + lz * lz) * 1.02, 0.022, 0.022]} />
+                  <boxGeometry args={[Math.sqrt(lx * lx + lz * lz) * 0.92, 0.022, 0.022]} />
                 </mesh>
               ))}
             </>
