@@ -443,7 +443,7 @@ export class SimulationEngine {
     queuedProducts.sort((a, b) => b.pathPosition - a.pathPosition);
 
     // Check if downstream exit is blocked
-    const outEdges = this.getOutEdges(node.id);
+    const outEdges = this.getTransferOutEdges(node);
     let exitBlocked = outEdges.length === 0;
     if (!exitBlocked && outEdges.length > 0) {
       const nextNodeId = outEdges[0].to;
@@ -782,10 +782,10 @@ export class SimulationEngine {
 
       const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters);
       const toPorts = getConnectionPorts(toNode.type, toNode.parameters);
-      // Match port by id, or fall back to first port of matching type
-      const fp = fromPorts.find(p => p.id === edge.fromPort)
+      // Only accept type-correct endpoints so stale/mismatched port ids don't break transfer.
+      const fp = fromPorts.find(p => p.id === edge.fromPort && p.type === 'output')
         || fromPorts.find(p => p.type === 'output');
-      const tp = toPorts.find(p => p.id === edge.toPort)
+      const tp = toPorts.find(p => p.id === edge.toPort && p.type === 'input')
         || toPorts.find(p => p.type === 'input');
       if (!fp || !tp) continue;
 
@@ -1720,6 +1720,24 @@ export class SimulationEngine {
 
   private getOutEdges(nodeId: string): ProcessEdge[] {
     return this.edges.filter(e => e.from === nodeId);
+  }
+
+  /**
+   * Returns transfer-capable out edges for a node.
+   * Edges authored against stale port ids are kept as fallback, but edges that
+   * explicitly reference an input port are deprioritized when better options exist.
+   */
+  private getTransferOutEdges(node: ProcessNode): ProcessEdge[] {
+    const outEdges = this.getOutEdges(node.id);
+    if (outEdges.length <= 1) return outEdges;
+
+    const ports = getConnectionPorts(node.type, node.parameters);
+    const portTypeById = new Map(ports.map(p => [p.id, p.type] as const));
+    const preferred = outEdges.filter(edge => {
+      if (!edge.fromPort) return true;
+      return portTypeById.get(edge.fromPort) !== 'input';
+    });
+    return preferred.length > 0 ? preferred : outEdges;
   }
 
   getProducts(): Product[] {

@@ -1,10 +1,11 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { Settings, Move3D, RotateCw, Maximize, Palette, Sliders, ChevronLeft, ChevronRight, Layers, ChevronDown, ChevronUp, Eye, EyeOff, Zap, Radio } from 'lucide-react';
-import { useEditorStore } from '../../store/editorStore';
+import { getConnectionPorts, useEditorStore } from '../../store/editorStore';
 import { getModuleDefinition } from '../../lib/moduleLibrary';
 import { getAssetById, ParametricAssetDef } from '../../lib/assetManifest';
 import { simulationEngine } from '../../simulation/SimulationEngine';
 import { mToMm, mmToM, radToDeg, degToRad } from '../../utils/units';
+import { getPortWorldPosition } from '../../lib/nodeTransform';
 import BOMPanel from './BOMPanel';
 import { generateBOM } from '../../lib/bom/bomEngine';
 
@@ -31,6 +32,7 @@ const Section: React.FC<{ title: string; icon?: any; children: React.ReactNode; 
 const inputStyle: React.CSSProperties = { width: '100%', padding: '6px 10px', fontSize: 12, background: 'var(--mm-bg-input)', border: '1px solid var(--mm-border)', borderRadius: 6, color: 'var(--mm-text-primary)', outline: 'none' };
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: 'var(--mm-text-tertiary)', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' };
 const fieldGap: React.CSSProperties = { marginBottom: 12 };
+const LENGTH_ANCHORED_TYPES = new Set(['conveyor', 'belt-conveyor', 'roller-conveyor', 'incline-conveyor', 'modular-conveyor-straight']);
 
 /* ─── Parameter grouper ─── */
 function groupParams(params: [string, any][]) {
@@ -81,6 +83,75 @@ const RightPanel: React.FC = () => {
 
   const handleParam = (k: string, v: any) => {
     if (!selectedObject || !selectedObjectType) return;
+
+    // Keep conveyor infeed anchored while changing length, then carry downstream
+    // connected nodes by the resulting outfeed delta to preserve node continuity.
+    if (selectedObjectType === 'process' && k === 'length' && Number.isFinite(v)) {
+      const state = useEditorStore.getState();
+      const node = state.processNodes.find(n => n.id === selectedObject.id);
+      if (node && LENGTH_ANCHORED_TYPES.has(node.type)) {
+        const nextParameters = { ...node.parameters, [k]: v };
+        const oldPorts = getConnectionPorts(node.type, node.parameters, node.assetId);
+        const nextPorts = getConnectionPorts(node.type, nextParameters, node.assetId);
+        const oldIn = oldPorts.find(p => p.type === 'input');
+        const oldOut = oldPorts.find(p => p.type === 'output');
+        const nextIn = nextPorts.find(p => p.type === 'input');
+        const nextOut = nextPorts.find(p => p.type === 'output');
+
+        if (oldIn && oldOut && nextIn && nextOut) {
+          const inBefore = getPortWorldPosition(oldIn.localPosition, node);
+          const outBefore = getPortWorldPosition(oldOut.localPosition, node);
+
+          const previewNode = { ...node, parameters: nextParameters };
+          const inAfter = getPortWorldPosition(nextIn.localPosition, previewNode);
+          const anchorDelta: [number, number, number] = [
+            inBefore[0] - inAfter[0],
+            inBefore[1] - inAfter[1],
+            inBefore[2] - inAfter[2],
+          ];
+          const anchoredPosition: [number, number, number] = [
+            node.position[0] + anchorDelta[0],
+            node.position[1] + anchorDelta[1],
+            node.position[2] + anchorDelta[2],
+          ];
+          const anchoredNode = { ...previewNode, position: anchoredPosition };
+          const outAfter = getPortWorldPosition(nextOut.localPosition, anchoredNode);
+          const outDelta: [number, number, number] = [
+            outAfter[0] - outBefore[0],
+            outAfter[1] - outBefore[1],
+            outAfter[2] - outBefore[2],
+          ];
+
+          updateObject(node.id, 'process', { parameters: nextParameters, position: anchoredPosition });
+
+          const moved = new Set<string>();
+          const outputPortIds = new Set(nextPorts.filter(p => p.type === 'output').map(p => p.id));
+          const deltaMag = Math.abs(outDelta[0]) + Math.abs(outDelta[1]) + Math.abs(outDelta[2]);
+          if (deltaMag > 1e-6) {
+            for (const edge of state.edges) {
+              if (edge.from !== node.id) continue;
+              if (edge.fromPort && !outputPortIds.has(edge.fromPort)) continue;
+              if (moved.has(edge.to)) continue;
+              const downstream = state.processNodes.find(n => n.id === edge.to);
+              if (!downstream) continue;
+              moved.add(edge.to);
+              updateObject(downstream.id, 'process', {
+                position: [
+                  downstream.position[0] + outDelta[0],
+                  downstream.position[1] + outDelta[1],
+                  downstream.position[2] + outDelta[2],
+                ],
+              });
+            }
+          }
+          return;
+        }
+
+        updateObject(node.id, 'process', { parameters: nextParameters });
+        return;
+      }
+    }
+
     updateObject(selectedObject.id, selectedObjectType, { parameters: { ...selectedObject.parameters, [k]: v } });
   };
 

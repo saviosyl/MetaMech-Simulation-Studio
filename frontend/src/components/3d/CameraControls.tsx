@@ -10,6 +10,7 @@ const _up = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
 const _offset = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
+const _selectedPos = new THREE.Vector3();
 
 const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }) => {
   const { camera } = useThree();
@@ -105,6 +106,8 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef
     if (!hasInput) return;
     if (!controls) return;
 
+    const cfg = spaceMouse.config;
+
     // Get camera-relative directions
     camera.getWorldDirection(_fwd);
     _right.crossVectors(_fwd, camera.up).normalize();
@@ -114,9 +117,21 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef
     _offset.copy(camera.position).sub(controls.target);
     const dist = _offset.length();
 
+    // Prefer selected object as a rotation center during pure orbit gestures.
+    if (selectedObjectId && (Math.abs(tx) + Math.abs(ty)) < 0.03 && (Math.abs(rx) + Math.abs(rz)) > 0.03) {
+      const selected =
+        processNodes.find(n => n.id === selectedObjectId) ||
+        environmentAssets.find(a => a.id === selectedObjectId) ||
+        actors.find(a => a.id === selectedObjectId);
+      if (selected) {
+        _selectedPos.set(selected.position[0], selected.position[1], selected.position[2]);
+        controls.target.lerp(_selectedPos, Math.min(1, dt * 3.5));
+      }
+    }
+
     // ── PAN: slide left/right (tx), up/down (ty) ──
     if (Math.abs(tx) > 0.005 || Math.abs(ty) > 0.005) {
-      const panSpeed = dt * dist * 0.8;  // proportional to distance for natural feel
+      const panSpeed = dt * dist * 0.85 * cfg.translateSpeed;  // proportional to distance
       _v.set(0, 0, 0);
       _v.addScaledVector(_right, -tx * panSpeed);   // negative: push right = pan right
       _v.addScaledVector(_up, ty * panSpeed);
@@ -126,7 +141,7 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef
 
     // ── ZOOM: push/pull (tz) ──
     if (Math.abs(tz) > 0.005) {
-      const zoomSpeed = dt * dist * 1.2;  // proportional zoom
+      const zoomSpeed = dt * dist * 1.1 * cfg.zoomSpeed;
       const zoomAmount = tz * zoomSpeed;
       // Move camera along the camera→target direction
       _offset.copy(camera.position).sub(controls.target);
@@ -138,7 +153,7 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef
     // ── ORBIT HORIZONTAL: twist/yaw (rZ) — twist left = orbit left ──
     if (Math.abs(rz) > 0.005) {
       _offset.copy(camera.position).sub(controls.target);
-      const yawAngle = rz * dt * 4.0;  // strong, direct response
+      const yawAngle = rz * dt * 3.0 * cfg.rotateSpeed;
       _offset.applyAxisAngle(_yAxis, yawAngle);
       camera.position.copy(controls.target).add(_offset);
     }
@@ -146,7 +161,7 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef
     // ── ORBIT VERTICAL: tilt/pitch (rX) — tilt forward = orbit down ──
     if (Math.abs(rx) > 0.005) {
       _offset.copy(camera.position).sub(controls.target);
-      const pitchAngle = rx * dt * 3.0;
+      const pitchAngle = rx * dt * 2.5 * cfg.rotateSpeed;
       _offset.applyAxisAngle(_right, pitchAngle);
       // Prevent flipping past poles
       const normalized = _offset.clone().normalize();
@@ -158,6 +173,8 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef
     // ── ROLL (rY) — optional, used for camera roll if needed ──
     // Most 3D apps ignore roll for orbit, so we skip it
 
+    // Stabilize horizon to avoid subtle long-session roll drift.
+    camera.up.lerp(_yAxis, Math.min(1, dt * 4));
     camera.lookAt(controls.target);
     controls.update();
   });
