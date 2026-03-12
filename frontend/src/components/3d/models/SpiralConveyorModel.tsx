@@ -601,10 +601,6 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
             </mesh>
           </group>
         ))}
-        {/* Enclosed return slot (remove exposed protruding belt strip) */}
-        <mesh material={matRubber} position={[0.2, 0.062, 0]}>
-          <boxGeometry args={[0.24, 0.007, beltWidthM * 0.52]} />
-        </mesh>
         {/* Side guards with visible profile */}
         {[-1, 1].map((sz, i) => (
           <mesh key={`ret-guard-${i}`} material={matGuardCover} position={[0.2, 0.102, sz * (beltWidthM * 0.45)]} castShadow>
