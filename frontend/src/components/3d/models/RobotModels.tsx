@@ -487,6 +487,7 @@ export const CobotModel: React.FC<RobotProps> = ({ parameters, isSelected, nodeI
   const j1Ref = useRef<THREE.Group>(null);
   const j2Ref = useRef<THREE.Group>(null);
   const toolPitchRef = useRef<THREE.Group>(null);
+  const nodeRotY = useEditorStore(s => (nodeId ? s.processNodes.find(n => n.id === nodeId)?.rotation?.[1] : 0) ?? 0);
 
   const reach = (parameters.reach || 850) / 1000;
   const bH = (parameters.baseHeight || 200) / 1000;
@@ -503,28 +504,24 @@ export const CobotModel: React.FC<RobotProps> = ({ parameters, isSelected, nodeI
 
   useFrame(({ clock }) => {
     if (simState) {
-      const p = simState.phaseProgress;
-      const ease = p * p * (3 - 2 * p);
-      let j1z = 0, j2z = -0.25;
-      switch (simState.phase) {
-        case 'idle': j1z = 0; j2z = -0.25; break;
-        case 'approach-pick': j1z = 0.3 * ease; j2z = -0.25 - 0.4 * ease; break;
-        case 'pick': j1z = 0.3; j2z = -0.65; break;
-        case 'retract-pick': j1z = 0.3 - 0.15 * ease; j2z = -0.65 + 0.2 * ease; break;
-        case 'move-to-place': j1z = 0.15 - 0.45 * ease; j2z = -0.45; break;
-        case 'approach-place': j1z = -0.3; j2z = -0.45 - 0.2 * ease; break;
-        case 'place': j1z = -0.3; j2z = -0.65; break;
-        case 'retract-place': j1z = -0.3; j2z = -0.65 + 0.2 * ease; break;
-        case 'return': j1z = -0.3 * (1 - ease); j2z = -0.45 * (1 - ease) - 0.25 * ease; break;
+      const sm = 0.18;
+      const yawTarget = (simState.j1 || 0) - nodeRotY;
+      const shoulderTarget = (simState.j2 || 0.3) - Math.PI / 2;
+      const elbowTarget = simState.j3 || -0.4;
+      if (j1Ref.current) {
+        j1Ref.current.rotation.y += (yawTarget - j1Ref.current.rotation.y) * sm;
+        j1Ref.current.rotation.z += (shoulderTarget - j1Ref.current.rotation.z) * sm;
       }
-      if (j1Ref.current) j1Ref.current.rotation.z += (j1z - j1Ref.current.rotation.z) * 0.12;
-      if (j2Ref.current) j2Ref.current.rotation.z += (j2z - j2Ref.current.rotation.z) * 0.12;
+      if (j2Ref.current) j2Ref.current.rotation.z += (elbowTarget - j2Ref.current.rotation.z) * sm;
       const downPhases = ['approach-pick', 'pick', 'approach-place', 'place'];
       const targetToolPitch = downPhases.includes(simState.phase) ? -Math.PI / 2 : -Math.PI * 0.35;
       if (toolPitchRef.current) toolPitchRef.current.rotation.x += (targetToolPitch - toolPitchRef.current.rotation.x) * 0.15;
     } else {
       const t = clock.getElapsedTime() * 0.4;
-      if (j1Ref.current) j1Ref.current.rotation.z = Math.sin(t) * 0.35;
+      if (j1Ref.current) {
+        j1Ref.current.rotation.y = Math.sin(t * 0.7) * 0.5;
+        j1Ref.current.rotation.z = Math.sin(t) * 0.35;
+      }
       if (j2Ref.current) j2Ref.current.rotation.z = Math.sin(t * 1.2 + 1) * 0.5 - 0.25;
       if (toolPitchRef.current) toolPitchRef.current.rotation.x += (-Math.PI * 0.35 - toolPitchRef.current.rotation.x) * 0.08;
     }
@@ -648,6 +645,7 @@ export const Robot5AxisModel: React.FC<RobotProps> = ({ parameters, isSelected, 
   const turretRef = useRef<THREE.Group>(null);
   const armRef = useRef<THREE.Group>(null);
   const toolPitchRef = useRef<THREE.Group>(null);
+  const nodeRotY = useEditorStore(s => (nodeId ? s.processNodes.find(n => n.id === nodeId)?.rotation?.[1] : 0) ?? 0);
 
   const reach = (parameters.reach || 1400) / 1000;
   const bH = (parameters.baseHeight || 400) / 1000;
@@ -664,22 +662,11 @@ export const Robot5AxisModel: React.FC<RobotProps> = ({ parameters, isSelected, 
 
   useFrame(({ clock }) => {
     if (simState) {
-      const p = simState.phaseProgress;
-      const ease = p * p * (3 - 2 * p);
-      let tY = 0, aZ = -0.15;
-      switch (simState.phase) {
-        case 'idle': tY = 0; aZ = -0.15; break;
-        case 'approach-pick': tY = -0.5 * ease; aZ = -0.15 - 0.4 * ease; break;
-        case 'pick': tY = -0.5; aZ = -0.55; break;
-        case 'retract-pick': tY = -0.5; aZ = -0.55 + 0.2 * ease; break;
-        case 'move-to-place': tY = -0.5 + 1.0 * ease; aZ = -0.35; break;
-        case 'approach-place': tY = 0.5; aZ = -0.35 - 0.2 * ease; break;
-        case 'place': tY = 0.5; aZ = -0.55; break;
-        case 'retract-place': tY = 0.5; aZ = -0.55 + 0.2 * ease; break;
-        case 'return': tY = 0.5 * (1 - ease); aZ = -0.35 * (1 - ease) - 0.15 * ease; break;
-      }
-      if (turretRef.current) turretRef.current.rotation.y += (tY - turretRef.current.rotation.y) * 0.12;
-      if (armRef.current) armRef.current.rotation.z += (aZ - armRef.current.rotation.z) * 0.12;
+      const sm = 0.16;
+      const yawTarget = (simState.j1 || 0) - nodeRotY;
+      const armTarget = (simState.j2 || 0.3) + (simState.j3 || -0.6) * 0.55 - Math.PI / 2;
+      if (turretRef.current) turretRef.current.rotation.y += (yawTarget - turretRef.current.rotation.y) * sm;
+      if (armRef.current) armRef.current.rotation.z += (armTarget - armRef.current.rotation.z) * sm;
       const downPhases = ['approach-pick', 'pick', 'approach-place', 'place'];
       const targetToolPitch = downPhases.includes(simState.phase) ? -Math.PI / 2 : -Math.PI * 0.4;
       if (toolPitchRef.current) toolPitchRef.current.rotation.x += (targetToolPitch - toolPitchRef.current.rotation.x) * 0.15;
@@ -819,12 +806,14 @@ export const Robot6AxisModel: React.FC<RobotProps> = ({ parameters, isSelected, 
   const foreW = Math.max(0.06, reach * 0.055);
 
   const simState = useSimulationPose(nodeId);
+  const nodeRotY = useEditorStore(s => (nodeId ? s.processNodes.find(n => n.id === nodeId)?.rotation?.[1] : 0) ?? 0);
 
   useFrame(({ clock }) => {
     if (simState && simState.phase !== 'idle') {
       // ─── Simulation-driven: IK joint angles from state ───
       const sm = 0.18; // smoothing factor (higher = snappier)
-      if (j1Ref.current) j1Ref.current.rotation.y += ((simState.j1 || 0) - j1Ref.current.rotation.y) * sm;
+      const yawTarget = (simState.j1 || 0) - nodeRotY;
+      if (j1Ref.current) j1Ref.current.rotation.y += (yawTarget - j1Ref.current.rotation.y) * sm;
       if (j2Ref.current) j2Ref.current.rotation.z += ((simState.j2 || 0.3) - j2Ref.current.rotation.z) * sm;
       if (j3Ref.current) j3Ref.current.rotation.z += ((simState.j3 || -0.6) - j3Ref.current.rotation.z) * sm;
       if (j4Ref.current) j4Ref.current.rotation.x += ((simState.j4 || 0) - j4Ref.current.rotation.x) * sm;
