@@ -103,16 +103,9 @@ export class SimulationEngine {
           homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
         };
         const rState = createRobotState(config);
-        const reach = (node.parameters.reach || node.parameters.reachX || 1400) / 1000;
-        const ports = getConnectionPorts(node.type, node.parameters);
-        const pickPort = ports.find(p => p.id === 'pick') || ports.find(p => p.type === 'input');
-        const placePort = ports.find(p => p.id === 'place') || ports.find(p => p.type === 'output');
-        rState.pickPosition = pickPort
-          ? getPortWorldPosition(pickPort.localPosition, node)
-          : [node.position[0] - reach * 0.4, node.position[1] + (node.parameters.pickHeight || 800) / 1000, node.position[2]];
-        rState.placePosition = placePort
-          ? getPortWorldPosition(placePort.localPosition, node)
-          : [node.position[0] + reach * 0.4, node.position[1] + (node.parameters.placeHeight || 800) / 1000, node.position[2]];
+        const anchors = this.resolveRobotAnchors(node);
+        rState.pickPosition = anchors.pickPosition;
+        rState.placePosition = anchors.placePosition;
 
         this.robotStates.set(node.id, rState);
       }
@@ -920,23 +913,10 @@ export class SimulationEngine {
       homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
     };
 
-    // Keep robot pick/place anchors bound to the robot's real infeed/outfeed ports.
-    const ports = getConnectionPorts(node.type, node.parameters);
-    const pickPort = ports.find(p => p.id === 'pick') || ports.find(p => p.type === 'input');
-    const placePort = ports.find(p => p.id === 'place') || ports.find(p => p.type === 'output');
-    const reach = (node.parameters.reach || node.parameters.reachX || 1400) / 1000;
-    const pickFallback: [number, number, number] = [
-      node.position[0] - reach * 0.4,
-      node.position[1] + (node.parameters.pickHeight || 800) / 1000,
-      node.position[2],
-    ];
-    const placeFallback: [number, number, number] = [
-      node.position[0] + reach * 0.4,
-      node.position[1] + (node.parameters.placeHeight || 800) / 1000,
-      node.position[2],
-    ];
-    rState.pickPosition = pickPort ? getPortWorldPosition(pickPort.localPosition, node) : pickFallback;
-    rState.placePosition = placePort ? getPortWorldPosition(placePort.localPosition, node) : placeFallback;
+    // Resolve flow-aware pick/place anchors from actual connected edges and robot ports.
+    const anchors = this.resolveRobotAnchors(node);
+    rState.pickPosition = anchors.pickPosition;
+    rState.placePosition = anchors.placePosition;
 
     // Find available product at pick source — accept arriving products into queue
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
@@ -1028,11 +1008,11 @@ export class SimulationEngine {
           placed.currentPosition = [...rState.placePosition];
           placed.currentNodeId = node.id;
           placed.currentEdgeId = null;
-          if (outEdges.length > 0) {
+          if (anchors.preferredOutEdge) {
             placed.state = 'at-node';
             placed.pathPosition = 0;  // Start at beginning of destination
             placed.conveyorEntryTime = null;
-            this.sendProductAlongEdge(placed, outEdges[0]);
+            this.sendProductAlongEdge(placed, anchors.preferredOutEdge);
           } else {
             // No output edge — place at robot's place position
             placed.state = 'completed';
@@ -1044,6 +1024,51 @@ export class SimulationEngine {
     }
 
     if (rState.phase !== 'idle') stats.busyTime += dt;
+  }
+
+  /** Resolve robot pick/place anchors from actual edge-connected robot ports. */
+  private resolveRobotAnchors(node: ProcessNode): {
+    pickPosition: [number, number, number];
+    placePosition: [number, number, number];
+    preferredOutEdge: ProcessEdge | null;
+  } {
+    const ports = getConnectionPorts(node.type, node.parameters);
+    const inEdges = this.edges.filter(e => e.to === node.id);
+    const outEdges = this.edges.filter(e => e.from === node.id);
+
+    let pickPort = ports.find(p => p.id === 'pick') || ports.find(p => p.type === 'input');
+    if (inEdges.length > 0) {
+      const inEdge = inEdges.find(e => ports.some(p => p.id === e.toPort)) || inEdges[0];
+      const edgePort = ports.find(p => p.id === inEdge.toPort);
+      if (edgePort) pickPort = edgePort;
+    }
+
+    let placePort = ports.find(p => p.id === 'place') || ports.find(p => p.type === 'output');
+    if (outEdges.length > 0) {
+      const outEdge = outEdges.find(e => ports.some(p => p.id === e.fromPort)) || outEdges[0];
+      const edgePort = ports.find(p => p.id === outEdge.fromPort);
+      if (edgePort) placePort = edgePort;
+    }
+
+    const reach = (node.parameters.reach || node.parameters.reachX || 1400) / 1000;
+    const pickFallback: [number, number, number] = [
+      node.position[0] - reach * 0.4,
+      node.position[1] + (node.parameters.pickHeight || 800) / 1000,
+      node.position[2],
+    ];
+    const placeFallback: [number, number, number] = [
+      node.position[0] + reach * 0.4,
+      node.position[1] + (node.parameters.placeHeight || 800) / 1000,
+      node.position[2],
+    ];
+
+    const pickPosition = pickPort ? getPortWorldPosition(pickPort.localPosition, node) : pickFallback;
+    const placePosition = placePort ? getPortWorldPosition(placePort.localPosition, node) : placeFallback;
+    const preferredOutEdge = placePort
+      ? (outEdges.find(e => e.fromPort === placePort!.id) || outEdges[0] || null)
+      : (outEdges[0] || null);
+
+    return { pickPosition, placePosition, preferredOutEdge };
   }
 
   // ─── Stopper: physically blocks products — reads sensor signals for triggers ───
