@@ -21,16 +21,34 @@ export function wallBuilder(params: Record<string, any>): BuilderResult {
   // Industrial wall color
   const wallColor = params.wallColor || '#d4d4d4';
   const matOpts: any = { color: wallColor, metalness: 0.15, roughness: 0.7 };
+  const imageMode: 'pattern' | 'decal' = params.wallImageMode === 'decal' ? 'decal' : 'pattern';
+  const imageOpacityRaw = Number(params.wallImageOpacity ?? 1);
+  const imageOpacity = Number.isFinite(imageOpacityRaw)
+    ? Math.max(0, Math.min(1, imageOpacityRaw))
+    : 1;
+  let wallImageTex: THREE.Texture | null = null;
 
   // Texture support
   if (params.textureUrl) {
     try {
-      const tex = new THREE.TextureLoader().load(params.textureUrl);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.wrapS = THREE.RepeatWrapping;
-      tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(w, h);
-      matOpts.map = tex;
+      wallImageTex = new THREE.TextureLoader().load(params.textureUrl);
+      wallImageTex.colorSpace = THREE.SRGBColorSpace;
+      if (imageMode === 'pattern') {
+        // Pattern mode: tile across the wall (legacy behavior with explicit repeat controls).
+        wallImageTex.wrapS = THREE.RepeatWrapping;
+        wallImageTex.wrapT = THREE.RepeatWrapping;
+        const repeatX = Number(params.wallPatternRepeatX ?? w);
+        const repeatY = Number(params.wallPatternRepeatY ?? h);
+        wallImageTex.repeat.set(
+          Number.isFinite(repeatX) ? Math.max(0.1, repeatX) : w,
+          Number.isFinite(repeatY) ? Math.max(0.1, repeatY) : h,
+        );
+        matOpts.map = wallImageTex;
+        if (imageOpacity < 0.999) {
+          matOpts.transparent = true;
+          matOpts.opacity = imageOpacity;
+        }
+      }
     } catch (_) { /* fallback to color */ }
   }
 
@@ -42,6 +60,45 @@ export function wallBuilder(params: Record<string, any>): BuilderResult {
   const numPanels = Math.floor(h / panelH);
   // Main wall body
   addMesh(group, new THREE.BoxGeometry(w, h, t), mat, [0, h / 2, 0]);
+
+  // Single-logo mode: place one decal plane on the front face (no tiling).
+  if (wallImageTex && imageMode === 'decal') {
+    wallImageTex.wrapS = THREE.ClampToEdgeWrapping;
+    wallImageTex.wrapT = THREE.ClampToEdgeWrapping;
+    wallImageTex.repeat.set(1, 1);
+    wallImageTex.offset.set(0, 0);
+
+    const logoWidth = Math.max(0.05, (Number(params.wallLogoWidth ?? 1200) || 1200) / 1000);
+    let logoHeight = Math.max(0.05, (Number(params.wallLogoHeight ?? 600) || 600) / 1000);
+    const keepAspect = params.wallLogoKeepAspect ?? true;
+    const img = wallImageTex.image as { width?: number; height?: number } | undefined;
+    if (keepAspect && img?.width && img?.height && img.width > 0 && img.height > 0) {
+      logoHeight = logoWidth * (img.height / img.width);
+    }
+
+    const offsetX = (Number(params.wallLogoOffsetX ?? 0) || 0) / 1000;
+    const offsetY = (Number(params.wallLogoOffsetY ?? 0) || 0) / 1000;
+    const rotationDeg = Number(params.wallLogoRotation ?? 0) || 0;
+    const rotationRad = (rotationDeg * Math.PI) / 180;
+
+    const decalMat = new THREE.MeshStandardMaterial({
+      map: wallImageTex,
+      color: '#ffffff',
+      metalness: 0.05,
+      roughness: 0.7,
+      transparent: true,
+      opacity: imageOpacity,
+      alphaTest: 0.01,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const decal = new THREE.Mesh(new THREE.PlaneGeometry(logoWidth, logoHeight), decalMat);
+    decal.position.set(offsetX, h / 2 + offsetY, t / 2 + 0.012);
+    decal.rotation.set(0, 0, rotationRad);
+    decal.castShadow = false;
+    decal.receiveShadow = false;
+    group.add(decal);
+  }
 
   // Panel groove lines (subtle industrial look)
   const grooveMat = new THREE.MeshStandardMaterial({ color: '#999999', metalness: 0.3, roughness: 0.5 });

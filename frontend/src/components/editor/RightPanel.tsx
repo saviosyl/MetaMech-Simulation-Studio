@@ -40,7 +40,12 @@ function groupParams(params: [string, any][]) {
   const geoK = ['length','width','height','radius','angle','angleDeg','bendAngle','pitch','turns','drumDiameter','supportSpacing','conveyorType','driveType','showSupports','showLegs','showSideGuides','sideGuideHeight','adjustableFeetEnabled','footAdjustmentMm','supportType','legCount','ceilingHeight','hangerStyle','hangerCrossbar'];
   const simK = ['beltSpeed','speed','spawnRate','ppm','processTime','capacity','cycleTime','maxItems','productColor','productType','productLength','productWidth','productHeight','speedFactor','pickHeight','placeHeight','approachHeight','pickDelay','placeDelay','accumulationMode','accumulationZones'];
   const logK = ['stopperMode','stopperTag','triggerSensorTag','secondarySensorTag','stopCondition','releaseCondition','releaseDelay','stopCount','pusherMode','holdTime','releaseCount','openDuration','sensorTag','sensorType','detectColor','detectType','detectSize','colorFilter','typeFilter','cooldown','debounce','dwellTimeThreshold','onDwellEvent','showBeam','mountPosition','mountSide','mountHeight','parentConveyorId','lateralOffset','engaged','enabled','targetColor','targetProductType','routeBy','routeValues','stroke','side','runMode','blockedBySensorTag','dwellBlockThreshold','resumeDelay'];
-  const appK = ['beltColor','frameColor','color','materialColor','finish','wallColor','textureUrl','productTextureUrl','productLabel','wallLabel','labelFontSize','labelColor'];
+  const appK = [
+    'beltColor','frameColor','color','materialColor','finish',
+    'wallColor','textureUrl','wallImageMode','wallImageOpacity','wallPatternRepeat',
+    'wallLogoWidth','wallLogoHeight','wallLogoKeepAspect','wallLogoOffsetX','wallLogoOffsetY','wallLogoRotation',
+    'productTextureUrl','productLabel','wallLabel','labelFontSize','labelColor',
+  ];
   for (const [k, d] of params) {
     const kl = k.toLowerCase();
     if (geoK.some(g => kl.includes(g.toLowerCase()))) geo.push([k,d]);
