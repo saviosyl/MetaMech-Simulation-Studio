@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { simulationEngine } from '../../simulation/SimulationEngine';
-import { isAccessoryType } from '../../lib/accessorySnap';
+import { shouldValidateFlowConnectivity } from '../../lib/validation/connectivityFilter';
 
 type Tab = 'overview' | 'flow' | 'kpi' | 'validation';
 
@@ -103,7 +103,11 @@ function validateScene(nodes: any[], edges: any[]): ValidationIssue[] {
   // Disconnected nodes
   const connectedIds = new Set<string>();
   edges.forEach((e: any) => { connectedIds.add(e.from); connectedIds.add(e.to); });
-  const disconnected = nodes.filter((n: any) => !connectedIds.has(n.id) && !['source', 'sink'].includes(n.type) && !isAccessoryType(n.type));
+  const disconnected = nodes.filter((n: any) =>
+    !connectedIds.has(n.id) &&
+    !['source', 'sink'].includes(n.type) &&
+    shouldValidateFlowConnectivity(n.type),
+  );
   for (const n of disconnected) {
     issues.push({ id: `disc-${n.id}`, severity: 'warning', title: `"${n.name}" not connected`, detail: 'This node has no edges — products cannot reach it.', nodeId: n.id });
   }

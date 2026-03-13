@@ -15,6 +15,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
+import { shouldValidateFlowConnectivity } from '../../lib/validation/connectivityFilter';
 
 type Severity = 'error' | 'warning' | 'info' | 'success';
 
@@ -63,27 +64,9 @@ function validateScene(nodes: any[], edges: any[]): ValidationIssue[] {
     });
   }
 
-  // Check: disconnected nodes (no edges in or out)
-  // Decorative / environment assets don't need flow edges — skip them
-  const DECORATIVE_TYPES = new Set([
-    // Environment
-    'wall', 'door', 'window', 'stairs', 'pallet-rack', 'safety-rail', 'warehouse-shell',
-    'fence', 'fence-gate', 'bollard', 'operator-station', 'electrical-cabinet',
-    'tower-light', 'hmi-stand', 'machine-enclosure', 'floor-zone', 'pallet-stack',
-    'pallet', 'cardboard-box', 'floor-marking', 'floor', 'stretch-wrapper',
-    'guard-partition', 'light-curtain',
-    // Pallets (placed as scene objects, not flow nodes)
-    'eur-pallet', 'standard-pallet', 'custom-pallet',
-    // Actors
-    'operator', 'operator-1', 'operator-2', 'operator-3', 'engineer',
-    'forklift', 'agv', 'pallet-truck',
-    // Static models
-    'forklift-static', 'agv-static', 'worker-static', 'pallet-truck-static',
-    'pallet-static', 'cardboard-box-static',
-  ]);
-
+  // Check: disconnected flow nodes (exclude non-process/static/environment assets)
   for (const node of nodes) {
-    if (DECORATIVE_TYPES.has(node.type)) continue;
+    if (!shouldValidateFlowConnectivity(node.type)) continue;
 
     const hasIn = edges.some(e => e.to === node.id);
     const hasOut = edges.some(e => e.from === node.id);
