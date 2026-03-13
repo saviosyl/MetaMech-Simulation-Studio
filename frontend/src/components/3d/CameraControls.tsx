@@ -17,6 +17,8 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
   const {
     cameraTargetPosition,
     cameraTargetLookAt,
+    cameraTargetUp,
+    cameraMode,
     focusRequest,
     selectedObjectId,
     processNodes,
@@ -27,6 +29,7 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
   const animating = useRef(false);
   const targetPos = useRef(new THREE.Vector3());
   const targetLookAt = useRef(new THREE.Vector3());
+  const targetUp = useRef(new THREE.Vector3(0, 1, 0));
   const lastFocusRequest = useRef(0);
   const loggedOnce = useRef(false);
 
@@ -35,9 +38,14 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
     if (cameraTargetPosition && cameraTargetLookAt) {
       targetPos.current.set(...cameraTargetPosition);
       targetLookAt.current.set(...cameraTargetLookAt);
+      if (cameraTargetUp) {
+        targetUp.current.set(...cameraTargetUp);
+      } else {
+        targetUp.current.set(0, 1, 0);
+      }
       animating.current = true;
     }
-  }, [cameraTargetPosition, cameraTargetLookAt]);
+  }, [cameraTargetPosition, cameraTargetLookAt, cameraTargetUp]);
 
   // Handle focus request
   useEffect(() => {
@@ -67,13 +75,19 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
     // ── Camera preset animation ──
     if (animating.current) {
       camera.position.lerp(targetPos.current, 0.1);
+      camera.up.lerp(targetUp.current, 0.14);
       if (controls) {
         controls.target.lerp(targetLookAt.current, 0.1);
         controls.update();
       }
       if (camera.position.distanceTo(targetPos.current) < 0.05) {
         animating.current = false;
-        useEditorStore.setState({ cameraTargetPosition: null, cameraTargetLookAt: null, activeCameraPreset: null });
+        if ((camera as any).isOrthographicCamera) {
+          const ortho = camera as THREE.OrthographicCamera;
+          ortho.zoom = cameraMode === 'orthographic' ? 42 : 1;
+          ortho.updateProjectionMatrix();
+        }
+        useEditorStore.setState({ cameraTargetPosition: null, cameraTargetLookAt: null, cameraTargetUp: null, activeCameraPreset: null });
       }
     }
 

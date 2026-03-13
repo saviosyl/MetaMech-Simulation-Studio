@@ -8,13 +8,13 @@ import { Eye, ChevronDown } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 
 const VIEWS = [
-  { id: 'top', label: 'Top View', desc: 'XZ plane', key: '7' },
-  { id: 'front', label: 'Front View', desc: 'XY plane', key: '1' },
-  { id: 'right', label: 'Right View', desc: 'YZ plane', key: '3' },
-  { id: 'left', label: 'Left View', desc: 'YZ plane', key: '' },
-  { id: 'back', label: 'Back View', desc: 'XY plane', key: '' },
-  { id: 'bottom', label: 'Bottom View', desc: 'XZ plane', key: '' },
-  { id: 'perspective', label: '3D Perspective', desc: 'Free orbit', key: '5' },
+  { id: 'top', label: 'Top View', desc: 'Normal to top plane', key: '7' },
+  { id: 'front', label: 'Front View', desc: 'Normal to front plane', key: '1' },
+  { id: 'right', label: 'Right View', desc: 'Normal to right plane', key: '3' },
+  { id: 'left', label: 'Left View', desc: 'Normal to left plane', key: '' },
+  { id: 'back', label: 'Back View', desc: 'Normal to back plane', key: '' },
+  { id: 'bottom', label: 'Bottom View', desc: 'Normal to bottom plane', key: '' },
+  { id: 'perspective', label: '3D Perspective', desc: 'Free orbit camera', key: '5' },
 ] as const;
 
 const CameraViewToolbar: React.FC = () => {
@@ -33,7 +33,7 @@ const CameraViewToolbar: React.FC = () => {
           fontFamily: "'Inter', sans-serif", letterSpacing: '0.01em',
           transition: 'all 0.15s',
         }}
-        title="Camera view presets (Top/Front/Right/Perspective)"
+        title="Open camera presets (normal views and perspective)"
       >
         <Eye size={13} style={{ color: '#67e8f9' }} />
         <span>{cameraMode === 'orthographic' ? 'Ortho' : '3D'}</span>
@@ -61,6 +61,7 @@ const CameraViewToolbar: React.FC = () => {
               <button
                 key={v.id}
                 onClick={() => { setCameraView(v.id); setOpen(false); }}
+                title={`${v.label} — ${v.desc}`}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '8px 12px', border: 'none', cursor: 'pointer',

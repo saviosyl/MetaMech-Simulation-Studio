@@ -161,12 +161,13 @@ const LeftPanel: React.FC = () => {
             <div
               style={{
                 display: 'flex',
+                flexWrap: 'wrap',
                 gap: 5,
                 padding: '7px 8px',
                 borderBottom: '1px solid var(--mm-border-subtle)',
                 background: 'rgba(15,23,42,0.2)',
                 flexShrink: 0,
-                overflowX: 'auto',
+                overflow: 'hidden',
               }}
             >
               {TABS.map(tab => {
@@ -174,9 +175,10 @@ const LeftPanel: React.FC = () => {
                 const Icon = tab.icon;
                 return (
                   <button key={tab.id} onClick={() => setActiveLibraryTab(tab.id)}
+                    title={`Show ${tab.name} assets`}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 5,
-                      padding: '5px 7px', borderRadius: 6, flexShrink: 0,
+                      padding: '5px 7px', borderRadius: 6, minWidth: 0,
                       border: `1px solid ${active ? 'rgba(34,211,238,0.3)' : 'rgba(148,163,184,0.16)'}`,
                       background: active ? 'var(--mm-accent-primary-muted)' : 'rgba(15,23,42,0.24)',
                       color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-tertiary)',

@@ -59,26 +59,18 @@ const ViewportToolbar: React.FC = () => {
     setOverlaysHidden(!overlaysHidden);
   };
 
-  const sectionStyle: React.CSSProperties = {
-    display: 'flex',
+  const clusterStyle: React.CSSProperties = {
+    display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
-    padding: '3px 5px',
-    borderRadius: 8,
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(15,23,42,0.45)',
   };
 
-  const sectionLabelStyle: React.CSSProperties = {
-    fontSize: 8,
-    fontWeight: 700,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    fontFamily: "'Orbitron', monospace",
-    color: 'rgba(148,163,184,0.75)',
-    marginRight: 1,
-    paddingRight: 4,
-    borderRight: '1px solid rgba(255,255,255,0.1)',
+  const dividerStyle: React.CSSProperties = {
+    width: 1,
+    height: 22,
+    background: 'rgba(148,163,184,0.25)',
+    margin: '0 2px',
+    flexShrink: 0,
   };
 
   const btnStyle = (active: boolean, disabled = false): React.CSSProperties => ({
@@ -101,28 +93,28 @@ const ViewportToolbar: React.FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: 'clamp(22px, 3vw, 34px)',
+        top: 'clamp(24px, 3.5vw, 40px)',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 45,
         display: 'flex',
         alignItems: 'center',
-        gap: 6,
-        width: 'fit-content',
-        maxWidth: 'calc(100% - 24px)',
-        flexWrap: 'wrap',
+        gap: 5,
+        width: 'min(1220px, calc(100% - 24px))',
+        flexWrap: 'nowrap',
+        overflowX: 'auto',
         justifyContent: 'center',
-        background: 'rgba(2,6,23,0.54)',
-        backdropFilter: 'blur(8px)',
-        borderRadius: 10,
-        padding: '5px 6px',
-        boxShadow: '0 3px 14px rgba(0,0,0,0.3)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgba(2,6,23,0.58)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: 11,
+        padding: '6px 8px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.28)',
+        border: '1px solid rgba(255,255,255,0.1)',
       }}
+      title="Main modeling ribbon"
     >
       {/* Tools */}
-      <div style={sectionStyle}>
-        <span style={sectionLabelStyle}>Tools</span>
+      <div style={clusterStyle}>
         {tools.map(tool => (
           <button
             key={tool.id}
@@ -135,11 +127,12 @@ const ViewportToolbar: React.FC = () => {
         ))}
       </div>
 
+      <div style={dividerStyle} />
+
       {/* Edit */}
-      <div style={sectionStyle}>
-        <span style={sectionLabelStyle}>Edit</span>
+      <div style={clusterStyle}>
         <button
-          title="Copy selected object(s) (Ctrl+C)"
+          title="Copy selected object(s) to clipboard (Ctrl+C)"
           onClick={copySelected}
           style={btnStyle(false, !selectedObjectId)}
           disabled={!selectedObjectId}
@@ -147,7 +140,7 @@ const ViewportToolbar: React.FC = () => {
           <Copy size={14} />
         </button>
         <button
-          title="Paste copied object(s) (Ctrl+V)"
+          title="Paste copied object(s) from clipboard (Ctrl+V)"
           onClick={pasteClipboard}
           style={btnStyle(false, !clipboard)}
           disabled={!clipboard}
@@ -164,7 +157,7 @@ const ViewportToolbar: React.FC = () => {
           </button>
         )}
         <button
-          title="Import custom 3D model (.GLB/.GLTF)"
+          title="Import custom 3D model (.GLB/.GLTF) into scene"
           onClick={() => setShowImport(true)}
           style={btnStyle(false)}
         >
@@ -172,18 +165,19 @@ const ViewportToolbar: React.FC = () => {
         </button>
       </div>
 
+      <div style={dividerStyle} />
+
       {/* View */}
-      <div style={sectionStyle}>
-        <span style={sectionLabelStyle}>View</span>
+      <div style={clusterStyle}>
         <button
-          title={`Toggle grid snapping (${gridSnap ? 'On' : 'Off'})`}
+          title={`Toggle grid snapping for transforms (${gridSnap ? 'On' : 'Off'})`}
           onClick={() => setGridSnap(!gridSnap)}
           style={btnStyle(gridSnap)}
         >
           <Grid3X3 size={14} />
         </button>
         <button
-          title={overlaysHidden ? 'Show overlays and flow helpers' : 'Hide overlays for clean presentation view'}
+          title={overlaysHidden ? 'Show helpers: ports, connections, and overlays' : 'Hide helpers for a clean presentation view'}
           onClick={toggleCleanView}
           style={btnStyle(overlaysHidden)}
         >
@@ -198,9 +192,10 @@ const ViewportToolbar: React.FC = () => {
         </button>
       </div>
 
+      <div style={dividerStyle} />
+
       {/* Camera */}
-      <div style={sectionStyle}>
-        <span style={sectionLabelStyle}>Camera</span>
+      <div style={clusterStyle}>
         <CameraViewToolbar />
       </div>
 

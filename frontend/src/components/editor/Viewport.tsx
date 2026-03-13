@@ -9,6 +9,8 @@ import {
   Text,
   GizmoHelper,
   GizmoViewport,
+  PerspectiveCamera,
+  OrthographicCamera,
 } from '@react-three/drei';
 // EffectComposer removed — ToneMapping+SMAA can cause blank screens on some devices
 import * as THREE from 'three';
@@ -540,7 +542,7 @@ const SceneContent: React.FC<{
         minDistance={2}
         maxDistance={100}
         minPolarAngle={0}
-        maxPolarAngle={Math.PI / 2}
+        maxPolarAngle={Math.PI - 0.001}
         onStart={() => onNavigationChange(true)}
         onEnd={() => onNavigationChange(false)}
       />
@@ -576,6 +578,7 @@ const Viewport: React.FC = () => {
     selectedObjectId,
     selectedObjectType,
     transformMode,
+    cameraMode,
     addProcessNode,
     addEnvironmentAsset,
     addActor,
@@ -645,12 +648,6 @@ const Viewport: React.FC = () => {
       onDragOver={handleDragOver}
     >
       <Canvas
-        camera={{
-          position: [10, 10, 10],
-          fov: 50,
-          near: 0.1,
-          far: 1000,
-        }}
         dpr={[1, 2]}
         shadows
         gl={{ 
@@ -663,22 +660,28 @@ const Viewport: React.FC = () => {
         }}
         frameloop="always"
       >
+        {cameraMode === 'orthographic' ? (
+          <OrthographicCamera makeDefault position={[10, 10, 10]} zoom={42} near={0.1} far={1000} />
+        ) : (
+          <PerspectiveCamera makeDefault position={[10, 10, 10]} fov={50} near={0.1} far={1000} />
+        )}
         <CameraCapture />
         <InteractionPerformanceTuner isNavigating={isNavigating} />
         <Suspense fallback={null}>
           <SceneContent orbitRef={orbitRef} isNavigating={isNavigating} onNavigationChange={setIsNavigating} />
         </Suspense>
-        {/* 3D UCS Orientation Gizmo — bottom left */}
-        <GizmoHelper alignment="bottom-left" margin={[80, 120]}>
+        {/* 3D orientation gizmo */}
+        <GizmoHelper alignment="bottom-right" margin={[78, 88]}>
           <GizmoViewport
             axisColors={['#ef4444', '#22c55e', '#3b82f6']}
-            labelColor="white"
+            labelColor="#f8fafc"
           />
         </GizmoHelper>
       </Canvas>
 
       {/* Viewport Toolbar */}
       <ViewportToolbar />
+      <OrientationPad />
 
       {/* Viewport Overlay - Instructions */}
       {processNodes.length === 0 && environmentAssets.length === 0 && actors.length === 0 && (
@@ -703,6 +706,59 @@ const Viewport: React.FC = () => {
         transformMode={transformMode}
         selectedName={selectedObject?.name}
       />
+    </div>
+  );
+};
+
+const OrientationPad: React.FC = () => {
+  const setCameraView = useEditorStore(s => s.setCameraView);
+  const buttons: { id: 'top' | 'front' | 'right' | 'left' | 'back' | 'perspective'; label: string; tooltip: string }[] = [
+    { id: 'top', label: 'Top', tooltip: 'Top normal view (flat to screen)' },
+    { id: 'front', label: 'Front', tooltip: 'Front normal view (flat to screen)' },
+    { id: 'right', label: 'Right', tooltip: 'Right normal view (flat to screen)' },
+    { id: 'left', label: 'Left', tooltip: 'Left normal view (flat to screen)' },
+    { id: 'back', label: 'Back', tooltip: 'Back normal view (flat to screen)' },
+    { id: 'perspective', label: 'Iso', tooltip: 'Return to perspective/isometric 3D view' },
+  ];
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 'clamp(92px, 13vh, 130px)',
+        right: 12,
+        zIndex: 30,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, auto)',
+        gap: 4,
+        padding: 6,
+        borderRadius: 10,
+        background: 'rgba(2,6,23,0.5)',
+        border: '1px solid rgba(148,163,184,0.22)',
+        backdropFilter: 'blur(8px)',
+      }}
+      title="Orientation quick views"
+    >
+      {buttons.map((b) => (
+        <button
+          key={b.id}
+          onClick={() => setCameraView(b.id)}
+          title={b.tooltip}
+          style={{
+            padding: '4px 7px',
+            borderRadius: 6,
+            border: '1px solid rgba(148,163,184,0.2)',
+            background: 'rgba(15,23,42,0.35)',
+            color: '#cbd5e1',
+            cursor: 'pointer',
+            fontSize: 10,
+            fontWeight: 700,
+            fontFamily: "'Orbitron', monospace",
+          }}
+        >
+          {b.label}
+        </button>
+      ))}
     </div>
   );
 };

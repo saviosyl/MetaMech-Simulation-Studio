@@ -24,7 +24,9 @@ const S = {
   bar: {
     position: 'relative' as const,
     zIndex: 80,
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    display: 'grid',
+    gridTemplateColumns: '1fr auto 1fr',
+    alignItems: 'center',
     padding: '0 12px', height: 46,
     background: 'var(--mm-bg-panel)',
     borderBottom: '1px solid var(--mm-border)',
@@ -241,7 +243,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   return (
     <div style={S.bar}>
       {/* ════ LEFT: Project + Edit + Build ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifySelf: 'start', minWidth: 0 }}>
         {/* Brand */}
         <button onClick={() => navigate('/dashboard')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s' }}
@@ -280,17 +282,17 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
       </div>
 
       {/* ════ CENTER: Simulation (bigger, prominent) ════ */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, justifySelf: 'center' }}>
         <div style={{ ...S.group, padding: '6px 12px', gap: 8, background: 'var(--mm-bg-app)', border: '2px solid var(--mm-border)' }}>
           {/* Play/Pause */}
           <button onClick={isPlaying ? pause : play}
             style={S.simBtn(isPlaying ? '#f59e0b' : '#06b6d4')}
-            title={isPlaying ? 'Pause' : 'Play'}>
+            title={isPlaying ? 'Pause simulation playback' : 'Start simulation playback'}>
             {isPlaying ? <Pause size={18} /> : <Play size={18} />}
           </button>
 
           {/* Reset */}
-          <button onClick={reset} style={S.simBtn('#64748b')} title="Reset Simulation">
+          <button onClick={reset} style={S.simBtn('#64748b')} title="Reset simulation and clear transient runtime state">
             <Square size={16} />
           </button>
 
@@ -303,6 +305,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
             <div style={{ display: 'flex', gap: 2 }}>
               {speedOptions.map(o => (
                 <button key={o.value} onClick={() => setSimulationSpeed(o.value)}
+                  title={`Set simulation speed to ${o.label}`}
                   style={{
                     padding: '3px 8px', borderRadius: 4, border: 'none', cursor: 'pointer',
                     fontSize: 11, fontWeight: 700, fontFamily: "'Orbitron', monospace",
@@ -325,14 +328,14 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
               ...S.simBtn(isRecording ? '#ef4444' : '#8b5cf6'),
               animation: isRecording ? 'pulse 1.5s ease-in-out infinite' : undefined,
             }}
-            title={isRecording ? 'Stop Recording' : 'Record Video (manual camera)'}>
+            title={isRecording ? 'Stop viewport recording and save WebM file' : 'Record viewport video with manual camera movement'}>
             <Video size={16} />
           </button>
           {/* Record with camera path */}
           {!isRecording && (
             <button onClick={startRecordingWithCameraPath}
               style={S.simBtn('#6366f1')}
-              title="Record with Camera Path (auto smooth camera)">
+              title="Record using the active camera path for smooth cinematic motion">
               <Video size={14} /><span style={{ fontSize: 9, marginLeft: -2 }}>🎬</span>
             </button>
           )}
@@ -346,7 +349,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
       </div>
 
       {/* ════ RIGHT: View + File + Save + User ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifySelf: 'end' }}>
         {/* View */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
           <div style={S.group}>

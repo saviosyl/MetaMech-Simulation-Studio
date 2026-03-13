@@ -574,6 +574,7 @@ interface EditorState {
   activeCameraPreset: string | null;
   cameraTargetPosition: [number, number, number] | null;
   cameraTargetLookAt: [number, number, number] | null;
+  cameraTargetUp: [number, number, number] | null;
   
   // Shortcuts panel
   showShortcuts: boolean;
@@ -769,6 +770,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeCameraPreset: null,
   cameraTargetPosition: null,
   cameraTargetLookAt: null,
+  cameraTargetUp: null,
   
   showShortcuts: false,
   focusRequest: 0,
@@ -1034,7 +1036,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setCameraPreset: (name) => {
     const preset = get().cameraPresets.find(p => p.name === name);
     if (preset) {
-      set({ activeCameraPreset: name, cameraTargetPosition: [...preset.position] as [number, number, number], cameraTargetLookAt: [...preset.target] as [number, number, number] });
+      set({
+        activeCameraPreset: name,
+        cameraTargetPosition: [...preset.position] as [number, number, number],
+        cameraTargetLookAt: [...preset.target] as [number, number, number],
+        cameraTargetUp: [0, 1, 0],
+        cameraMode: 'perspective',
+      });
     }
   },
   setShowShortcuts: (show) => set({ showShortcuts: show }),
@@ -1253,23 +1261,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setCameraMode: (mode) => set({ cameraMode: mode }),
   setCameraView: (view) => {
     const dist = 30;
-    // All views look at scene center with correct orientation
-    // Top: camera above, looking down — X goes right, Z goes down on screen
-    // Front: camera in front (positive Z), looking at center — X goes right, Y goes up
-    // Right: camera on right (positive X), looking at center — Z goes left, Y goes up
-    const viewMap: Record<string, { pos: [number, number, number]; target: [number, number, number]; mode: 'perspective' | 'orthographic' }> = {
-      top:         { pos: [0, dist, 0.001], target: [0, 0, 0], mode: 'orthographic' },
-      front:       { pos: [0, 3, dist], target: [0, 3, 0], mode: 'orthographic' },
-      right:       { pos: [dist, 3, 0], target: [0, 3, 0], mode: 'orthographic' },
-      left:        { pos: [-dist, 3, 0], target: [0, 3, 0], mode: 'orthographic' },
-      back:        { pos: [0, 3, -dist], target: [0, 3, 0], mode: 'orthographic' },
-      bottom:      { pos: [0, dist, 0.001], target: [0, 0, 0], mode: 'orthographic' }, // same as top for safety (polar clamp)
-      perspective: { pos: [15, 12, 15], target: [0, 0, 0], mode: 'perspective' },
+    const viewMap: Record<string, { pos: [number, number, number]; target: [number, number, number]; up: [number, number, number]; mode: 'perspective' | 'orthographic' }> = {
+      top:         { pos: [0, dist, 0], target: [0, 0, 0], up: [0, 0, -1], mode: 'orthographic' },
+      front:       { pos: [0, 0, dist], target: [0, 0, 0], up: [0, 1, 0], mode: 'orthographic' },
+      right:       { pos: [dist, 0, 0], target: [0, 0, 0], up: [0, 1, 0], mode: 'orthographic' },
+      left:        { pos: [-dist, 0, 0], target: [0, 0, 0], up: [0, 1, 0], mode: 'orthographic' },
+      back:        { pos: [0, 0, -dist], target: [0, 0, 0], up: [0, 1, 0], mode: 'orthographic' },
+      bottom:      { pos: [0, -dist, 0], target: [0, 0, 0], up: [0, 0, 1], mode: 'orthographic' },
+      perspective: { pos: [15, 12, 15], target: [0, 0, 0], up: [0, 1, 0], mode: 'perspective' },
     };
     const v = viewMap[view] || viewMap.perspective;
     set({
       cameraTargetPosition: v.pos,
       cameraTargetLookAt: v.target,
+      cameraTargetUp: v.up,
       cameraMode: v.mode,
     });
   },
