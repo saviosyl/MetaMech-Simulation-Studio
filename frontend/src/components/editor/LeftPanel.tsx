@@ -91,10 +91,28 @@ const LeftPanel: React.FC = () => {
 
   return (
     <div style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(360, Math.max(200, leftPanelWidth)) }}>
-      <div style={{ flex: 1, background: 'var(--mm-bg-panel)', borderRight: '1px solid var(--mm-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div
+        style={{
+          flex: 1,
+          background: 'var(--mm-bg-panel)',
+          borderRight: '1px solid var(--mm-border)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.02)',
+        }}
+      >
         
         {/* Header */}
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0 }}>
+        <div
+          style={{
+            padding: '9px 12px',
+            borderBottom: '1px solid var(--mm-border-subtle)',
+            background: 'rgba(15,23,42,0.34)',
+            backdropFilter: 'blur(6px)',
+            flexShrink: 0,
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ display: 'flex', gap: 2 }}>
               {(['library', 'scene'] as const).map(m => (
@@ -140,7 +158,17 @@ const LeftPanel: React.FC = () => {
         {viewMode === 'scene' ? <SceneHierarchy /> : (
           <>
             {/* Category tabs — single compact strip with horizontal scroll */}
-            <div style={{ display: 'flex', gap: 4, padding: '6px 8px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0, overflowX: 'auto' }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: 5,
+                padding: '7px 8px',
+                borderBottom: '1px solid var(--mm-border-subtle)',
+                background: 'rgba(15,23,42,0.2)',
+                flexShrink: 0,
+                overflowX: 'auto',
+              }}
+            >
               {TABS.map(tab => {
                 const active = activeLibraryTab === tab.id;
                 const Icon = tab.icon;
@@ -149,8 +177,8 @@ const LeftPanel: React.FC = () => {
                     style={{
                       display: 'flex', alignItems: 'center', gap: 5,
                       padding: '5px 7px', borderRadius: 6, flexShrink: 0,
-                      border: `1px solid ${active ? 'rgba(34,211,238,0.3)' : 'transparent'}`,
-                      background: active ? 'var(--mm-accent-primary-muted)' : 'transparent',
+                      border: `1px solid ${active ? 'rgba(34,211,238,0.3)' : 'rgba(148,163,184,0.16)'}`,
+                      background: active ? 'var(--mm-accent-primary-muted)' : 'rgba(15,23,42,0.24)',
                       color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-tertiary)',
                       cursor: 'pointer', fontSize: 10, fontWeight: 600,
                       fontFamily: "'Orbitron', monospace", transition: 'all 0.15s',
@@ -163,19 +191,20 @@ const LeftPanel: React.FC = () => {
             </div>
 
             {/* Module list */}
-            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 14px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '10px 12px' }}>
               {Object.entries(groupedModules).map(([group, items]) => (
-                <div key={group} style={{ marginBottom: 18 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, position: 'sticky', top: 0, background: 'var(--mm-bg-panel)', zIndex: 5, paddingTop: 4, paddingBottom: 4 }}>
-                    <div style={{ flex: 1, height: 1, background: 'var(--mm-border-subtle)' }} />
+                <div key={group} style={{ marginBottom: 12, border: '1px solid rgba(148,163,184,0.16)', borderRadius: 10, background: 'rgba(15,23,42,0.2)', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6, position: 'sticky', top: 0, background: 'rgba(2,6,23,0.72)', zIndex: 5, padding: '6px 8px', borderBottom: '1px solid rgba(148,163,184,0.14)' }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Orbitron', monospace" }}>
-                      {group} <span style={{ color: 'var(--mm-text-disabled)' }}>{items.length}</span>
+                      {group}
                     </span>
-                    <div style={{ flex: 1, height: 1, background: 'var(--mm-border-subtle)' }} />
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-disabled)', padding: '1px 6px', borderRadius: 999, background: 'rgba(148,163,184,0.14)' }}>
+                      {items.length}
+                    </span>
                   </div>
 
                   {layout === 'grid' ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, padding: '0 8px 8px' }}>
                       {items.map(mod => {
                         const Icon = mod.icon;
                         return (
@@ -192,12 +221,12 @@ const LeftPanel: React.FC = () => {
                       })}
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '0 6px 8px' }}>
                       {items.map(mod => {
                         const Icon = mod.icon;
                         return (
                           <div key={mod.id} draggable onDragStart={(e) => handleDragStart(e, mod)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 6, cursor: 'grab', transition: 'background 0.1s' }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 7, cursor: 'grab', border: '1px solid transparent', transition: 'background 0.1s, border-color 0.1s' }}
                             onMouseEnter={e => { (e.currentTarget).style.background = 'var(--mm-bg-surface)'; }}
                             onMouseLeave={e => { (e.currentTarget).style.background = 'transparent'; }}>
                             <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--mm-accent-primary-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
