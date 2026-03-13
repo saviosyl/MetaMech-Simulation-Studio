@@ -1,5 +1,9 @@
 [
   {
+    "file": "Factory_Sample_Layout_01.json",
+    "fallbackName": "Factory Sample Layout 01"
+  },
+  {
     "file": "Model_Sample_Layout_01.json",
     "fallbackName": "Sample Production Line"
   }
