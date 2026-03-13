@@ -27,26 +27,26 @@ const CameraViewToolbar: React.FC = () => {
         onClick={() => setOpen(!open)}
         style={{
           display: 'flex', alignItems: 'center', gap: 5,
-          padding: '5px 10px', fontSize: 11, fontWeight: 600,
-          color: 'var(--mm-text-secondary)', background: 'var(--mm-bg-surface)',
-          border: '1px solid var(--mm-border)', borderRadius: 8, cursor: 'pointer',
-          fontFamily: "'Orbitron', monospace", letterSpacing: '0.03em',
+          height: 32, padding: '0 10px', fontSize: 11, fontWeight: 600,
+          color: '#cbd5e1', background: 'rgba(15,23,42,0.3)',
+          border: '1px solid transparent', borderRadius: 8, cursor: 'pointer',
+          fontFamily: "'Inter', sans-serif", letterSpacing: '0.01em',
           transition: 'all 0.15s',
         }}
-        title="Camera Views"
+        title="Camera view presets (Top/Front/Right/Perspective)"
       >
-        <Eye size={13} style={{ color: 'var(--mm-accent-primary)' }} />
-        <span>{cameraMode === 'orthographic' ? 'ORTHO' : '3D'}</span>
+        <Eye size={13} style={{ color: '#67e8f9' }} />
+        <span>{cameraMode === 'orthographic' ? 'Ortho' : 'Perspective'}</span>
         <ChevronDown size={10} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
 
       {open && (
         <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 30 }} onClick={() => setOpen(false)} />
+          <div style={{ position: 'fixed', inset: 0, zIndex: 90 }} onClick={() => setOpen(false)} />
           <div style={{
             position: 'absolute', top: '100%', right: 0, marginTop: 4, width: 180,
             background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)',
-            borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.4)', zIndex: 40,
+            borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.4)', zIndex: 100,
             overflow: 'hidden',
           }}>
             <div style={{
