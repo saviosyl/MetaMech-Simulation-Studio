@@ -58,12 +58,22 @@ function addMemberMesh(
 
 export function buildFrameAssembly(params: Record<string, any>): BuilderResult {
   const assembly = asAssemblyFromParams(params);
-  const profile = getProfileFamily(assembly.profileFamilyId);
-  const material = new THREE.MeshStandardMaterial({
-    color: profile.color,
-    metalness: 0.72,
-    roughness: 0.32,
-  });
+  const materialByProfile = new Map<string, THREE.MeshStandardMaterial>();
+  const sectionByProfile = new Map<string, [number, number]>();
+  for (const m of assembly.members) {
+    if (!materialByProfile.has(m.profileFamilyId)) {
+      const p = getProfileFamily(m.profileFamilyId);
+      materialByProfile.set(
+        m.profileFamilyId,
+        new THREE.MeshStandardMaterial({
+          color: p.color,
+          metalness: 0.72,
+          roughness: 0.32,
+        }),
+      );
+      sectionByProfile.set(m.profileFamilyId, p.sectionMm);
+    }
+  }
 
   const group = new THREE.Group();
   group.name = `frame-assembly-${assembly.templateId}`;
@@ -81,7 +91,9 @@ export function buildFrameAssembly(params: Record<string, any>): BuilderResult {
     const a = nodeMap.get(member.startNodeId);
     const b = nodeMap.get(member.endNodeId);
     if (!a || !b) continue;
-    totalLength += addMemberMesh(group, a, b, profile.sectionMm, material);
+    const section = sectionByProfile.get(member.profileFamilyId) ?? getProfileFamily(assembly.profileFamilyId).sectionMm;
+    const material = materialByProfile.get(member.profileFamilyId) ?? new THREE.MeshStandardMaterial({ color: '#c5cbd2', metalness: 0.72, roughness: 0.32 });
+    totalLength += addMemberMesh(group, a, b, section, material);
   }
 
   const ports: ConnectionPort[] = [];
