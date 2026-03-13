@@ -1,4 +1,4 @@
-import React, { Suspense, useRef, useCallback, useEffect } from 'react';
+import React, { Suspense, useRef, useCallback, useEffect, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { 
   OrbitControls, 
@@ -22,6 +22,26 @@ const CameraCapture: React.FC = () => {
   const { camera, size } = useThree();
   _threeCamera = camera;
   _canvasSize = size;
+  return null;
+};
+
+/**
+ * Pause expensive shadow-map refresh while user is actively navigating camera.
+ * Re-enable and refresh once interaction ends.
+ */
+const InteractionPerformanceTuner: React.FC<{ isNavigating: boolean }> = ({ isNavigating }) => {
+  const { gl } = useThree();
+
+  useEffect(() => {
+    if (!gl.shadowMap) return;
+    if (isNavigating) {
+      gl.shadowMap.autoUpdate = false;
+      return;
+    }
+    gl.shadowMap.autoUpdate = true;
+    gl.shadowMap.needsUpdate = true;
+  }, [gl, isNavigating]);
+
   return null;
 };
 
@@ -247,7 +267,11 @@ const OVERLAY_HIDDEN_TYPES = new Set(['source', 'sink']);
 const isMobileSafari = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) || 
   (typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
 
-const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }) => {
+const SceneContent: React.FC<{
+  orbitRef: React.RefObject<any>;
+  isNavigating: boolean;
+  onNavigationChange: (moving: boolean) => void;
+}> = ({ orbitRef, isNavigating, onNavigationChange }) => {
   const {
     processNodes,
     environmentAssets,
@@ -347,7 +371,7 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
       )}
 
       {/* Contact Shadows — premium ground contact effect */}
-      {!isMobileSafari && (
+      {!isMobileSafari && !isNavigating && (
         <ContactShadows 
           position={[0, -0.01, 0]} 
           opacity={0.6} 
@@ -500,7 +524,7 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
       <MeasurementTool />
 
       {/* Camera Animation Controls */}
-      <CameraControls orbitRef={orbitRef} />
+      <CameraControls orbitRef={orbitRef} suspendSpaceMouse={isNavigating} />
 
       {/* Camera Controls */}
       <OrbitControls
@@ -508,10 +532,17 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
         enablePan={true}
         enableZoom={true}
         enableRotate={true}
+        enableDamping={true}
+        dampingFactor={0.08}
+        rotateSpeed={0.9}
+        zoomSpeed={0.95}
+        panSpeed={0.9}
         minDistance={2}
         maxDistance={100}
         minPolarAngle={0}
         maxPolarAngle={Math.PI / 2}
+        onStart={() => onNavigationChange(true)}
+        onEnd={() => onNavigationChange(false)}
       />
 
       {/* Scene background color — adapts to theme */}
@@ -536,6 +567,7 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
 
 const Viewport: React.FC = () => {
   const orbitRef = useRef<any>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
   
   const {
     processNodes,
@@ -632,8 +664,9 @@ const Viewport: React.FC = () => {
         frameloop="always"
       >
         <CameraCapture />
+        <InteractionPerformanceTuner isNavigating={isNavigating} />
         <Suspense fallback={null}>
-          <SceneContent orbitRef={orbitRef} />
+          <SceneContent orbitRef={orbitRef} isNavigating={isNavigating} onNavigationChange={setIsNavigating} />
         </Suspense>
         {/* 3D UCS Orientation Gizmo — bottom left */}
         <GizmoHelper alignment="bottom-left" margin={[80, 120]}>

@@ -12,7 +12,7 @@ const _offset = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 const _selectedPos = new THREE.Vector3();
 
-const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }) => {
+const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMouse?: boolean }> = ({ orbitRef, suspendSpaceMouse = false }) => {
   const { camera } = useThree();
   const {
     cameraTargetPosition,
@@ -78,6 +78,8 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef
     }
 
     // ── 3Dconnexion SpaceMouse ──
+    if (suspendSpaceMouse) return;
+
     const sm = spaceMouse.poll();
     if (!sm.connected) return;
 
