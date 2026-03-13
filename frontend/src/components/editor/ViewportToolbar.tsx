@@ -11,19 +11,18 @@ type ToolType = 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 
 
 interface ToolButton {
   id: ToolType;
-  shortLabel: string;
   tooltip: string;
   icon: React.ReactNode;
 }
 
 const tools: ToolButton[] = [
-  { id: 'select', shortLabel: 'Select', tooltip: 'Select objects (Q)', icon: <MousePointer size={14} /> },
-  { id: 'move', shortLabel: 'Move', tooltip: 'Move objects (W)', icon: <Move size={14} /> },
-  { id: 'rotate', shortLabel: 'Rotate', tooltip: 'Rotate objects (E)', icon: <RotateCcw size={14} /> },
-  { id: 'scale', shortLabel: 'Scale', tooltip: 'Scale objects (R)', icon: <Maximize2 size={14} /> },
-  { id: 'mate', shortLabel: 'Mate', tooltip: 'Create/inspect node connections (M)', icon: <Link2 size={14} /> },
-  { id: 'snap-move', shortLabel: 'Snap', tooltip: 'Drag with auto-snap assist (N)', icon: <Magnet size={14} /> },
-  { id: 'measure', shortLabel: 'Measure', tooltip: 'Measure distances in viewport', icon: <Ruler size={14} /> },
+  { id: 'select', tooltip: 'Select objects (Q)', icon: <MousePointer size={13} /> },
+  { id: 'move', tooltip: 'Move objects (W)', icon: <Move size={13} /> },
+  { id: 'rotate', tooltip: 'Rotate objects (E)', icon: <RotateCcw size={13} /> },
+  { id: 'scale', tooltip: 'Scale objects (R)', icon: <Maximize2 size={13} /> },
+  { id: 'mate', tooltip: 'Create/inspect node connections (M)', icon: <Link2 size={13} /> },
+  { id: 'snap-move', tooltip: 'Drag with auto-snap assist (N)', icon: <Magnet size={13} /> },
+  { id: 'measure', tooltip: 'Measure distances in viewport', icon: <Ruler size={13} /> },
 ];
 
 const ViewportToolbar: React.FC = () => {
@@ -63,39 +62,37 @@ const ViewportToolbar: React.FC = () => {
   const sectionStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
-    padding: '6px 8px',
-    borderRadius: 10,
+    gap: 4,
+    padding: '3px 5px',
+    borderRadius: 8,
     border: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(15,23,42,0.55)',
+    background: 'rgba(15,23,42,0.45)',
   };
 
   const sectionLabelStyle: React.CSSProperties = {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 700,
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
     fontFamily: "'Orbitron', monospace",
-    color: 'rgba(148,163,184,0.9)',
-    marginRight: 2,
-    paddingRight: 6,
+    color: 'rgba(148,163,184,0.75)',
+    marginRight: 1,
+    paddingRight: 4,
     borderRight: '1px solid rgba(255,255,255,0.1)',
   };
 
   const btnStyle = (active: boolean, disabled = false): React.CSSProperties => ({
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 6,
-    height: 32,
-    padding: '0 10px',
+    justifyContent: 'center',
+    width: 28,
+    height: 28,
+    padding: 0,
     border: '1px solid transparent',
-    borderRadius: 8,
-    background: active ? 'rgba(6,182,212,0.25)' : 'rgba(15,23,42,0.3)',
+    borderRadius: 7,
+    background: active ? 'rgba(6,182,212,0.2)' : 'rgba(15,23,42,0.18)',
     color: active ? '#e6fbff' : '#cbd5e1',
     opacity: disabled ? 0.45 : 1,
-    fontSize: 11,
-    fontWeight: 600,
-    fontFamily: "'Inter', sans-serif",
     cursor: 'pointer',
     transition: 'all 0.15s',
   });
@@ -104,22 +101,21 @@ const ViewportToolbar: React.FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: 12,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 70,
+        top: 8,
+        right: 10,
+        zIndex: 55,
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
-        maxWidth: 'min(96%, 1240px)',
+        gap: 6,
+        maxWidth: 'min(96%, 920px)',
         flexWrap: 'wrap',
-        justifyContent: 'center',
-        background: 'rgba(2,6,23,0.78)',
-        backdropFilter: 'blur(12px)',
-        borderRadius: 14,
-        padding: '8px 10px',
-        boxShadow: '0 6px 24px rgba(0,0,0,0.45)',
-        border: '1px solid rgba(255,255,255,0.12)',
+        justifyContent: 'flex-end',
+        background: 'rgba(2,6,23,0.54)',
+        backdropFilter: 'blur(8px)',
+        borderRadius: 10,
+        padding: '5px 6px',
+        boxShadow: '0 3px 14px rgba(0,0,0,0.3)',
+        border: '1px solid rgba(255,255,255,0.08)',
       }}
     >
       {/* Tools */}
@@ -133,7 +129,6 @@ const ViewportToolbar: React.FC = () => {
             style={btnStyle(activeTool === tool.id)}
           >
             {tool.icon}
-            <span>{tool.shortLabel}</span>
           </button>
         ))}
       </div>
@@ -148,7 +143,6 @@ const ViewportToolbar: React.FC = () => {
           disabled={!selectedObjectId}
         >
           <Copy size={14} />
-          <span>Copy</span>
         </button>
         <button
           title="Paste copied object(s) (Ctrl+V)"
@@ -157,7 +151,6 @@ const ViewportToolbar: React.FC = () => {
           disabled={!clipboard}
         >
           <Download size={14} />
-          <span>Paste</span>
         </button>
         {selectedEdges.length > 0 && (
           <button
@@ -166,7 +159,6 @@ const ViewportToolbar: React.FC = () => {
             style={{ ...btnStyle(false), color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
           >
             <Trash2 size={14} />
-            <span>Disconnect</span>
           </button>
         )}
         <button
@@ -175,7 +167,6 @@ const ViewportToolbar: React.FC = () => {
           style={btnStyle(false)}
         >
           <Package size={14} />
-          <span>Import</span>
         </button>
       </div>
 
@@ -188,7 +179,6 @@ const ViewportToolbar: React.FC = () => {
           style={btnStyle(gridSnap)}
         >
           <Grid3X3 size={14} />
-          <span>Grid Snap</span>
         </button>
         <button
           title={overlaysHidden ? 'Show overlays and flow helpers' : 'Hide overlays for clean presentation view'}
@@ -196,7 +186,6 @@ const ViewportToolbar: React.FC = () => {
           style={btnStyle(overlaysHidden)}
         >
           {overlaysHidden ? <EyeOff size={14} /> : <Eye size={14} />}
-          <span>Clean View</span>
         </button>
         <button
           title={pathsVisible ? 'Hide path trajectories and waypoints' : 'Show path trajectories and waypoints'}
@@ -204,7 +193,6 @@ const ViewportToolbar: React.FC = () => {
           style={btnStyle(pathsVisible)}
         >
           <Route size={14} />
-          <span>Paths</span>
         </button>
       </div>
 

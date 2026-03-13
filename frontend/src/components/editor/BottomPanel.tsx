@@ -16,16 +16,18 @@ import { shouldValidateFlowConnectivity } from '../../lib/validation/connectivit
 
 type Tab = 'overview' | 'flow' | 'kpi' | 'validation';
 
-const MIN_HEIGHT = 42;  // collapsed header only
-const DEFAULT_HEIGHT = 200;
+const MIN_HEIGHT = 34;  // collapsed header only
+const DEFAULT_HEIGHT = 170;
 const MAX_HEIGHT = 500;
 
 // ─── Styles ───
 const S = {
-  panel: (h: number) => ({
+  panel: (h: number, collapsed: boolean) => ({
     position: 'absolute' as const, bottom: 0, left: 0, right: 0, zIndex: 20,
     height: h, display: 'flex', flexDirection: 'column' as const,
-    background: 'var(--mm-bg-panel)', borderTop: '1px solid var(--mm-border)',
+    background: collapsed ? 'rgba(2,6,23,0.68)' : 'var(--mm-bg-panel)',
+    backdropFilter: collapsed ? 'blur(8px)' : undefined,
+    borderTop: '1px solid var(--mm-border)',
     transition: 'none',
   }),
   dragHandle: {
@@ -39,7 +41,7 @@ const S = {
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 16px', height: 36, flexShrink: 0,
+    padding: '0 12px', height: 30, flexShrink: 0,
     borderBottom: '1px solid var(--mm-border-subtle)',
     cursor: 'pointer',
   } as React.CSSProperties,
@@ -58,7 +60,7 @@ const S = {
     transition: 'all 0.15s',
   } as React.CSSProperties),
   content: {
-    flex: 1, overflowY: 'auto' as const, padding: '10px 16px',
+    flex: 1, overflowY: 'auto' as const, padding: '8px 12px',
     fontSize: 12, color: 'var(--mm-text-secondary)',
   } as React.CSSProperties,
   kpiCard: {
@@ -206,7 +208,7 @@ const BottomPanel: React.FC = () => {
   const actualHeight = collapsed ? MIN_HEIGHT : height;
 
   return (
-    <div style={S.panel(actualHeight)}>
+    <div style={S.panel(actualHeight, collapsed)}>
       {/* Drag handle */}
       {!collapsed && (
         <div style={S.dragHandle} onMouseDown={onMouseDown}>

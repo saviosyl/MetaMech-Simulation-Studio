@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Play, Pause, Square, Save, Download, Upload, Video,
   ArrowLeft, Undo2, Redo2, Check, AlertCircle,
-  Loader2, Grid3X3, Ruler, HelpCircle, MousePointer, Move, RotateCcw,
-  Link2, Magnet, Sun, Moon, Maximize2,
+  Loader2, HelpCircle, Sun, Moon, Maximize2,
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,14 +23,14 @@ interface TopBarProps {
 const S = {
   bar: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 16px', height: 52,
+    padding: '0 12px', height: 46,
     background: 'var(--mm-bg-panel)',
     borderBottom: '1px solid var(--mm-border)',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    boxShadow: '0 1px 6px rgba(0,0,0,0.12)',
   } as React.CSSProperties,
   group: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '4px 8px',
+    padding: '3px 6px',
     background: 'var(--mm-bg-surface)',
     borderRadius: 8,
     border: '1px solid var(--mm-border-subtle)',
@@ -51,7 +50,7 @@ const S = {
   } as React.CSSProperties),
   simBtn: (color: string) => ({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
+    width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer',
     background: color, color: '#fff',
     boxShadow: `0 2px 8px ${color}44`,
     transition: 'all 0.15s',
@@ -82,9 +81,6 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     isPlaying, simulationSpeed,
     play, pause, reset, setSimulationSpeed,
     getSceneData, loadScene,
-    gridSnap, setGridSnap,
-    measureActive, setMeasureActive,
-    activeTool, setActiveTool,
     setShowShortcuts,
     isCameraPathPlaying,
   } = useEditorStore();
@@ -243,7 +239,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   return (
     <div style={S.bar}>
       {/* ════ LEFT: Project + Edit + Build ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {/* Brand */}
         <button onClick={() => navigate('/dashboard')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s' }}
@@ -277,25 +273,12 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           <span style={S.groupLabel}>Edit</span>
         </div>
 
-        {/* Build / Transform group */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-          <div style={S.group}>
-            <button onClick={() => setActiveTool('select')} style={S.iconBtn(activeTool === 'select')} title="Select (V)"><MousePointer size={15} /></button>
-            <button onClick={() => setActiveTool('move')} style={S.iconBtn(activeTool === 'move')} title="Move (W)"><Move size={15} /></button>
-            <button onClick={() => setActiveTool('rotate')} style={S.iconBtn(activeTool === 'rotate')} title="Rotate (E)"><RotateCcw size={15} /></button>
-            <div style={{ width: 1, height: 18, background: 'var(--mm-border-subtle)' }} />
-            <button onClick={() => setActiveTool('mate')} style={S.iconBtn(activeTool === 'mate')} title="Mate"><Link2 size={15} /></button>
-            <button onClick={() => setActiveTool('snap-move')} style={S.iconBtn(activeTool === 'snap-move')} title="Snap Move"><Magnet size={15} /></button>
-          </div>
-          <span style={S.groupLabel}>Build</span>
-        </div>
-
         {/* Scenarios */}
         <ScenarioLoader />
       </div>
 
       {/* ════ CENTER: Simulation (bigger, prominent) ════ */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
         <div style={{ ...S.group, padding: '6px 12px', gap: 8, background: 'var(--mm-bg-app)', border: '2px solid var(--mm-border)' }}>
           {/* Play/Pause */}
           <button onClick={isPlaying ? pause : play}
@@ -365,8 +348,6 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         {/* View */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
           <div style={S.group}>
-            <button onClick={() => setGridSnap(!gridSnap)} style={S.iconBtn(gridSnap)} title="Toggle Grid"><Grid3X3 size={15} /></button>
-            <button onClick={() => setMeasureActive(!measureActive)} style={S.iconBtn(measureActive)} title="Measure"><Ruler size={15} /></button>
             <button onClick={() => useEditorStore.getState().toggleTheme()} style={S.iconBtn()} title="Toggle Theme">
               {useEditorStore.getState().themeMode === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
             </button>

@@ -784,8 +784,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   showPropertiesPanel: true,
   
   // Panel defaults
-  leftPanelWidth: 320,
-  rightPanelWidth: 320,
+  leftPanelWidth: 280,
+  rightPanelWidth: 280,
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
   
@@ -1061,8 +1061,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   // Panel actions
-  setLeftPanelWidth: (width) => set({ leftPanelWidth: Math.min(500, Math.max(240, width)) }),
-  setRightPanelWidth: (width) => set({ rightPanelWidth: Math.min(500, Math.max(240, width)) }),
+  setLeftPanelWidth: (width) => set({ leftPanelWidth: Math.min(420, Math.max(200, width)) }),
+  setRightPanelWidth: (width) => set({ rightPanelWidth: Math.min(420, Math.max(200, width)) }),
   setLeftPanelCollapsed: (collapsed) => set({ leftPanelCollapsed: collapsed }),
   setRightPanelCollapsed: (collapsed) => set({ rightPanelCollapsed: collapsed }),
   

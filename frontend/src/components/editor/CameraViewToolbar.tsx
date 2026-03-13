@@ -27,7 +27,7 @@ const CameraViewToolbar: React.FC = () => {
         onClick={() => setOpen(!open)}
         style={{
           display: 'flex', alignItems: 'center', gap: 5,
-          height: 32, padding: '0 10px', fontSize: 11, fontWeight: 600,
+          height: 28, padding: '0 8px', fontSize: 10, fontWeight: 600,
           color: '#cbd5e1', background: 'rgba(15,23,42,0.3)',
           border: '1px solid transparent', borderRadius: 8, cursor: 'pointer',
           fontFamily: "'Inter', sans-serif", letterSpacing: '0.01em',
@@ -36,7 +36,7 @@ const CameraViewToolbar: React.FC = () => {
         title="Camera view presets (Top/Front/Right/Perspective)"
       >
         <Eye size={13} style={{ color: '#67e8f9' }} />
-        <span>{cameraMode === 'orthographic' ? 'Ortho' : 'Perspective'}</span>
+        <span>{cameraMode === 'orthographic' ? 'Ortho' : '3D'}</span>
         <ChevronDown size={10} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
 

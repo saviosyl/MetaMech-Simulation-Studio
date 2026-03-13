@@ -80,6 +80,8 @@ const RightPanel: React.FC = () => {
   }, [selectedObjectId, selectedObjectType, processNodes, environmentAssets, actors]);
 
   const moduleDef = selectedObject ? getModuleDefinition(selectedObject.type) : null;
+  const widthMin = selectedObject ? 220 : 180;
+  const widthMax = selectedObject ? 380 : 300;
   const paramAssetDef = React.useMemo(() => {
     if (!selectedObject || !(selectedObject as any).assetId) return null;
     const d = getAssetById((selectedObject as any).assetId);
@@ -255,7 +257,7 @@ const RightPanel: React.FC = () => {
   }
 
   return (
-    <div style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(400, Math.max(240, rightPanelWidth)) }}>
+    <div style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(widthMax, Math.max(widthMin, rightPanelWidth)) }}>
       {/* Resize handle */}
       <div style={{ width: 4, cursor: 'col-resize', flexShrink: 0, background: 'transparent', transition: 'background 0.15s' }}
         onMouseDown={handleResizeStart}
@@ -478,7 +480,7 @@ const RightPanel: React.FC = () => {
               </Section>
 
               {/* Empty state */}
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <div style={{ textAlign: 'center', padding: '28px 0' }}>
                 <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--mm-bg-surface)', border: '1px solid var(--mm-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
                   <Sliders size={18} style={{ color: 'var(--mm-text-disabled)' }} />
                 </div>

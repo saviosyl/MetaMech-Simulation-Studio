@@ -90,7 +90,7 @@ const LeftPanel: React.FC = () => {
   }
 
   return (
-    <div style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(400, Math.max(220, leftPanelWidth)) }}>
+    <div style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(360, Math.max(200, leftPanelWidth)) }}>
       <div style={{ flex: 1, background: 'var(--mm-bg-panel)', borderRight: '1px solid var(--mm-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
         {/* Header */}
@@ -140,16 +140,15 @@ const LeftPanel: React.FC = () => {
         {viewMode === 'scene' ? <SceneHierarchy /> : (
           <>
             {/* Category tabs — 2-row grid so all are always visible */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, padding: '6px 10px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2, padding: '5px 8px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0 }}>
               {TABS.map(tab => {
                 const active = activeLibraryTab === tab.id;
-                const count = getModulesByCategory(tab.id).length;
                 const Icon = tab.icon;
                 return (
                   <button key={tab.id} onClick={() => setActiveLibraryTab(tab.id)}
                     style={{
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                      padding: '5px 2px', borderRadius: 6,
+                      padding: '4px 2px', borderRadius: 6,
                       border: `1px solid ${active ? 'rgba(34,211,238,0.3)' : 'transparent'}`,
                       background: active ? 'var(--mm-accent-primary-muted)' : 'transparent',
                       color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-tertiary)',
@@ -158,9 +157,6 @@ const LeftPanel: React.FC = () => {
                     }}>
                     <Icon size={14} />
                     <span style={{ lineHeight: 1 }}>{tab.name}</span>
-                    <span style={{ fontSize: 8, padding: '0px 4px', borderRadius: 6, background: active ? 'rgba(34,211,238,0.15)' : 'var(--mm-bg-surface)', color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-disabled)' }}>
-                      {count}
-                    </span>
                   </button>
                 );
               })}
