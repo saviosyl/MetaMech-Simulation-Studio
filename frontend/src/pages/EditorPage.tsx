@@ -10,6 +10,7 @@ import Viewport from '../components/editor/Viewport';
 import ContextMenu from '../components/editor/ContextMenu';
 import BottomPanel from '../components/editor/BottomPanel';
 import ShortcutsPanel from '../components/editor/ShortcutsPanel';
+import { takePendingFrameAssemblyExport } from '../lib/frameDesigner/sceneInterop';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -46,6 +47,12 @@ const EditorPage: React.FC = () => {
     setPresentationMode,
   } = useEditorStore();
 
+  const importPendingFrameAssembly = useCallback(() => {
+    const pending = takePendingFrameAssemblyExport();
+    if (!pending) return;
+    useEditorStore.getState().insertFrameAssembly(pending, [0, 0, 0]);
+  }, []);
+
   // Track changes for undo history
   useEffect(() => {
     pushHistory(useEditorStore.getState());
@@ -81,14 +88,17 @@ const EditorPage: React.FC = () => {
             }
           }
           loadScene(scene);
+          importPendingFrameAssembly();
           if (savedName) setProjectName(savedName);
         } catch {
           localStorage.removeItem('metamech_autosave');
           localStorage.removeItem('metamech_autosave_name');
           loadScene({});
+          importPendingFrameAssembly();
         }
       } else {
         loadScene({});
+        importPendingFrameAssembly();
       }
     }
   }, [id]);
@@ -183,9 +193,11 @@ const EditorPage: React.FC = () => {
       const project = await getProject(projectId);
       setProjectName(project.name || 'Untitled Project');
       loadScene(project.data || {});
+      importPendingFrameAssembly();
     } catch (error) {
       console.error('Failed to load project:', error);
       loadScene({});
+      importPendingFrameAssembly();
     }
   };
 

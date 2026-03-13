@@ -178,6 +178,7 @@ function getAssetColor(type: EnvironmentAsset['type']): string {
     'floor-marking': '#ffff00', // Yellow
     'pallet-rack': '#ff6b35',  // Orange
     'warehouse-shell': '#e5e7eb', // Light gray
+    'frame-assembly': '#c5cbd2',
     'floor': '#f0f0f0',        // Very light gray
     'pallet': '#c4a55a',
     'cardboard-box': '#b8860b',
@@ -196,6 +197,7 @@ function getMetalness(type: EnvironmentAsset['type']): number {
     'floor-marking': 0.0,
     'pallet-rack': 0.7,
     'warehouse-shell': 0.2,
+    'frame-assembly': 0.7,
     'floor': 0.1,
     'pallet': 0.0,
     'cardboard-box': 0.0,
@@ -214,6 +216,7 @@ function getRoughness(type: EnvironmentAsset['type']): number {
     'floor-marking': 0.9,
     'pallet-rack': 0.4,
     'warehouse-shell': 0.7,
+    'frame-assembly': 0.35,
     'floor': 0.8,
     'pallet': 0.9,
     'cardboard-box': 0.9,

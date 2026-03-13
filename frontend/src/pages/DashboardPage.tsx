@@ -175,6 +175,7 @@ const DashboardPage: React.FC = () => {
             </button>
             <input ref={fileInputRef} type="file" accept=".json,.metamech.json" onChange={handleImportFile} style={{ display: 'none' }} />
             <button onClick={() => navigate('/demo')} style={S.btnGhost}>Quick Demo</button>
+            <button onClick={() => navigate('/frame-designer-demo')} style={S.btnGhost}>Frame Designer</button>
             <button onClick={() => setShowCreateModal(true)} style={S.btnPrimary}>
               <Plus size={14} /> New Project
             </button>

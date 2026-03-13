@@ -6,6 +6,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
+import FrameDesignerPage from './pages/FrameDesignerPage';
 import './index.css';
 
 // Apply saved theme on load
@@ -26,6 +27,7 @@ function App() {
           
           {/* Demo route - direct editor access without auth */}
           <Route path="/demo" element={<EditorPage />} />
+          <Route path="/frame-designer-demo" element={<FrameDesignerPage />} />
           
           {/* Protected routes */}
           <Route
@@ -42,6 +44,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <EditorPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/frame-designer"
+            element={
+              <ProtectedRoute>
+                <FrameDesignerPage />
               </ProtectedRoute>
             }
           />

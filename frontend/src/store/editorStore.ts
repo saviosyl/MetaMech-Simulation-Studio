@@ -4,6 +4,8 @@ import { AssetDef, getAssetManifest, getAssetById, ParametricAssetDef } from '..
 import { runBuilder } from '../lib/parametricBuilders';
 import { getPortWorldPosition, getWorldPorts as computeWorldPorts } from '../lib/nodeTransform';
 import { computeSpiralTransferGeometry } from '../lib/spiralTransfer';
+import { FrameAssemblyExportContract } from '../lib/frameDesigner/model';
+import { toFrameAssemblyParameters } from '../lib/frameDesigner/sceneInterop';
 
 // Types
 export interface ProcessNode {
@@ -49,7 +51,7 @@ export interface SceneObject {
 export interface EnvironmentAsset {
   id: string;
   type: 'wall' | 'door' | 'window' | 'stairs' | 'safety-rail' | 
-        'floor-marking' | 'pallet-rack' | 'warehouse-shell' | 'floor' | 'pallet' | 'cardboard-box';
+        'floor-marking' | 'pallet-rack' | 'warehouse-shell' | 'floor' | 'pallet' | 'cardboard-box' | 'frame-assembly';
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -614,6 +616,7 @@ interface EditorState {
   // Actions
   addProcessNode: (type: ProcessNode['type'], position: [number, number, number]) => void;
   addEnvironmentAsset: (type: EnvironmentAsset['type'], position: [number, number, number]) => void;
+  insertFrameAssembly: (payload: FrameAssemblyExportContract, position?: [number, number, number]) => string;
   addActor: (type: Actor['type'], position: [number, number, number]) => void;
   
   updateObject: (id: string, type: 'process' | 'environment' | 'actor', updates: Record<string, any>) => void;
@@ -887,6 +890,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedObjectId: newAsset.id,
       selectedObjectType: 'environment',
     }));
+  },
+
+  insertFrameAssembly: (payload, position = [0, 0, 0]) => {
+    const manifest = get().assetManifest;
+    const matchingAsset = manifest.find(a => a.id === 'frame-assembly' && a.category === 'environment');
+    const defaultParams = getDefaultParameters('frame-assembly');
+    const params = {
+      ...defaultParams,
+      ...toFrameAssemblyParameters(payload),
+    };
+    const id = uuidv4();
+
+    const newAsset: EnvironmentAsset = {
+      id,
+      type: 'frame-assembly',
+      position: [position[0], 0, position[2]],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      parameters: params,
+      name: payload.assembly.name || 'Frame Assembly',
+      assetId: matchingAsset?.id,
+      assetDefType: matchingAsset?.assetType,
+    };
+
+    set(state => ({
+      environmentAssets: [...state.environmentAssets, newAsset],
+      selectedObjectId: newAsset.id,
+      selectedObjectType: 'environment',
+    }));
+
+    return id;
   },
   
   addActor: (type, position) => {
@@ -1385,6 +1419,7 @@ function getDefaultParameters(type: string): Record<string, any> {
     'floor-marking': { length: 5, width: 0.2, color: 'yellow' },
     'pallet-rack': { width: 3, height: 4, depth: 1.2, levels: 4 },
     'warehouse-shell': { width: 20, height: 8, depth: 15 },
+    'frame-assembly': { templateId: 'table-frame', profileFamilyId: 'profile-40x40', widthMm: 1600, heightMm: 1200, depthMm: 800 },
     floor: { width: 50, depth: 50, color: '#f0f0f0' },
     pallet: {},
     'cardboard-box': {},

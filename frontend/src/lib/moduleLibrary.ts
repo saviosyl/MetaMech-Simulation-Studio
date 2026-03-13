@@ -624,6 +624,21 @@ export const moduleLibrary: ModuleDefinition[] = [
     },
   },
   {
+    id: 'frame-assembly',
+    name: 'Frame Assembly',
+    category: 'environment',
+    icon: Columns,
+    description: 'Imported aluminium profile frame assembly from Frame Designer',
+    assetId: 'frame-assembly',
+    parameters: {
+      templateId: { type: 'select', label: 'Template', default: 'table-frame', options: ['table-frame', 'support-stand', 'guarding-frame', 'enclosure-frame'] },
+      profileFamilyId: { type: 'select', label: 'Profile Family', default: 'profile-40x40', options: ['profile-20x20', 'profile-30x30', 'profile-40x40', 'profile-45x45'] },
+      widthMm: { type: 'number', label: 'Width (mm)', default: 1600, min: 300, max: 20000, step: 50 },
+      heightMm: { type: 'number', label: 'Height (mm)', default: 1200, min: 300, max: 12000, step: 50 },
+      depthMm: { type: 'number', label: 'Depth (mm)', default: 800, min: 250, max: 12000, step: 50 },
+    },
+  },
+  {
     id: 'door',
     name: 'Door',
     category: 'environment',
