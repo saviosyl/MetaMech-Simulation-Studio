@@ -81,8 +81,9 @@ const PathLine: React.FC<{ path: ActorPath }> = ({ path }) => {
 
 const PathRenderer: React.FC = () => {
   const paths = useEditorStore(s => s.paths);
+  const pathsVisible = useEditorStore(s => s.pathsVisible);
 
-  if (paths.length === 0) return null;
+  if (!pathsVisible || paths.length === 0) return null;
 
   return (
     <group>

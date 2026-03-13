@@ -35,6 +35,8 @@ const ViewportToolbar: React.FC = () => {
   const pasteClipboard = useEditorStore(s => s.pasteClipboard);
   const overlaysHidden = useEditorStore(s => s.overlaysHidden);
   const setOverlaysHidden = useEditorStore(s => s.setOverlaysHidden);
+  const pathsVisible = useEditorStore(s => s.pathsVisible);
+  const setPathsVisible = useEditorStore(s => s.setPathsVisible);
 
   // Check if selected node has any connections
   const selectedEdges = selectedObjectId
@@ -172,6 +174,15 @@ const ViewportToolbar: React.FC = () => {
         style={btnStyle(overlaysHidden)}
       >
         {overlaysHidden ? '👁‍🗨' : '👁'}
+      </button>
+
+      {/* Path overlay visibility */}
+      <button
+        title={pathsVisible ? 'Hide Paths' : 'Show Paths'}
+        onClick={() => setPathsVisible(!pathsVisible)}
+        style={btnStyle(pathsVisible)}
+      >
+        🛣
       </button>
 
       {/* Camera Views */}

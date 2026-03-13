@@ -637,6 +637,8 @@ interface EditorState {
   toggleVisibility: (id: string) => void;
   overlaysHidden: boolean;
   setOverlaysHidden: (hidden: boolean) => void;
+  pathsVisible: boolean;
+  setPathsVisible: (visible: boolean) => void;
   
   setSceneSettings: (settings: Partial<SceneSettings>) => void;
   setActiveLibraryTab: (tab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical') => void;
@@ -772,6 +774,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   focusRequest: 0,
   hiddenIds: new Set(),
   overlaysHidden: false,
+  pathsVisible: true,
   
   isPlaying: false,
   isPaused: false,
@@ -1045,6 +1048,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   setOverlaysHidden: (hidden) => set({ overlaysHidden: hidden }),
+  setPathsVisible: (visible) => set({ pathsVisible: visible }),
   
   setSceneSettings: (settings) => {
     set(state => ({
@@ -1313,6 +1317,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       customModels: data.customModels || [],
       paths: data.paths || [],
       cameraPaths: data.cameraPaths || [],
+      pathsVisible: data.pathsVisible ?? true,
       activeCameraPathId: null,
       isCameraPathPlaying: false,
       selectedObjectId: null,
@@ -1333,6 +1338,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       customProducts: state.customProducts,
       customModels: state.customModels,
       paths: state.paths,
+      pathsVisible: state.pathsVisible,
       cameraPaths: state.cameraPaths,
     };
   },
