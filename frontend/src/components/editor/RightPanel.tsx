@@ -80,8 +80,8 @@ const RightPanel: React.FC = () => {
   }, [selectedObjectId, selectedObjectType, processNodes, environmentAssets, actors]);
 
   const moduleDef = selectedObject ? getModuleDefinition(selectedObject.type) : null;
-  const widthMin = selectedObject ? 220 : 180;
-  const widthMax = selectedObject ? 380 : 300;
+  const widthMin = selectedObject ? 220 : 160;
+  const widthMax = selectedObject ? 380 : 260;
   const paramAssetDef = React.useMemo(() => {
     if (!selectedObject || !(selectedObject as any).assetId) return null;
     const d = getAssetById((selectedObject as any).assetId);
@@ -480,8 +480,8 @@ const RightPanel: React.FC = () => {
               </Section>
 
               {/* Empty state */}
-              <div style={{ textAlign: 'center', padding: '28px 0' }}>
-                <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--mm-bg-surface)', border: '1px solid var(--mm-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--mm-bg-surface)', border: '1px solid var(--mm-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
                   <Sliders size={18} style={{ color: 'var(--mm-text-disabled)' }} />
                 </div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)', marginBottom: 4 }}>No object selected</div>

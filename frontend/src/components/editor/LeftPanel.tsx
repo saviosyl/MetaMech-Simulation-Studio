@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState, useMemo } from 'react';
-import { Search, ChevronLeft, ChevronRight, List, GripVertical, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModulesByCategory, ModuleDefinition } from '../../lib/moduleLibrary';
 import SceneHierarchy from './SceneHierarchy';
@@ -94,7 +94,7 @@ const LeftPanel: React.FC = () => {
       <div style={{ flex: 1, background: 'var(--mm-bg-panel)', borderRight: '1px solid var(--mm-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
         {/* Header */}
-        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0 }}>
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ display: 'flex', gap: 2 }}>
               {(['library', 'scene'] as const).map(m => (
@@ -139,24 +139,24 @@ const LeftPanel: React.FC = () => {
 
         {viewMode === 'scene' ? <SceneHierarchy /> : (
           <>
-            {/* Category tabs — 2-row grid so all are always visible */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2, padding: '5px 8px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0 }}>
+            {/* Category tabs — single compact strip with horizontal scroll */}
+            <div style={{ display: 'flex', gap: 4, padding: '6px 8px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0, overflowX: 'auto' }}>
               {TABS.map(tab => {
                 const active = activeLibraryTab === tab.id;
                 const Icon = tab.icon;
                 return (
                   <button key={tab.id} onClick={() => setActiveLibraryTab(tab.id)}
                     style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                      padding: '4px 2px', borderRadius: 6,
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '5px 7px', borderRadius: 6, flexShrink: 0,
                       border: `1px solid ${active ? 'rgba(34,211,238,0.3)' : 'transparent'}`,
                       background: active ? 'var(--mm-accent-primary-muted)' : 'transparent',
                       color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-tertiary)',
-                      cursor: 'pointer', fontSize: 9, fontWeight: 600,
+                      cursor: 'pointer', fontSize: 10, fontWeight: 600,
                       fontFamily: "'Orbitron', monospace", transition: 'all 0.15s',
                     }}>
-                    <Icon size={14} />
-                    <span style={{ lineHeight: 1 }}>{tab.name}</span>
+                    <Icon size={12} />
+                    <span style={{ lineHeight: 1, whiteSpace: 'nowrap' }}>{tab.name}</span>
                   </button>
                 );
               })}
@@ -204,7 +204,6 @@ const LeftPanel: React.FC = () => {
                               <Icon size={13} style={{ color: 'var(--mm-accent-primary)' }} />
                             </div>
                             <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--mm-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mod.name}</span>
-                            <GripVertical size={11} style={{ color: 'var(--mm-text-disabled)', flexShrink: 0 }} />
                           </div>
                         );
                       })}

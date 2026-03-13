@@ -101,9 +101,9 @@ const ViewportToolbar: React.FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: 8,
-        right: 10,
-        zIndex: 55,
+        top: 'clamp(14px, 2vw, 24px)',
+        right: 'clamp(8px, 1.6vw, 16px)',
+        zIndex: 45,
         display: 'flex',
         alignItems: 'center',
         gap: 6,

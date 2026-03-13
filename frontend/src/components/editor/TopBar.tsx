@@ -22,6 +22,8 @@ interface TopBarProps {
 // ─── Styles ───
 const S = {
   bar: {
+    position: 'relative' as const,
+    zIndex: 80,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     padding: '0 12px', height: 46,
     background: 'var(--mm-bg-panel)',

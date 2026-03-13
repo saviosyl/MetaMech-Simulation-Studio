@@ -16,8 +16,8 @@ import { shouldValidateFlowConnectivity } from '../../lib/validation/connectivit
 
 type Tab = 'overview' | 'flow' | 'kpi' | 'validation';
 
-const MIN_HEIGHT = 34;  // collapsed header only
-const DEFAULT_HEIGHT = 170;
+const MIN_HEIGHT = 32;  // collapsed header only
+const DEFAULT_HEIGHT = 156;
 const MAX_HEIGHT = 500;
 
 // ─── Styles ───
@@ -41,17 +41,17 @@ const S = {
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 12px', height: 30, flexShrink: 0,
+    padding: '0 10px', height: 28, flexShrink: 0,
     borderBottom: '1px solid var(--mm-border-subtle)',
     cursor: 'pointer',
   } as React.CSSProperties,
   tabs: {
-    display: 'flex', gap: 2, padding: '6px 16px 0',
+    display: 'flex', gap: 2, padding: '5px 12px 0',
     borderBottom: '1px solid var(--mm-border-subtle)',
     flexShrink: 0,
   } as React.CSSProperties,
   tab: (active: boolean) => ({
-    padding: '6px 14px', fontSize: 11, fontWeight: 600,
+    padding: '5px 10px', fontSize: 10, fontWeight: 600,
     fontFamily: "'Orbitron', monospace", borderRadius: '6px 6px 0 0',
     border: 'none', cursor: 'pointer',
     background: active ? 'var(--mm-bg-surface)' : 'transparent',
