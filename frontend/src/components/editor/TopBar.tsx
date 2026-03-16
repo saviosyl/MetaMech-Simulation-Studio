@@ -36,27 +36,36 @@ const S = {
     display: 'grid',
     gridTemplateColumns: '1fr auto 1fr',
     alignItems: 'center',
-    padding: '0 12px', height: 46,
+    padding: '0 10px', height: 44,
     background: 'var(--mm-bg-panel)',
     borderBottom: '1px solid var(--mm-border)',
-    boxShadow: '0 1px 6px rgba(0,0,0,0.12)',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
   } as React.CSSProperties,
   group: {
-    display: 'flex', alignItems: 'center', gap: 6,
-    padding: '3px 6px',
-    background: 'var(--mm-bg-surface)',
+    display: 'flex', alignItems: 'center', gap: 4,
+    padding: '2px 4px',
+    background: 'transparent',
     borderRadius: 8,
-    border: '1px solid var(--mm-border-subtle)',
+    border: 'none',
+  } as React.CSSProperties,
+  strip: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '4px 6px',
+    borderRadius: 8,
+    background: 'rgba(15,23,42,0.2)',
+    border: '1px solid rgba(148,163,184,0.18)',
   } as React.CSSProperties,
   groupLabel: {
-    fontSize: 9, fontWeight: 700, color: 'var(--mm-text-disabled)',
+    fontSize: 8, fontWeight: 700, color: 'var(--mm-text-disabled)',
     letterSpacing: '0.08em', textTransform: 'uppercase' as const,
     fontFamily: "'Orbitron', monospace",
   } as React.CSSProperties,
-  divider: { width: 1, height: 24, background: 'var(--mm-border-subtle)', flexShrink: 0 } as React.CSSProperties,
+  divider: { width: 1, height: 18, background: 'rgba(148,163,184,0.28)', flexShrink: 0 } as React.CSSProperties,
   iconBtn: (active?: boolean) => ({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 30, height: 30, borderRadius: 6, border: 'none', cursor: 'pointer',
+    width: 28, height: 28, borderRadius: 6, border: 'none', cursor: 'pointer',
     background: active ? 'var(--mm-accent-primary-muted)' : 'transparent',
     color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-secondary)',
     transition: 'all 0.15s',
@@ -83,8 +92,21 @@ const S = {
     border: '1px solid var(--mm-border-subtle)',
     background: 'var(--mm-bg-surface)',
     color: 'var(--mm-text-secondary)',
-    fontWeight: 600,
+    fontWeight: 700,
     outline: 'none',
+  } as React.CSSProperties,
+  projectNameText: {
+    display: 'inline-block',
+    maxWidth: 128,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+    fontSize: 12,
+    fontWeight: 700,
+    fontFamily: "'Orbitron', monospace",
+    color: 'var(--mm-text-primary)',
+    cursor: 'pointer',
+    letterSpacing: '0.02em',
   } as React.CSSProperties,
 };
 
@@ -285,7 +307,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   return (
     <div style={S.bar} data-tour="top-ribbon">
       {/* ════ LEFT: Project + Edit + Build ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifySelf: 'start', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, justifySelf: 'start', minWidth: 0 }}>
         {/* Brand */}
         <button onClick={() => navigate('/dashboard')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s' }}
@@ -300,23 +322,23 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         {isEditing ? (
           <input type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)}
             onBlur={() => setIsEditing(false)} onKeyPress={(e) => e.key === 'Enter' && setIsEditing(false)} autoFocus
-            style={{ fontSize: 13, fontWeight: 600, fontFamily: "'Orbitron', monospace", background: 'transparent', border: 'none', borderBottom: '2px solid var(--mm-accent-primary)', color: 'var(--mm-text-primary)', outline: 'none', padding: '2px 0', width: 180 }} />
+            style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Orbitron', monospace", background: 'transparent', border: 'none', borderBottom: '2px solid var(--mm-accent-primary)', color: 'var(--mm-text-primary)', outline: 'none', padding: '1px 0', width: 132 }} />
         ) : (
-          <span onClick={() => setIsEditing(true)}
-            style={{ fontSize: 13, fontWeight: 600, fontFamily: "'Orbitron', monospace", color: 'var(--mm-text-primary)', cursor: 'pointer' }}>
+          <span
+            onClick={() => setIsEditing(true)}
+            title={projectName}
+            style={S.projectNameText}
+          >
             {projectName}
           </span>
         )}
 
         <div style={S.divider} />
 
-        {/* Edit group */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-          <div style={S.group}>
-            <button onClick={handleUndo} style={S.iconBtn()} title="Undo (Ctrl+Z)"><Undo2 size={15} /></button>
-            <button onClick={handleRedo} style={S.iconBtn()} title="Redo (Ctrl+Shift+Z)"><Redo2 size={15} /></button>
-          </div>
-          <span style={S.groupLabel}>Edit</span>
+        {/* Edit */}
+        <div style={S.strip}>
+          <button onClick={handleUndo} style={S.iconBtn()} title="Undo (Ctrl+Z)"><Undo2 size={15} /></button>
+          <button onClick={handleRedo} style={S.iconBtn()} title="Redo (Ctrl+Shift+Z)"><Redo2 size={15} /></button>
         </div>
 
         {/* Scenarios */}
@@ -324,8 +346,17 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
       </div>
 
       {/* ════ CENTER: Simulation (bigger, prominent) ════ */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, justifySelf: 'center' }}>
-        <div style={{ ...S.group, padding: '6px 12px', gap: 8, background: 'var(--mm-bg-app)', border: '2px solid var(--mm-border)' }} data-tour="simulation-controls">
+      <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'center' }}>
+        <div
+          style={{
+            ...S.strip,
+            padding: '5px 10px',
+            gap: 7,
+            background: 'rgba(2,6,23,0.3)',
+            border: '1px solid rgba(148,163,184,0.22)',
+          }}
+          data-tour="simulation-controls"
+        >
           {/* Play/Pause */}
           <button onClick={isPlaying ? pause : play}
             style={S.simBtn(isPlaying ? '#f59e0b' : '#06b6d4')}
@@ -419,33 +450,24 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
             </span>
           )}
         </div>
-        <span style={S.groupLabel}>Simulation</span>
       </div>
 
       {/* ════ RIGHT: View + File + Save + User ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifySelf: 'end' }}>
-        {/* View */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-          <div style={S.group}>
-            <button onClick={() => useEditorStore.getState().toggleTheme()} style={S.iconBtn()} title="Toggle Theme">
-              {useEditorStore.getState().themeMode === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-            </button>
-            <button onClick={() => useEditorStore.getState().setPresentationMode(true)} style={S.iconBtn()} title="Presentation Mode"><Maximize2 size={15} /></button>
-            <button onClick={() => setShowShortcuts(true)} style={S.iconBtn()} title="Shortcuts (?)"><HelpCircle size={15} /></button>
-          </div>
-          <span style={S.groupLabel}>View</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifySelf: 'end' }}>
+        <div style={S.strip}>
+          <button onClick={() => useEditorStore.getState().toggleTheme()} style={S.iconBtn()} title="Toggle Theme">
+            {useEditorStore.getState().themeMode === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+          <button onClick={() => useEditorStore.getState().setPresentationMode(true)} style={S.iconBtn()} title="Presentation Mode"><Maximize2 size={15} /></button>
+          <button onClick={() => setShowShortcuts(true)} style={S.iconBtn()} title="Shortcuts (?)"><HelpCircle size={15} /></button>
         </div>
 
         <div style={S.divider} />
 
-        {/* File */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-          <div style={S.group}>
-            <button onClick={handleImport} style={S.iconBtn()} title="Import Project"><Upload size={15} /></button>
-            <button onClick={handleExport} style={S.iconBtn()} title="Export Project"><Download size={15} /></button>
-            <button onClick={() => setShowAIBuilder(true)} style={{ ...S.iconBtn(), color: 'var(--mm-accent-primary)', fontWeight: 700, fontSize: 11, padding: '4px 8px' }} title="AI Layout Builder">AI</button>
-          </div>
-          <span style={S.groupLabel}>File</span>
+        <div style={S.strip}>
+          <button onClick={handleImport} style={S.iconBtn()} title="Import Project"><Upload size={15} /></button>
+          <button onClick={handleExport} style={S.iconBtn()} title="Export Project"><Download size={15} /></button>
+          <button onClick={() => setShowAIBuilder(true)} style={{ ...S.iconBtn(), color: 'var(--mm-accent-primary)', fontWeight: 700, fontSize: 11, padding: '4px 8px' }} title="AI Layout Builder">AI</button>
         </div>
 
         {/* Save */}
