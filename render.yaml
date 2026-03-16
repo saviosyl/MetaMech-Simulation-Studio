@@ -4,7 +4,7 @@ services:
     runtime: node
     rootDir: backend
     buildCommand: npm install --include=dev && npm run build
-    preDeployCommand: npm run migrate
+    preDeployCommand: node dist/migrate.js
     startCommand: npm run start
     healthCheckPath: /health
     autoDeploy: true
@@ -23,8 +23,6 @@ services:
         value: "false"
       - key: EXPOSE_DEV_VERIFICATION_LINK
         value: "false"
-      - key: DB_SSL
-        value: "true"
       - key: JWT_SECRET
         sync: false
       - key: JWT_EXPIRES_IN

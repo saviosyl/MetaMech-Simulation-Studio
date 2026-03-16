@@ -28,7 +28,8 @@ Set these backend environment variables:
 - `JWT_EXPIRES_IN=7d` (or your policy)
 - `DATABASE_URL=<production postgres connection string>`
   - or full `DB_*` set if not using `DATABASE_URL`
-- `DB_SSL=true` (if your managed postgres requires TLS)
+- `DB_SSL=true` only when your postgres host requires explicit TLS flag.
+  - For some managed providers, `DATABASE_URL` already encodes SSL and `DB_SSL` can be omitted.
 - `FRONTEND_URL=https://app.metamechsolutions.com`
 - `CORS_ORIGINS=https://app.metamechsolutions.com`
 - `TRIAL_IDENTITY_SALT=<long random secret>`
