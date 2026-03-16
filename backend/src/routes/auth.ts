@@ -285,9 +285,10 @@ router.post('/login', async (req, res) => {
 
     if (!user.email_verified_at) {
       return res.status(403).json({
-        error: 'Please verify your email before signing in.',
+        error: 'Please verify your email before signing in. You can request a new verification link if needed.',
         code: 'EMAIL_VERIFICATION_REQUIRED',
         email: user.email,
+        nextStep: 'verify_email',
       });
     }
 
@@ -362,7 +363,7 @@ router.post('/resend-verification', async (req, res) => {
 
     const user = userResult.rows[0] as { id: number; email_verified_at: Date | null };
     if (user.email_verified_at) {
-      return res.json({ message: 'Email is already verified. You can sign in now.' });
+      return res.json({ message: 'Email is already verified. You can sign in now.', alreadyVerified: true });
     }
 
     const verifyLink = await issueEmailVerificationToken(user.id);
@@ -422,11 +423,17 @@ router.post('/verify-email', async (req, res) => {
     );
 
     const trialResult = await startOneDayTrialIfEligible(user.id, user.email);
+    const verifyMessage =
+      trialResult.reason === 'granted'
+        ? 'Email verified successfully. Your 1-day trial is now active.'
+        : trialResult.reason === 'already_used'
+          ? 'Email verified successfully. Your previous trial has already been used. Sign in to continue with subscription access.'
+          : trialResult.reason === 'identity_conflict'
+            ? 'Email verified successfully. This identity already consumed a trial previously. Sign in to continue with subscription access.'
+            : 'Email verified successfully.';
 
     return res.json({
-      message: trialResult.granted
-        ? 'Email verified successfully. Your 1-day trial is now active.'
-        : 'Email verified successfully.',
+      message: verifyMessage,
       emailVerified: true,
       trialGranted: trialResult.granted,
       trialReason: trialResult.reason,

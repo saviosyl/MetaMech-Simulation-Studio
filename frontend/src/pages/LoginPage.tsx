@@ -23,6 +23,7 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [info, setInfo] = useState('');
 
   const { login, user, loading } = useAuth();
   const navigate = useNavigate();
@@ -43,6 +44,10 @@ const LoginPage: React.FC = () => {
     : rawFrom;
 
   useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    const stateMessage = (location.state as any)?.message || '';
+    if (stateMessage) setInfo(stateMessage);
+  }, [location.state]);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -57,7 +62,7 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) { setError('Please enter both email and password.'); return; }
-    setIsLoading(true); setError('');
+    setIsLoading(true); setError(''); setInfo('');
     try {
       const signedIn = await login(email, password);
       if (!signedIn.emailVerified) {
@@ -178,6 +183,16 @@ const LoginPage: React.FC = () => {
               padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 20,
             }}>
               {error}
+            </div>
+          )}
+          {info && (
+            <div style={{
+              background: 'rgba(16,185,129,0.14)',
+              border: '1px solid rgba(16,185,129,0.35)',
+              color: '#34d399',
+              padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 20,
+            }}>
+              {info}
             </div>
           )}
 

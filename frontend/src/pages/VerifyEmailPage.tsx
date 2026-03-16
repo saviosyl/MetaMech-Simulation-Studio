@@ -10,7 +10,19 @@ const VerifyEmailPage: React.FC = () => {
   const { user } = useAuth();
 
   const token = useMemo(() => params.get('token') || '', [params]);
-  const next = useMemo(() => params.get('next') || '/dashboard', [params]);
+  const next = useMemo(() => {
+    const raw = params.get('next') || '/dashboard';
+    if (
+      raw.startsWith('/login')
+      || raw.startsWith('/register')
+      || raw.startsWith('/verify-email')
+      || raw.startsWith('/forgot-password')
+      || raw.startsWith('/reset-password')
+    ) {
+      return '/dashboard';
+    }
+    return raw;
+  }, [params]);
   const [email, setEmail] = useState(params.get('email') || user?.email || '');
 
   const [verifyLoading, setVerifyLoading] = useState(false);
@@ -19,6 +31,8 @@ const VerifyEmailPage: React.FC = () => {
   const [message, setMessage] = useState((location.state as any)?.message || '');
   const [devVerificationLink, setDevVerificationLink] = useState((location.state as any)?.devVerificationLink || '');
   const [verified, setVerified] = useState(false);
+  const [trialGranted, setTrialGranted] = useState(false);
+  const [trialReason, setTrialReason] = useState('');
 
   useEffect(() => {
     if (!email && user?.email) setEmail(user.email);
@@ -28,6 +42,10 @@ const VerifyEmailPage: React.FC = () => {
     if (!user) return;
     if (user.emailVerified && user.subscription?.entitled) {
       navigate(next, { replace: true });
+      return;
+    }
+    if (user.emailVerified && !user.subscription?.entitled) {
+      navigate(`/billing?next=${encodeURIComponent(next)}`, { replace: true });
     }
   }, [user, next, navigate]);
 
@@ -39,10 +57,17 @@ const VerifyEmailPage: React.FC = () => {
       setMessage('');
       try {
         const response = await api.post('/auth/verify-email', { token });
+        const granted = !!response.data?.trialGranted;
+        const reason = String(response.data?.trialReason || '');
+        setTrialGranted(granted);
+        setTrialReason(reason);
         setVerified(true);
-        setMessage(response.data?.message || 'Email verified successfully. You can now sign in.');
+        setMessage(response.data?.message || (granted
+          ? 'Email verified successfully. Your 1-day trial is now active.'
+          : 'Email verified successfully. Sign in to continue.'));
       } catch (err: any) {
         setError(err?.response?.data?.error || 'Unable to verify email. The link may be invalid or expired.');
+        setMessage('If your verification link has expired, request a new one below.');
       } finally {
         setVerifyLoading(false);
       }
@@ -65,6 +90,7 @@ const VerifyEmailPage: React.FC = () => {
     try {
       const response = await api.post('/auth/resend-verification', { email: email.trim().toLowerCase() });
       setMessage(response.data?.message || 'Verification email sent.');
+      setVerified(false);
       setDevVerificationLink(response.data?.devVerificationLink || '');
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Unable to resend verification email. Please try again.');
@@ -100,7 +126,11 @@ const VerifyEmailPage: React.FC = () => {
             </div>
           )}
           {message && (
-            <div className="bg-teal-50 border border-teal-200 text-teal-700 px-4 py-3 rounded-lg mb-4">
+            <div className={`px-4 py-3 rounded-lg mb-4 border ${
+              trialReason === 'identity_conflict' || trialReason === 'already_used'
+                ? 'bg-amber-50 border-amber-200 text-amber-800'
+                : 'bg-teal-50 border-teal-200 text-teal-700'
+            }`}>
               {message}
             </div>
           )}
@@ -114,11 +144,33 @@ const VerifyEmailPage: React.FC = () => {
 
           {verified ? (
             <div className="space-y-3">
+              {!trialGranted && (
+                <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  Your email is verified, but trial access is not active for this account. You can still sign in and continue from billing/subscription.
+                </div>
+              )}
               <button
-                onClick={() => navigate(`/login?next=${encodeURIComponent(next)}`, { replace: true })}
+                onClick={() => navigate(`/login?next=${encodeURIComponent(next)}`, {
+                  replace: true,
+                  state: {
+                    message: trialGranted
+                      ? 'Email verified and trial activated. You can sign in now.'
+                      : 'Email verified. Sign in to continue.',
+                  },
+                })}
                 className="w-full bg-teal-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-teal-700 transition-colors"
               >
                 Continue to Sign In
+              </button>
+              <button
+                onClick={() => {
+                  setVerified(false);
+                  setError('');
+                  setMessage('Need a fresh link? Resend verification below.');
+                }}
+                className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+              >
+                Need another verification email?
               </button>
             </div>
           ) : (
@@ -144,6 +196,9 @@ const VerifyEmailPage: React.FC = () => {
               >
                 {resendLoading ? 'Sending verification...' : 'Resend verification email'}
               </button>
+              <p className="text-xs text-gray-500 text-center">
+                For security, the same message may be shown even if an account does not exist.
+              </p>
             </form>
           )}
 
