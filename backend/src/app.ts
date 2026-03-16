@@ -12,6 +12,23 @@ dotenv.config();
 
 const app = express();
 
+function buildAllowedOrigins(): Set<string> {
+  const defaults = new Set<string>([
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+  ]);
+  const frontendUrl = (process.env.FRONTEND_URL || '').trim();
+  if (frontendUrl) defaults.add(frontendUrl.replace(/\/+$/, ''));
+  const configured = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+  for (const origin of configured) defaults.add(origin.replace(/\/+$/, ''));
+  return defaults;
+}
+
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -27,10 +44,16 @@ app.use(helmet({
 }));
 
 // CORS configuration
+const allowedOrigins = buildAllowedOrigins();
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://studio.metamechsolutions.com'] 
-    : ['http://localhost:5173', 'http://localhost:3000'],
+  origin: (origin, callback) => {
+    // Non-browser tools (curl/postman) may omit origin
+    if (!origin) return callback(null, true);
+    const normalized = origin.replace(/\/+$/, '');
+    if (allowedOrigins.has(normalized)) return callback(null, true);
+    if (process.env.NODE_ENV !== 'production') return callback(null, true);
+    return callback(new Error(`Origin not allowed by CORS: ${origin}`));
+  },
   credentials: true,
   optionsSuccessStatus: 200
 }));
