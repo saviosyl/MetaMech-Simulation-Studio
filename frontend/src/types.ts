@@ -4,6 +4,15 @@ export interface User {
   displayName: string;
   role: string;
   createdAt: string;
+  subscription: SubscriptionInfo;
+}
+
+export interface SubscriptionInfo {
+  status: 'trialing' | 'active' | 'past_due' | 'canceled' | 'expired' | 'none';
+  entitled: boolean;
+  planCode: string | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
 }
 
 export interface Project {

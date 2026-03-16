@@ -25,11 +25,10 @@ api.interceptors.response.use(
     // Only redirect on actual 401 from a working backend
     // Don't redirect on network errors (ECONNREFUSED etc.)
     if (error.response?.status === 401 && !window.location.pathname.startsWith('/login')) {
-      // Check if user has local auth — if so, don't redirect
-      const stored = localStorage.getItem('metamech_auth_user');
-      if (!stored) {
-        window.location.href = '/login';
-      }
+      window.location.href = '/login';
+    }
+    if (error.response?.status === 402 && !window.location.pathname.startsWith('/billing')) {
+      window.location.href = '/billing';
     }
     return Promise.reject(error);
   }

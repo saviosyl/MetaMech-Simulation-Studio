@@ -2,11 +2,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { query } from '../database';
 import { authenticateToken } from '../middleware/auth';
+import { requireActiveSubscription } from '../middleware/subscription';
 
 const router = Router();
 
 // Apply auth middleware to all routes
 router.use(authenticateToken);
+router.use(requireActiveSubscription);
 
 // Validation schemas
 const createProjectSchema = z.object({

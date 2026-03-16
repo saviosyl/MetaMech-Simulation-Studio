@@ -1,9 +1,12 @@
 export interface User {
   id: number;
   email: string;
-  password_hash: string;
+  password_hash?: string;
   display_name: string;
   role: string;
+  account_status?: string;
+  email_verified_at?: Date | null;
+  token_version?: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -19,16 +22,25 @@ export interface Project {
 
 export interface PasswordReset {
   id: number;
-  email: string;
-  token: string;
+  user_id: number;
+  token_hash: string;
   expires_at: Date;
-  used: boolean;
+  used_at: Date | null;
   created_at: Date;
+}
+
+export interface SubscriptionEntitlement {
+  status: 'trialing' | 'active' | 'past_due' | 'canceled' | 'expired' | 'none';
+  entitled: boolean;
+  planCode: string | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
 }
 
 export interface JWTPayload {
   userId: number;
   email: string;
+  tokenVersion: number;
 }
 
 declare global {

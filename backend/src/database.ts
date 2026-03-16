@@ -3,19 +3,39 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-export const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'metamech_studio',
-  password: 'postgres',
-  port: 5432,
-});
+function readRequiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+function buildPoolConfig(): ConstructorParameters<typeof Pool>[0] {
+  if (process.env.DATABASE_URL) {
+    return {
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+    };
+  }
+
+  return {
+    user: readRequiredEnv('DB_USER'),
+    host: readRequiredEnv('DB_HOST'),
+    database: readRequiredEnv('DB_NAME'),
+    password: readRequiredEnv('DB_PASSWORD'),
+    port: Number(readRequiredEnv('DB_PORT')),
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  };
+}
+
+export const pool = new Pool(buildPoolConfig());
 
 export async function query(text: string, params?: any[]) {
   const start = Date.now();
   const res = await pool.query(text, params);
   const duration = Date.now() - start;
-  console.log('Executed query', { text, duration, rows: res.rowCount });
+  console.log('Executed query', { duration, rows: res.rowCount });
   return res;
 }
 

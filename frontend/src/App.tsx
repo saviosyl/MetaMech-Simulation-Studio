@@ -4,6 +4,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import BillingPage from './pages/BillingPage';
 import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
 import FrameDesignerPage from './pages/FrameDesignerPage';
@@ -24,12 +26,18 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          
-          {/* Demo route - direct editor access without auth */}
-          <Route path="/demo" element={<EditorPage />} />
-          <Route path="/frame-designer-demo" element={<FrameDesignerPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           
           {/* Protected routes */}
+          <Route
+            path="/billing"
+            element={
+              <ProtectedRoute requireSubscription={false}>
+                <BillingPage />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/dashboard"
             element={
@@ -50,6 +58,24 @@ function App() {
 
           <Route
             path="/frame-designer"
+            element={
+              <ProtectedRoute>
+                <FrameDesignerPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Locked demo routes (auth + subscription required) */}
+          <Route
+            path="/demo"
+            element={
+              <ProtectedRoute>
+                <EditorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/frame-designer-demo"
             element={
               <ProtectedRoute>
                 <FrameDesignerPage />

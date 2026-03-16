@@ -8,6 +8,7 @@ const ForgotPasswordPage: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [devResetLink, setDevResetLink] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +24,7 @@ const ForgotPasswordPage: React.FC = () => {
     try {
       const response = await api.post('/auth/forgot-password', { email });
       setMessage(response.data.message);
+      setDevResetLink(response.data.devResetLink || '');
       setIsSubmitted(true);
     } catch (error: any) {
       setError(error.response?.data?.error || 'Something went wrong. Please try again.');
@@ -62,11 +64,18 @@ const ForgotPasswordPage: React.FC = () => {
               </p>
 
               <div className="space-y-4">
+                {devResetLink && (
+                  <div className="text-left bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-sm">
+                    <div className="font-semibold mb-1">Development reset link</div>
+                    <a href={devResetLink} className="underline break-all">{devResetLink}</a>
+                  </div>
+                )}
                 <button
                   onClick={() => {
                     setIsSubmitted(false);
                     setMessage('');
                     setEmail('');
+                    setDevResetLink('');
                   }}
                   className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"
                 >
