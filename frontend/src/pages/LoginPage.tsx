@@ -35,6 +35,7 @@ const LoginPage: React.FC = () => {
   const from = (
     rawFrom.startsWith('/login')
     || rawFrom.startsWith('/register')
+    || rawFrom.startsWith('/verify-email')
     || rawFrom.startsWith('/forgot-password')
     || rawFrom.startsWith('/reset-password')
   )
@@ -45,6 +46,10 @@ const LoginPage: React.FC = () => {
 
   useEffect(() => {
     if (loading || !user) return;
+    if (!user.emailVerified) {
+      navigate(`/verify-email?email=${encodeURIComponent(user.email)}&next=${encodeURIComponent(from)}`, { replace: true });
+      return;
+    }
     if (user.subscription?.entitled) navigate(from, { replace: true });
     else navigate(`/billing?next=${encodeURIComponent(from)}`, { replace: true });
   }, [loading, user, navigate, from]);
@@ -55,10 +60,22 @@ const LoginPage: React.FC = () => {
     setIsLoading(true); setError('');
     try {
       const signedIn = await login(email, password);
-      if (signedIn.subscription?.entitled) navigate(from, { replace: true });
+      if (!signedIn.emailVerified) {
+        navigate(`/verify-email?email=${encodeURIComponent(signedIn.email)}&next=${encodeURIComponent(from)}`, { replace: true });
+      } else if (signedIn.subscription?.entitled) navigate(from, { replace: true });
       else navigate(`/billing?next=${encodeURIComponent(from)}`, { replace: true });
     }
-    catch (error: any) { setError(error.message); }
+    catch (error: any) {
+      if (error?.code === 'EMAIL_VERIFICATION_REQUIRED') {
+        const unresolvedEmail = error?.email || email.trim().toLowerCase();
+        navigate(`/verify-email?email=${encodeURIComponent(unresolvedEmail)}&next=${encodeURIComponent(from)}`, {
+          replace: true,
+          state: { message: error.message || 'Please verify your email before signing in.' },
+        });
+        return;
+      }
+      setError(error.message);
+    }
     finally { setIsLoading(false); }
   };
 

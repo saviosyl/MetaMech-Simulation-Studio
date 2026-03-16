@@ -7,6 +7,8 @@ export interface User {
   account_status?: string;
   email_verified_at?: Date | null;
   token_version?: number;
+  trial_used_at?: Date | null;
+  stripe_customer_id?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -30,8 +32,9 @@ export interface PasswordReset {
 }
 
 export interface SubscriptionEntitlement {
-  status: 'trialing' | 'active' | 'past_due' | 'canceled' | 'expired' | 'none';
+  status: 'pending_verification' | 'trialing' | 'active' | 'past_due' | 'canceled' | 'expired' | 'none';
   entitled: boolean;
+  requiresEmailVerification: boolean;
   planCode: string | null;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;

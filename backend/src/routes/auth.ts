@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { query } from '../database';
 import { authenticateToken } from '../middleware/auth';
-import { JWTPayload } from '../types';
+import { JWTPayload, SubscriptionEntitlement } from '../types';
 import { getUserSubscriptionEntitlement } from '../middleware/subscription';
 
 const router = Router();
@@ -28,6 +28,24 @@ function frontendBaseUrl(): string {
   return (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
 }
 
+function verificationTokenTtlHours(): number {
+  const parsed = Number(process.env.EMAIL_VERIFICATION_TOKEN_HOURS || 24);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 24;
+}
+
+function exposeDevVerificationLink(): boolean {
+  return process.env.NODE_ENV !== 'production' && process.env.EXPOSE_DEV_VERIFICATION_LINK === 'true';
+}
+
+function trialIdentitySalt(): string {
+  const base = process.env.TRIAL_IDENTITY_SALT || process.env.JWT_SECRET || 'metamech-dev-trial-salt';
+  return base;
+}
+
+function hashIdentityEmail(email: string): string {
+  return crypto.createHmac('sha256', trialIdentitySalt()).update(normalizeEmail(email)).digest('hex');
+}
+
 function setAuthCookie(res: Response, token: string) {
   res.cookie('token', token, {
     httpOnly: true,
@@ -35,6 +53,122 @@ function setAuthCookie(res: Response, token: string) {
     sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
+}
+
+async function issueEmailVerificationToken(userId: number): Promise<string> {
+  const tokenRaw = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(tokenRaw).digest('hex');
+  const expiresAt = new Date(Date.now() + verificationTokenTtlHours() * 60 * 60 * 1000);
+
+  await query(
+    'UPDATE email_verification_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL',
+    [userId]
+  );
+
+  await query(
+    'INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+    [userId, tokenHash, expiresAt]
+  );
+
+  return `${frontendBaseUrl()}/verify-email?token=${tokenRaw}`;
+}
+
+type TrialGrantResult = {
+  granted: boolean;
+  reason: 'granted' | 'already_used' | 'identity_conflict' | 'not_applicable';
+  entitlement: SubscriptionEntitlement;
+};
+
+async function startOneDayTrialIfEligible(userId: number, email: string): Promise<TrialGrantResult> {
+  const userResult = await query(
+    'SELECT trial_used_at FROM users WHERE id = $1 LIMIT 1',
+    [userId]
+  );
+
+  if (userResult.rows.length === 0) {
+    return {
+      granted: false,
+      reason: 'not_applicable',
+      entitlement: await getUserSubscriptionEntitlement(userId, true),
+    };
+  }
+
+  const userRow = userResult.rows[0] as { trial_used_at: Date | null };
+  const emailHash = hashIdentityEmail(email);
+  const ledger = await query(
+    'SELECT first_user_id FROM trial_identity_ledger WHERE email_hash = $1 LIMIT 1',
+    [emailHash]
+  );
+
+  if (userRow.trial_used_at) {
+    const entitlement = await getUserSubscriptionEntitlement(userId, true);
+    return { granted: false, reason: 'already_used', entitlement };
+  }
+
+  if (ledger.rows.length > 0 && Number(ledger.rows[0].first_user_id) !== userId) {
+    await query(
+      'UPDATE users SET trial_used_at = NOW(), updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND trial_used_at IS NULL',
+      [userId]
+    );
+    await query(
+      `UPDATE subscriptions
+       SET status = 'expired', current_period_end = NOW(), updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1 AND status = 'pending_verification'`,
+      [userId]
+    );
+    const entitlement = await getUserSubscriptionEntitlement(userId, true);
+    return { granted: false, reason: 'identity_conflict', entitlement };
+  }
+
+  const ledgerInsert = await query(
+    `INSERT INTO trial_identity_ledger (email_hash, first_user_id, trial_consumed_at)
+     VALUES ($1, $2, NOW())
+     ON CONFLICT (email_hash) DO NOTHING
+     RETURNING first_user_id`,
+    [emailHash, userId]
+  );
+
+  if (ledgerInsert.rows.length === 0) {
+    const existingLedger = await query(
+      'SELECT first_user_id FROM trial_identity_ledger WHERE email_hash = $1 LIMIT 1',
+      [emailHash]
+    );
+    if (existingLedger.rows.length > 0 && Number(existingLedger.rows[0].first_user_id) !== userId) {
+      await query(
+        'UPDATE users SET trial_used_at = NOW(), updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND trial_used_at IS NULL',
+        [userId]
+      );
+      await query(
+        `UPDATE subscriptions
+         SET status = 'expired', current_period_end = NOW(), updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $1 AND status = 'pending_verification'`,
+        [userId]
+      );
+      const entitlement = await getUserSubscriptionEntitlement(userId, true);
+      return { granted: false, reason: 'identity_conflict', entitlement };
+    }
+  }
+
+  await query(
+    'UPDATE users SET trial_used_at = NOW(), updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND trial_used_at IS NULL',
+    [userId]
+  );
+
+  await query(
+    `UPDATE subscriptions
+     SET status = 'trialing',
+         plan_code = COALESCE(plan_code, 'trial-1d'),
+         current_period_start = NOW(),
+         current_period_end = NOW() + INTERVAL '1 day',
+         trial_started_at = NOW(),
+         trial_ends_at = NOW() + INTERVAL '1 day',
+         updated_at = CURRENT_TIMESTAMP
+     WHERE user_id = $1 AND status = 'pending_verification'`,
+    [userId]
+  );
+
+  const entitlement = await getUserSubscriptionEntitlement(userId, true);
+  return { granted: true, reason: 'granted', entitlement };
 }
 
 // Validation schemas
@@ -51,6 +185,14 @@ const loginSchema = z.object({
 
 const forgotPasswordSchema = z.object({
   email: z.string().email()
+});
+
+const resendVerificationSchema = z.object({
+  email: z.string().email()
+});
+
+const verifyEmailSchema = z.object({
+  token: z.string().min(1)
 });
 
 const resetPasswordSchema = z.object({
@@ -79,41 +221,27 @@ router.post('/register', async (req, res) => {
     const result = await query(
       `INSERT INTO users (email, password_hash, display_name)
        VALUES ($1, $2, $3)
-       RETURNING id, email, display_name, role, token_version, created_at`,
+       RETURNING id, email, display_name, role, created_at`,
       [email, passwordHash, displayName]
     );
 
     const user = result.rows[0];
 
-    // Create default trial subscription for new user
+    // New accounts must verify email before trial starts
     await query(
       `INSERT INTO subscriptions (user_id, status, plan_code, current_period_start, current_period_end)
-       VALUES ($1, 'trialing', 'phase1-manual', NOW(), NOW() + INTERVAL '14 days')
+       VALUES ($1, 'pending_verification', 'trial-1d', NULL, NULL)
        ON CONFLICT (user_id) DO NOTHING`,
       [user.id]
     );
 
-    const subscription = await getUserSubscriptionEntitlement(user.id);
-
-    // Create JWT token
-    const payload: JWTPayload = { userId: user.id, email: user.email, tokenVersion: user.token_version ?? 1 };
-    const expiresIn = resolveJwtExpiresIn();
-    const token = jwt.sign(payload, process.env.JWT_SECRET!, {
-      expiresIn
-    });
-
-    setAuthCookie(res, token);
+    const verifyLink = await issueEmailVerificationToken(user.id);
 
     res.status(201).json({
-      message: 'User created successfully',
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.display_name,
-        role: user.role,
-        createdAt: user.created_at,
-        subscription,
-      },
+      message: 'Account created. Verify your email to start your 1-day trial.',
+      requiresEmailVerification: true,
+      email: user.email,
+      ...(exposeDevVerificationLink() ? { devVerificationLink: verifyLink } : {}),
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -133,7 +261,7 @@ router.post('/login', async (req, res) => {
 
     // Find user
     const result = await query(
-      `SELECT id, email, password_hash, display_name, role, account_status, token_version, created_at
+      `SELECT id, email, password_hash, display_name, role, account_status, email_verified_at, token_version, created_at
        FROM users
        WHERE email = $1`,
       [email]
@@ -155,6 +283,14 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    if (!user.email_verified_at) {
+      return res.status(403).json({
+        error: 'Please verify your email before signing in.',
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        email: user.email,
+      });
+    }
+
     // Create JWT token
     const payload: JWTPayload = { userId: user.id, email: user.email, tokenVersion: user.token_version ?? 1 };
     const expiresIn = resolveJwtExpiresIn();
@@ -164,7 +300,7 @@ router.post('/login', async (req, res) => {
 
     setAuthCookie(res, token);
 
-    const subscription = await getUserSubscriptionEntitlement(user.id);
+    const subscription = await getUserSubscriptionEntitlement(user.id, true);
 
     res.json({
       message: 'Login successful',
@@ -174,6 +310,7 @@ router.post('/login', async (req, res) => {
         displayName: user.display_name,
         role: user.role,
         createdAt: user.created_at,
+        emailVerified: true,
         subscription,
       },
     });
@@ -194,7 +331,8 @@ router.post('/logout', (req, res) => {
 
 // Get current user
 router.get('/me', authenticateToken, async (req, res) => {
-  const subscription = await getUserSubscriptionEntitlement(req.user!.id);
+  const emailVerified = !!req.user!.email_verified_at;
+  const subscription = await getUserSubscriptionEntitlement(req.user!.id, emailVerified);
   res.json({
     user: {
       id: req.user!.id,
@@ -202,9 +340,105 @@ router.get('/me', authenticateToken, async (req, res) => {
       displayName: req.user!.display_name,
       role: req.user!.role,
       createdAt: req.user!.created_at,
+      emailVerified,
       subscription,
     },
   });
+});
+
+// Resend email verification
+router.post('/resend-verification', async (req, res) => {
+  try {
+    const parsed = resendVerificationSchema.parse(req.body);
+    const email = normalizeEmail(parsed.email);
+    const userResult = await query(
+      'SELECT id, email_verified_at FROM users WHERE email = $1 LIMIT 1',
+      [email]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.json({ message: 'If an account with that email exists, a verification link has been sent.' });
+    }
+
+    const user = userResult.rows[0] as { id: number; email_verified_at: Date | null };
+    if (user.email_verified_at) {
+      return res.json({ message: 'Email is already verified. You can sign in now.' });
+    }
+
+    const verifyLink = await issueEmailVerificationToken(user.id);
+
+    return res.json({
+      message: 'If an account with that email exists, a verification link has been sent.',
+      ...(exposeDevVerificationLink() ? { devVerificationLink: verifyLink } : {}),
+    });
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Verify email and start one-time 1-day trial
+router.post('/verify-email', async (req, res) => {
+  try {
+    const { token } = verifyEmailSchema.parse(req.body);
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const tokenResult = await query(
+      `SELECT id, user_id
+       FROM email_verification_tokens
+       WHERE token_hash = $1
+         AND expires_at > NOW()
+         AND used_at IS NULL
+       LIMIT 1`,
+      [tokenHash]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired verification token' });
+    }
+
+    const verificationRow = tokenResult.rows[0] as { id: number; user_id: number };
+    const userResult = await query(
+      'SELECT id, email, email_verified_at FROM users WHERE id = $1 LIMIT 1',
+      [verificationRow.user_id]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Verification target account not found' });
+    }
+
+    const user = userResult.rows[0] as { id: number; email: string; email_verified_at: Date | null };
+
+    await query('UPDATE email_verification_tokens SET used_at = NOW() WHERE id = $1', [verificationRow.id]);
+    await query(
+      'UPDATE users SET email_verified_at = COALESCE(email_verified_at, NOW()), updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [user.id]
+    );
+    await query(
+      'UPDATE email_verification_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL',
+      [user.id]
+    );
+
+    const trialResult = await startOneDayTrialIfEligible(user.id, user.email);
+
+    return res.json({
+      message: trialResult.granted
+        ? 'Email verified successfully. Your 1-day trial is now active.'
+        : 'Email verified successfully.',
+      emailVerified: true,
+      trialGranted: trialResult.granted,
+      trialReason: trialResult.reason,
+      subscription: trialResult.entitlement,
+    });
+  } catch (error) {
+    console.error('Verify email error:', error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Forgot password

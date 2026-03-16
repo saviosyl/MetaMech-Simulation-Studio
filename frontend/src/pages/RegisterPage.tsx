@@ -23,6 +23,7 @@ const RegisterPage: React.FC = () => {
   const from = (
     rawFrom.startsWith('/login')
     || rawFrom.startsWith('/register')
+    || rawFrom.startsWith('/verify-email')
     || rawFrom.startsWith('/forgot-password')
     || rawFrom.startsWith('/reset-password')
   )
@@ -31,6 +32,10 @@ const RegisterPage: React.FC = () => {
 
   useEffect(() => {
     if (loading || !user) return;
+    if (!user.emailVerified) {
+      navigate(`/verify-email?email=${encodeURIComponent(user.email)}&next=${encodeURIComponent(from)}`, { replace: true });
+      return;
+    }
     if (user.subscription?.entitled) navigate(from, { replace: true });
     else navigate(`/billing?next=${encodeURIComponent(from)}`, { replace: true });
   }, [loading, user, navigate, from]);
@@ -65,8 +70,13 @@ const RegisterPage: React.FC = () => {
 
     try {
       const created = await register(formData.email, formData.password, formData.displayName);
-      if (created.subscription?.entitled) navigate(from, { replace: true });
-      else navigate(`/billing?next=${encodeURIComponent(from)}`, { replace: true });
+      navigate(`/verify-email?email=${encodeURIComponent(created.email)}&next=${encodeURIComponent(from)}`, {
+        replace: true,
+        state: {
+          message: created.message,
+          devVerificationLink: created.devVerificationLink || '',
+        },
+      });
     } catch (error: any) {
       setError(error.message);
     } finally {

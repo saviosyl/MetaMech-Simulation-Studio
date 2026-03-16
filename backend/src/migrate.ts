@@ -93,6 +93,49 @@ const migrations = [
         SELECT 1 FROM subscriptions s WHERE s.user_id = u.id
       );
     `
+  },
+  {
+    name: '005_trial_hardening_phase1',
+    sql: `
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_used_at TIMESTAMP NULL;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255) NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_users_stripe_customer_id
+        ON users(stripe_customer_id)
+        WHERE stripe_customer_id IS NOT NULL;
+
+      ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS trial_started_at TIMESTAMP NULL;
+      ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP NULL;
+      ALTER TABLE subscriptions ALTER COLUMN current_period_start DROP NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_user_id ON email_verification_tokens(user_id);
+      CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_hash ON email_verification_tokens(token_hash);
+      CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_expires ON email_verification_tokens(expires_at);
+
+      CREATE TABLE IF NOT EXISTS trial_identity_ledger (
+        id SERIAL PRIMARY KEY,
+        email_hash VARCHAR(64) UNIQUE NOT NULL,
+        first_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        stripe_customer_id VARCHAR(255) NULL,
+        trial_consumed_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_trial_identity_ledger_first_user_id ON trial_identity_ledger(first_user_id);
+
+      -- Backward compatibility: existing accounts pre-date verification flow
+      UPDATE users
+      SET email_verified_at = COALESCE(email_verified_at, created_at)
+      WHERE email_verified_at IS NULL;
+    `
   }
 ];
 

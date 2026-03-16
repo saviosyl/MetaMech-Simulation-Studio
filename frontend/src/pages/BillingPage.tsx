@@ -18,6 +18,7 @@ const BillingPage: React.FC = () => {
     rawNext.startsWith('/billing')
     || rawNext.startsWith('/login')
     || rawNext.startsWith('/register')
+    || rawNext.startsWith('/verify-email')
     || rawNext.startsWith('/forgot-password')
     || rawNext.startsWith('/reset-password')
   )
@@ -25,7 +26,9 @@ const BillingPage: React.FC = () => {
     : rawNext;
 
   const statusLabel =
-    status === 'past_due'
+    status === 'pending_verification'
+      ? 'Email verification required'
+      : status === 'past_due'
       ? 'Payment pending'
       : status === 'canceled'
         ? 'Subscription canceled'

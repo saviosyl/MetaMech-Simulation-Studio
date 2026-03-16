@@ -26,6 +26,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireSubscr
     return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} state={{ from: location }} replace />;
   }
 
+  if (!user.emailVerified) {
+    return <Navigate to={`/verify-email?email=${encodeURIComponent(user.email)}&next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  }
+
   if (requireSubscription && !user.subscription?.entitled) {
     return <Navigate to={`/billing?next=${encodeURIComponent(location.pathname + location.search)}`} state={{ from: location }} replace />;
   }

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import api from '../utils/api';
-import { User, AuthContextType } from '../types';
+import { User, AuthContextType, RegisterResult } from '../types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -35,8 +35,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const login = async (email: string, password: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
     try {
-      const response = await api.post('/auth/login', { email: email.trim().toLowerCase(), password });
+      const response = await api.post('/auth/login', { email: normalizedEmail, password });
       const u = response.data.user as User;
       setUser(u);
       return u;
@@ -44,25 +45,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (!error?.response) {
         throw new Error('Unable to reach server. Check your connection and try again.');
       }
-      throw new Error(error?.response?.data?.error || 'Login failed');
+      const err = new Error(error?.response?.data?.error || 'Login failed');
+      (err as any).code = error?.response?.data?.code;
+      (err as any).email = error?.response?.data?.email || normalizedEmail;
+      throw err;
     }
   };
 
   const register = async (email: string, password: string, displayName: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
     try {
       const response = await api.post('/auth/register', {
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         password,
         displayName: displayName.trim(),
       });
-      const u = response.data.user as User;
-      setUser(u);
-      return u;
+      setUser(null);
+      return response.data as RegisterResult;
     } catch (error: any) {
       if (!error?.response) {
         throw new Error('Unable to reach server. Check your connection and try again.');
       }
-      throw new Error(error?.response?.data?.error || 'Registration failed');
+      const err = new Error(error?.response?.data?.error || 'Registration failed');
+      (err as any).code = error?.response?.data?.code;
+      (err as any).email = error?.response?.data?.email || normalizedEmail;
+      throw err;
     }
   };
 
