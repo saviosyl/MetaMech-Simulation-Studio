@@ -188,8 +188,17 @@ function clearCookieHeader(): string {
   ].join('; ');
 }
 
-function frontendOrigin(env: Env): string {
-  return (env.FRONTEND_ORIGIN || 'https://app.metamechsolutions.com').replace(/\/+$/g, '');
+function frontendOrigins(env: Env): string[] {
+  const raw = env.FRONTEND_ORIGIN || 'https://app.metamechsolutions.com';
+  return raw
+    .split(',')
+    .map((entry) => entry.trim().replace(/\/+$/g, ''))
+    .filter((entry) => entry.length > 0);
+}
+
+function primaryFrontendOrigin(env: Env): string {
+  const origins = frontendOrigins(env);
+  return origins[0] || 'https://app.metamechsolutions.com';
 }
 
 function expiresInSeconds(env: Env): number {
@@ -264,7 +273,7 @@ async function issueVerificationToken(env: Env, userId: number): Promise<{ rawTo
     .bind(userId, tokenHash, `+${verificationTtlHours(env)} hours`)
     .run();
 
-  const link = `${frontendOrigin(env)}/verify-email?token=${encodeURIComponent(rawToken)}`;
+  const link = `${primaryFrontendOrigin(env)}/verify-email?token=${encodeURIComponent(rawToken)}`;
   return { rawToken, link };
 }
 
@@ -328,9 +337,9 @@ async function startTrialIfEligible(env: Env, userId: number, email: string): Pr
 
 function withCors(request: Request, response: Response, env: Env): Response {
   const origin = request.headers.get('Origin');
-  const allowed = frontendOrigin(env);
+  const allowed = frontendOrigins(env);
   const headers = new Headers(response.headers);
-  if (origin && origin === allowed) {
+  if (origin && allowed.includes(origin)) {
     headers.set('Access-Control-Allow-Origin', origin);
     headers.set('Access-Control-Allow-Credentials', 'true');
   }
@@ -340,12 +349,12 @@ function withCors(request: Request, response: Response, env: Env): Response {
 
 function optionsResponse(request: Request, env: Env): Response {
   const origin = request.headers.get('Origin');
-  const allowed = frontendOrigin(env);
+  const allowed = frontendOrigins(env);
   const headers = new Headers();
-  if (origin && origin === allowed) {
+  if (origin && allowed.includes(origin)) {
     headers.set('Access-Control-Allow-Origin', origin);
     headers.set('Access-Control-Allow-Credentials', 'true');
-    headers.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    headers.set('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     headers.set('Access-Control-Allow-Headers', 'Content-Type');
     headers.set('Access-Control-Max-Age', '86400');
   }

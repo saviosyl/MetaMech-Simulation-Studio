@@ -4,7 +4,7 @@ compatibility_date = "2026-03-16"
 workers_dev = true
 
 [vars]
-FRONTEND_ORIGIN = "https://app.metamechsolutions.com"
+FRONTEND_ORIGIN = "https://app.metamechsolutions.com,https://metamech-studio.pages.dev"
 JWT_EXPIRES_IN_SECONDS = "604800"
 EMAIL_VERIFICATION_TOKEN_HOURS = "24"
 EXPOSE_DEV_VERIFICATION_LINK = "false"
