@@ -22,11 +22,18 @@ type SubscriptionEntitlement = {
 type Env = {
   DB: D1Database;
   JWT_SECRET: string;
+  ZEPTO_TOKEN?: string;
+  ZEPTO_API_URL?: string;
+  MAIL_FROM?: string;
+  MAIL_FROM_NAME?: string;
+  FRONTEND_PRIMARY_ORIGIN?: string;
   FRONTEND_ORIGIN?: string;
   JWT_EXPIRES_IN_SECONDS?: string;
   EMAIL_VERIFICATION_TOKEN_HOURS?: string;
   EXPOSE_DEV_VERIFICATION_LINK?: string;
   TRIAL_IDENTITY_SALT?: string;
+  NODE_ENV?: string;
+  ADMIN_TEST_EMAIL_KEY?: string;
 };
 
 const textEncoder = new TextEncoder();
@@ -197,8 +204,91 @@ function frontendOrigins(env: Env): string[] {
 }
 
 function primaryFrontendOrigin(env: Env): string {
+  const explicit = (env.FRONTEND_PRIMARY_ORIGIN || '').trim().replace(/\/+$/g, '');
+  if (explicit) return explicit;
   const origins = frontendOrigins(env);
   return origins[0] || 'https://app.metamechsolutions.com';
+}
+
+function shouldExposeDevLinks(env: Env): boolean {
+  return String(env.EXPOSE_DEV_VERIFICATION_LINK || '').toLowerCase() === 'true';
+}
+
+function resetTokenTtlHours(): number {
+  return 1;
+}
+
+function adminRouteAllowed(request: Request, env: Env): boolean {
+  if (String(env.NODE_ENV || 'production').toLowerCase() !== 'production') return true;
+  const configuredKey = (env.ADMIN_TEST_EMAIL_KEY || '').trim();
+  if (!configuredKey) return false;
+  const url = new URL(request.url);
+  const supplied = (url.searchParams.get('key') || request.headers.get('x-admin-key') || '').trim();
+  if (!supplied) return false;
+  return safeEqual(configuredKey, supplied);
+}
+
+function verificationEmailHtml(verifyLink: string): string {
+  return `
+  <div style="font-family:Segoe UI,Arial,sans-serif;color:#111827;line-height:1.6">
+    <h2 style="margin:0 0 12px">Verify your MetaMech account</h2>
+    <p style="margin:0 0 12px">Please click below to verify your email and activate your trial:</p>
+    <p style="margin:0 0 16px">
+      <a href="${verifyLink}" style="display:inline-block;background:#0f766e;color:white;padding:10px 14px;border-radius:6px;text-decoration:none">
+        Verify Account
+      </a>
+    </p>
+    <p style="margin:0;color:#6b7280">If you did not create an account, you can safely ignore this email.</p>
+  </div>`;
+}
+
+function resetEmailHtml(resetLink: string): string {
+  return `
+  <div style="font-family:Segoe UI,Arial,sans-serif;color:#111827;line-height:1.6">
+    <h2 style="margin:0 0 12px">Reset your MetaMech password</h2>
+    <p style="margin:0 0 12px">Click below to set a new password. This link expires in 1 hour.</p>
+    <p style="margin:0 0 16px">
+      <a href="${resetLink}" style="display:inline-block;background:#0f766e;color:white;padding:10px 14px;border-radius:6px;text-decoration:none">
+        Reset Password
+      </a>
+    </p>
+    <p style="margin:0;color:#6b7280">If you did not request this, please ignore this email.</p>
+  </div>`;
+}
+
+async function sendZeptoMail(env: Env, toEmail: string, subject: string, html: string): Promise<string> {
+  const url = env.ZEPTO_API_URL || 'https://api.zeptomail.eu/v1.1/email';
+  const token = env.ZEPTO_TOKEN;
+  if (!token) throw new Error('Missing ZEPTO_TOKEN');
+
+  const fromAddress = env.MAIL_FROM || 'hi@metamechsolutions.com';
+  const fromName = env.MAIL_FROM_NAME || 'MetaMech Solutions';
+  const payload = {
+    from: { address: fromAddress, name: fromName },
+    to: [{ email_address: { address: toEmail, name: toEmail } }],
+    reply_to: [{ address: fromAddress, name: fromName }],
+    subject,
+    htmlbody: html,
+    track_clicks: true,
+    track_opens: true,
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Zoho-enczapikey ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.text();
+  console.log(`[MAIL] Zepto status=${res.status} to=${toEmail}`);
+  if (!res.ok) {
+    throw new Error(`ZeptoMail failed ${res.status}: ${body}`);
+  }
+  console.log(`[MAIL] Zepto accepted to=${toEmail} body=${body.slice(0, 400)}`);
+  return body;
 }
 
 function expiresInSeconds(env: Env): number {
@@ -380,8 +470,30 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
     return toJson({ error: 'Validation failed' }, 400);
   }
 
-  const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ? LIMIT 1').bind(email).first();
-  if (existing) return toJson({ error: 'User already exists with this email' }, 400);
+  const safeMessage = 'If an account with that email exists, a verification link has been sent.';
+  const existing = await env.DB
+    .prepare('SELECT id, email_verified_at FROM users WHERE email = ? LIMIT 1')
+    .bind(email)
+    .first<{ id: number; email_verified_at: string | null }>();
+
+  if (existing) {
+    let link = '';
+    if (!existing.email_verified_at) {
+      ({ link } = await issueVerificationToken(env, existing.id));
+      try {
+        await sendZeptoMail(env, email, 'Verify your MetaMech account', verificationEmailHtml(link));
+      } catch (e: any) {
+        console.log('[MAIL] verification send failed:', e?.message || e);
+      }
+    }
+
+    return toJson({
+      message: safeMessage,
+      requiresEmailVerification: true,
+      email,
+      ...(shouldExposeDevLinks(env) && link ? { devVerificationLink: link } : {}),
+    });
+  }
 
   const passwordHash = await hashPassword(password);
   const created = await env.DB
@@ -405,13 +517,17 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
     .run();
 
   const { link } = await issueVerificationToken(env, userId);
-  const exposeDev = env.EXPOSE_DEV_VERIFICATION_LINK === 'true';
+  try {
+    await sendZeptoMail(env, email, 'Verify your MetaMech account', verificationEmailHtml(link));
+  } catch (e: any) {
+    console.log('[MAIL] verification send failed:', e?.message || e);
+  }
 
   return toJson({
-    message: 'Account created. Verify your email to start your 1-day trial.',
+    message: safeMessage,
     requiresEmailVerification: true,
     email,
-    ...(exposeDev ? { devVerificationLink: link } : {}),
+    ...(shouldExposeDevLinks(env) ? { devVerificationLink: link } : {}),
   }, 201);
 }
 
@@ -483,10 +599,112 @@ async function handleResendVerification(request: Request, env: Env): Promise<Res
   if (user.email_verified_at) return toJson({ message: 'Email is already verified. You can sign in now.', alreadyVerified: true });
 
   const { link } = await issueVerificationToken(env, user.id);
-  const exposeDev = env.EXPOSE_DEV_VERIFICATION_LINK === 'true';
+  try {
+    await sendZeptoMail(env, email, 'Verify your MetaMech account', verificationEmailHtml(link));
+  } catch (e: any) {
+    console.log('[MAIL] resend verification failed:', e?.message || e);
+  }
   return toJson({
     message: 'If an account with that email exists, a verification link has been sent.',
-    ...(exposeDev ? { devVerificationLink: link } : {}),
+    ...(shouldExposeDevLinks(env) ? { devVerificationLink: link } : {}),
+  });
+}
+
+async function handleForgotPassword(request: Request, env: Env): Promise<Response> {
+  const body = await readJson<{ email?: string }>(request);
+  const email = normalizeEmail(body?.email || '');
+  if (!isEmail(email)) return toJson({ error: 'Validation failed' }, 400);
+
+  const genericMessage = 'If an account with that email exists, we sent a password reset link.';
+  const user = await env.DB
+    .prepare('SELECT id FROM users WHERE email = ? LIMIT 1')
+    .bind(email)
+    .first<{ id: number }>();
+  if (!user) return toJson({ message: genericMessage });
+
+  const rawToken = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+  const tokenHash = await sha256Hex(rawToken);
+  await env.DB
+    .prepare('UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL')
+    .bind(user.id)
+    .run();
+  await env.DB
+    .prepare(
+      `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+       VALUES (?, ?, datetime('now', ?))`
+    )
+    .bind(user.id, tokenHash, `+${resetTokenTtlHours()} hours`)
+    .run();
+
+  const resetLink = `${primaryFrontendOrigin(env)}/reset-password?token=${encodeURIComponent(rawToken)}`;
+  try {
+    await sendZeptoMail(env, email, 'Reset your MetaMech password', resetEmailHtml(resetLink));
+  } catch (e: any) {
+    console.log('[MAIL] forgot-password send failed:', e?.message || e);
+  }
+
+  return toJson({
+    message: genericMessage,
+    ...(shouldExposeDevLinks(env) ? { devResetLink: resetLink } : {}),
+  });
+}
+
+async function handleResetPassword(request: Request, env: Env): Promise<Response> {
+  const body = await readJson<{ token?: string; password?: string }>(request);
+  const token = (body?.token || '').trim();
+  const password = body?.password || '';
+  if (!token || password.length < 8) return toJson({ error: 'Validation failed' }, 400);
+
+  const tokenHash = await sha256Hex(token);
+  const resetRow = await env.DB
+    .prepare(
+      `SELECT id, user_id
+       FROM password_reset_tokens
+       WHERE token_hash = ?
+         AND used_at IS NULL
+         AND expires_at > CURRENT_TIMESTAMP
+       LIMIT 1`
+    )
+    .bind(tokenHash)
+    .first<{ id: number; user_id: number }>();
+  if (!resetRow) return toJson({ error: 'Invalid or expired reset token' }, 400);
+
+  const passwordHash = await hashPassword(password);
+  await env.DB
+    .prepare('UPDATE users SET password_hash = ?, token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .bind(passwordHash, resetRow.user_id)
+    .run();
+  await env.DB
+    .prepare('UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .bind(resetRow.id)
+    .run();
+  await env.DB
+    .prepare('UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL')
+    .bind(resetRow.user_id)
+    .run();
+
+  return toJson({ message: 'Password reset successful' });
+}
+
+async function handleAdminTestEmail(request: Request, env: Env): Promise<Response> {
+  if (!adminRouteAllowed(request, env)) {
+    return toJson({ error: 'Forbidden' }, 403);
+  }
+  const url = new URL(request.url);
+  const toEmail = normalizeEmail(url.searchParams.get('to') || '');
+  if (!isEmail(toEmail)) return toJson({ error: 'Validation failed' }, 400);
+
+  const html = `
+  <div style="font-family:Segoe UI,Arial,sans-serif;color:#111827;line-height:1.6">
+    <h2 style="margin:0 0 12px">MetaMech test email</h2>
+    <p style="margin:0 0 12px">This is a direct ZeptoMail test from the Cloudflare Worker.</p>
+    <p style="margin:0;color:#6b7280">Timestamp: ${new Date().toISOString()}</p>
+  </div>`;
+  const providerResponse = await sendZeptoMail(env, toEmail, 'MetaMech ZeptoMail test', html);
+  return toJson({
+    message: 'Test email request accepted.',
+    to: toEmail,
+    providerResponse: providerResponse.slice(0, 800),
   });
 }
 
@@ -635,6 +853,18 @@ export default {
       }
       if (request.method === 'POST' && path === '/auth/resend-verification') {
         response = await handleResendVerification(request, env);
+        return withCors(request, response, env);
+      }
+      if (request.method === 'POST' && path === '/auth/forgot-password') {
+        response = await handleForgotPassword(request, env);
+        return withCors(request, response, env);
+      }
+      if (request.method === 'POST' && path === '/auth/reset-password') {
+        response = await handleResetPassword(request, env);
+        return withCors(request, response, env);
+      }
+      if (request.method === 'GET' && path === '/admin/test-email') {
+        response = await handleAdminTestEmail(request, env);
         return withCors(request, response, env);
       }
 

@@ -5,6 +5,10 @@ workers_dev = true
 
 [vars]
 FRONTEND_ORIGIN = "https://app.metamechsolutions.com,https://metamech-studio.pages.dev"
+FRONTEND_PRIMARY_ORIGIN = "https://app.metamechsolutions.com"
+ZEPTO_API_URL = "https://api.zeptomail.eu/v1.1/email"
+MAIL_FROM = "hi@metamechsolutions.com"
+MAIL_FROM_NAME = "MetaMech Solutions"
 JWT_EXPIRES_IN_SECONDS = "604800"
 EMAIL_VERIFICATION_TOKEN_HOURS = "24"
 EXPOSE_DEV_VERIFICATION_LINK = "false"

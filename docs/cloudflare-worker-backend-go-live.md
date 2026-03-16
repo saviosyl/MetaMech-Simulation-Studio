@@ -15,11 +15,14 @@ This guide is copy-paste oriented and matches the files in this repo.
 - `POST /auth/login`
 - `POST /auth/logout`
 - `GET /auth/me`
+- `POST /auth/forgot-password`
+- `POST /auth/reset-password`
 
 Compatibility endpoints (for current UI verification flow):
 
 - `POST /auth/verify-email`
 - `POST /auth/resend-verification`
+- `GET /admin/test-email?to=user@example.com&key=...` (temporary, protected)
 
 ## Files added/updated
 
@@ -84,10 +87,21 @@ echo "your-strong-trial-identity-salt" | npx wrangler secret put TRIAL_IDENTITY_
 
 Non-secret vars are in `wrangler.toml`:
 
-- `FRONTEND_ORIGIN=https://app.metamechsolutions.com`
+- `FRONTEND_ORIGIN=https://app.metamechsolutions.com,https://metamech-studio.pages.dev`
+- `FRONTEND_PRIMARY_ORIGIN=https://app.metamechsolutions.com`
+- `ZEPTO_API_URL=https://api.zeptomail.eu/v1.1/email`
+- `MAIL_FROM=hi@metamechsolutions.com`
+- `MAIL_FROM_NAME=MetaMech Solutions`
 - `JWT_EXPIRES_IN_SECONDS=604800`
 - `EMAIL_VERIFICATION_TOKEN_HOURS=24`
 - `EXPOSE_DEV_VERIFICATION_LINK=false`
+
+Additional secrets for operational use:
+
+```bash
+echo "your-zepto-token" | npx wrangler secret put ZEPTO_TOKEN
+echo "your-admin-test-email-key" | npx wrangler secret put ADMIN_TEST_EMAIL_KEY
+```
 
 ## 5) Deploy Worker
 
