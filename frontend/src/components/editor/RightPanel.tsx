@@ -19,12 +19,12 @@ const Section: React.FC<{ title: string; icon?: any; children: React.ReactNode; 
         borderRadius: 10,
         overflow: 'hidden',
         marginBottom: 10,
-        background: 'rgba(15,23,42,0.22)',
+        background: 'var(--mm-bg-surface)',
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
       }}
     >
       <button onClick={() => setOpen(!open)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: open ? 'rgba(15,23,42,0.54)' : 'transparent', border: 'none', cursor: 'pointer', transition: 'background 0.1s' }}>
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: open ? 'var(--mm-bg-panel-hover)' : 'transparent', border: 'none', cursor: 'pointer', transition: 'background 0.1s' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {Icon && <Icon size={13} style={{ color: 'var(--mm-accent-primary)' }} />}
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)', letterSpacing: '0.05em', fontFamily: "'Orbitron', monospace" }}>{title.toUpperCase()}</span>
@@ -289,7 +289,7 @@ const RightPanel: React.FC = () => {
           style={{
             padding: '10px 12px',
             borderBottom: '1px solid var(--mm-border-subtle)',
-            background: 'rgba(15,23,42,0.34)',
+            background: 'var(--mm-bg-toolbar-secondary)',
             backdropFilter: 'blur(6px)',
             flexShrink: 0,
             display: 'flex',
@@ -511,7 +511,7 @@ const RightPanel: React.FC = () => {
 
               {/* Empty state */}
               <div style={{ textAlign: 'center', padding: '16px 0 4px' }}>
-                <div style={{ width: 100, margin: '0 auto', padding: '10px 10px 8px', borderRadius: 10, border: '1px dashed rgba(148,163,184,0.26)', background: 'rgba(15,23,42,0.24)' }}>
+                <div style={{ width: 100, margin: '0 auto', padding: '10px 10px 8px', borderRadius: 10, border: '1px dashed rgba(148,163,184,0.26)', background: 'var(--mm-bg-surface)' }}>
                   <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--mm-bg-surface)', border: '1px solid var(--mm-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>
                     <Sliders size={16} style={{ color: 'var(--mm-text-disabled)' }} />
                   </div>

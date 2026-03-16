@@ -1,6 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../utils/api';
+import AuthPageLayout from '../components/auth/AuthPageLayout';
+import AuthCard from '../components/auth/AuthCard';
+import AuthHeader from '../components/auth/AuthHeader';
+import AuthInput from '../components/auth/AuthInput';
+import AuthButton from '../components/auth/AuthButton';
+import AuthMessage from '../components/auth/AuthMessage';
 
 const ResetPasswordPage: React.FC = () => {
   const [params] = useSearchParams();
@@ -44,71 +50,51 @@ const ResetPasswordPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-6">
-      <div className="container mx-auto max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            <span className="text-teal-600">MetaMech</span> Studio
-          </h1>
-          <p className="text-gray-600">Set a new account password</p>
-        </div>
+    <AuthPageLayout>
+      <AuthCard>
+        <AuthHeader
+          title="Set a new password"
+          subtitle="Choose a strong password for your MetaMech account."
+        />
 
-        <div className="bg-white shadow-lg rounded-xl p-8">
-          <h2 className="text-2xl font-semibold text-gray-900 text-center mb-6">Reset Password</h2>
+        {error ? <AuthMessage tone="error">{error}</AuthMessage> : null}
+        {message ? <AuthMessage tone="success">{message}</AuthMessage> : null}
 
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">{error}</div>}
-          {message && <div className="bg-teal-50 border border-teal-200 text-teal-700 px-4 py-3 rounded-lg mb-6">{message}</div>}
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                New Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimum 8 characters"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm New Password
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repeat new password"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                disabled={isLoading}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-teal-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-teal-700 focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoading ? 'Resetting...' : 'Reset Password'}
-            </button>
-          </form>
-
-          <div className="mt-8 text-center">
-            <Link to="/login" className="text-teal-600 hover:text-teal-700 font-medium">
-              Back to Sign In
-            </Link>
+        <form onSubmit={handleSubmit}>
+          <AuthInput
+            id="password"
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Minimum 8 characters"
+            disabled={isLoading}
+          />
+          <AuthInput
+            id="confirmPassword"
+            label="Confirm new password"
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Repeat your new password"
+            disabled={isLoading}
+          />
+          <div style={{ marginTop: 'var(--mm-space-6)' }}>
+            <AuthButton type="submit" isLoading={isLoading} loadingText="Resetting password...">
+              Reset password
+            </AuthButton>
           </div>
+        </form>
+
+        <div style={{ marginTop: 'var(--mm-space-5)', textAlign: 'center' }}>
+          <Link to="/login" style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>
+            Back to sign in
+          </Link>
         </div>
-      </div>
-    </div>
+      </AuthCard>
+    </AuthPageLayout>
   );
 };
 

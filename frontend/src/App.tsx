@@ -12,10 +12,17 @@ import EditorPage from './pages/EditorPage';
 import FrameDesignerPage from './pages/FrameDesignerPage';
 import './index.css';
 
-// Apply saved theme on load
-const savedTheme = localStorage.getItem('metamech_theme') as 'dark' | 'light' | null;
-if (savedTheme) {
-  document.documentElement.setAttribute('data-theme', savedTheme);
+const THEME_STORAGE_KEY = 'metamech-theme';
+const LEGACY_THEME_STORAGE_KEY = 'metamech_theme';
+
+// Apply saved theme on load (default to light when no preference exists).
+const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) as 'dark' | 'light' | null;
+const legacyTheme = localStorage.getItem(LEGACY_THEME_STORAGE_KEY) as 'dark' | 'light' | null;
+const resolvedTheme: 'dark' | 'light' = savedTheme || legacyTheme || 'light';
+document.documentElement.setAttribute('data-theme', resolvedTheme);
+localStorage.setItem(THEME_STORAGE_KEY, resolvedTheme);
+if (legacyTheme && !savedTheme) {
+  localStorage.removeItem(LEGACY_THEME_STORAGE_KEY);
 }
 
 function App() {

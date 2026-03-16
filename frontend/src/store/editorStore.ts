@@ -801,18 +801,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
   
-  // Theme defaults (restored from localStorage)
-  themeMode: (typeof localStorage !== 'undefined' && localStorage.getItem('metamech_theme') as 'dark' | 'light') || 'dark',
+  // Theme defaults (restored from localStorage; first launch defaults to light)
+  themeMode: (() => {
+    if (typeof localStorage === 'undefined') return 'light';
+    const next = localStorage.getItem('metamech-theme') as 'dark' | 'light' | null;
+    const legacy = localStorage.getItem('metamech_theme') as 'dark' | 'light' | null;
+    const resolved = next || legacy || 'light';
+    localStorage.setItem('metamech-theme', resolved);
+    if (legacy && !next) localStorage.removeItem('metamech_theme');
+    return resolved;
+  })(),
   setThemeMode: (mode) => {
     document.documentElement.setAttribute('data-theme', mode);
-    localStorage.setItem('metamech_theme', mode);
+    localStorage.setItem('metamech-theme', mode);
     set({ themeMode: mode });
   },
   toggleTheme: () => {
     const current = get().themeMode;
     const next = current === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('metamech_theme', next);
+    localStorage.setItem('metamech-theme', next);
     set({ themeMode: next });
   },
   

@@ -16,13 +16,13 @@ interface ToolButton {
 }
 
 const tools: ToolButton[] = [
-  { id: 'select', tooltip: 'Select objects (Q)', icon: <MousePointer size={13} /> },
-  { id: 'move', tooltip: 'Move objects (W)', icon: <Move size={13} /> },
-  { id: 'rotate', tooltip: 'Rotate objects (E)', icon: <RotateCcw size={13} /> },
-  { id: 'scale', tooltip: 'Scale objects (R)', icon: <Maximize2 size={13} /> },
-  { id: 'mate', tooltip: 'Create/inspect node connections (M)', icon: <Link2 size={13} /> },
-  { id: 'snap-move', tooltip: 'Drag with auto-snap assist (N)', icon: <Magnet size={13} /> },
-  { id: 'measure', tooltip: 'Measure distances in viewport', icon: <Ruler size={13} /> },
+  { id: 'select', tooltip: 'Select objects (Q)', icon: <MousePointer size={16} /> },
+  { id: 'move', tooltip: 'Move objects (W)', icon: <Move size={16} /> },
+  { id: 'rotate', tooltip: 'Rotate objects (E)', icon: <RotateCcw size={16} /> },
+  { id: 'scale', tooltip: 'Scale objects (R)', icon: <Maximize2 size={16} /> },
+  { id: 'mate', tooltip: 'Create/inspect node connections (M)', icon: <Link2 size={16} /> },
+  { id: 'snap-move', tooltip: 'Drag with auto-snap assist (N)', icon: <Magnet size={16} /> },
+  { id: 'measure', tooltip: 'Measure distances in viewport', icon: <Ruler size={16} /> },
 ];
 
 const ViewportToolbar: React.FC = () => {
@@ -62,14 +62,14 @@ const ViewportToolbar: React.FC = () => {
   const clusterStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   };
 
   const dividerStyle: React.CSSProperties = {
     width: 1,
-    height: 22,
-    background: 'rgba(148,163,184,0.25)',
-    margin: '0 2px',
+    height: 28,
+    background: 'var(--mm-border-subtle)',
+    margin: '0 6px',
     flexShrink: 0,
   };
 
@@ -77,13 +77,13 @@ const ViewportToolbar: React.FC = () => {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 28,
-    height: 28,
+    width: 38,
+    height: 38,
     padding: 0,
-    border: '1px solid transparent',
-    borderRadius: 7,
-    background: active ? 'rgba(6,182,212,0.2)' : 'rgba(15,23,42,0.18)',
-    color: active ? '#e6fbff' : '#cbd5e1',
+    border: '1px solid var(--mm-border-subtle)',
+    borderRadius: 12,
+    background: active ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)',
+    color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-secondary)',
     opacity: disabled ? 0.45 : 1,
     cursor: 'pointer',
     transition: 'all 0.15s',
@@ -93,23 +93,24 @@ const ViewportToolbar: React.FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: 'clamp(24px, 3.5vw, 40px)',
+        top: 'clamp(88px, 11vw, 106px)',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 45,
         display: 'flex',
         alignItems: 'center',
-        gap: 5,
+        gap: 8,
         width: 'min(1220px, calc(100% - 24px))',
         flexWrap: 'nowrap',
         overflowX: 'auto',
         justifyContent: 'center',
-        background: 'rgba(2,6,23,0.58)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: 11,
-        padding: '6px 8px',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.28)',
-        border: '1px solid rgba(255,255,255,0.1)',
+        minHeight: 48,
+        background: 'var(--mm-bg-toolbar-secondary)',
+        backdropFilter: 'blur(8px)',
+        borderRadius: 14,
+        padding: '7px 10px',
+        boxShadow: 'var(--mm-shadow-sm)',
+        border: '1px solid var(--mm-border-subtle)',
       }}
       title="Main modeling ribbon"
     >
@@ -137,7 +138,7 @@ const ViewportToolbar: React.FC = () => {
           style={btnStyle(false, !selectedObjectId)}
           disabled={!selectedObjectId}
         >
-          <Copy size={14} />
+          <Copy size={16} />
         </button>
         <button
           title="Paste copied object(s) from clipboard (Ctrl+V)"
@@ -145,7 +146,7 @@ const ViewportToolbar: React.FC = () => {
           style={btnStyle(false, !clipboard)}
           disabled={!clipboard}
         >
-          <Download size={14} />
+          <Download size={16} />
         </button>
         {selectedEdges.length > 0 && (
           <button
@@ -153,7 +154,7 @@ const ViewportToolbar: React.FC = () => {
             onClick={disconnectSelected}
             style={{ ...btnStyle(false), color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
           >
-            <Trash2 size={14} />
+            <Trash2 size={16} />
           </button>
         )}
         <button
@@ -161,7 +162,7 @@ const ViewportToolbar: React.FC = () => {
           onClick={() => setShowImport(true)}
           style={btnStyle(false)}
         >
-          <Package size={14} />
+          <Package size={16} />
         </button>
       </div>
 
@@ -174,21 +175,21 @@ const ViewportToolbar: React.FC = () => {
           onClick={() => setGridSnap(!gridSnap)}
           style={btnStyle(gridSnap)}
         >
-          <Grid3X3 size={14} />
+          <Grid3X3 size={16} />
         </button>
         <button
           title={overlaysHidden ? 'Show helpers: ports, connections, and overlays' : 'Hide helpers for a clean presentation view'}
           onClick={toggleCleanView}
           style={btnStyle(overlaysHidden)}
         >
-          {overlaysHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+          {overlaysHidden ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
         <button
           title={pathsVisible ? 'Hide path trajectories and waypoints' : 'Show path trajectories and waypoints'}
           onClick={() => setPathsVisible(!pathsVisible)}
           style={btnStyle(pathsVisible)}
         >
-          <Route size={14} />
+          <Route size={16} />
         </button>
       </div>
 

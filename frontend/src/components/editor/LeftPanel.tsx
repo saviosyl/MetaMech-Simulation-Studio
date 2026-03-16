@@ -108,7 +108,7 @@ const LeftPanel: React.FC = () => {
           style={{
             padding: '9px 12px',
             borderBottom: '1px solid var(--mm-border-subtle)',
-            background: 'rgba(15,23,42,0.34)',
+            background: 'var(--mm-bg-toolbar-secondary)',
             backdropFilter: 'blur(6px)',
             flexShrink: 0,
           }}
@@ -165,7 +165,7 @@ const LeftPanel: React.FC = () => {
                 gap: 5,
                 padding: '7px 8px',
                 borderBottom: '1px solid var(--mm-border-subtle)',
-                background: 'rgba(15,23,42,0.2)',
+                background: 'var(--mm-bg-surface)',
                 flexShrink: 0,
                 overflow: 'hidden',
               }}
@@ -180,7 +180,7 @@ const LeftPanel: React.FC = () => {
                       display: 'flex', alignItems: 'center', gap: 5,
                       padding: '5px 7px', borderRadius: 6, minWidth: 0,
                       border: `1px solid ${active ? 'rgba(34,211,238,0.3)' : 'rgba(148,163,184,0.16)'}`,
-                      background: active ? 'var(--mm-accent-primary-muted)' : 'rgba(15,23,42,0.24)',
+                      background: active ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)',
                       color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-tertiary)',
                       cursor: 'pointer', fontSize: 10, fontWeight: 600,
                       fontFamily: "'Orbitron', monospace", transition: 'all 0.15s',
@@ -195,12 +195,12 @@ const LeftPanel: React.FC = () => {
             {/* Module list */}
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '10px 12px' }}>
               {Object.entries(groupedModules).map(([group, items]) => (
-                <div key={group} style={{ marginBottom: 12, border: '1px solid rgba(148,163,184,0.16)', borderRadius: 10, background: 'rgba(15,23,42,0.2)', overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6, position: 'sticky', top: 0, background: 'rgba(2,6,23,0.72)', zIndex: 5, padding: '6px 8px', borderBottom: '1px solid rgba(148,163,184,0.14)' }}>
+                <div key={group} style={{ marginBottom: 12, border: '1px solid var(--mm-border-subtle)', borderRadius: 10, background: 'var(--mm-bg-surface)', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6, position: 'sticky', top: 0, background: 'var(--mm-bg-panel)', zIndex: 5, padding: '6px 8px', borderBottom: '1px solid var(--mm-border-subtle)' }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Orbitron', monospace" }}>
                       {group}
                     </span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-disabled)', padding: '1px 6px', borderRadius: 999, background: 'rgba(148,163,184,0.14)' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-disabled)', padding: '1px 6px', borderRadius: 999, background: 'var(--mm-bg-panel-hover)' }}>
                       {items.length}
                     </span>
                   </div>
