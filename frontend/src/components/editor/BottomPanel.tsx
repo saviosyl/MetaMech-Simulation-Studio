@@ -208,7 +208,7 @@ const BottomPanel: React.FC = () => {
   const actualHeight = collapsed ? MIN_HEIGHT : height;
 
   return (
-    <div style={S.panel(actualHeight, collapsed)}>
+    <div style={S.panel(actualHeight, collapsed)} data-tour="bottom-panel">
       {/* Drag handle */}
       {!collapsed && (
         <div style={S.dragHandle} onMouseDown={onMouseDown}>

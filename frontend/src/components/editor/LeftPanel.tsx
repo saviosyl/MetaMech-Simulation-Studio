@@ -71,7 +71,7 @@ const LeftPanel: React.FC = () => {
   // ─── Collapsed sidebar ───
   if (leftPanelCollapsed) {
     return (
-      <div style={{ flexShrink: 0, width: 44, borderRight: '1px solid var(--mm-border)', background: 'var(--mm-bg-panel)', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 10, gap: 4 }}>
+      <div data-tour="left-library" style={{ flexShrink: 0, width: 44, borderRight: '1px solid var(--mm-border)', background: 'var(--mm-bg-panel)', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 10, gap: 4 }}>
         <button onClick={() => setLeftPanelCollapsed(false)} style={{ padding: 6, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-tertiary)' }} title="Expand">
           <ChevronRight size={14} />
         </button>
@@ -90,7 +90,7 @@ const LeftPanel: React.FC = () => {
   }
 
   return (
-    <div style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(360, Math.max(200, leftPanelWidth)) }}>
+    <div data-tour="left-library" style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(360, Math.max(200, leftPanelWidth)) }}>
       <div
         style={{
           flex: 1,

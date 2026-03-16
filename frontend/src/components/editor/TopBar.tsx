@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Play, Pause, Square, Save, Download, Upload, Video,
   ArrowLeft, Undo2, Redo2, Check, AlertCircle,
-  Loader2, HelpCircle, Sun, Moon, Maximize2, Film,
+  Loader2, HelpCircle, Sun, Moon, Maximize2, Film, LifeBuoy,
 } from 'lucide-react';
 import * as THREE from 'three';
 import { useEditorStore } from '../../store/editorStore';
@@ -25,6 +25,7 @@ interface TopBarProps {
   setProjectName: (name: string) => void;
   saveStatus: SaveStatus;
   onSave: () => void;
+  onOpenHelpSupport: () => void;
 }
 
 // ─── Styles ───
@@ -87,7 +88,7 @@ const S = {
   } as React.CSSProperties,
 };
 
-const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus, onSave }) => {
+const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus, onSave, onOpenHelpSupport }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -282,7 +283,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   };
 
   return (
-    <div style={S.bar}>
+    <div style={S.bar} data-tour="top-ribbon">
       {/* ════ LEFT: Project + Edit + Build ════ */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifySelf: 'start', minWidth: 0 }}>
         {/* Brand */}
@@ -324,7 +325,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
 
       {/* ════ CENTER: Simulation (bigger, prominent) ════ */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, justifySelf: 'center' }}>
-        <div style={{ ...S.group, padding: '6px 12px', gap: 8, background: 'var(--mm-bg-app)', border: '2px solid var(--mm-border)' }}>
+        <div style={{ ...S.group, padding: '6px 12px', gap: 8, background: 'var(--mm-bg-app)', border: '2px solid var(--mm-border)' }} data-tour="simulation-controls">
           {/* Play/Pause */}
           <button onClick={isPlaying ? pause : play}
             style={S.simBtn(isPlaying ? '#f59e0b' : '#06b6d4')}
@@ -452,6 +453,31 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           style={S.primaryBtn(saveStatus === 'saved' ? '#10b981' : saveStatus === 'error' ? '#ef4444' : '#06b6d4')}>
           {saveIcon()}
           {saveStatus === 'saving' ? 'SAVING' : saveStatus === 'saved' ? 'SAVED' : 'SAVE'}
+        </button>
+
+        {/* Help / Support */}
+        <button
+          onClick={onOpenHelpSupport}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 10px',
+            borderRadius: 8,
+            border: '1px solid var(--mm-border-subtle)',
+            background: 'var(--mm-bg-surface)',
+            color: 'var(--mm-text-secondary)',
+            cursor: 'pointer',
+            fontSize: 11,
+            fontWeight: 700,
+            fontFamily: "'Orbitron', monospace",
+            letterSpacing: '0.04em',
+          }}
+          title="Open MetaMech Help / Support and product guide"
+          data-tour="help-support"
+        >
+          <LifeBuoy size={13} />
+          HELP
         </button>
 
         <input ref={fileInputRef} type="file" accept=".json,.metamech-sim.json" onChange={handleFileChange} style={{ display: 'none' }} />

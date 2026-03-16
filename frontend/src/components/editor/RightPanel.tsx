@@ -257,7 +257,7 @@ const RightPanel: React.FC = () => {
   // Collapsed
   if (rightPanelCollapsed) {
     return (
-      <div style={{ flexShrink: 0, width: 44, borderLeft: '1px solid var(--mm-border)', background: 'var(--mm-bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div data-tour="right-properties" style={{ flexShrink: 0, width: 44, borderLeft: '1px solid var(--mm-border)', background: 'var(--mm-bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <button onClick={() => setRightPanelCollapsed(false)} style={{ padding: 6, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-tertiary)' }} title="Expand">
           <ChevronLeft size={14} />
         </button>
@@ -266,7 +266,7 @@ const RightPanel: React.FC = () => {
   }
 
   return (
-    <div style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(widthMax, Math.max(widthMin, rightPanelWidth)) }}>
+    <div data-tour="right-properties" style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(widthMax, Math.max(widthMin, rightPanelWidth)) }}>
       {/* Resize handle */}
       <div style={{ width: 4, cursor: 'col-resize', flexShrink: 0, background: 'transparent', transition: 'background 0.15s' }}
         onMouseDown={handleResizeStart}
