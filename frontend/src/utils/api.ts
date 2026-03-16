@@ -22,13 +22,21 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const currentPath = window.location.pathname;
+    const isAuthPage = currentPath.startsWith('/login')
+      || currentPath.startsWith('/register')
+      || currentPath.startsWith('/forgot-password')
+      || currentPath.startsWith('/reset-password');
+
+    const next = encodeURIComponent(window.location.pathname + window.location.search);
+
     // Only redirect on actual 401 from a working backend
     // Don't redirect on network errors (ECONNREFUSED etc.)
-    if (error.response?.status === 401 && !window.location.pathname.startsWith('/login')) {
-      window.location.href = '/login';
+    if (error.response?.status === 401 && !isAuthPage) {
+      window.location.href = `/login?next=${next}`;
     }
-    if (error.response?.status === 402 && !window.location.pathname.startsWith('/billing')) {
-      window.location.href = '/billing';
+    if (error.response?.status === 402 && !currentPath.startsWith('/billing')) {
+      window.location.href = `/billing?next=${next}`;
     }
     return Promise.reject(error);
   }

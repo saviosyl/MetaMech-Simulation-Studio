@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 // ─── CSS Keyframes (injected once) ───
@@ -24,18 +24,40 @@ const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  const { login } = useAuth();
+  const { login, user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || '/dashboard';
+  const [searchParams] = useSearchParams();
+  const fromLocation = location.state?.from as { pathname: string; search?: string } | undefined;
+  const fromState = fromLocation ? `${fromLocation.pathname}${fromLocation.search || ''}` : undefined;
+  const nextParam = searchParams.get('next');
+  const rawFrom = nextParam || fromState || '/dashboard';
+  const from = (
+    rawFrom.startsWith('/login')
+    || rawFrom.startsWith('/register')
+    || rawFrom.startsWith('/forgot-password')
+    || rawFrom.startsWith('/reset-password')
+  )
+    ? '/dashboard'
+    : rawFrom;
 
   useEffect(() => { setMounted(true); }, []);
 
+  useEffect(() => {
+    if (loading || !user) return;
+    if (user.subscription?.entitled) navigate(from, { replace: true });
+    else navigate(`/billing?next=${encodeURIComponent(from)}`, { replace: true });
+  }, [loading, user, navigate, from]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) { setError('Please fill in all fields'); return; }
+    if (!email.trim() || !password) { setError('Please enter both email and password.'); return; }
     setIsLoading(true); setError('');
-    try { await login(email, password); navigate(from, { replace: true }); }
+    try {
+      const signedIn = await login(email, password);
+      if (signedIn.subscription?.entitled) navigate(from, { replace: true });
+      else navigate(`/billing?next=${encodeURIComponent(from)}`, { replace: true });
+    }
     catch (error: any) { setError(error.message); }
     finally { setIsLoading(false); }
   };
@@ -194,7 +216,7 @@ const LoginPage: React.FC = () => {
           }}>
             <span style={{ fontSize: 13, color: 'var(--mm-text-tertiary)' }}>
               Don't have an account?{' '}
-              <Link to="/register" style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none' }}>
+              <Link to={`/register?next=${encodeURIComponent(from)}`} style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none' }}>
                 Create Account
               </Link>
             </span>

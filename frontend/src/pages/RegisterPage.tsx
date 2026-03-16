@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const RegisterPage: React.FC = () => {
@@ -12,8 +12,28 @@ const RegisterPage: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { register } = useAuth();
+  const { register, user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const fromLocation = location.state?.from as { pathname: string; search?: string } | undefined;
+  const fromState = fromLocation ? `${fromLocation.pathname}${fromLocation.search || ''}` : undefined;
+  const nextParam = searchParams.get('next');
+  const rawFrom = nextParam || fromState || '/dashboard';
+  const from = (
+    rawFrom.startsWith('/login')
+    || rawFrom.startsWith('/register')
+    || rawFrom.startsWith('/forgot-password')
+    || rawFrom.startsWith('/reset-password')
+  )
+    ? '/dashboard'
+    : rawFrom;
+
+  useEffect(() => {
+    if (loading || !user) return;
+    if (user.subscription?.entitled) navigate(from, { replace: true });
+    else navigate(`/billing?next=${encodeURIComponent(from)}`, { replace: true });
+  }, [loading, user, navigate, from]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -44,8 +64,9 @@ const RegisterPage: React.FC = () => {
     setError('');
 
     try {
-      await register(formData.email, formData.password, formData.displayName);
-      navigate('/dashboard', { replace: true });
+      const created = await register(formData.email, formData.password, formData.displayName);
+      if (created.subscription?.entitled) navigate(from, { replace: true });
+      else navigate(`/billing?next=${encodeURIComponent(from)}`, { replace: true });
     } catch (error: any) {
       setError(error.message);
     } finally {
@@ -160,7 +181,7 @@ const RegisterPage: React.FC = () => {
           <div className="mt-8 text-center">
             <p className="text-gray-600">
               Already have an account?{' '}
-              <Link to="/login" className="text-teal-600 hover:text-teal-700 font-medium">
+              <Link to={`/login?next=${encodeURIComponent(from)}`} className="text-teal-600 hover:text-teal-700 font-medium">
                 Sign In
               </Link>
             </p>

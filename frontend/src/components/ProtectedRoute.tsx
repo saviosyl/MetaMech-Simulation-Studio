@@ -23,11 +23,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireSubscr
   }
 
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} state={{ from: location }} replace />;
   }
 
   if (requireSubscription && !user.subscription?.entitled) {
-    return <Navigate to="/billing" state={{ from: location }} replace />;
+    return <Navigate to={`/billing?next=${encodeURIComponent(location.pathname + location.search)}`} state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
