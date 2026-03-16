@@ -34,6 +34,7 @@ type Env = {
   TRIAL_IDENTITY_SALT?: string;
   NODE_ENV?: string;
   ADMIN_TEST_EMAIL_KEY?: string;
+  ENABLE_ADMIN_TEST_EMAIL?: string;
 };
 
 const textEncoder = new TextEncoder();
@@ -218,7 +219,108 @@ function resetTokenTtlHours(): number {
   return 1;
 }
 
+function getClientIp(request: Request): string {
+  return (
+    request.headers.get('cf-connecting-ip')
+    || request.headers.get('x-forwarded-for')
+    || request.headers.get('x-real-ip')
+    || 'unknown'
+  ).split(',')[0].trim();
+}
+
+async function enforceRateLimit(
+  env: Env,
+  bucketKey: string,
+  limit: number,
+  windowSeconds: number
+): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  const now = Math.floor(Date.now() / 1000);
+  const currentWindowStart = now - (now % windowSeconds);
+
+  const existing = await env.DB
+    .prepare('SELECT count, window_start FROM rate_limits WHERE bucket_key = ? LIMIT 1')
+    .bind(bucketKey)
+    .first<{ count: number; window_start: number }>();
+
+  if (existing && Number(existing.window_start) === currentWindowStart) {
+    if (Number(existing.count) >= limit) {
+      const retryAfterSeconds = Math.max(1, currentWindowStart + windowSeconds - now);
+      return { allowed: false, retryAfterSeconds };
+    }
+    await env.DB
+      .prepare('UPDATE rate_limits SET count = count + 1, updated_at = CURRENT_TIMESTAMP WHERE bucket_key = ?')
+      .bind(bucketKey)
+      .run();
+  } else {
+    await env.DB
+      .prepare(
+        `INSERT INTO rate_limits (bucket_key, count, window_start, updated_at)
+         VALUES (?, 1, ?, CURRENT_TIMESTAMP)
+         ON CONFLICT(bucket_key) DO UPDATE SET
+           count = excluded.count,
+           window_start = excluded.window_start,
+           updated_at = CURRENT_TIMESTAMP`
+      )
+      .bind(bucketKey, currentWindowStart)
+      .run();
+  }
+
+  // Opportunistic cleanup to prevent unbounded growth.
+  if (Math.random() < 0.02) {
+    const oldestWindowToKeep = currentWindowStart - windowSeconds * 12;
+    await env.DB
+      .prepare('DELETE FROM rate_limits WHERE window_start < ?')
+      .bind(oldestWindowToKeep)
+      .run();
+  }
+
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
+async function checkRequestRateLimit(
+  request: Request,
+  env: Env,
+  options: {
+    routeTag: string;
+    email?: string;
+    perIpLimit: number;
+    perIpWindowSeconds: number;
+    perEmailLimit?: number;
+    perEmailWindowSeconds?: number;
+  }
+): Promise<Response | null> {
+  const ip = getClientIp(request);
+  const ipBucketRaw = `${options.routeTag}:ip:${ip}`;
+  const ipBucket = `${options.routeTag}:ip:${await sha256Hex(ipBucketRaw)}`;
+  const ipCheck = await enforceRateLimit(env, ipBucket, options.perIpLimit, options.perIpWindowSeconds);
+  if (!ipCheck.allowed) {
+    return toJson(
+      { error: 'Too many requests. Please wait and try again.' },
+      429,
+      { 'Retry-After': String(ipCheck.retryAfterSeconds) }
+    );
+  }
+
+  const normalizedEmail = normalizeEmail(options.email || '');
+  if (normalizedEmail && options.perEmailLimit && options.perEmailWindowSeconds) {
+    const emailBucketRaw = `${options.routeTag}:email:${normalizedEmail}`;
+    const emailBucket = `${options.routeTag}:email:${await sha256Hex(emailBucketRaw)}`;
+    const emailCheck = await enforceRateLimit(env, emailBucket, options.perEmailLimit, options.perEmailWindowSeconds);
+    if (!emailCheck.allowed) {
+      return toJson(
+        { error: 'Too many requests. Please wait and try again.' },
+        429,
+        { 'Retry-After': String(emailCheck.retryAfterSeconds) }
+      );
+    }
+  }
+
+  return null;
+}
+
 function adminRouteAllowed(request: Request, env: Env): boolean {
+  const enabled = String(env.ENABLE_ADMIN_TEST_EMAIL || '').toLowerCase() === 'true';
+  if (!enabled) return false;
   if (String(env.NODE_ENV || 'production').toLowerCase() !== 'production') return true;
   const configuredKey = (env.ADMIN_TEST_EMAIL_KEY || '').trim();
   if (!configuredKey) return false;
@@ -230,29 +332,49 @@ function adminRouteAllowed(request: Request, env: Env): boolean {
 
 function verificationEmailHtml(verifyLink: string): string {
   return `
-  <div style="font-family:Segoe UI,Arial,sans-serif;color:#111827;line-height:1.6">
-    <h2 style="margin:0 0 12px">Verify your MetaMech account</h2>
-    <p style="margin:0 0 12px">Please click below to verify your email and activate your trial:</p>
-    <p style="margin:0 0 16px">
-      <a href="${verifyLink}" style="display:inline-block;background:#0f766e;color:white;padding:10px 14px;border-radius:6px;text-decoration:none">
-        Verify Account
-      </a>
-    </p>
-    <p style="margin:0;color:#6b7280">If you did not create an account, you can safely ignore this email.</p>
+  <div style="margin:0;background:#f3f4f6;padding:24px;font-family:Segoe UI,Arial,sans-serif;color:#111827">
+    <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+      <div style="background:#0f766e;padding:16px 20px;color:#ffffff">
+        <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85">MetaMech Solutions</div>
+        <div style="font-size:22px;font-weight:700;line-height:1.2">Account Verification</div>
+      </div>
+      <div style="padding:22px 20px;line-height:1.65">
+        <p style="margin:0 0 14px">Welcome to <strong>MetaMech Simulation Studio</strong>.</p>
+        <p style="margin:0 0 16px">Please verify your email to activate your account and start your one-day trial:</p>
+        <p style="margin:0 0 20px">
+          <a href="${verifyLink}" style="display:inline-block;background:#0f766e;color:#ffffff;padding:11px 16px;border-radius:8px;text-decoration:none;font-weight:600">
+            Verify Account
+          </a>
+        </p>
+        <p style="margin:0 0 8px;font-size:13px;color:#4b5563">If the button does not work, copy this link:</p>
+        <p style="margin:0 0 14px;font-size:13px;word-break:break-all;color:#0f766e">${verifyLink}</p>
+        <p style="margin:0;font-size:13px;color:#6b7280">If you did not create this account, you can ignore this email.</p>
+      </div>
+    </div>
   </div>`;
 }
 
 function resetEmailHtml(resetLink: string): string {
   return `
-  <div style="font-family:Segoe UI,Arial,sans-serif;color:#111827;line-height:1.6">
-    <h2 style="margin:0 0 12px">Reset your MetaMech password</h2>
-    <p style="margin:0 0 12px">Click below to set a new password. This link expires in 1 hour.</p>
-    <p style="margin:0 0 16px">
-      <a href="${resetLink}" style="display:inline-block;background:#0f766e;color:white;padding:10px 14px;border-radius:6px;text-decoration:none">
-        Reset Password
-      </a>
-    </p>
-    <p style="margin:0;color:#6b7280">If you did not request this, please ignore this email.</p>
+  <div style="margin:0;background:#f3f4f6;padding:24px;font-family:Segoe UI,Arial,sans-serif;color:#111827">
+    <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+      <div style="background:#1f2937;padding:16px 20px;color:#ffffff">
+        <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85">MetaMech Solutions</div>
+        <div style="font-size:22px;font-weight:700;line-height:1.2">Password Reset</div>
+      </div>
+      <div style="padding:22px 20px;line-height:1.65">
+        <p style="margin:0 0 14px">We received a request to reset your MetaMech password.</p>
+        <p style="margin:0 0 16px">Use the link below to choose a new password. This link expires in <strong>1 hour</strong>.</p>
+        <p style="margin:0 0 20px">
+          <a href="${resetLink}" style="display:inline-block;background:#0f766e;color:#ffffff;padding:11px 16px;border-radius:8px;text-decoration:none;font-weight:600">
+            Reset Password
+          </a>
+        </p>
+        <p style="margin:0 0 8px;font-size:13px;color:#4b5563">If the button does not work, copy this link:</p>
+        <p style="margin:0 0 14px;font-size:13px;word-break:break-all;color:#0f766e">${resetLink}</p>
+        <p style="margin:0;font-size:13px;color:#6b7280">If you did not request this reset, you can ignore this email.</p>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -466,6 +588,16 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
   const password = body?.password || '';
   const displayName = (body?.displayName || '').trim();
 
+  const limitResponse = await checkRequestRateLimit(request, env, {
+    routeTag: 'auth_register',
+    email,
+    perIpLimit: 12,
+    perIpWindowSeconds: 10 * 60,
+    perEmailLimit: 5,
+    perEmailWindowSeconds: 60 * 60,
+  });
+  if (limitResponse) return limitResponse;
+
   if (!isEmail(email) || password.length < 8 || !displayName) {
     return toJson({ error: 'Validation failed' }, 400);
   }
@@ -613,6 +745,17 @@ async function handleResendVerification(request: Request, env: Env): Promise<Res
 async function handleForgotPassword(request: Request, env: Env): Promise<Response> {
   const body = await readJson<{ email?: string }>(request);
   const email = normalizeEmail(body?.email || '');
+
+  const limitResponse = await checkRequestRateLimit(request, env, {
+    routeTag: 'auth_forgot_password',
+    email,
+    perIpLimit: 20,
+    perIpWindowSeconds: 10 * 60,
+    perEmailLimit: 6,
+    perEmailWindowSeconds: 60 * 60,
+  });
+  if (limitResponse) return limitResponse;
+
   if (!isEmail(email)) return toJson({ error: 'Validation failed' }, 400);
 
   const genericMessage = 'If an account with that email exists, we sent a password reset link.';
@@ -692,6 +835,17 @@ async function handleAdminTestEmail(request: Request, env: Env): Promise<Respons
   }
   const url = new URL(request.url);
   const toEmail = normalizeEmail(url.searchParams.get('to') || '');
+
+  const limitResponse = await checkRequestRateLimit(request, env, {
+    routeTag: 'admin_test_email',
+    email: toEmail,
+    perIpLimit: 5,
+    perIpWindowSeconds: 10 * 60,
+    perEmailLimit: 5,
+    perEmailWindowSeconds: 10 * 60,
+  });
+  if (limitResponse) return limitResponse;
+
   if (!isEmail(toEmail)) return toJson({ error: 'Validation failed' }, 400);
 
   const html = `
@@ -863,6 +1017,7 @@ export default {
         response = await handleResetPassword(request, env);
         return withCors(request, response, env);
       }
+      // Temporary operational route: disable by setting ENABLE_ADMIN_TEST_EMAIL=false (or removing this block).
       if (request.method === 'GET' && path === '/admin/test-email') {
         response = await handleAdminTestEmail(request, env);
         return withCors(request, response, env);
