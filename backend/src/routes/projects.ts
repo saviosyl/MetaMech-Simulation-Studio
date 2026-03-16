@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { query } from '../database';
 import { authenticateToken } from '../middleware/auth';
@@ -21,7 +21,7 @@ const updateProjectSchema = z.object({
 });
 
 // Get all projects for the authenticated user
-router.get('/', async (req, res) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
     const result = await query(
       'SELECT id, name, data, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY updated_at DESC',
@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create a new project
-router.post('/', async (req, res) => {
+router.post('/', async (req: Request, res: Response) => {
   try {
     const { name } = createProjectSchema.parse(req.body);
 
@@ -57,7 +57,7 @@ router.post('/', async (req, res) => {
 });
 
 // Get a specific project
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req: Request, res: Response) => {
   try {
     const projectId = parseInt(req.params.id);
     
@@ -82,7 +82,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update a project
-router.put('/:id', async (req, res) => {
+router.put('/:id', async (req: Request, res: Response) => {
   try {
     const projectId = parseInt(req.params.id);
     
@@ -140,7 +140,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete a project
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const projectId = parseInt(req.params.id);
     
@@ -165,7 +165,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Duplicate a project
-router.post('/:id/duplicate', async (req, res) => {
+router.post('/:id/duplicate', async (req: Request, res: Response) => {
   try {
     const projectId = parseInt(req.params.id);
     
