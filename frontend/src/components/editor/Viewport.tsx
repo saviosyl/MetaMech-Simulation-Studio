@@ -11,6 +11,7 @@ import {
   GizmoViewport,
   PerspectiveCamera,
   OrthographicCamera,
+  MeshReflectorMaterial,
 } from '@react-three/drei';
 // EffectComposer removed — ToneMapping+SMAA can cause blank screens on some devices
 import * as THREE from 'three';
@@ -31,18 +32,84 @@ const CameraCapture: React.FC = () => {
  * Pause expensive shadow-map refresh while user is actively navigating camera.
  * Re-enable and refresh once interaction ends.
  */
-const InteractionPerformanceTuner: React.FC<{ isNavigating: boolean }> = ({ isNavigating }) => {
+const InteractionPerformanceTuner: React.FC<{ isNavigating: boolean; isExportRendering: boolean }> = ({ isNavigating, isExportRendering }) => {
   const { gl } = useThree();
 
   useEffect(() => {
     if (!gl.shadowMap) return;
+    if (isExportRendering) {
+      gl.shadowMap.autoUpdate = true;
+      gl.shadowMap.needsUpdate = true;
+      return;
+    }
     if (isNavigating) {
       gl.shadowMap.autoUpdate = false;
       return;
     }
     gl.shadowMap.autoUpdate = true;
     gl.shadowMap.needsUpdate = true;
-  }, [gl, isNavigating]);
+  }, [gl, isNavigating, isExportRendering]);
+
+  return null;
+};
+
+/**
+ * During capture/export, temporarily push renderer toward presentation quality.
+ * This only runs while recording to preserve normal interactive performance.
+ */
+const ExportRendererTuner: React.FC<{ active: boolean; preset: VideoQualityPreset }> = ({ active, preset }) => {
+  const { gl } = useThree();
+  const previousRef = useRef<{
+    toneMapping: THREE.ToneMapping;
+    toneMappingExposure: number;
+    shadowEnabled: boolean;
+    shadowType: THREE.ShadowMapType;
+    outputColorSpace: THREE.ColorSpace;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!active) {
+      if (previousRef.current) {
+        gl.toneMapping = previousRef.current.toneMapping;
+        gl.toneMappingExposure = previousRef.current.toneMappingExposure;
+        gl.shadowMap.enabled = previousRef.current.shadowEnabled;
+        gl.shadowMap.type = previousRef.current.shadowType;
+        (gl as any).outputColorSpace = previousRef.current.outputColorSpace;
+        gl.shadowMap.needsUpdate = true;
+        previousRef.current = null;
+      }
+      return;
+    }
+
+    if (!previousRef.current) {
+      previousRef.current = {
+        toneMapping: gl.toneMapping,
+        toneMappingExposure: gl.toneMappingExposure,
+        shadowEnabled: gl.shadowMap.enabled,
+        shadowType: gl.shadowMap.type,
+        outputColorSpace: (gl as any).outputColorSpace ?? THREE.SRGBColorSpace,
+      };
+    }
+
+    const exportPreset = VIDEO_CAPTURE_PRESETS[preset];
+    gl.toneMapping = THREE.ACESFilmicToneMapping;
+    gl.toneMappingExposure = exportPreset.toneMappingExposure;
+    gl.shadowMap.enabled = true;
+    gl.shadowMap.type = preset === 'ultra' ? THREE.VSMShadowMap : THREE.PCFSoftShadowMap;
+    (gl as any).outputColorSpace = THREE.SRGBColorSpace;
+    gl.shadowMap.needsUpdate = true;
+
+    return () => {
+      if (!previousRef.current) return;
+      gl.toneMapping = previousRef.current.toneMapping;
+      gl.toneMappingExposure = previousRef.current.toneMappingExposure;
+      gl.shadowMap.enabled = previousRef.current.shadowEnabled;
+      gl.shadowMap.type = previousRef.current.shadowType;
+      (gl as any).outputColorSpace = previousRef.current.outputColorSpace;
+      gl.shadowMap.needsUpdate = true;
+      previousRef.current = null;
+    };
+  }, [active, preset, gl]);
 
   return null;
 };
@@ -75,6 +142,7 @@ import CustomModelRenderer from '../3d/CustomModelRenderer';
 import PathRenderer from '../3d/PathRenderer';
 import CameraPathPlayer from '../3d/CameraPathPlayer';
 import ViewportToolbar from '../editor/ViewportToolbar';
+import { VIDEO_CAPTURE_PRESETS, VideoQualityPreset } from '../../lib/videoExportPresets';
 
 // Wrapper that attaches TransformControls to the selected object
 const DraggableObject: React.FC<{
@@ -288,7 +356,14 @@ const SceneContent: React.FC<{
     overlaysHidden,
     themeMode,
     activeTool,
+    isExportRendering,
+    captureQualityPreset,
   } = useEditorStore();
+
+  const exportPreset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
+  const keyShadowMapSize = isExportRendering ? exportPreset.shadowMapSize : (isMobileSafari ? 1024 : 4096);
+  const contactShadowRes = isExportRendering ? exportPreset.contactShadowResolution : (isMobileSafari ? 256 : 512);
+  const contactShadowBlur = isExportRendering ? exportPreset.contactShadowBlur : 2.0;
 
   // Disable orbit rotation when a 3D object is selected AND a manipulation tool is active
   // Click empty space to deselect → orbit re-enables
@@ -314,28 +389,28 @@ const SceneContent: React.FC<{
       {/* Key light — warm industrial */}
       <directionalLight
         position={[12, 15, 8]}
-        intensity={1.2}
+        intensity={isExportRendering ? 1.35 : 1.2}
         color="#fff5e6"
         castShadow
-        shadow-mapSize-width={isMobileSafari ? 1024 : 4096}
-        shadow-mapSize-height={isMobileSafari ? 1024 : 4096}
+        shadow-mapSize-width={keyShadowMapSize}
+        shadow-mapSize-height={keyShadowMapSize}
         shadow-camera-far={60}
         shadow-camera-left={-25}
         shadow-camera-right={25}
         shadow-camera-top={25}
         shadow-camera-bottom={-25}
-        shadow-bias={-0.001}
+        shadow-bias={isExportRendering ? -0.00055 : -0.001}
       />
       {/* Fill light — cool blue from opposite side */}
       <directionalLight
         position={[-8, 8, -5]}
-        intensity={0.3}
+        intensity={isExportRendering ? 0.42 : 0.3}
         color="#c8d8f0"
       />
       {/* Rim light — subtle backlight for depth */}
       <directionalLight
         position={[0, 3, -10]}
-        intensity={0.15}
+        intensity={isExportRendering ? 0.22 : 0.15}
         color="#f0f0ff"
       />
 
@@ -373,16 +448,36 @@ const SceneContent: React.FC<{
       )}
 
       {/* Contact Shadows — premium ground contact effect */}
-      {!isMobileSafari && !isNavigating && (
+      {!isMobileSafari && (!isNavigating || isExportRendering) && (
         <ContactShadows 
           position={[0, -0.01, 0]} 
-          opacity={0.6} 
+          opacity={isExportRendering ? 0.7 : 0.6} 
           scale={60} 
-          blur={2.0} 
+          blur={contactShadowBlur} 
           far={12} 
-          resolution={isMobileSafari ? 256 : 512}
+          resolution={contactShadowRes}
           color="#1a1a2e"
         />
+      )}
+
+      {/* Export-only reflective floor for presentation-style video output */}
+      {isExportRendering && exportPreset.reflectionQuality !== 'off' && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]} receiveShadow>
+          <planeGeometry args={[120, 120]} />
+          <MeshReflectorMaterial
+            mirror={0.35}
+            resolution={exportPreset.reflectionQuality === 'high' ? 1024 : 512}
+            blur={exportPreset.reflectionQuality === 'high' ? [420, 120] : [260, 70]}
+            mixBlur={1}
+            mixStrength={exportPreset.reflectionQuality === 'high' ? 0.38 : 0.24}
+            roughness={0.5}
+            depthScale={0.008}
+            minDepthThreshold={0.3}
+            maxDepthThreshold={1.5}
+            color={themeMode === 'light' ? '#e6ebf2' : '#0f172a'}
+            metalness={0.3}
+          />
+        </mesh>
       )}
 
       {/* Ground plane for raycasting (invisible) — handles path drawing + measurement clicks */}
@@ -579,10 +674,15 @@ const Viewport: React.FC = () => {
     selectedObjectType,
     transformMode,
     cameraMode,
+    isExportRendering,
+    captureQualityPreset,
     addProcessNode,
     addEnvironmentAsset,
     addActor,
   } = useEditorStore();
+
+  const exportPreset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
+  const dynamicDprMax = isExportRendering ? Math.max(2, Math.min(3, exportPreset.targetDpr)) : 2;
 
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -648,7 +748,7 @@ const Viewport: React.FC = () => {
       onDragOver={handleDragOver}
     >
       <Canvas
-        dpr={[1, 2]}
+        dpr={[1, dynamicDprMax]}
         shadows
         gl={{ 
           antialias: true,
@@ -666,7 +766,8 @@ const Viewport: React.FC = () => {
           <PerspectiveCamera makeDefault position={[10, 10, 10]} fov={50} near={0.1} far={1000} />
         )}
         <CameraCapture />
-        <InteractionPerformanceTuner isNavigating={isNavigating} />
+        <ExportRendererTuner active={isExportRendering} preset={captureQualityPreset} />
+        <InteractionPerformanceTuner isNavigating={isNavigating} isExportRendering={isExportRendering} />
         <Suspense fallback={null}>
           <SceneContent orbitRef={orbitRef} isNavigating={isNavigating} onNavigationChange={setIsNavigating} />
         </Suspense>

@@ -3,14 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Play, Pause, Square, Save, Download, Upload, Video,
   ArrowLeft, Undo2, Redo2, Check, AlertCircle,
-  Loader2, HelpCircle, Sun, Moon, Maximize2,
+  Loader2, HelpCircle, Sun, Moon, Maximize2, Film,
 } from 'lucide-react';
+import * as THREE from 'three';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuth } from '../../contexts/AuthContext';
 import { undo, redo } from '../../store/historyMiddleware';
 import { SaveStatus } from '../../pages/EditorPage';
 import ScenarioLoader from './ScenarioLoader';
 import AILayoutBuilder from './AILayoutBuilder';
+import {
+  VideoFormatPreference,
+  VideoQualityPreset,
+  VIDEO_CAPTURE_PRESETS,
+  VIDEO_QUALITY_PRESET_ORDER,
+  resolveRecordingMimeType,
+} from '../../lib/videoExportPresets';
 
 interface TopBarProps {
   projectName: string;
@@ -67,6 +75,16 @@ const S = {
     letterSpacing: '0.04em', transition: 'all 0.15s',
     boxShadow: `0 2px 8px ${bg}33`,
   } as React.CSSProperties),
+  compactSelect: {
+    padding: '2px 6px',
+    fontSize: 10,
+    borderRadius: 6,
+    border: '1px solid var(--mm-border-subtle)',
+    background: 'var(--mm-bg-surface)',
+    color: 'var(--mm-text-secondary)',
+    fontWeight: 600,
+    outline: 'none',
+  } as React.CSSProperties,
 };
 
 const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus, onSave }) => {
@@ -75,10 +93,12 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   const [isEditing, setIsEditing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showAIBuilder, setShowAIBuilder] = useState(false);
+  const [videoFormatPreference, setVideoFormatPreference] = useState<VideoFormatPreference>('auto');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recordingModeRef = useRef<'manual' | 'camera-path' | null>(null);
-  const renderBoostRef = useRef<{ gl: any; prevDpr: number; width: number; height: number } | null>(null);
+  const renderBoostRef = useRef<{ gl: THREE.WebGLRenderer; prevDpr: number; width: number; height: number } | null>(null);
+  const fallbackNoticeShownRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const {
@@ -87,6 +107,9 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     getSceneData, loadScene,
     setShowShortcuts,
     isCameraPathPlaying,
+    captureQualityPreset,
+    setCaptureQualityPreset,
+    setIsExportRendering,
   } = useEditorStore();
 
   const speedOptions = [
@@ -97,15 +120,16 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     { value: 4, label: '4×' },
   ];
 
-  const boostViewportCaptureQuality = useCallback((canvas: HTMLCanvasElement) => {
+  const boostViewportCaptureQuality = useCallback((canvas: HTMLCanvasElement, preset: VideoQualityPreset) => {
     // @ts-ignore — R3F store reference is attached to canvas at runtime
     const r3f = (canvas as any).__r3f;
     const state = r3f?.store?.getState?.();
-    const gl = state?.gl;
+    const gl = state?.gl as THREE.WebGLRenderer | undefined;
     const size = state?.size;
     if (!gl || !size) return;
+    const presetConfig = VIDEO_CAPTURE_PRESETS[preset];
     const prevDpr = gl.getPixelRatio?.() ?? 1;
-    const targetDpr = Math.max(1, Math.min(2, Math.max(prevDpr, 2)));
+    const targetDpr = Math.max(1, Math.min(3, Math.max(prevDpr, presetConfig.targetDpr)));
     gl.setPixelRatio?.(targetDpr);
     gl.setSize?.(size.width, size.height, false);
     renderBoostRef.current = { gl, prevDpr, width: size.width, height: size.height };
@@ -119,43 +143,42 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     renderBoostRef.current = null;
   }, []);
 
-  // ─── Record Video (high quality) ───
+  // ─── Record Video (quality preset + format preference) ───
   const startRecording = useCallback((mode: 'manual' | 'camera-path' = 'manual') => {
     const canvas = document.querySelector('canvas');
     if (!canvas) { alert('No 3D viewport found'); return; }
     try {
-      boostViewportCaptureQuality(canvas as HTMLCanvasElement);
-      // Capture at 60fps for smoother output
-      const stream = canvas.captureStream(60);
+      const preset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
+      setIsExportRendering(true);
+      boostViewportCaptureQuality(canvas as HTMLCanvasElement, captureQualityPreset);
+      const stream = (canvas as HTMLCanvasElement).captureStream(preset.captureFps);
 
-      // Try VP9 first (best quality), fall back to VP8
-      let mimeType = 'video/webm;codecs=vp9';
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'video/webm;codecs=vp8';
-      }
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'video/webm';
+      const format = resolveRecordingMimeType(videoFormatPreference);
+      if (format.usedFallback && !fallbackNoticeShownRef.current) {
+        fallbackNoticeShownRef.current = true;
+        alert('Requested video format is not supported by this browser. Falling back automatically.');
       }
 
       const recorder = new MediaRecorder(stream, {
-        mimeType,
-        videoBitsPerSecond: 35_000_000, // 35 Mbps — clearer edges/less blockiness
+        mimeType: format.mimeType,
+        videoBitsPerSecond: preset.videoBitsPerSecond,
       });
 
       chunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const blob = new Blob(chunksRef.current, { type: format.mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${projectName.replace(/\s+/g, '_')}_recording.webm`;
+        a.download = `${projectName.replace(/\s+/g, '_')}_${preset.label.toLowerCase()}_recording.${format.extension}`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        stream.getTracks().forEach((track) => track.stop());
         restoreViewportCaptureQuality();
         recordingModeRef.current = null;
+        setIsExportRendering(false);
       };
-      // Larger timeslice = fewer chunks = cleaner encoding
       recorder.start(1000);
       mediaRecorderRef.current = recorder;
       recordingModeRef.current = mode;
@@ -163,18 +186,29 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     } catch (err) {
       console.error('Recording failed:', err);
       restoreViewportCaptureQuality();
+      setIsExportRendering(false);
       alert('Recording not supported in this browser');
     }
-  }, [projectName, boostViewportCaptureQuality, restoreViewportCaptureQuality]);
+  }, [
+    projectName,
+    boostViewportCaptureQuality,
+    restoreViewportCaptureQuality,
+    captureQualityPreset,
+    videoFormatPreference,
+    setIsExportRendering,
+  ]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
+    } else {
+      restoreViewportCaptureQuality();
+      setIsExportRendering(false);
     }
     setIsRecording(false);
     // Stop camera path playback too
     useEditorStore.getState().setIsCameraPathPlaying(false);
-  }, []);
+  }, [restoreViewportCaptureQuality, setIsExportRendering]);
 
   // Auto-stop camera-path recordings when non-loop path playback completes
   useEffect(() => {
@@ -183,6 +217,13 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     if (isCameraPathPlaying) return;
     stopRecording();
   }, [isRecording, isCameraPathPlaying, stopRecording]);
+
+  useEffect(() => {
+    return () => {
+      restoreViewportCaptureQuality();
+      setIsExportRendering(false);
+    };
+  }, [restoreViewportCaptureQuality, setIsExportRendering]);
 
   // Record with camera path: starts recording + plays the active camera path
   const startRecordingWithCameraPath = useCallback(() => {
@@ -322,20 +363,52 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           {/* Divider */}
           <div style={{ width: 1, height: 28, background: 'var(--mm-border)' }} />
 
+          {/* Export quality / format */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 124 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Film size={11} style={{ color: 'var(--mm-text-disabled)' }} />
+              <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--mm-text-disabled)', letterSpacing: '0.08em', fontFamily: "'Orbitron', monospace" }}>
+                EXPORT
+              </span>
+            </div>
+            <select
+              value={captureQualityPreset}
+              onChange={(e) => setCaptureQualityPreset(e.target.value as VideoQualityPreset)}
+              style={S.compactSelect}
+              title="Recording quality preset: higher settings increase resolution, bitrate, shadows, and reflections."
+            >
+              {VIDEO_QUALITY_PRESET_ORDER.map((key) => (
+                <option key={key} value={key}>
+                  {VIDEO_CAPTURE_PRESETS[key].label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={videoFormatPreference}
+              onChange={(e) => setVideoFormatPreference(e.target.value as VideoFormatPreference)}
+              style={S.compactSelect}
+              title="Preferred export format. MP4 is used when browser support is available."
+            >
+              <option value="auto">Auto (prefer MP4)</option>
+              <option value="mp4">MP4 (if supported)</option>
+              <option value="webm">WebM</option>
+            </select>
+          </div>
+
           {/* Record */}
           <button onClick={isRecording ? stopRecording : () => startRecording()}
             style={{
               ...S.simBtn(isRecording ? '#ef4444' : '#8b5cf6'),
               animation: isRecording ? 'pulse 1.5s ease-in-out infinite' : undefined,
             }}
-            title={isRecording ? 'Stop viewport recording and save WebM file' : 'Record viewport video with manual camera movement'}>
+            title={isRecording ? 'Stop recording and export video file' : `Record viewport video (${VIDEO_CAPTURE_PRESETS[captureQualityPreset].label} preset)`}>
             <Video size={16} />
           </button>
           {/* Record with camera path */}
           {!isRecording && (
             <button onClick={startRecordingWithCameraPath}
               style={S.simBtn('#6366f1')}
-              title="Record using the active camera path for smooth cinematic motion">
+              title={`Record with active camera path (${VIDEO_CAPTURE_PRESETS[captureQualityPreset].label} preset)`}>
               <Video size={14} /><span style={{ fontSize: 9, marginLeft: -2 }}>🎬</span>
             </button>
           )}

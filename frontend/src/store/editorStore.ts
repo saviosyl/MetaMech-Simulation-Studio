@@ -6,6 +6,7 @@ import { getPortWorldPosition, getWorldPorts as computeWorldPorts } from '../lib
 import { computeSpiralTransferGeometry } from '../lib/spiralTransfer';
 import { FrameAssemblyExportContract } from '../lib/frameDesigner/model';
 import { toFrameAssemblyParameters } from '../lib/frameDesigner/sceneInterop';
+import { VideoQualityPreset } from '../lib/videoExportPresets';
 
 // Types
 export interface ProcessNode {
@@ -607,6 +608,12 @@ interface EditorState {
   // Presentation mode
   presentationMode: boolean;
   setPresentationMode: (active: boolean) => void;
+
+  // Export capture quality
+  isExportRendering: boolean;
+  captureQualityPreset: VideoQualityPreset;
+  setIsExportRendering: (active: boolean) => void;
+  setCaptureQualityPreset: (preset: VideoQualityPreset) => void;
   
   // Snap state
   isDragging: boolean;
@@ -812,6 +819,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // Presentation mode
   presentationMode: false,
   setPresentationMode: (active) => set({ presentationMode: active }),
+
+  // Export capture quality defaults
+  isExportRendering: false,
+  captureQualityPreset: 'presentation',
+  setIsExportRendering: (active) => set({ isExportRendering: active }),
+  setCaptureQualityPreset: (preset) => set({ captureQualityPreset: preset }),
   
   // Snap defaults
   isDragging: false,
