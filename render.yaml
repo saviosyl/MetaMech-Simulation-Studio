@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: metamech-simulation-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    preDeployCommand: npm run migrate
+    startCommand: npm run start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: FRONTEND_URL
+        value: https://app.metamechsolutions.com
+      - key: CORS_ORIGINS
+        value: https://app.metamechsolutions.com
+      - key: EMAIL_VERIFICATION_TOKEN_HOURS
+        value: "24"
+      - key: EXPOSE_DEV_RESET_LINK
+        value: "false"
+      - key: EXPOSE_DEV_VERIFICATION_LINK
+        value: "false"
+      - key: DB_SSL
+        value: "true"
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: DATABASE_URL
+        sync: false
+      - key: TRIAL_IDENTITY_SALT
+        sync: false
