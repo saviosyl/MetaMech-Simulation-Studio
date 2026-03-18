@@ -7,6 +7,9 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import BillingPage from './pages/BillingPage';
+import HomePage from './pages/HomePage';
+import SimulationProductPage from './pages/SimulationProductPage';
+import SimulationPricingPage from './pages/SimulationPricingPage';
 import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
 import FrameDesignerPage from './pages/FrameDesignerPage';
@@ -31,6 +34,9 @@ function App() {
       <Router>
         <Routes>
           {/* Public routes */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/simulation" element={<SimulationProductPage />} />
+          <Route path="/simulation/pricing" element={<SimulationPricingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -92,11 +98,8 @@ function App() {
             }
           />
           
-          {/* Redirect root to login */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          
           {/* Catch all */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </AuthProvider>
