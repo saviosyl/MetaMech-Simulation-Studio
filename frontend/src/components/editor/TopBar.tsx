@@ -36,10 +36,10 @@ const S = {
     display: 'grid',
     gridTemplateColumns: '1fr auto 1fr',
     alignItems: 'center',
-    gap: 14,
-    margin: '10px 14px 0',
-    padding: '10px 18px',
-    minHeight: 68,
+    gap: 10,
+    margin: '6px 12px 0',
+    padding: '7px 14px',
+    minHeight: 58,
     background: 'var(--mm-bg-toolbar)',
     border: '1px solid var(--mm-border-subtle)',
     borderRadius: 16,
@@ -47,7 +47,7 @@ const S = {
   } as React.CSSProperties,
   group: {
     display: 'flex', alignItems: 'center', gap: 4,
-    padding: '2px 4px',
+    padding: '1px 3px',
     background: 'transparent',
     borderRadius: 8,
     border: 'none',
@@ -55,9 +55,9 @@ const S = {
   strip: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '6px 8px',
-    borderRadius: 12,
+    gap: 6,
+    padding: '4px 6px',
+    borderRadius: 10,
     background: 'var(--mm-bg-surface)',
     border: '1px solid var(--mm-border-subtle)',
   } as React.CSSProperties,
@@ -66,35 +66,35 @@ const S = {
     letterSpacing: '0.08em', textTransform: 'uppercase' as const,
     fontFamily: "'Orbitron', monospace",
   } as React.CSSProperties,
-  divider: { width: 1, height: 30, background: 'var(--mm-border-subtle)', flexShrink: 0 } as React.CSSProperties,
+  divider: { width: 1, height: 24, background: 'var(--mm-border-subtle)', flexShrink: 0 } as React.CSSProperties,
   iconBtn: (active?: boolean) => ({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 38, height: 38, borderRadius: 12, border: '1px solid transparent', cursor: 'pointer',
+    width: 36, height: 36, borderRadius: 10, border: '1px solid transparent', cursor: 'pointer',
     background: active ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)',
     color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-secondary)',
     transition: 'all 0.15s',
   } as React.CSSProperties),
   simBtn: (color: string) => ({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 40, height: 40, borderRadius: 12, border: 'none', cursor: 'pointer',
+    width: 36, height: 36, borderRadius: 10, border: 'none', cursor: 'pointer',
     background: color, color: '#fff',
     boxShadow: `0 2px 8px ${color}44`,
     transition: 'all 0.15s',
   } as React.CSSProperties),
   primaryBtn: (bg: string) => ({
     display: 'inline-flex', alignItems: 'center', gap: 6,
-    height: 40,
-    padding: '0 16px', borderRadius: 12, border: 'none', cursor: 'pointer',
+    height: 36,
+    padding: '0 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
     background: bg, color: '#fff',
-    fontSize: 13, fontWeight: 600,
+    fontSize: 12, fontWeight: 600,
     letterSpacing: '0.01em', transition: 'all 0.15s',
     boxShadow: `0 2px 8px ${bg}33`,
   } as React.CSSProperties),
   compactSelect: {
-    height: 38,
-    padding: '0 12px',
-    fontSize: 13,
-    borderRadius: 12,
+    height: 34,
+    padding: '0 10px',
+    fontSize: 12,
+    borderRadius: 10,
     border: '1px solid var(--mm-border-subtle)',
     background: 'var(--mm-bg-surface)',
     color: 'var(--mm-text-secondary)',
@@ -107,7 +107,7 @@ const S = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 600,
     color: 'var(--mm-text-primary)',
     cursor: 'pointer',
@@ -315,13 +315,13 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   return (
     <div style={S.bar} data-tour="top-ribbon">
       {/* ════ LEFT: Project + Edit + Build ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifySelf: 'start', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifySelf: 'start', minWidth: 0 }}>
         {/* Brand */}
         <button onClick={() => navigate('/dashboard')}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s', padding: '0 2px' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s', padding: '0 2px' }}
           title="Back to Dashboard">
-          <ArrowLeft size={16} />
-          <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.01em' }}>MetaMech</span>
+          <ArrowLeft size={15} />
+          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.01em' }}>MetaMech</span>
         </button>
 
         <div style={S.divider} />
@@ -330,7 +330,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         {isEditing ? (
           <input type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)}
             onBlur={() => setIsEditing(false)} onKeyPress={(e) => e.key === 'Enter' && setIsEditing(false)} autoFocus
-            style={{ fontSize: 13, fontWeight: 600, background: 'transparent', border: 'none', borderBottom: '2px solid var(--mm-accent-primary)', color: 'var(--mm-text-primary)', outline: 'none', padding: '3px 0', width: 170 }} />
+            style={{ fontSize: 12, fontWeight: 600, background: 'transparent', border: 'none', borderBottom: '2px solid var(--mm-accent-primary)', color: 'var(--mm-text-primary)', outline: 'none', padding: '2px 0', width: 170 }} />
         ) : (
           <span
             onClick={() => setIsEditing(true)}
@@ -358,8 +358,8 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         <div
           style={{
             ...S.strip,
-            padding: '7px 10px',
-            gap: 9,
+            padding: '5px 8px',
+            gap: 7,
             background: 'var(--mm-bg-surface)',
             border: '1px solid var(--mm-border-subtle)',
           }}
@@ -369,28 +369,28 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           <button onClick={isPlaying ? pause : play}
             style={S.simBtn(isPlaying ? '#f59e0b' : '#06b6d4')}
             title={isPlaying ? 'Pause simulation playback' : 'Start simulation playback'}>
-            {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+            {isPlaying ? <Pause size={17} /> : <Play size={17} />}
           </button>
 
           {/* Reset */}
           <button onClick={reset} style={S.simBtn('#64748b')} title="Reset simulation and clear transient runtime state">
-            <Square size={16} />
+            <Square size={15} />
           </button>
 
           {/* Divider */}
-          <div style={{ width: 1, height: 30, background: 'var(--mm-border-subtle)' }} />
+          <div style={{ width: 1, height: 24, background: 'var(--mm-border-subtle)' }} />
 
           {/* Speed */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.05em' }}>Speed</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.05em' }}>Speed</span>
             <div style={{ display: 'flex', gap: 6 }}>
               {speedOptions.map(o => (
                 <button key={o.value} onClick={() => setSimulationSpeed(o.value)}
                   title={`Set simulation speed to ${o.label}`}
                   style={{
-                    height: 28,
-                    padding: '0 10px', borderRadius: 10, border: '1px solid transparent', cursor: 'pointer',
-                    fontSize: 12, fontWeight: 600,
+                    height: 26,
+                    padding: '0 8px', borderRadius: 9, border: '1px solid transparent', cursor: 'pointer',
+                    fontSize: 11, fontWeight: 600,
                     background: simulationSpeed === o.value ? 'var(--mm-accent-primary)' : 'var(--mm-bg-surface)',
                     color: simulationSpeed === o.value ? '#fff' : 'var(--mm-text-secondary)',
                     transition: 'all 0.15s',
@@ -402,13 +402,13 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           </div>
 
           {/* Divider */}
-          <div style={{ width: 1, height: 30, background: 'var(--mm-border-subtle)' }} />
+          <div style={{ width: 1, height: 24, background: 'var(--mm-border-subtle)' }} />
 
           {/* Export quality / format */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 168 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 152 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Film size={14} style={{ color: 'var(--mm-text-tertiary)' }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.03em' }}>
+              <Film size={13} style={{ color: 'var(--mm-text-tertiary)' }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.03em' }}>
                 Export
               </span>
             </div>
@@ -443,18 +443,18 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
               animation: isRecording ? 'pulse 1.5s ease-in-out infinite' : undefined,
             }}
             title={isRecording ? 'Stop recording and export video file' : `Record viewport video (${VIDEO_CAPTURE_PRESETS[captureQualityPreset].label} preset)`}>
-            <Video size={16} />
+            <Video size={15} />
           </button>
           {/* Record with camera path */}
           {!isRecording && (
             <button onClick={startRecordingWithCameraPath}
               style={S.simBtn('#6366f1')}
               title={`Record with active camera path (${VIDEO_CAPTURE_PRESETS[captureQualityPreset].label} preset)`}>
-              <Video size={16} /><span style={{ fontSize: 9, marginLeft: -2 }}>🎬</span>
+              <Video size={15} /><span style={{ fontSize: 9, marginLeft: -2 }}>🎬</span>
             </button>
           )}
           {isRecording && (
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', animation: 'pulse 1s ease-in-out infinite' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', animation: 'pulse 1s ease-in-out infinite' }}>
               REC
             </span>
           )}
@@ -462,7 +462,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
       </div>
 
       {/* ════ RIGHT: View + File + Save + User ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifySelf: 'end' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, justifySelf: 'end' }}>
         <div style={S.strip}>
           <button onClick={toggleTheme} style={S.iconBtn()} title="Toggle Theme">
             {themeMode === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
@@ -476,7 +476,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         <div style={S.strip}>
           <button onClick={handleImport} style={S.iconBtn()} title="Import Project"><Upload size={15} /></button>
           <button onClick={handleExport} style={S.iconBtn()} title="Export Project"><Download size={15} /></button>
-          <button onClick={() => setShowAIBuilder(true)} style={{ ...S.iconBtn(), width: 46, color: 'var(--mm-accent-primary)', fontWeight: 700, fontSize: 12 }} title="AI Layout Builder">AI</button>
+          <button onClick={() => setShowAIBuilder(true)} style={{ ...S.iconBtn(), width: 42, color: 'var(--mm-accent-primary)', fontWeight: 700, fontSize: 11 }} title="AI Layout Builder">AI</button>
         </div>
 
         {/* Save */}
@@ -493,21 +493,21 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
             display: 'inline-flex',
             alignItems: 'center',
             gap: 6,
-            height: 40,
-            padding: '0 12px',
-            borderRadius: 12,
+            height: 36,
+            padding: '0 10px',
+            borderRadius: 10,
             border: '1px solid var(--mm-border-subtle)',
             background: 'var(--mm-bg-surface)',
             color: 'var(--mm-text-secondary)',
             cursor: 'pointer',
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 600,
             letterSpacing: '0.01em',
           }}
           title="Open MetaMech Help / Support and product guide"
           data-tour="help-support"
         >
-          <LifeBuoy size={13} />
+          <LifeBuoy size={12} />
           HELP
         </button>
 
@@ -517,7 +517,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
 
         {/* User */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }}>
             {user?.displayName?.charAt(0).toUpperCase() || 'U'}
           </div>
         </div>

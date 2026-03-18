@@ -62,14 +62,14 @@ const ViewportToolbar: React.FC = () => {
   const clusterStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   };
 
   const dividerStyle: React.CSSProperties = {
     width: 1,
-    height: 28,
+    height: 24,
     background: 'var(--mm-border-subtle)',
-    margin: '0 6px',
+    margin: '0 5px',
     flexShrink: 0,
   };
 
@@ -77,11 +77,11 @@ const ViewportToolbar: React.FC = () => {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 38,
-    height: 38,
+    width: 34,
+    height: 34,
     padding: 0,
     border: '1px solid var(--mm-border-subtle)',
-    borderRadius: 12,
+    borderRadius: 10,
     background: active ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)',
     color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-secondary)',
     opacity: disabled ? 0.45 : 1,
@@ -93,22 +93,22 @@ const ViewportToolbar: React.FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: 'clamp(88px, 11vw, 106px)',
+        top: 'clamp(76px, 9.5vw, 94px)',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 45,
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
         width: 'min(1220px, calc(100% - 24px))',
         flexWrap: 'nowrap',
         overflowX: 'auto',
         justifyContent: 'center',
-        minHeight: 48,
+        minHeight: 42,
         background: 'var(--mm-bg-toolbar-secondary)',
         backdropFilter: 'blur(8px)',
-        borderRadius: 14,
-        padding: '7px 10px',
+        borderRadius: 12,
+        padding: '5px 8px',
         boxShadow: 'var(--mm-shadow-sm)',
         border: '1px solid var(--mm-border-subtle)',
       }}
