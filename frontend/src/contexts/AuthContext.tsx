@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import api from '../utils/api';
 import { User, AuthContextType, RegisterResult } from '../types';
-import { setInternalReviewSessionEmail } from '../lib/internalReviewAccess';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -26,11 +25,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await api.get('/auth/me');
       const u = response.data.user;
       setUser(u);
-      setInternalReviewSessionEmail(u?.email);
       return u as User;
     } catch {
       setUser(null);
-      setInternalReviewSessionEmail(null);
       return null;
     } finally {
       setLoading(false);
@@ -43,7 +40,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await api.post('/auth/login', { email: normalizedEmail, password });
       const u = response.data.user as User;
       setUser(u);
-      setInternalReviewSessionEmail(u?.email);
       return u;
     } catch (error: any) {
       if (!error?.response) {
@@ -82,7 +78,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await api.post('/auth/logout');
     } catch { /* ignore logout errors */ }
     setUser(null);
-    setInternalReviewSessionEmail(null);
   };
 
   useEffect(() => {

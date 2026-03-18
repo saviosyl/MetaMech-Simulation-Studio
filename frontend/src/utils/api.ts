@@ -1,6 +1,5 @@
 /// <reference types="vite/client" />
 import axios from 'axios';
-import { isInternalReviewSession } from '../lib/internalReviewAccess';
 
 const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
 // Dev fallback stays localhost, but production must never default to localhost.
@@ -47,11 +46,6 @@ api.interceptors.response.use(
     ) {
       const email = encodeURIComponent(error.response?.data?.email || '');
       window.location.href = `/verify-email?email=${email}&next=${next}`;
-    }
-    // TEMP REVIEW-ONLY exception to prevent forced billing redirects for the
-    // internal review account while trial is expired. Remove after review sign-off.
-    if (error.response?.status === 402 && isInternalReviewSession()) {
-      return Promise.reject(error);
     }
     if (error.response?.status === 402 && !currentPath.startsWith('/billing')) {
       window.location.href = `/billing?next=${next}`;

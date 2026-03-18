@@ -1,7 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { isInternalReviewUser } from '../lib/internalReviewAccess';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -31,12 +30,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireSubscr
     return <Navigate to={`/verify-email?email=${encodeURIComponent(user.email)}&next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
 
-  // TEMP REVIEW-ONLY OVERRIDE (must be removed after internal review sign-off).
-  // Tracking doc: docs/phase2/simulation-tool-review-access-cleanup.md
-  // Long-term policy: backend-managed entitlement in D1 (no frontend-only bypass).
-  const isReviewAdmin = isInternalReviewUser(user);
-
-  if (requireSubscription && !user.subscription?.entitled && !isReviewAdmin) {
+  if (requireSubscription && !user.subscription?.entitled) {
     return <Navigate to={`/billing?next=${encodeURIComponent(location.pathname + location.search)}`} state={{ from: location }} replace />;
   }
 

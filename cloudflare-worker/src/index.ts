@@ -35,6 +35,7 @@ type Env = {
   NODE_ENV?: string;
   ADMIN_TEST_EMAIL_KEY?: string;
   ENABLE_ADMIN_TEST_EMAIL?: string;
+  INTERNAL_ADMIN_EMAILS?: string;
 };
 
 const textEncoder = new TextEncoder();
@@ -55,6 +56,30 @@ function toJson(data: unknown, status = 200, extraHeaders?: Record<string, strin
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+const DEFAULT_INTERNAL_ADMIN_EMAILS = new Set(['saviosyl@gmail.com']);
+
+function isInternalAdminEmail(email: string, env: Env): boolean {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return false;
+  if (DEFAULT_INTERNAL_ADMIN_EMAILS.has(normalized)) return true;
+  const configured = (env.INTERNAL_ADMIN_EMAILS || '')
+    .split(',')
+    .map((entry) => normalizeEmail(entry))
+    .filter((entry) => entry.length > 0);
+  return configured.includes(normalized);
+}
+
+function internalAdminEntitlement(): SubscriptionEntitlement {
+  return {
+    status: 'active',
+    entitled: true,
+    requiresEmailVerification: false,
+    planCode: 'internal-full-access',
+    currentPeriodStart: null,
+    currentPeriodEnd: '2099-12-31T00:00:00.000Z',
+  };
 }
 
 function parseCookies(request: Request): Record<string, string> {
@@ -884,7 +909,9 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   const passOk = await verifyPassword(password, user.password_hash);
   if (!passOk) return toJson({ error: 'Invalid email or password' }, 401);
 
-  if (!user.email_verified_at) {
+  const internalAdmin = isInternalAdminEmail(user.email, env);
+
+  if (!user.email_verified_at && !internalAdmin) {
     return toJson(
       {
         error: 'Please verify your email before signing in. You can request a new verification link if needed.',
@@ -901,7 +928,9 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     env.JWT_SECRET,
     expiresInSeconds(env)
   );
-  const entitlement = await getEntitlement(env.DB, user.id, true);
+  const entitlement = internalAdmin
+    ? internalAdminEntitlement()
+    : await getEntitlement(env.DB, user.id, true);
   return toJson(
     {
       message: 'Login successful',
@@ -909,9 +938,9 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
         id: user.id,
         email: user.email,
         displayName: user.display_name,
-        role: user.role,
+        role: internalAdmin ? 'admin' : user.role,
         createdAt: user.created_at,
-        emailVerified: true,
+        emailVerified: internalAdmin ? true : !!user.email_verified_at,
         subscription: entitlement,
       },
     },
@@ -947,14 +976,17 @@ async function readAuthedUser(request: Request, env: Env): Promise<UserRow | nul
 async function handleMe(request: Request, env: Env): Promise<Response> {
   const user = await readAuthedUser(request, env);
   if (!user) return toJson({ error: 'Authentication required' }, 401);
-  const emailVerified = !!user.email_verified_at;
-  const entitlement = await getEntitlement(env.DB, user.id, emailVerified);
+  const internalAdmin = isInternalAdminEmail(user.email, env);
+  const emailVerified = internalAdmin ? true : !!user.email_verified_at;
+  const entitlement = internalAdmin
+    ? internalAdminEntitlement()
+    : await getEntitlement(env.DB, user.id, emailVerified);
   return toJson({
     user: {
       id: user.id,
       email: user.email,
       displayName: user.display_name,
-      role: user.role,
+      role: internalAdmin ? 'admin' : user.role,
       createdAt: user.created_at,
       emailVerified,
       subscription: entitlement,
