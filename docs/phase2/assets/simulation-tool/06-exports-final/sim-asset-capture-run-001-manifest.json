@@ -1,0 +1,21 @@
+{
+  "generatedAt": "2026-03-18T11:24:10.703Z",
+  "source": "Phase2 Batch5 capture run 001",
+  "assets": [
+    "/workspace/docs/phase2/assets/simulation-tool/01-screenshots/sim-hero-main-light-v01.png",
+    "/workspace/docs/phase2/assets/simulation-tool/01-screenshots/sim-proof-connection-transfer-light-v01.png",
+    "/workspace/docs/phase2/assets/simulation-tool/01-screenshots/sim-proof-flow-behavior-light-v01.png",
+    "/workspace/docs/phase2/assets/simulation-tool/01-screenshots/sim-proof-validation-process-panel-light-v01.png",
+    "/workspace/docs/phase2/assets/simulation-tool/01-screenshots/sim-proof-transfer-reliability-light-v01.png",
+    "/workspace/docs/phase2/assets/simulation-tool/01-screenshots/sim-presentation-export-cinematic-light-v01.png",
+    "/workspace/docs/phase2/assets/simulation-tool/03-pricing-visuals/sim-pricing-trial-fullaccess-light-v01.png"
+  ],
+  "derivativeCopies": [
+    "/workspace/docs/phase2/assets/simulation-tool/02-page-visuals/sim-hero-main-light-v01.png",
+    "/workspace/docs/phase2/assets/simulation-tool/02-page-visuals/sim-presentation-export-cinematic-light-v01.png",
+    "/workspace/docs/phase2/assets/simulation-tool/02-page-visuals/sim-pricing-trial-fullaccess-light-v01.png",
+    "/workspace/docs/phase2/assets/simulation-tool/04-brochure-visuals/sim-brochure-topbanner-hero-light-v01.png",
+    "/workspace/docs/phase2/assets/simulation-tool/04-brochure-visuals/sim-brochure-solution-proof-light-v01.png",
+    "/workspace/docs/phase2/assets/simulation-tool/04-brochure-visuals/sim-brochure-lower-presentation-light-v01.png"
+  ]
+}
