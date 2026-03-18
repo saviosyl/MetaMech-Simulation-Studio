@@ -1,0 +1,140 @@
+[
+  {
+    "viewport": {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900
+    },
+    "ribbon": {
+      "hasTopRibbon": true,
+      "hasFloatingToolbar": true,
+      "topHeight": 142,
+      "floatingHeight": 54,
+      "floatingTop": 259,
+      "topBottom": 152,
+      "overlap": false,
+      "horizontalOverflow": false
+    },
+    "lightDefault": "light",
+    "login": {
+      "horizontalOverflow": false,
+      "inputHeight": 48,
+      "buttonHeight": 50,
+      "cardWidth": 460,
+      "cardFitsViewport": true
+    },
+    "register": {
+      "horizontalOverflow": false,
+      "inputHeight": 48,
+      "buttonHeight": 50,
+      "cardWidth": 460,
+      "cardFitsViewport": true
+    },
+    "forgot": {
+      "horizontalOverflow": false,
+      "inputHeight": 48,
+      "buttonHeight": 50,
+      "cardWidth": 460,
+      "cardFitsViewport": true
+    },
+    "reset": {
+      "horizontalOverflow": false,
+      "inputHeight": 48,
+      "buttonHeight": 50,
+      "cardWidth": 460,
+      "cardFitsViewport": true
+    }
+  },
+  {
+    "viewport": {
+      "name": "tablet",
+      "width": 1024,
+      "height": 768
+    },
+    "ribbon": {
+      "hasTopRibbon": true,
+      "hasFloatingToolbar": true,
+      "topHeight": 142,
+      "floatingHeight": 60,
+      "floatingTop": 259,
+      "topBottom": 152,
+      "overlap": false,
+      "horizontalOverflow": false
+    },
+    "lightDefault": "light",
+    "login": {
+      "horizontalOverflow": false,
+      "inputHeight": 48,
+      "buttonHeight": 50,
+      "cardWidth": 460,
+      "cardFitsViewport": true
+    },
+    "register": {
+      "horizontalOverflow": false,
+      "inputHeight": 48,
+      "buttonHeight": 50,
+      "cardWidth": 460,
+      "cardFitsViewport": true
+    },
+    "forgot": {
+      "horizontalOverflow": false,
+      "inputHeight": 48,
+      "buttonHeight": 50,
+      "cardWidth": 460,
+      "cardFitsViewport": true
+    },
+    "reset": {
+      "horizontalOverflow": false,
+      "inputHeight": 48,
+      "buttonHeight": 50,
+      "cardWidth": 460,
+      "cardFitsViewport": true
+    }
+  },
+  {
+    "viewport": {
+      "name": "mobile",
+      "width": 390,
+      "height": 844
+    },
+    "ribbon": {
+      "hasTopRibbon": true,
+      "hasFloatingToolbar": true,
+      "topHeight": 142,
+      "floatingHeight": 60,
+      "floatingTop": 241,
+      "topBottom": 152,
+      "overlap": false,
+      "horizontalOverflow": false
+    },
+    "lightDefault": "light",
+    "login": {
+      "horizontalOverflow": false,
+      "inputHeight": 48,
+      "buttonHeight": 50,
+      "cardWidth": 358,
+      "cardFitsViewport": true
+    },
+    "register": {
+      "horizontalOverflow": false,
+      "inputHeight": 48,
+      "buttonHeight": 50,
+      "cardWidth": 358,
+      "cardFitsViewport": true
+    },
+    "forgot": {
+      "horizontalOverflow": false,
+      "inputHeight": 48,
+      "buttonHeight": 50,
+      "cardWidth": 358,
+      "cardFitsViewport": true
+    },
+    "reset": {
+      "horizontalOverflow": false,
+      "inputHeight": 48,
+      "buttonHeight": 50,
+      "cardWidth": 358,
+      "cardFitsViewport": true
+    }
+  }
+]
