@@ -6,15 +6,37 @@ Pricing model: **1-Day Trial** + **Full Access (Monthly / Yearly)** only
 
 ---
 
+## 0) Final Headline Refinement Options (Premium Tone Pass)
+
+### Hero headline options
+1. **Plan, test, and present industrial layouts with confidence.**
+2. **Industrial layout clarity for faster engineering decisions.**
+3. **Build line concepts with clearer flow insight from day one.**
+4. **From layout concept to confident execution.**
+5. **A professional simulation workspace for modern engineering teams.**
+
+### Hero subheadline options
+1. MetaMech Studio helps teams shape layouts, test product movement, and communicate outcomes clearly before implementation.
+2. Create industrial layouts, verify flow behavior, and present stakeholder-ready results in one professional environment.
+3. Give engineering and operations teams clear visual proof before equipment moves to the floor.
+4. Align technical and commercial decisions faster with practical industrial layout simulation.
+5. Turn line concepts into clear, review-ready evidence for smarter project decisions.
+
+### Recommended final hero pairing
+**Headline:** Plan, test, and present industrial layouts with confidence.  
+**Subheadline:** MetaMech Studio helps teams shape layouts, test product movement, and communicate outcomes clearly before implementation.
+
+---
+
 ## 1) Final Simulation Product Page Copy (Full Page Order)
 
 ### Hero Section
 
 **Headline**  
-**Validate industrial layouts before they become expensive mistakes.**
+**Plan, test, and present industrial layouts with confidence.**
 
 **Subheadline**  
-MetaMech Studio helps engineering teams design layouts, simulate flow behavior, and present decision-ready outcomes in one professional workspace.
+MetaMech Studio helps teams shape layouts, test product movement, and communicate outcomes clearly before implementation.
 
 **Primary CTA**  
 **Start 1-Day Trial**
@@ -26,8 +48,8 @@ MetaMech Studio helps engineering teams design layouts, simulate flow behavior, 
 
 ### Trust / Value Intro
 
-Engineering decisions move faster when teams can see system behavior clearly.  
-MetaMech Studio gives you a practical simulation workflow to validate transfer logic, communicate with stakeholders, and reduce avoidable rework before implementation.
+When flow behavior is visible early, decisions improve and project risk drops.  
+MetaMech Studio gives engineering teams a clear way to test line behavior, align stakeholders, and move forward with confidence.
 
 ---
 
@@ -36,17 +58,17 @@ MetaMech Studio gives you a practical simulation workflow to validate transfer l
 **Section Heading**  
 **Why teams choose MetaMech Studio**
 
-**1) Faster validation cycles**  
-Move from concept to simulation-backed decisions without fragmented workflows.
+**1) Faster engineering decisions**  
+Move from concept to clear, evidence-backed direction without fragmented tools.
 
-**2) Clear flow visibility**  
-Understand how products move through connected equipment before physical changes are made.
+**2) Earlier flow insight**  
+See how products travel through connected equipment before physical changes begin.
 
-**3) Better stakeholder alignment**  
-Use polished visuals and simulation playback to communicate decisions with confidence.
+**3) Stronger stakeholder communication**  
+Use polished visuals and playback to align engineering, operations, and customers.
 
-**4) Lower rework risk**  
-Catch connection and transfer issues earlier, when fixes are cheaper and faster.
+**4) Reduced late-stage rework**  
+Find transfer and connection issues sooner, when fixes are faster and less costly.
 
 ---
 
@@ -93,17 +115,17 @@ Common use cases:
 ### Pricing Section
 
 **Section Heading**  
-**Simple pricing for serious simulation work**
+**Straightforward pricing for engineering teams**
 
 **Supporting Line**  
-Start with a full-access 1-Day Trial. Continue with Full Access on monthly or yearly billing.
+Start with a full-access 1-Day Trial, then continue with Full Access on monthly or yearly billing.
 
 **Card 1 — 1-Day Trial**  
-Full access to evaluate your real workflow in a focused session.  
+Full platform access for a focused evaluation using your real scenario.  
 **CTA:** Start 1-Day Trial
 
 **Card 2 — Full Access**  
-Continuous access for day-to-day engineering, validation, and presentation use.  
+Continuous access for active engineering, planning, and presentation work.  
 Billing options: **Monthly** / **Yearly**  
 **CTA:** Get Full Access
 
@@ -140,10 +162,10 @@ Yes. Customer-specific simulation scenarios and project configurations can be us
 ### Final CTA Section
 
 **Section Heading**  
-**Ready to make layout decisions with clearer simulation proof?**
+**Ready to move from concept to confident execution?**
 
 **Supporting Line**  
-Start with a 1-Day Trial or schedule a guided demo based on your use case.
+Start with a 1-Day Trial or book a focused demo tailored to your line.
 
 **CTA Buttons**
 
@@ -156,16 +178,16 @@ Start with a 1-Day Trial or schedule a guided demo based on your use case.
 ## 2) Final Homepage Simulation Section Copy (Short Form)
 
 **Section Headline**  
-**Industrial simulation for faster, clearer engineering decisions.**
+**Industrial layout insight for faster, smarter decisions.**
 
 **Supporting Text**  
-MetaMech Studio helps teams design layouts, validate flow behavior, and present decision-ready results before implementation.
+MetaMech Studio helps teams shape layouts, test line behavior, and present clear outcomes before implementation.
 
 **Benefit Points**
 
-- Validate transfer and flow logic earlier
-- Reduce rework risk with clearer simulation proof
-- Align technical and business stakeholders faster
+- Reveal transfer and flow behavior earlier
+- Reduce rework risk with clearer technical evidence
+- Align engineering and business stakeholders faster
 - Present polished scenarios with confidence
 
 **CTA Labels**
@@ -181,14 +203,14 @@ MetaMech Studio helps teams design layouts, validate flow behavior, and present 
 **Simulation Tool Pricing**
 
 **Supporting Line**  
-Choose your access path: full product evaluation with a 1-Day Trial, then ongoing use with Full Access monthly or yearly.
+Choose your access path: evaluate with a 1-Day Trial, then continue with Full Access monthly or yearly.
 
 **Card Title: 1-Day Trial**  
-Full Simulation Tool access for short, focused evaluation using your real workflow.  
+Full access for a focused, real-world evaluation in one day.  
 **CTA:** Start 1-Day Trial
 
 **Card Title: Full Access**  
-Continuous Simulation Tool access for active engineering, validation, and presentation work.  
+Continuous access for engineering teams running active planning and review cycles.  
 Billing options: **Monthly** / **Yearly**  
 **CTA:** Get Full Access
 
@@ -196,7 +218,7 @@ Billing options: **Monthly** / **Yearly**
 Yearly is recommended for teams running simulation workflows continuously.
 
 **Upgrade Line**  
-Finish your trial and move to Full Access to keep your work moving without interruption.
+Finish your trial and move to Full Access to keep momentum without interruption.
 
 ---
 
@@ -274,12 +296,12 @@ Yes. Onboarding and support guidance are available to help your team start quick
 
 ## 6) Messaging Refinement Pass (Batch 2 -> Batch 3)
 
-Refinements applied in this final copy:
+Refinements applied in this premium tone pass:
 
-1. Replaced generic phrasing with outcome-first language (validation speed, decision confidence, rework reduction).
-2. Removed internal/tool-building tone and shifted to customer-facing value statements.
-3. Reduced repetitive lines; standardized language across product, pricing, one-pager, and FAQ.
-4. Tightened commercial calls-to-action to be direct and conversion-ready.
+1. Improved headline/subheadline quality to sound more premium and commercially confident.
+2. Reduced repetitive wording by varying language across benefits, pricing, and CTA blocks.
+3. Replaced flat/internal phrasing with customer-facing, engineering-grounded language.
+4. Tightened CTAs to be clearer and conversion-focused without hype.
 5. Kept wording aligned to the locked pricing model only:
    - 1-Day Trial
    - Full Access (Monthly / Yearly)
