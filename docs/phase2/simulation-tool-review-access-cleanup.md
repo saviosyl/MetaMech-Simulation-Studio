@@ -5,9 +5,8 @@ Scope: MetaMech Studio (Simulation Tool) access control only
 
 ## Why this exists
 
-A temporary frontend route-gating override was added to unblock internal admin review for:
+A temporary frontend review override was added to unblock internal review for:
 
-- role: `admin`
 - email: `saviosyl@gmail.com`
 
 This is intentionally temporary and must not remain as a permanent production access pattern.
@@ -16,10 +15,15 @@ This is intentionally temporary and must not remain as a permanent production ac
 
 - File: `frontend/src/components/ProtectedRoute.tsx`
 - Marker comment: `TEMP REVIEW-ONLY OVERRIDE`
+- File: `frontend/src/utils/api.ts` (402 redirect suppression for review session)
+- File: `frontend/src/lib/internalReviewAccess.ts` (email/session helper)
+- File: `frontend/src/contexts/AuthContext.tsx` (review session email persistence)
 
 ## Cleanup task (required after review sign-off)
 
-- [ ] Remove `REVIEW_ADMIN_EMAILS` override logic from `ProtectedRoute.tsx`
+- [ ] Remove temporary review override logic from `ProtectedRoute.tsx`
+- [ ] Remove temporary 402 suppression for review session from `utils/api.ts`
+- [ ] Remove `internalReviewAccess.ts` helper and related session persistence calls
 - [ ] Verify subscription gating works normally for all users (including admin users)
 - [ ] Confirm billing-blocked behavior returns for expired/non-entitled accounts
 - [ ] Deploy cleanup commit to production

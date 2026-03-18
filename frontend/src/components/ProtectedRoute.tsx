@@ -1,17 +1,12 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { isInternalReviewUser } from '../lib/internalReviewAccess';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireSubscription?: boolean;
 }
-
-// TEMP REVIEW-ONLY OVERRIDE (must be removed after internal review sign-off).
-// Tracking doc: docs/phase2/simulation-tool-review-access-cleanup.md
-// Long-term policy: backend-managed entitlement in D1 (no frontend-only bypass).
-// Keeps the commercial model unchanged for all regular users.
-const REVIEW_ADMIN_EMAILS = new Set(['saviosyl@gmail.com']);
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireSubscription = true }) => {
   const { user, loading } = useAuth();
@@ -36,9 +31,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireSubscr
     return <Navigate to={`/verify-email?email=${encodeURIComponent(user.email)}&next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
 
-  const isReviewAdmin =
-    user.role === 'admin' &&
-    REVIEW_ADMIN_EMAILS.has((user.email || '').trim().toLowerCase());
+  // TEMP REVIEW-ONLY OVERRIDE (must be removed after internal review sign-off).
+  // Tracking doc: docs/phase2/simulation-tool-review-access-cleanup.md
+  // Long-term policy: backend-managed entitlement in D1 (no frontend-only bypass).
+  const isReviewAdmin = isInternalReviewUser(user);
 
   if (requireSubscription && !user.subscription?.entitled && !isReviewAdmin) {
     return <Navigate to={`/billing?next=${encodeURIComponent(location.pathname + location.search)}`} state={{ from: location }} replace />;
