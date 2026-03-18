@@ -7,7 +7,9 @@ interface ProtectedRouteProps {
   requireSubscription?: boolean;
 }
 
-// Temporary internal review override for the MetaMech admin account.
+// TEMP REVIEW-ONLY OVERRIDE (must be removed after internal review sign-off).
+// Tracking doc: docs/phase2/simulation-tool-review-access-cleanup.md
+// Long-term policy: backend-managed entitlement in D1 (no frontend-only bypass).
 // Keeps the commercial model unchanged for all regular users.
 const REVIEW_ADMIN_EMAILS = new Set(['saviosyl@gmail.com']);
 
