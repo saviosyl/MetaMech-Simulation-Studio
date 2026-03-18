@@ -1,4 +1,4 @@
-import React, { Suspense, useRef, useCallback, useEffect } from 'react';
+import React, { Suspense, useRef, useCallback, useEffect, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { 
   OrbitControls, 
@@ -9,6 +9,9 @@ import {
   Text,
   GizmoHelper,
   GizmoViewport,
+  PerspectiveCamera,
+  OrthographicCamera,
+  MeshReflectorMaterial,
 } from '@react-three/drei';
 // EffectComposer removed — ToneMapping+SMAA can cause blank screens on some devices
 import * as THREE from 'three';
@@ -22,6 +25,92 @@ const CameraCapture: React.FC = () => {
   const { camera, size } = useThree();
   _threeCamera = camera;
   _canvasSize = size;
+  return null;
+};
+
+/**
+ * Pause expensive shadow-map refresh while user is actively navigating camera.
+ * Re-enable and refresh once interaction ends.
+ */
+const InteractionPerformanceTuner: React.FC<{ isNavigating: boolean; isExportRendering: boolean }> = ({ isNavigating, isExportRendering }) => {
+  const { gl } = useThree();
+
+  useEffect(() => {
+    if (!gl.shadowMap) return;
+    if (isExportRendering) {
+      gl.shadowMap.autoUpdate = true;
+      gl.shadowMap.needsUpdate = true;
+      return;
+    }
+    if (isNavigating) {
+      gl.shadowMap.autoUpdate = false;
+      return;
+    }
+    gl.shadowMap.autoUpdate = true;
+    gl.shadowMap.needsUpdate = true;
+  }, [gl, isNavigating, isExportRendering]);
+
+  return null;
+};
+
+/**
+ * During capture/export, temporarily push renderer toward presentation quality.
+ * This only runs while recording to preserve normal interactive performance.
+ */
+const ExportRendererTuner: React.FC<{ active: boolean; preset: VideoQualityPreset }> = ({ active, preset }) => {
+  const { gl } = useThree();
+  const previousRef = useRef<{
+    toneMapping: THREE.ToneMapping;
+    toneMappingExposure: number;
+    shadowEnabled: boolean;
+    shadowType: THREE.ShadowMapType;
+    outputColorSpace: THREE.ColorSpace;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!active) {
+      if (previousRef.current) {
+        gl.toneMapping = previousRef.current.toneMapping;
+        gl.toneMappingExposure = previousRef.current.toneMappingExposure;
+        gl.shadowMap.enabled = previousRef.current.shadowEnabled;
+        gl.shadowMap.type = previousRef.current.shadowType;
+        (gl as any).outputColorSpace = previousRef.current.outputColorSpace;
+        gl.shadowMap.needsUpdate = true;
+        previousRef.current = null;
+      }
+      return;
+    }
+
+    if (!previousRef.current) {
+      previousRef.current = {
+        toneMapping: gl.toneMapping,
+        toneMappingExposure: gl.toneMappingExposure,
+        shadowEnabled: gl.shadowMap.enabled,
+        shadowType: gl.shadowMap.type,
+        outputColorSpace: (gl as any).outputColorSpace ?? THREE.SRGBColorSpace,
+      };
+    }
+
+    const exportPreset = VIDEO_CAPTURE_PRESETS[preset];
+    gl.toneMapping = THREE.ACESFilmicToneMapping;
+    gl.toneMappingExposure = exportPreset.toneMappingExposure;
+    gl.shadowMap.enabled = true;
+    gl.shadowMap.type = preset === 'ultra' ? THREE.VSMShadowMap : THREE.PCFSoftShadowMap;
+    (gl as any).outputColorSpace = THREE.SRGBColorSpace;
+    gl.shadowMap.needsUpdate = true;
+
+    return () => {
+      if (!previousRef.current) return;
+      gl.toneMapping = previousRef.current.toneMapping;
+      gl.toneMappingExposure = previousRef.current.toneMappingExposure;
+      gl.shadowMap.enabled = previousRef.current.shadowEnabled;
+      gl.shadowMap.type = previousRef.current.shadowType;
+      (gl as any).outputColorSpace = previousRef.current.outputColorSpace;
+      gl.shadowMap.needsUpdate = true;
+      previousRef.current = null;
+    };
+  }, [active, preset, gl]);
+
   return null;
 };
 
@@ -53,6 +142,7 @@ import CustomModelRenderer from '../3d/CustomModelRenderer';
 import PathRenderer from '../3d/PathRenderer';
 import CameraPathPlayer from '../3d/CameraPathPlayer';
 import ViewportToolbar from '../editor/ViewportToolbar';
+import { VIDEO_CAPTURE_PRESETS, VideoQualityPreset } from '../../lib/videoExportPresets';
 
 // Wrapper that attaches TransformControls to the selected object
 const DraggableObject: React.FC<{
@@ -247,7 +337,11 @@ const OVERLAY_HIDDEN_TYPES = new Set(['source', 'sink']);
 const isMobileSafari = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) || 
   (typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
 
-const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }) => {
+const SceneContent: React.FC<{
+  orbitRef: React.RefObject<any>;
+  isNavigating: boolean;
+  onNavigationChange: (moving: boolean) => void;
+}> = ({ orbitRef, isNavigating, onNavigationChange }) => {
   const {
     processNodes,
     environmentAssets,
@@ -262,7 +356,14 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
     overlaysHidden,
     themeMode,
     activeTool,
+    isExportRendering,
+    captureQualityPreset,
   } = useEditorStore();
+
+  const exportPreset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
+  const keyShadowMapSize = isExportRendering ? exportPreset.shadowMapSize : (isMobileSafari ? 1024 : 4096);
+  const contactShadowRes = isExportRendering ? exportPreset.contactShadowResolution : (isMobileSafari ? 256 : 512);
+  const contactShadowBlur = isExportRendering ? exportPreset.contactShadowBlur : 2.0;
 
   // Disable orbit rotation when a 3D object is selected AND a manipulation tool is active
   // Click empty space to deselect → orbit re-enables
@@ -288,28 +389,28 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
       {/* Key light — warm industrial */}
       <directionalLight
         position={[12, 15, 8]}
-        intensity={1.2}
+        intensity={isExportRendering ? 1.35 : 1.2}
         color="#fff5e6"
         castShadow
-        shadow-mapSize-width={isMobileSafari ? 1024 : 4096}
-        shadow-mapSize-height={isMobileSafari ? 1024 : 4096}
+        shadow-mapSize-width={keyShadowMapSize}
+        shadow-mapSize-height={keyShadowMapSize}
         shadow-camera-far={60}
         shadow-camera-left={-25}
         shadow-camera-right={25}
         shadow-camera-top={25}
         shadow-camera-bottom={-25}
-        shadow-bias={-0.001}
+        shadow-bias={isExportRendering ? -0.00055 : -0.001}
       />
       {/* Fill light — cool blue from opposite side */}
       <directionalLight
         position={[-8, 8, -5]}
-        intensity={0.3}
+        intensity={isExportRendering ? 0.42 : 0.3}
         color="#c8d8f0"
       />
       {/* Rim light — subtle backlight for depth */}
       <directionalLight
         position={[0, 3, -10]}
-        intensity={0.15}
+        intensity={isExportRendering ? 0.22 : 0.15}
         color="#f0f0ff"
       />
 
@@ -347,16 +448,36 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
       )}
 
       {/* Contact Shadows — premium ground contact effect */}
-      {!isMobileSafari && (
+      {!isMobileSafari && (!isNavigating || isExportRendering) && (
         <ContactShadows 
           position={[0, -0.01, 0]} 
-          opacity={0.6} 
+          opacity={isExportRendering ? 0.7 : 0.6} 
           scale={60} 
-          blur={2.0} 
+          blur={contactShadowBlur} 
           far={12} 
-          resolution={isMobileSafari ? 256 : 512}
+          resolution={contactShadowRes}
           color="#1a1a2e"
         />
+      )}
+
+      {/* Export-only reflective floor for presentation-style video output */}
+      {isExportRendering && exportPreset.reflectionQuality !== 'off' && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]} receiveShadow>
+          <planeGeometry args={[120, 120]} />
+          <MeshReflectorMaterial
+            mirror={0.35}
+            resolution={exportPreset.reflectionQuality === 'high' ? 1024 : 512}
+            blur={exportPreset.reflectionQuality === 'high' ? [420, 120] : [260, 70]}
+            mixBlur={1}
+            mixStrength={exportPreset.reflectionQuality === 'high' ? 0.38 : 0.24}
+            roughness={0.5}
+            depthScale={0.008}
+            minDepthThreshold={0.3}
+            maxDepthThreshold={1.5}
+            color={themeMode === 'light' ? '#e6ebf2' : '#0f172a'}
+            metalness={0.3}
+          />
+        </mesh>
       )}
 
       {/* Ground plane for raycasting (invisible) — handles path drawing + measurement clicks */}
@@ -500,7 +621,7 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
       <MeasurementTool />
 
       {/* Camera Animation Controls */}
-      <CameraControls orbitRef={orbitRef} />
+      <CameraControls orbitRef={orbitRef} suspendSpaceMouse={isNavigating} />
 
       {/* Camera Controls */}
       <OrbitControls
@@ -508,10 +629,17 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
         enablePan={true}
         enableZoom={true}
         enableRotate={true}
+        enableDamping={true}
+        dampingFactor={0.08}
+        rotateSpeed={0.9}
+        zoomSpeed={0.95}
+        panSpeed={0.9}
         minDistance={2}
         maxDistance={100}
         minPolarAngle={0}
-        maxPolarAngle={Math.PI / 2}
+        maxPolarAngle={Math.PI - 0.001}
+        onStart={() => onNavigationChange(true)}
+        onEnd={() => onNavigationChange(false)}
       />
 
       {/* Scene background color — adapts to theme */}
@@ -536,6 +664,7 @@ const SceneContent: React.FC<{ orbitRef: React.RefObject<any> }> = ({ orbitRef }
 
 const Viewport: React.FC = () => {
   const orbitRef = useRef<any>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
   
   const {
     processNodes,
@@ -544,10 +673,16 @@ const Viewport: React.FC = () => {
     selectedObjectId,
     selectedObjectType,
     transformMode,
+    cameraMode,
+    isExportRendering,
+    captureQualityPreset,
     addProcessNode,
     addEnvironmentAsset,
     addActor,
   } = useEditorStore();
+
+  const exportPreset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
+  const dynamicDprMax = isExportRendering ? Math.max(2, Math.min(3, exportPreset.targetDpr)) : 2;
 
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -608,18 +743,13 @@ const Viewport: React.FC = () => {
 
   return (
     <div 
+      data-tour="viewport-center"
       style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--mm-bg-viewport)' }}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
       <Canvas
-        camera={{
-          position: [10, 10, 10],
-          fov: 50,
-          near: 0.1,
-          far: 1000,
-        }}
-        dpr={[1, 2]}
+        dpr={[1, dynamicDprMax]}
         shadows
         gl={{ 
           antialias: true,
@@ -631,21 +761,29 @@ const Viewport: React.FC = () => {
         }}
         frameloop="always"
       >
+        {cameraMode === 'orthographic' ? (
+          <OrthographicCamera makeDefault position={[10, 10, 10]} zoom={42} near={0.1} far={1000} />
+        ) : (
+          <PerspectiveCamera makeDefault position={[10, 10, 10]} fov={50} near={0.1} far={1000} />
+        )}
         <CameraCapture />
+        <ExportRendererTuner active={isExportRendering} preset={captureQualityPreset} />
+        <InteractionPerformanceTuner isNavigating={isNavigating} isExportRendering={isExportRendering} />
         <Suspense fallback={null}>
-          <SceneContent orbitRef={orbitRef} />
+          <SceneContent orbitRef={orbitRef} isNavigating={isNavigating} onNavigationChange={setIsNavigating} />
         </Suspense>
-        {/* 3D UCS Orientation Gizmo — bottom left */}
-        <GizmoHelper alignment="bottom-left" margin={[80, 120]}>
+        {/* 3D orientation gizmo */}
+        <GizmoHelper alignment="bottom-right" margin={[78, 88]}>
           <GizmoViewport
             axisColors={['#ef4444', '#22c55e', '#3b82f6']}
-            labelColor="white"
+            labelColor="#f8fafc"
           />
         </GizmoHelper>
       </Canvas>
 
       {/* Viewport Toolbar */}
       <ViewportToolbar />
+      <OrientationPad />
 
       {/* Viewport Overlay - Instructions */}
       {processNodes.length === 0 && environmentAssets.length === 0 && actors.length === 0 && (
@@ -670,6 +808,59 @@ const Viewport: React.FC = () => {
         transformMode={transformMode}
         selectedName={selectedObject?.name}
       />
+    </div>
+  );
+};
+
+const OrientationPad: React.FC = () => {
+  const setCameraView = useEditorStore(s => s.setCameraView);
+  const buttons: { id: 'top' | 'front' | 'right' | 'left' | 'back' | 'perspective'; label: string; tooltip: string }[] = [
+    { id: 'top', label: 'Top', tooltip: 'Top normal view (flat to screen)' },
+    { id: 'front', label: 'Front', tooltip: 'Front normal view (flat to screen)' },
+    { id: 'right', label: 'Right', tooltip: 'Right normal view (flat to screen)' },
+    { id: 'left', label: 'Left', tooltip: 'Left normal view (flat to screen)' },
+    { id: 'back', label: 'Back', tooltip: 'Back normal view (flat to screen)' },
+    { id: 'perspective', label: 'Iso', tooltip: 'Return to perspective/isometric 3D view' },
+  ];
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 'clamp(92px, 13vh, 130px)',
+        right: 12,
+        zIndex: 30,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, auto)',
+        gap: 4,
+        padding: 6,
+        borderRadius: 10,
+        background: 'rgba(2,6,23,0.5)',
+        border: '1px solid rgba(148,163,184,0.22)',
+        backdropFilter: 'blur(8px)',
+      }}
+      title="Orientation quick views"
+    >
+      {buttons.map((b) => (
+        <button
+          key={b.id}
+          onClick={() => setCameraView(b.id)}
+          title={b.tooltip}
+          style={{
+            padding: '4px 7px',
+            borderRadius: 6,
+            border: '1px solid rgba(148,163,184,0.2)',
+            background: 'rgba(15,23,42,0.35)',
+            color: '#cbd5e1',
+            cursor: 'pointer',
+            fontSize: 10,
+            fontWeight: 700,
+            fontFamily: "'Orbitron', monospace",
+          }}
+        >
+          {b.label}
+        </button>
+      ))}
     </div>
   );
 };

@@ -1,0 +1,26 @@
+name = "metamech-api"
+main = "cloudflare-worker/src/index.ts"
+compatibility_date = "2026-03-16"
+workers_dev = true
+
+[vars]
+FRONTEND_ORIGIN = "https://app.metamechsolutions.com,https://metamech-studio.pages.dev"
+FRONTEND_PRIMARY_ORIGIN = "https://app.metamechsolutions.com"
+ZEPTO_API_URL = "https://api.zeptomail.eu/v1.1/email"
+MAIL_FROM = "hi@metamechsolutions.com"
+MAIL_FROM_NAME = "MetaMech Solutions"
+JWT_EXPIRES_IN_SECONDS = "604800"
+EMAIL_VERIFICATION_TOKEN_HOURS = "24"
+EXPOSE_DEV_VERIFICATION_LINK = "false"
+ENABLE_ADMIN_TEST_EMAIL = "false"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "metamech-api-db"
+database_id = "aeefbbf8-2f52-4391-be86-65b29c08fb93"
+migrations_dir = "cloudflare-worker/migrations"
+
+[[routes]]
+pattern = "api.metamechsolutions.com/*"
+zone_name = "metamechsolutions.com"
+

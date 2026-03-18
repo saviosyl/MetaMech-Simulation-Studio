@@ -3,90 +3,144 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Play, Pause, Square, Save, Download, Upload, Video,
   ArrowLeft, Undo2, Redo2, Check, AlertCircle,
-  Loader2, Grid3X3, Ruler, HelpCircle, MousePointer, Move, RotateCcw,
-  Link2, Magnet, Sun, Moon, Maximize2,
+  Loader2, HelpCircle, Sun, Moon, Maximize2, Film, LifeBuoy,
 } from 'lucide-react';
+import * as THREE from 'three';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuth } from '../../contexts/AuthContext';
 import { undo, redo } from '../../store/historyMiddleware';
 import { SaveStatus } from '../../pages/EditorPage';
 import ScenarioLoader from './ScenarioLoader';
 import AILayoutBuilder from './AILayoutBuilder';
+import {
+  VideoFormatPreference,
+  VideoQualityPreset,
+  VIDEO_CAPTURE_PRESETS,
+  VIDEO_QUALITY_PRESET_ORDER,
+  resolveRecordingMimeType,
+} from '../../lib/videoExportPresets';
 
 interface TopBarProps {
   projectName: string;
   setProjectName: (name: string) => void;
   saveStatus: SaveStatus;
   onSave: () => void;
+  onOpenHelpSupport: () => void;
 }
 
 // ─── Styles ───
 const S = {
   bar: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 16px', height: 52,
-    background: 'var(--mm-bg-panel)',
-    borderBottom: '1px solid var(--mm-border)',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    position: 'relative' as const,
+    zIndex: 80,
+    display: 'grid',
+    gridTemplateColumns: '1fr auto 1fr',
+    alignItems: 'center',
+    gap: 14,
+    margin: '10px 14px 0',
+    padding: '10px 18px',
+    minHeight: 68,
+    background: 'var(--mm-bg-toolbar)',
+    border: '1px solid var(--mm-border-subtle)',
+    borderRadius: 16,
+    boxShadow: 'var(--mm-shadow-md)',
   } as React.CSSProperties,
   group: {
-    display: 'flex', alignItems: 'center', gap: 6,
-    padding: '4px 8px',
-    background: 'var(--mm-bg-surface)',
+    display: 'flex', alignItems: 'center', gap: 4,
+    padding: '2px 4px',
+    background: 'transparent',
     borderRadius: 8,
+    border: 'none',
+  } as React.CSSProperties,
+  strip: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '6px 8px',
+    borderRadius: 12,
+    background: 'var(--mm-bg-surface)',
     border: '1px solid var(--mm-border-subtle)',
   } as React.CSSProperties,
   groupLabel: {
-    fontSize: 9, fontWeight: 700, color: 'var(--mm-text-disabled)',
+    fontSize: 8, fontWeight: 700, color: 'var(--mm-text-disabled)',
     letterSpacing: '0.08em', textTransform: 'uppercase' as const,
     fontFamily: "'Orbitron', monospace",
   } as React.CSSProperties,
-  divider: { width: 1, height: 24, background: 'var(--mm-border-subtle)', flexShrink: 0 } as React.CSSProperties,
+  divider: { width: 1, height: 30, background: 'var(--mm-border-subtle)', flexShrink: 0 } as React.CSSProperties,
   iconBtn: (active?: boolean) => ({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 30, height: 30, borderRadius: 6, border: 'none', cursor: 'pointer',
-    background: active ? 'var(--mm-accent-primary-muted)' : 'transparent',
+    width: 38, height: 38, borderRadius: 12, border: '1px solid transparent', cursor: 'pointer',
+    background: active ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)',
     color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-secondary)',
     transition: 'all 0.15s',
   } as React.CSSProperties),
   simBtn: (color: string) => ({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
+    width: 40, height: 40, borderRadius: 12, border: 'none', cursor: 'pointer',
     background: color, color: '#fff',
     boxShadow: `0 2px 8px ${color}44`,
     transition: 'all 0.15s',
   } as React.CSSProperties),
   primaryBtn: (bg: string) => ({
     display: 'inline-flex', alignItems: 'center', gap: 6,
-    padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+    height: 40,
+    padding: '0 16px', borderRadius: 12, border: 'none', cursor: 'pointer',
     background: bg, color: '#fff',
-    fontSize: 12, fontWeight: 700, fontFamily: "'Orbitron', monospace",
-    letterSpacing: '0.04em', transition: 'all 0.15s',
+    fontSize: 13, fontWeight: 600,
+    letterSpacing: '0.01em', transition: 'all 0.15s',
     boxShadow: `0 2px 8px ${bg}33`,
   } as React.CSSProperties),
+  compactSelect: {
+    height: 38,
+    padding: '0 12px',
+    fontSize: 13,
+    borderRadius: 12,
+    border: '1px solid var(--mm-border-subtle)',
+    background: 'var(--mm-bg-surface)',
+    color: 'var(--mm-text-secondary)',
+    fontWeight: 500,
+    outline: 'none',
+  } as React.CSSProperties,
+  projectNameText: {
+    display: 'inline-block',
+    maxWidth: 170,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+    fontSize: 13,
+    fontWeight: 600,
+    color: 'var(--mm-text-primary)',
+    cursor: 'pointer',
+    letterSpacing: '0.01em',
+  } as React.CSSProperties,
 };
 
-const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus, onSave }) => {
+const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus, onSave, onOpenHelpSupport }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showAIBuilder, setShowAIBuilder] = useState(false);
+  const [videoFormatPreference, setVideoFormatPreference] = useState<VideoFormatPreference>('auto');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recordingModeRef = useRef<'manual' | 'camera-path' | null>(null);
-  const renderBoostRef = useRef<{ gl: any; prevDpr: number; width: number; height: number } | null>(null);
+  const renderBoostRef = useRef<{ gl: THREE.WebGLRenderer; prevDpr: number; width: number; height: number } | null>(null);
+  const fallbackNoticeShownRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const {
     isPlaying, simulationSpeed,
     play, pause, reset, setSimulationSpeed,
     getSceneData, loadScene,
-    gridSnap, setGridSnap,
-    measureActive, setMeasureActive,
-    activeTool, setActiveTool,
     setShowShortcuts,
     isCameraPathPlaying,
+    captureQualityPreset,
+    setCaptureQualityPreset,
+    setIsExportRendering,
+    themeMode,
+    toggleTheme,
+    setPresentationMode,
   } = useEditorStore();
 
   const speedOptions = [
@@ -97,15 +151,16 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     { value: 4, label: '4×' },
   ];
 
-  const boostViewportCaptureQuality = useCallback((canvas: HTMLCanvasElement) => {
+  const boostViewportCaptureQuality = useCallback((canvas: HTMLCanvasElement, preset: VideoQualityPreset) => {
     // @ts-ignore — R3F store reference is attached to canvas at runtime
     const r3f = (canvas as any).__r3f;
     const state = r3f?.store?.getState?.();
-    const gl = state?.gl;
+    const gl = state?.gl as THREE.WebGLRenderer | undefined;
     const size = state?.size;
     if (!gl || !size) return;
+    const presetConfig = VIDEO_CAPTURE_PRESETS[preset];
     const prevDpr = gl.getPixelRatio?.() ?? 1;
-    const targetDpr = Math.max(1, Math.min(2, Math.max(prevDpr, 2)));
+    const targetDpr = Math.max(1, Math.min(3, Math.max(prevDpr, presetConfig.targetDpr)));
     gl.setPixelRatio?.(targetDpr);
     gl.setSize?.(size.width, size.height, false);
     renderBoostRef.current = { gl, prevDpr, width: size.width, height: size.height };
@@ -119,43 +174,42 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     renderBoostRef.current = null;
   }, []);
 
-  // ─── Record Video (high quality) ───
+  // ─── Record Video (quality preset + format preference) ───
   const startRecording = useCallback((mode: 'manual' | 'camera-path' = 'manual') => {
     const canvas = document.querySelector('canvas');
     if (!canvas) { alert('No 3D viewport found'); return; }
     try {
-      boostViewportCaptureQuality(canvas as HTMLCanvasElement);
-      // Capture at 60fps for smoother output
-      const stream = canvas.captureStream(60);
+      const preset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
+      setIsExportRendering(true);
+      boostViewportCaptureQuality(canvas as HTMLCanvasElement, captureQualityPreset);
+      const stream = (canvas as HTMLCanvasElement).captureStream(preset.captureFps);
 
-      // Try VP9 first (best quality), fall back to VP8
-      let mimeType = 'video/webm;codecs=vp9';
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'video/webm;codecs=vp8';
-      }
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'video/webm';
+      const format = resolveRecordingMimeType(videoFormatPreference);
+      if (format.usedFallback && !fallbackNoticeShownRef.current) {
+        fallbackNoticeShownRef.current = true;
+        alert('Requested video format is not supported by this browser. Falling back automatically.');
       }
 
       const recorder = new MediaRecorder(stream, {
-        mimeType,
-        videoBitsPerSecond: 35_000_000, // 35 Mbps — clearer edges/less blockiness
+        mimeType: format.mimeType,
+        videoBitsPerSecond: preset.videoBitsPerSecond,
       });
 
       chunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const blob = new Blob(chunksRef.current, { type: format.mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${projectName.replace(/\s+/g, '_')}_recording.webm`;
+        a.download = `${projectName.replace(/\s+/g, '_')}_${preset.label.toLowerCase()}_recording.${format.extension}`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        stream.getTracks().forEach((track) => track.stop());
         restoreViewportCaptureQuality();
         recordingModeRef.current = null;
+        setIsExportRendering(false);
       };
-      // Larger timeslice = fewer chunks = cleaner encoding
       recorder.start(1000);
       mediaRecorderRef.current = recorder;
       recordingModeRef.current = mode;
@@ -163,18 +217,29 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     } catch (err) {
       console.error('Recording failed:', err);
       restoreViewportCaptureQuality();
+      setIsExportRendering(false);
       alert('Recording not supported in this browser');
     }
-  }, [projectName, boostViewportCaptureQuality, restoreViewportCaptureQuality]);
+  }, [
+    projectName,
+    boostViewportCaptureQuality,
+    restoreViewportCaptureQuality,
+    captureQualityPreset,
+    videoFormatPreference,
+    setIsExportRendering,
+  ]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
+    } else {
+      restoreViewportCaptureQuality();
+      setIsExportRendering(false);
     }
     setIsRecording(false);
     // Stop camera path playback too
     useEditorStore.getState().setIsCameraPathPlaying(false);
-  }, []);
+  }, [restoreViewportCaptureQuality, setIsExportRendering]);
 
   // Auto-stop camera-path recordings when non-loop path playback completes
   useEffect(() => {
@@ -183,6 +248,13 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     if (isCameraPathPlaying) return;
     stopRecording();
   }, [isRecording, isCameraPathPlaying, stopRecording]);
+
+  useEffect(() => {
+    return () => {
+      restoreViewportCaptureQuality();
+      setIsExportRendering(false);
+    };
+  }, [restoreViewportCaptureQuality, setIsExportRendering]);
 
   // Record with camera path: starts recording + plays the active camera path
   const startRecordingWithCameraPath = useCallback(() => {
@@ -241,15 +313,15 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   };
 
   return (
-    <div style={S.bar}>
+    <div style={S.bar} data-tour="top-ribbon">
       {/* ════ LEFT: Project + Edit + Build ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifySelf: 'start', minWidth: 0 }}>
         {/* Brand */}
         <button onClick={() => navigate('/dashboard')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s', padding: '0 2px' }}
           title="Back to Dashboard">
-          <ArrowLeft size={15} />
-          <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Orbitron', monospace", letterSpacing: '0.04em' }}>MetaMech</span>
+          <ArrowLeft size={16} />
+          <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.01em' }}>MetaMech</span>
         </button>
 
         <div style={S.divider} />
@@ -258,36 +330,23 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         {isEditing ? (
           <input type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)}
             onBlur={() => setIsEditing(false)} onKeyPress={(e) => e.key === 'Enter' && setIsEditing(false)} autoFocus
-            style={{ fontSize: 13, fontWeight: 600, fontFamily: "'Orbitron', monospace", background: 'transparent', border: 'none', borderBottom: '2px solid var(--mm-accent-primary)', color: 'var(--mm-text-primary)', outline: 'none', padding: '2px 0', width: 180 }} />
+            style={{ fontSize: 13, fontWeight: 600, background: 'transparent', border: 'none', borderBottom: '2px solid var(--mm-accent-primary)', color: 'var(--mm-text-primary)', outline: 'none', padding: '3px 0', width: 170 }} />
         ) : (
-          <span onClick={() => setIsEditing(true)}
-            style={{ fontSize: 13, fontWeight: 600, fontFamily: "'Orbitron', monospace", color: 'var(--mm-text-primary)', cursor: 'pointer' }}>
+          <span
+            onClick={() => setIsEditing(true)}
+            title={projectName}
+            style={S.projectNameText}
+          >
             {projectName}
           </span>
         )}
 
         <div style={S.divider} />
 
-        {/* Edit group */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-          <div style={S.group}>
-            <button onClick={handleUndo} style={S.iconBtn()} title="Undo (Ctrl+Z)"><Undo2 size={15} /></button>
-            <button onClick={handleRedo} style={S.iconBtn()} title="Redo (Ctrl+Shift+Z)"><Redo2 size={15} /></button>
-          </div>
-          <span style={S.groupLabel}>Edit</span>
-        </div>
-
-        {/* Build / Transform group */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-          <div style={S.group}>
-            <button onClick={() => setActiveTool('select')} style={S.iconBtn(activeTool === 'select')} title="Select (V)"><MousePointer size={15} /></button>
-            <button onClick={() => setActiveTool('move')} style={S.iconBtn(activeTool === 'move')} title="Move (W)"><Move size={15} /></button>
-            <button onClick={() => setActiveTool('rotate')} style={S.iconBtn(activeTool === 'rotate')} title="Rotate (E)"><RotateCcw size={15} /></button>
-            <div style={{ width: 1, height: 18, background: 'var(--mm-border-subtle)' }} />
-            <button onClick={() => setActiveTool('mate')} style={S.iconBtn(activeTool === 'mate')} title="Mate"><Link2 size={15} /></button>
-            <button onClick={() => setActiveTool('snap-move')} style={S.iconBtn(activeTool === 'snap-move')} title="Snap Move"><Magnet size={15} /></button>
-          </div>
-          <span style={S.groupLabel}>Build</span>
+        {/* Edit */}
+        <div style={S.strip}>
+          <button onClick={handleUndo} style={S.iconBtn()} title="Undo (Ctrl+Z)"><Undo2 size={15} /></button>
+          <button onClick={handleRedo} style={S.iconBtn()} title="Redo (Ctrl+Shift+Z)"><Redo2 size={15} /></button>
         </div>
 
         {/* Scenarios */}
@@ -295,32 +354,43 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
       </div>
 
       {/* ════ CENTER: Simulation (bigger, prominent) ════ */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-        <div style={{ ...S.group, padding: '6px 12px', gap: 8, background: 'var(--mm-bg-app)', border: '2px solid var(--mm-border)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'center' }}>
+        <div
+          style={{
+            ...S.strip,
+            padding: '7px 10px',
+            gap: 9,
+            background: 'var(--mm-bg-surface)',
+            border: '1px solid var(--mm-border-subtle)',
+          }}
+          data-tour="simulation-controls"
+        >
           {/* Play/Pause */}
           <button onClick={isPlaying ? pause : play}
             style={S.simBtn(isPlaying ? '#f59e0b' : '#06b6d4')}
-            title={isPlaying ? 'Pause' : 'Play'}>
+            title={isPlaying ? 'Pause simulation playback' : 'Start simulation playback'}>
             {isPlaying ? <Pause size={18} /> : <Play size={18} />}
           </button>
 
           {/* Reset */}
-          <button onClick={reset} style={S.simBtn('#64748b')} title="Reset Simulation">
+          <button onClick={reset} style={S.simBtn('#64748b')} title="Reset simulation and clear transient runtime state">
             <Square size={16} />
           </button>
 
           {/* Divider */}
-          <div style={{ width: 1, height: 28, background: 'var(--mm-border)' }} />
+          <div style={{ width: 1, height: 30, background: 'var(--mm-border-subtle)' }} />
 
           {/* Speed */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-            <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--mm-text-disabled)', letterSpacing: '0.1em', fontFamily: "'Orbitron', monospace" }}>SPEED</span>
-            <div style={{ display: 'flex', gap: 2 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.05em' }}>Speed</span>
+            <div style={{ display: 'flex', gap: 6 }}>
               {speedOptions.map(o => (
                 <button key={o.value} onClick={() => setSimulationSpeed(o.value)}
+                  title={`Set simulation speed to ${o.label}`}
                   style={{
-                    padding: '3px 8px', borderRadius: 4, border: 'none', cursor: 'pointer',
-                    fontSize: 11, fontWeight: 700, fontFamily: "'Orbitron', monospace",
+                    height: 28,
+                    padding: '0 10px', borderRadius: 10, border: '1px solid transparent', cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600,
                     background: simulationSpeed === o.value ? 'var(--mm-accent-primary)' : 'var(--mm-bg-surface)',
                     color: simulationSpeed === o.value ? '#fff' : 'var(--mm-text-secondary)',
                     transition: 'all 0.15s',
@@ -332,7 +402,39 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           </div>
 
           {/* Divider */}
-          <div style={{ width: 1, height: 28, background: 'var(--mm-border)' }} />
+          <div style={{ width: 1, height: 30, background: 'var(--mm-border-subtle)' }} />
+
+          {/* Export quality / format */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 168 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Film size={14} style={{ color: 'var(--mm-text-tertiary)' }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.03em' }}>
+                Export
+              </span>
+            </div>
+            <select
+              value={captureQualityPreset}
+              onChange={(e) => setCaptureQualityPreset(e.target.value as VideoQualityPreset)}
+              style={S.compactSelect}
+              title="Recording quality preset: higher settings increase resolution, bitrate, shadows, and reflections."
+            >
+              {VIDEO_QUALITY_PRESET_ORDER.map((key) => (
+                <option key={key} value={key}>
+                  {VIDEO_CAPTURE_PRESETS[key].label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={videoFormatPreference}
+              onChange={(e) => setVideoFormatPreference(e.target.value as VideoFormatPreference)}
+              style={S.compactSelect}
+              title="Preferred export format. MP4 is used when browser support is available."
+            >
+              <option value="auto">Auto (prefer MP4)</option>
+              <option value="mp4">MP4 (if supported)</option>
+              <option value="webm">WebM</option>
+            </select>
+          </div>
 
           {/* Record */}
           <button onClick={isRecording ? stopRecording : () => startRecording()}
@@ -340,52 +442,41 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
               ...S.simBtn(isRecording ? '#ef4444' : '#8b5cf6'),
               animation: isRecording ? 'pulse 1.5s ease-in-out infinite' : undefined,
             }}
-            title={isRecording ? 'Stop Recording' : 'Record Video (manual camera)'}>
+            title={isRecording ? 'Stop recording and export video file' : `Record viewport video (${VIDEO_CAPTURE_PRESETS[captureQualityPreset].label} preset)`}>
             <Video size={16} />
           </button>
           {/* Record with camera path */}
           {!isRecording && (
             <button onClick={startRecordingWithCameraPath}
               style={S.simBtn('#6366f1')}
-              title="Record with Camera Path (auto smooth camera)">
-              <Video size={14} /><span style={{ fontSize: 9, marginLeft: -2 }}>🎬</span>
+              title={`Record with active camera path (${VIDEO_CAPTURE_PRESETS[captureQualityPreset].label} preset)`}>
+              <Video size={16} /><span style={{ fontSize: 9, marginLeft: -2 }}>🎬</span>
             </button>
           )}
           {isRecording && (
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', fontFamily: "'Orbitron', monospace", animation: 'pulse 1s ease-in-out infinite' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', animation: 'pulse 1s ease-in-out infinite' }}>
               REC
             </span>
           )}
         </div>
-        <span style={S.groupLabel}>Simulation</span>
       </div>
 
       {/* ════ RIGHT: View + File + Save + User ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {/* View */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-          <div style={S.group}>
-            <button onClick={() => setGridSnap(!gridSnap)} style={S.iconBtn(gridSnap)} title="Toggle Grid"><Grid3X3 size={15} /></button>
-            <button onClick={() => setMeasureActive(!measureActive)} style={S.iconBtn(measureActive)} title="Measure"><Ruler size={15} /></button>
-            <button onClick={() => useEditorStore.getState().toggleTheme()} style={S.iconBtn()} title="Toggle Theme">
-              {useEditorStore.getState().themeMode === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-            </button>
-            <button onClick={() => useEditorStore.getState().setPresentationMode(true)} style={S.iconBtn()} title="Presentation Mode"><Maximize2 size={15} /></button>
-            <button onClick={() => setShowShortcuts(true)} style={S.iconBtn()} title="Shortcuts (?)"><HelpCircle size={15} /></button>
-          </div>
-          <span style={S.groupLabel}>View</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifySelf: 'end' }}>
+        <div style={S.strip}>
+          <button onClick={toggleTheme} style={S.iconBtn()} title="Toggle Theme">
+            {themeMode === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+          <button onClick={() => setPresentationMode(true)} style={S.iconBtn()} title="Presentation Mode"><Maximize2 size={15} /></button>
+          <button onClick={() => setShowShortcuts(true)} style={S.iconBtn()} title="Shortcuts (?)"><HelpCircle size={15} /></button>
         </div>
 
         <div style={S.divider} />
 
-        {/* File */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-          <div style={S.group}>
-            <button onClick={handleImport} style={S.iconBtn()} title="Import Project"><Upload size={15} /></button>
-            <button onClick={handleExport} style={S.iconBtn()} title="Export Project"><Download size={15} /></button>
-            <button onClick={() => setShowAIBuilder(true)} style={{ ...S.iconBtn(), color: 'var(--mm-accent-primary)', fontWeight: 700, fontSize: 11, padding: '4px 8px' }} title="AI Layout Builder">AI</button>
-          </div>
-          <span style={S.groupLabel}>File</span>
+        <div style={S.strip}>
+          <button onClick={handleImport} style={S.iconBtn()} title="Import Project"><Upload size={15} /></button>
+          <button onClick={handleExport} style={S.iconBtn()} title="Export Project"><Download size={15} /></button>
+          <button onClick={() => setShowAIBuilder(true)} style={{ ...S.iconBtn(), width: 46, color: 'var(--mm-accent-primary)', fontWeight: 700, fontSize: 12 }} title="AI Layout Builder">AI</button>
         </div>
 
         {/* Save */}
@@ -393,6 +484,31 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           style={S.primaryBtn(saveStatus === 'saved' ? '#10b981' : saveStatus === 'error' ? '#ef4444' : '#06b6d4')}>
           {saveIcon()}
           {saveStatus === 'saving' ? 'SAVING' : saveStatus === 'saved' ? 'SAVED' : 'SAVE'}
+        </button>
+
+        {/* Help / Support */}
+        <button
+          onClick={onOpenHelpSupport}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            height: 40,
+            padding: '0 12px',
+            borderRadius: 12,
+            border: '1px solid var(--mm-border-subtle)',
+            background: 'var(--mm-bg-surface)',
+            color: 'var(--mm-text-secondary)',
+            cursor: 'pointer',
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: '0.01em',
+          }}
+          title="Open MetaMech Help / Support and product guide"
+          data-tour="help-support"
+        >
+          <LifeBuoy size={13} />
+          HELP
         </button>
 
         <input ref={fileInputRef} type="file" accept=".json,.metamech-sim.json" onChange={handleFileChange} style={{ display: 'none' }} />

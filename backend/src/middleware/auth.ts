@@ -15,7 +15,10 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     
     // Fetch user from database
     const result = await query(
-      'SELECT id, email, display_name, role, created_at, updated_at FROM users WHERE id = $1',
+      `SELECT id, email, display_name, role, account_status, email_verified_at, token_version,
+              trial_used_at, stripe_customer_id, created_at, updated_at
+       FROM users
+       WHERE id = $1`,
       [decoded.userId]
     );
 
@@ -23,7 +26,17 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
       return res.status(401).json({ error: 'User not found' });
     }
 
-    req.user = result.rows[0] as User;
+    const user = result.rows[0] as User;
+
+    if (user.account_status === 'disabled') {
+      return res.status(403).json({ error: 'Account disabled' });
+    }
+
+    if (typeof user.token_version === 'number' && decoded.tokenVersion !== user.token_version) {
+      return res.status(401).json({ error: 'Session expired. Please sign in again.' });
+    }
+
+    req.user = user;
     next();
   } catch (error) {
     console.error('Auth error:', error);

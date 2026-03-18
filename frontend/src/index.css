@@ -13,6 +13,8 @@
   --mm-bg-panel: #283040;        /* Panel surfaces — clearly lifted */
   --mm-bg-panel-hover: #303848;  /* Panel hover state */
   --mm-bg-surface: #354050;      /* Cards, sections — obviously different */
+  --mm-bg-toolbar: #2a3244;
+  --mm-bg-toolbar-secondary: rgba(26, 33, 48, 0.86);
   --mm-bg-input: #1c2230;        /* Input fields — recessed */
   --mm-bg-viewport: #181d28;     /* 3D viewport background */
   
@@ -46,14 +48,23 @@
   --mm-shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
   
   /* ─── Sizing ─── */
-  --mm-radius-sm: 4px;
-  --mm-radius-md: 6px;
-  --mm-radius-lg: 8px;
-  --mm-radius-xl: 12px;
+  --mm-radius-sm: 10px;
+  --mm-radius-md: 12px;
+  --mm-radius-lg: 16px;
+  --mm-radius-xl: 20px;
   --mm-radius-full: 9999px;
+  --mm-space-1: 4px;
+  --mm-space-2: 8px;
+  --mm-space-3: 12px;
+  --mm-space-4: 16px;
+  --mm-space-5: 20px;
+  --mm-space-6: 24px;
+  --mm-space-8: 32px;
+  --mm-space-10: 40px;
   
   /* ─── Toolbar ─── */
-  --mm-toolbar-height: 48px;
+  --mm-toolbar-height: 68px;
+  --mm-toolbar-secondary-height: 48px;
   --mm-icon-sm: 14px;
   --mm-icon-md: 16px;
   --mm-icon-lg: 18px;
@@ -61,21 +72,23 @@
 
 /* ─── Light theme override ─── */
 [data-theme="light"] {
-  --mm-bg-app: #f0f2f5;
-  --mm-bg-panel: #ffffff;
-  --mm-bg-panel-hover: #f5f6f8;
-  --mm-bg-surface: #f8f9fb;
+  --mm-bg-app: #edf1f5;
+  --mm-bg-panel: #f7f9fc;
+  --mm-bg-panel-hover: #f2f5f9;
+  --mm-bg-surface: #ffffff;
+  --mm-bg-toolbar: #f8fafc;
+  --mm-bg-toolbar-secondary: rgba(248, 250, 252, 0.94);
   --mm-bg-input: #ffffff;
-  --mm-bg-viewport: #e8eaed;
+  --mm-bg-viewport: #e7ebf0;
   
-  --mm-border: #d0d5dd;
-  --mm-border-subtle: #e4e7ec;
-  --mm-border-strong: #b0b8c8;
+  --mm-border: #d1d8e2;
+  --mm-border-subtle: #e2e8f0;
+  --mm-border-strong: #b3bece;
   
-  --mm-text-primary: #1a1e2e;
-  --mm-text-secondary: #4a5068;
-  --mm-text-tertiary: #7a8098;
-  --mm-text-disabled: #b0b8c8;
+  --mm-text-primary: #1a1f2c;
+  --mm-text-secondary: #4c5568;
+  --mm-text-tertiary: #6c7688;
+  --mm-text-disabled: #96a3b8;
   --mm-text-inverse: #ffffff;
   
   --mm-accent-primary: #0891b2;
@@ -87,9 +100,9 @@
   --mm-accent-danger: #dc2626;
   --mm-accent-danger-muted: rgba(220, 38, 38, 0.1);
   
-  --mm-shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-  --mm-shadow-md: 0 4px 12px rgba(0,0,0,0.1);
-  --mm-shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  --mm-shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --mm-shadow-md: 0 10px 28px rgba(15, 23, 42, 0.08);
+  --mm-shadow-lg: 0 18px 42px rgba(15, 23, 42, 0.12);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -115,6 +128,28 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--mm-bg-app);
   color: var(--mm-text-primary);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.mm-auth-input::placeholder {
+  color: var(--mm-text-disabled);
+}
+
+.mm-auth-input:hover:not(:disabled) {
+  border-color: var(--mm-border-strong) !important;
+}
+
+.mm-auth-input:focus {
+  border-color: var(--mm-accent-primary) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--mm-accent-primary) 22%, transparent) !important;
+}
+
+.mm-auth-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
 }
 
 /* ─── Form elements — dark theme defaults ─── */

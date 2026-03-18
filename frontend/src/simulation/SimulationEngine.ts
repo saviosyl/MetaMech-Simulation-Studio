@@ -103,35 +103,9 @@ export class SimulationEngine {
           homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
         };
         const rState = createRobotState(config);
-        const reach = (node.parameters.reach || node.parameters.reachX || 1400) / 1000;
-        const pickH = (node.parameters.pickHeight || 800) / 1000;
-        const placeH = (node.parameters.placeHeight || 800) / 1000;
-
-        // Find pick source: input edge → source node position, or default to left side of robot
-        const inEdges = edges.filter(e => e.to === node.id);
-        const outEdges = edges.filter(e => e.from === node.id);
-        if (inEdges.length > 0) {
-          const srcNode = nodes.find(n => n.id === inEdges[0].from);
-          if (srcNode) {
-            rState.pickPosition = [srcNode.position[0], pickH, srcNode.position[2]];
-          }
-        }
-        if (!rState.pickPosition) {
-          // Default: pick from left side at reach distance
-          rState.pickPosition = [node.position[0] - reach * 0.4, pickH, node.position[2]];
-        }
-
-        // Find place target: output edge → target node position, or default to right side
-        if (outEdges.length > 0) {
-          const tgtNode = nodes.find(n => n.id === outEdges[0].to);
-          if (tgtNode) {
-            rState.placePosition = [tgtNode.position[0], placeH, tgtNode.position[2]];
-          }
-        }
-        if (!rState.placePosition) {
-          // Default: place to right side at reach distance
-          rState.placePosition = [node.position[0] + reach * 0.4, placeH, node.position[2]];
-        }
+        const anchors = this.resolveRobotAnchors(node);
+        rState.pickPosition = anchors.pickPosition;
+        rState.placePosition = anchors.placePosition;
 
         this.robotStates.set(node.id, rState);
       }
@@ -469,7 +443,7 @@ export class SimulationEngine {
     queuedProducts.sort((a, b) => b.pathPosition - a.pathPosition);
 
     // Check if downstream exit is blocked
-    const outEdges = this.getOutEdges(node.id);
+    const outEdges = this.getTransferOutEdges(node);
     let exitBlocked = outEdges.length === 0;
     if (!exitBlocked && outEdges.length > 0) {
       const nextNodeId = outEdges[0].to;
@@ -808,10 +782,10 @@ export class SimulationEngine {
 
       const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters);
       const toPorts = getConnectionPorts(toNode.type, toNode.parameters);
-      // Match port by id, or fall back to first port of matching type
-      const fp = fromPorts.find(p => p.id === edge.fromPort)
+      // Only accept type-correct endpoints so stale/mismatched port ids don't break transfer.
+      const fp = fromPorts.find(p => p.id === edge.fromPort && p.type === 'output')
         || fromPorts.find(p => p.type === 'output');
-      const tp = toPorts.find(p => p.id === edge.toPort)
+      const tp = toPorts.find(p => p.id === edge.toPort && p.type === 'input')
         || toPorts.find(p => p.type === 'input');
       if (!fp || !tp) continue;
 
@@ -939,13 +913,18 @@ export class SimulationEngine {
       homePosition: [node.position[0], node.position[1] + homeY, node.position[2]],
     };
 
+    // Resolve flow-aware pick/place anchors from actual connected edges and robot ports.
+    const anchors = this.resolveRobotAnchors(node);
+    rState.pickPosition = anchors.pickPosition;
+    rState.placePosition = anchors.placePosition;
+
     // Find available product at pick source — accept arriving products into queue
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     for (const product of arrived) {
       if (!stats.queue.includes(product.id)) {
         product.state = 'queued';
+        product.currentPosition = [...rState.pickPosition];
         stats.queue.push(product.id);
-        console.log(`[ROBOT] ${node.name} queued product ${product.id.slice(0,8)}, queue=${stats.queue.length}`);
       }
     }
 
@@ -953,17 +932,11 @@ export class SimulationEngine {
     let availableProductId: string | null = null;
     if (stats.queue.length > 0 && rState.phase === 'idle') {
       availableProductId = stats.queue[0];
-      console.log(`[ROBOT] ${node.name} idle, offering product ${availableProductId?.slice(0,8)}, pickPos=${JSON.stringify(rState.pickPosition)}`);
     }
     // Also pass the in-flight target so pick phase can confirm it
     const targetId = (rState as any)._targetProductId as string | undefined;
     if (targetId && !availableProductId) {
       availableProductId = targetId;
-    }
-
-    // Log robot phase every ~1 second
-    if (Math.floor(this.simTime * 2) !== Math.floor((this.simTime - dt) * 2)) {
-      console.log(`[ROBOT-STATE] ${node.name} t=${this.simTime.toFixed(1)} phase=${rState.phase} prog=${rState.phaseProgress.toFixed(2)} held=${rState.heldProductId?.slice(0,8)||'none'} queue=${stats.queue.length} pick=${JSON.stringify(rState.pickPosition)} place=${JSON.stringify(rState.placePosition)}`);
     }
 
     // Tick the motion controller
@@ -993,13 +966,17 @@ export class SimulationEngine {
     if (rState.heldProductId && GRIP_PHASES.includes(rState.phase)) {
       const held = this.products.find(p => p.id === rState.heldProductId);
       if (held) {
-        held.currentPosition = [...rState.toolCenterPoint];
+        const heldHalfHeight = (held.size?.[2] || 0.2) * 0.5;
+        held.currentPosition = [
+          rState.toolCenterPoint[0],
+          rState.toolCenterPoint[1] - heldHalfHeight,
+          rState.toolCenterPoint[2],
+        ];
       }
     }
 
     // If robot just placed a product
     if (placedId) {
-      console.log(`[ROBOT-PLACE] ${node.name} placed product ${placedId.slice(0,8)}`);
       const placed = this.products.find(p => p.id === placedId);
       if (placed) {
         // Check if place target is a pallet
@@ -1027,15 +1004,19 @@ export class SimulationEngine {
           }
         }
         if (!placedOnPallet) {
-          // Send to next node — could be a conveyor, buffer, or other target
-          if (outEdges.length > 0) {
-            placed.pathPosition = 0;  // Start at beginning of destination
+          // Place exactly at resolved outfeed target.
+          placed.currentPosition = [...rState.placePosition];
+          placed.currentEdgeId = null;
+          if (anchors.preferredOutEdge) {
+            // Transfer directly onto connected downstream node at its true input node.
+            placed.state = 'at-node';
+            placed.currentNodeId = anchors.preferredOutEdge.to;
+            placed.pathPosition = 0;
             placed.conveyorEntryTime = null;
-            this.sendProductAlongEdge(placed, outEdges[0]);
           } else {
-            // No output edge — place at robot's place position
+            // No output edge — keep at placed location as completed.
             placed.state = 'completed';
-            placed.currentPosition = [...rState.toolCenterPoint];
+            placed.currentNodeId = node.id;
           }
         }
         stats.throughput++;
@@ -1043,6 +1024,78 @@ export class SimulationEngine {
     }
 
     if (rState.phase !== 'idle') stats.busyTime += dt;
+  }
+
+  /** Resolve robot pick/place anchors from actual edge-connected robot ports. */
+  private resolveRobotAnchors(node: ProcessNode): {
+    pickPosition: [number, number, number];
+    placePosition: [number, number, number];
+    preferredOutEdge: ProcessEdge | null;
+  } {
+    const ports = getConnectionPorts(node.type, node.parameters);
+    const inEdges = this.edges.filter(e => e.to === node.id);
+    const outEdges = this.edges.filter(e => e.from === node.id);
+
+    let pickPort = ports.find(p => p.id === 'pick') || ports.find(p => p.type === 'input');
+    if (inEdges.length > 0) {
+      const inEdge = inEdges.find(e => ports.some(p => p.id === e.toPort)) || inEdges[0];
+      const edgePort = ports.find(p => p.id === inEdge.toPort);
+      if (edgePort) pickPort = edgePort;
+    }
+
+    let placePort = ports.find(p => p.id === 'place') || ports.find(p => p.type === 'output');
+    if (outEdges.length > 0) {
+      const outEdge = outEdges.find(e => ports.some(p => p.id === e.fromPort)) || outEdges[0];
+      const edgePort = ports.find(p => p.id === outEdge.fromPort);
+      if (edgePort) placePort = edgePort;
+    }
+
+    const reach = (node.parameters.reach || node.parameters.reachX || 1400) / 1000;
+    const pickFallback: [number, number, number] = [
+      node.position[0] - reach * 0.4,
+      node.position[1] + (node.parameters.pickHeight || 800) / 1000,
+      node.position[2],
+    ];
+    const placeFallback: [number, number, number] = [
+      node.position[0] + reach * 0.4,
+      node.position[1] + (node.parameters.placeHeight || 800) / 1000,
+      node.position[2],
+    ];
+
+    const pickPortWorld = pickPort ? getPortWorldPosition(pickPort.localPosition, node) : pickFallback;
+    const placePortWorld = placePort ? getPortWorldPosition(placePort.localPosition, node) : placeFallback;
+
+    // Use true connected node endpoints as source of truth where possible.
+    // This removes generic side-offset behavior and forces node-to-node transfer.
+    let pickPosition: [number, number, number] = pickPortWorld;
+    if (inEdges.length > 0) {
+      const edge = inEdges[0];
+      const fromNode = this.nodes.find(n => n.id === edge.from);
+      if (fromNode) {
+        const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters);
+        const fromPort = fromPorts.find(p => p.id === edge.fromPort) || fromPorts.find(p => p.type === 'output');
+        if (fromPort) {
+          pickPosition = getPortWorldPosition(fromPort.localPosition, fromNode);
+        }
+      }
+    }
+
+    let placePosition: [number, number, number] = placePortWorld;
+    let preferredOutEdge: ProcessEdge | null = null;
+    if (outEdges.length > 0) {
+      preferredOutEdge = outEdges[0];
+      const edge = preferredOutEdge;
+      const toNode = this.nodes.find(n => n.id === edge.to);
+      if (toNode) {
+        const toPorts = getConnectionPorts(toNode.type, toNode.parameters);
+        const toPort = toPorts.find(p => p.id === edge.toPort) || toPorts.find(p => p.type === 'input');
+        if (toPort) {
+          placePosition = getPortWorldPosition(toPort.localPosition, toNode);
+        }
+      }
+    }
+
+    return { pickPosition, placePosition, preferredOutEdge };
   }
 
   // ─── Stopper: physically blocks products — reads sensor signals for triggers ───
@@ -1667,6 +1720,24 @@ export class SimulationEngine {
 
   private getOutEdges(nodeId: string): ProcessEdge[] {
     return this.edges.filter(e => e.from === nodeId);
+  }
+
+  /**
+   * Returns transfer-capable out edges for a node.
+   * Edges authored against stale port ids are kept as fallback, but edges that
+   * explicitly reference an input port are deprioritized when better options exist.
+   */
+  private getTransferOutEdges(node: ProcessNode): ProcessEdge[] {
+    const outEdges = this.getOutEdges(node.id);
+    if (outEdges.length <= 1) return outEdges;
+
+    const ports = getConnectionPorts(node.type, node.parameters);
+    const portTypeById = new Map(ports.map(p => [p.id, p.type] as const));
+    const preferred = outEdges.filter(edge => {
+      if (!edge.fromPort) return true;
+      return portTypeById.get(edge.fromPort) !== 'input';
+    });
+    return preferred.length > 0 ? preferred : outEdges;
   }
 
   getProducts(): Product[] {

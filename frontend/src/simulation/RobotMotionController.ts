@@ -169,7 +169,9 @@ export function tickRobot(
   state.toolCenterPoint = tcp;
 
   // ─── Solve IK for current TCP ───
-  const ik = solveIK(tcp, base, state.dims);
+  const pickPlacePhases: RobotPhase[] = ['approach-pick', 'pick', 'approach-place', 'place'];
+  const toolDown = pickPlacePhases.includes(state.phase);
+  const ik = solveIK(tcp, base, state.dims, toolDown);
   applyIK(state, ik);
 
   // ─── Phase transitions ───

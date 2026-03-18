@@ -4,10 +4,17 @@
   "private": true,
   "description": "MetaMech Simulation Studio - scripts and tools",
   "scripts": {
-    "generate-parts": "node scripts/generate-conveyor-parts.mjs"
+    "generate-parts": "node scripts/generate-conveyor-parts.mjs",
+    "cf:deploy": "wrangler deploy",
+    "cf:d1:create": "wrangler d1 create metamech-api-db",
+    "cf:d1:migrate:local": "wrangler d1 migrations apply metamech-api-db --local",
+    "cf:d1:migrate:remote": "wrangler d1 migrations apply metamech-api-db --remote"
   },
   "dependencies": {
     "@types/three": "^0.183.1",
     "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "wrangler": "^4.45.0"
   }
 }

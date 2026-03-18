@@ -4,9 +4,10 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requireSubscription?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireSubscription = true }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -22,7 +23,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} state={{ from: location }} replace />;
+  }
+
+  if (!user.emailVerified) {
+    return <Navigate to={`/verify-email?email=${encodeURIComponent(user.email)}&next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  }
+
+  if (requireSubscription && !user.subscription?.entitled) {
+    return <Navigate to={`/billing?next=${encodeURIComponent(location.pathname + location.search)}`} state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

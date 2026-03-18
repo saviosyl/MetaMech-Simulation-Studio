@@ -7,6 +7,7 @@ import { wallBuilder, doorBuilder, windowBuilder, palletRackBuilder, stairsBuild
 import { buildTransferBridge, buildPopupTransfer, buildPusherTransfer, buildMergeDivert } from './transferBuilders';
 import { buildSpiralConveyor } from './spiralConveyorBuilder';
 import { buildVerticalLifter } from './verticalLifterBuilder';
+import { buildFrameAssembly } from './frameAssemblyBuilder';
 
 export type { BuilderResult, ConnectionPort } from './beltConveyorBuilder';
 
@@ -55,6 +56,7 @@ const registry: Record<string, BuilderFunction> = {
   mergeDivertBuilder: buildMergeDivert,
   spiralConveyorBuilder: buildSpiralConveyor,
   verticalLifterBuilder: buildVerticalLifter,
+  frameAssemblyBuilder: buildFrameAssembly,
 };
 
 export function getBuilder(name: string): BuilderFunction | undefined {

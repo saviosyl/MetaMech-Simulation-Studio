@@ -4,6 +4,9 @@ import { AssetDef, getAssetManifest, getAssetById, ParametricAssetDef } from '..
 import { runBuilder } from '../lib/parametricBuilders';
 import { getPortWorldPosition, getWorldPorts as computeWorldPorts } from '../lib/nodeTransform';
 import { computeSpiralTransferGeometry } from '../lib/spiralTransfer';
+import { FrameAssemblyExportContract } from '../lib/frameDesigner/model';
+import { toFrameAssemblyParameters } from '../lib/frameDesigner/sceneInterop';
+import { VideoQualityPreset } from '../lib/videoExportPresets';
 
 // Types
 export interface ProcessNode {
@@ -49,7 +52,7 @@ export interface SceneObject {
 export interface EnvironmentAsset {
   id: string;
   type: 'wall' | 'door' | 'window' | 'stairs' | 'safety-rail' | 
-        'floor-marking' | 'pallet-rack' | 'warehouse-shell' | 'floor' | 'pallet' | 'cardboard-box';
+        'floor-marking' | 'pallet-rack' | 'warehouse-shell' | 'floor' | 'pallet' | 'cardboard-box' | 'frame-assembly';
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
@@ -400,10 +403,13 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       const rReach = (params?.reach || params?.reachX || 1400) / 1000;
       const rBase = (params?.baseHeight || 500) / 1000;
       const pedH = params?.pedestalEnabled ? (params?.pedestalHeight || 0) / 1000 : 0;
-      const rH = rBase + pedH;
+      const defaultH = rBase + pedH;
+      const pickH = params?.pickHeight != null ? (params.pickHeight / 1000) : defaultH;
+      const placeH = params?.placeHeight != null ? (params.placeHeight / 1000) : pickH;
+      const span = rReach * 0.4;
       return [
-        { id: 'pick', type: 'input', localPosition: [-rReach * 0.4, rH, 0] as [number, number, number] },
-        { id: 'place', type: 'output', localPosition: [rReach * 0.4, rH, 0] as [number, number, number] },
+        { id: 'pick', type: 'input', localPosition: [0, pickH, -span] as [number, number, number] },
+        { id: 'place', type: 'output', localPosition: [0, placeH, span] as [number, number, number] },
       ];
     }
     case 'eur-pallet':
@@ -571,6 +577,7 @@ interface EditorState {
   activeCameraPreset: string | null;
   cameraTargetPosition: [number, number, number] | null;
   cameraTargetLookAt: [number, number, number] | null;
+  cameraTargetUp: [number, number, number] | null;
   
   // Shortcuts panel
   showShortcuts: boolean;
@@ -601,6 +608,12 @@ interface EditorState {
   // Presentation mode
   presentationMode: boolean;
   setPresentationMode: (active: boolean) => void;
+
+  // Export capture quality
+  isExportRendering: boolean;
+  captureQualityPreset: VideoQualityPreset;
+  setIsExportRendering: (active: boolean) => void;
+  setCaptureQualityPreset: (preset: VideoQualityPreset) => void;
   
   // Snap state
   isDragging: boolean;
@@ -610,6 +623,7 @@ interface EditorState {
   // Actions
   addProcessNode: (type: ProcessNode['type'], position: [number, number, number]) => void;
   addEnvironmentAsset: (type: EnvironmentAsset['type'], position: [number, number, number]) => void;
+  insertFrameAssembly: (payload: FrameAssemblyExportContract, position?: [number, number, number]) => string;
   addActor: (type: Actor['type'], position: [number, number, number]) => void;
   
   updateObject: (id: string, type: 'process' | 'environment' | 'actor', updates: Record<string, any>) => void;
@@ -634,6 +648,8 @@ interface EditorState {
   toggleVisibility: (id: string) => void;
   overlaysHidden: boolean;
   setOverlaysHidden: (hidden: boolean) => void;
+  pathsVisible: boolean;
+  setPathsVisible: (visible: boolean) => void;
   
   setSceneSettings: (settings: Partial<SceneSettings>) => void;
   setActiveLibraryTab: (tab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical') => void;
@@ -764,11 +780,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeCameraPreset: null,
   cameraTargetPosition: null,
   cameraTargetLookAt: null,
+  cameraTargetUp: null,
   
   showShortcuts: false,
   focusRequest: 0,
   hiddenIds: new Set(),
   overlaysHidden: false,
+  pathsVisible: true,
   
   isPlaying: false,
   isPaused: false,
@@ -778,29 +796,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   showPropertiesPanel: true,
   
   // Panel defaults
-  leftPanelWidth: 320,
-  rightPanelWidth: 320,
+  leftPanelWidth: 280,
+  rightPanelWidth: 280,
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
   
-  // Theme defaults (restored from localStorage)
-  themeMode: (typeof localStorage !== 'undefined' && localStorage.getItem('metamech_theme') as 'dark' | 'light') || 'dark',
+  // Theme defaults (restored from localStorage; first launch defaults to light)
+  themeMode: (() => {
+    if (typeof localStorage === 'undefined') return 'light';
+    const next = localStorage.getItem('metamech-theme') as 'dark' | 'light' | null;
+    const legacy = localStorage.getItem('metamech_theme') as 'dark' | 'light' | null;
+    const resolved = next || legacy || 'light';
+    localStorage.setItem('metamech-theme', resolved);
+    if (legacy && !next) localStorage.removeItem('metamech_theme');
+    return resolved;
+  })(),
   setThemeMode: (mode) => {
     document.documentElement.setAttribute('data-theme', mode);
-    localStorage.setItem('metamech_theme', mode);
+    localStorage.setItem('metamech-theme', mode);
     set({ themeMode: mode });
   },
   toggleTheme: () => {
     const current = get().themeMode;
     const next = current === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('metamech_theme', next);
+    localStorage.setItem('metamech-theme', next);
     set({ themeMode: next });
   },
   
   // Presentation mode
   presentationMode: false,
   setPresentationMode: (active) => set({ presentationMode: active }),
+
+  // Export capture quality defaults
+  isExportRendering: false,
+  captureQualityPreset: 'presentation',
+  setIsExportRendering: (active) => set({ isExportRendering: active }),
+  setCaptureQualityPreset: (preset) => set({ captureQualityPreset: preset }),
   
   // Snap defaults
   isDragging: false,
@@ -879,6 +911,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedObjectId: newAsset.id,
       selectedObjectType: 'environment',
     }));
+  },
+
+  insertFrameAssembly: (payload, position = [0, 0, 0]) => {
+    const manifest = get().assetManifest;
+    const matchingAsset = manifest.find(a => a.id === 'frame-assembly' && a.category === 'environment');
+    const defaultParams = getDefaultParameters('frame-assembly');
+    const params = {
+      ...defaultParams,
+      ...toFrameAssemblyParameters(payload),
+    };
+    const id = uuidv4();
+
+    const newAsset: EnvironmentAsset = {
+      id,
+      type: 'frame-assembly',
+      position: [position[0], 0, position[2]],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      parameters: params,
+      name: payload.assembly.name || 'Frame Assembly',
+      assetId: matchingAsset?.id,
+      assetDefType: matchingAsset?.assetType,
+    };
+
+    set(state => ({
+      environmentAssets: [...state.environmentAssets, newAsset],
+      selectedObjectId: newAsset.id,
+      selectedObjectType: 'environment',
+    }));
+
+    return id;
   },
   
   addActor: (type, position) => {
@@ -1028,7 +1091,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setCameraPreset: (name) => {
     const preset = get().cameraPresets.find(p => p.name === name);
     if (preset) {
-      set({ activeCameraPreset: name, cameraTargetPosition: [...preset.position] as [number, number, number], cameraTargetLookAt: [...preset.target] as [number, number, number] });
+      set({
+        activeCameraPreset: name,
+        cameraTargetPosition: [...preset.position] as [number, number, number],
+        cameraTargetLookAt: [...preset.target] as [number, number, number],
+        cameraTargetUp: [0, 1, 0],
+        cameraMode: 'perspective',
+      });
     }
   },
   setShowShortcuts: (show) => set({ showShortcuts: show }),
@@ -1042,6 +1111,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   setOverlaysHidden: (hidden) => set({ overlaysHidden: hidden }),
+  setPathsVisible: (visible) => set({ pathsVisible: visible }),
   
   setSceneSettings: (settings) => {
     set(state => ({
@@ -1054,8 +1124,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   // Panel actions
-  setLeftPanelWidth: (width) => set({ leftPanelWidth: Math.min(500, Math.max(240, width)) }),
-  setRightPanelWidth: (width) => set({ rightPanelWidth: Math.min(500, Math.max(240, width)) }),
+  setLeftPanelWidth: (width) => set({ leftPanelWidth: Math.min(420, Math.max(200, width)) }),
+  setRightPanelWidth: (width) => set({ rightPanelWidth: Math.min(420, Math.max(200, width)) }),
   setLeftPanelCollapsed: (collapsed) => set({ leftPanelCollapsed: collapsed }),
   setRightPanelCollapsed: (collapsed) => set({ rightPanelCollapsed: collapsed }),
   
@@ -1246,23 +1316,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setCameraMode: (mode) => set({ cameraMode: mode }),
   setCameraView: (view) => {
     const dist = 30;
-    // All views look at scene center with correct orientation
-    // Top: camera above, looking down — X goes right, Z goes down on screen
-    // Front: camera in front (positive Z), looking at center — X goes right, Y goes up
-    // Right: camera on right (positive X), looking at center — Z goes left, Y goes up
-    const viewMap: Record<string, { pos: [number, number, number]; target: [number, number, number]; mode: 'perspective' | 'orthographic' }> = {
-      top:         { pos: [0, dist, 0.001], target: [0, 0, 0], mode: 'orthographic' },
-      front:       { pos: [0, 3, dist], target: [0, 3, 0], mode: 'orthographic' },
-      right:       { pos: [dist, 3, 0], target: [0, 3, 0], mode: 'orthographic' },
-      left:        { pos: [-dist, 3, 0], target: [0, 3, 0], mode: 'orthographic' },
-      back:        { pos: [0, 3, -dist], target: [0, 3, 0], mode: 'orthographic' },
-      bottom:      { pos: [0, dist, 0.001], target: [0, 0, 0], mode: 'orthographic' }, // same as top for safety (polar clamp)
-      perspective: { pos: [15, 12, 15], target: [0, 0, 0], mode: 'perspective' },
+    const viewMap: Record<string, { pos: [number, number, number]; target: [number, number, number]; up: [number, number, number]; mode: 'perspective' | 'orthographic' }> = {
+      top:         { pos: [0, dist, 0], target: [0, 0, 0], up: [0, 0, -1], mode: 'orthographic' },
+      front:       { pos: [0, 0, dist], target: [0, 0, 0], up: [0, 1, 0], mode: 'orthographic' },
+      right:       { pos: [dist, 0, 0], target: [0, 0, 0], up: [0, 1, 0], mode: 'orthographic' },
+      left:        { pos: [-dist, 0, 0], target: [0, 0, 0], up: [0, 1, 0], mode: 'orthographic' },
+      back:        { pos: [0, 0, -dist], target: [0, 0, 0], up: [0, 1, 0], mode: 'orthographic' },
+      bottom:      { pos: [0, -dist, 0], target: [0, 0, 0], up: [0, 0, 1], mode: 'orthographic' },
+      perspective: { pos: [15, 12, 15], target: [0, 0, 0], up: [0, 1, 0], mode: 'perspective' },
     };
     const v = viewMap[view] || viewMap.perspective;
     set({
       cameraTargetPosition: v.pos,
       cameraTargetLookAt: v.target,
+      cameraTargetUp: v.up,
       cameraMode: v.mode,
     });
   },
@@ -1310,6 +1377,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       customModels: data.customModels || [],
       paths: data.paths || [],
       cameraPaths: data.cameraPaths || [],
+      pathsVisible: data.pathsVisible ?? true,
       activeCameraPathId: null,
       isCameraPathPlaying: false,
       selectedObjectId: null,
@@ -1330,6 +1398,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       customProducts: state.customProducts,
       customModels: state.customModels,
       paths: state.paths,
+      pathsVisible: state.pathsVisible,
       cameraPaths: state.cameraPaths,
     };
   },
@@ -1371,6 +1440,7 @@ function getDefaultParameters(type: string): Record<string, any> {
     'floor-marking': { length: 5, width: 0.2, color: 'yellow' },
     'pallet-rack': { width: 3, height: 4, depth: 1.2, levels: 4 },
     'warehouse-shell': { width: 20, height: 8, depth: 15 },
+    'frame-assembly': { templateId: 'table-frame', profileFamilyId: 'profile-40x40', widthMm: 1600, heightMm: 1200, depthMm: 800 },
     floor: { width: 50, depth: 50, color: '#f0f0f0' },
     pallet: {},
     'cardboard-box': {},

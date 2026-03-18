@@ -1,7 +1,9 @@
 /// <reference types="vite/client" />
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
+// Dev fallback stays localhost, but production must never default to localhost.
+const API_URL = configuredApiUrl || (import.meta.env.DEV ? 'http://localhost:3000' : window.location.origin);
 
 // Create axios instance
 const api = axios.create({
@@ -22,14 +24,31 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const currentPath = window.location.pathname;
+    const isAuthPage = currentPath.startsWith('/login')
+      || currentPath.startsWith('/register')
+      || currentPath.startsWith('/verify-email')
+      || currentPath.startsWith('/forgot-password')
+      || currentPath.startsWith('/reset-password');
+
+    const next = encodeURIComponent(window.location.pathname + window.location.search);
+
     // Only redirect on actual 401 from a working backend
     // Don't redirect on network errors (ECONNREFUSED etc.)
-    if (error.response?.status === 401 && !window.location.pathname.startsWith('/login')) {
-      // Check if user has local auth — if so, don't redirect
-      const stored = localStorage.getItem('metamech_auth_user');
-      if (!stored) {
-        window.location.href = '/login';
-      }
+    if (error.response?.status === 401 && !isAuthPage) {
+      window.location.href = `/login?next=${next}`;
+    }
+    if (
+      error.response?.status === 403
+      && error.response?.data?.code === 'EMAIL_VERIFICATION_REQUIRED'
+      && !isAuthPage
+      && !currentPath.startsWith('/verify-email')
+    ) {
+      const email = encodeURIComponent(error.response?.data?.email || '');
+      window.location.href = `/verify-email?email=${email}&next=${next}`;
+    }
+    if (error.response?.status === 402 && !currentPath.startsWith('/billing')) {
+      window.location.href = `/billing?next=${next}`;
     }
     return Promise.reject(error);
   }

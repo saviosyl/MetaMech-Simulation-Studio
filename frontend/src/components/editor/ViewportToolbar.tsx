@@ -2,23 +2,27 @@ import React, { useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import ImportModelDialog from './ImportModelDialog';
 import CameraViewToolbar from './CameraViewToolbar';
+import {
+  MousePointer, Move, RotateCcw, Maximize2, Link2, Magnet, Ruler,
+  Grid3X3, Eye, EyeOff, Route, Trash2, Copy, Download, Package,
+} from 'lucide-react';
 
 type ToolType = 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure';
 
 interface ToolButton {
   id: ToolType;
-  label: string;
-  icon: string;
+  tooltip: string;
+  icon: React.ReactNode;
 }
 
 const tools: ToolButton[] = [
-  { id: 'select', label: 'Select (Q)', icon: '🔘' },
-  { id: 'move', label: 'Move (W)', icon: '✥' },
-  { id: 'rotate', label: 'Rotate (E)', icon: '↻' },
-  { id: 'scale', label: 'Scale (R)', icon: '⤡' },
-  { id: 'mate', label: 'Mate/Connect (M)', icon: '🔗' },
-  { id: 'snap-move', label: 'Snap Move — drag with auto-snap (N)', icon: '🧲' },
-  { id: 'measure', label: 'Measure', icon: '📏' },
+  { id: 'select', tooltip: 'Select objects (Q)', icon: <MousePointer size={16} /> },
+  { id: 'move', tooltip: 'Move objects (W)', icon: <Move size={16} /> },
+  { id: 'rotate', tooltip: 'Rotate objects (E)', icon: <RotateCcw size={16} /> },
+  { id: 'scale', tooltip: 'Scale objects (R)', icon: <Maximize2 size={16} /> },
+  { id: 'mate', tooltip: 'Create/inspect node connections (M)', icon: <Link2 size={16} /> },
+  { id: 'snap-move', tooltip: 'Drag with auto-snap assist (N)', icon: <Magnet size={16} /> },
+  { id: 'measure', tooltip: 'Measure distances in viewport', icon: <Ruler size={16} /> },
 ];
 
 const ViewportToolbar: React.FC = () => {
@@ -35,6 +39,8 @@ const ViewportToolbar: React.FC = () => {
   const pasteClipboard = useEditorStore(s => s.pasteClipboard);
   const overlaysHidden = useEditorStore(s => s.overlaysHidden);
   const setOverlaysHidden = useEditorStore(s => s.setOverlaysHidden);
+  const pathsVisible = useEditorStore(s => s.pathsVisible);
+  const setPathsVisible = useEditorStore(s => s.setPathsVisible);
 
   // Check if selected node has any connections
   const selectedEdges = selectedObjectId
@@ -53,129 +59,144 @@ const ViewportToolbar: React.FC = () => {
     setOverlaysHidden(!overlaysHidden);
   };
 
-  const btnStyle = (active: boolean): React.CSSProperties => ({
-    width: 36,
-    height: 36,
-    border: 'none',
-    borderRadius: 12,
-    background: active ? 'rgba(6,182,212,0.5)' : 'transparent',
-    color: active ? '#fff' : '#aaa',
-    fontSize: 18,
-    cursor: 'pointer',
-    display: 'flex',
+  const clusterStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+  };
+
+  const dividerStyle: React.CSSProperties = {
+    width: 1,
+    height: 28,
+    background: 'var(--mm-border-subtle)',
+    margin: '0 6px',
+    flexShrink: 0,
+  };
+
+  const btnStyle = (active: boolean, disabled = false): React.CSSProperties => ({
+    display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'background 0.15s',
+    width: 38,
+    height: 38,
+    padding: 0,
+    border: '1px solid var(--mm-border-subtle)',
+    borderRadius: 12,
+    background: active ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)',
+    color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-secondary)',
+    opacity: disabled ? 0.45 : 1,
+    cursor: 'pointer',
+    transition: 'all 0.15s',
   });
-
-  const divider = (
-    <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
-  );
 
   return (
     <div
       style={{
         position: 'absolute',
-        top: 12,
+        top: 'clamp(88px, 11vw, 106px)',
         left: '50%',
         transform: 'translateX(-50%)',
-        zIndex: 20,
+        zIndex: 45,
         display: 'flex',
         alignItems: 'center',
-        gap: 2,
-        background: 'rgba(0,0,0,0.75)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: 24,
-        padding: '4px 8px',
-        boxShadow: '0 2px 16px rgba(0,0,0,0.5)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        gap: 8,
+        width: 'min(1220px, calc(100% - 24px))',
+        flexWrap: 'nowrap',
+        overflowX: 'auto',
+        justifyContent: 'center',
+        minHeight: 48,
+        background: 'var(--mm-bg-toolbar-secondary)',
+        backdropFilter: 'blur(8px)',
+        borderRadius: 14,
+        padding: '7px 10px',
+        boxShadow: 'var(--mm-shadow-sm)',
+        border: '1px solid var(--mm-border-subtle)',
       }}
+      title="Main modeling ribbon"
     >
-      {/* Main tools */}
-      {tools.map(tool => (
-        <button
-          key={tool.id}
-          title={tool.label}
-          onClick={() => setActiveTool(tool.id)}
-          style={btnStyle(activeTool === tool.id)}
-        >
-          {tool.icon}
-        </button>
-      ))}
-
-      {divider}
-
-      {/* Grid snap */}
-      <button
-        title={`Grid Snap ${gridSnap ? 'ON' : 'OFF'}`}
-        onClick={() => setGridSnap(!gridSnap)}
-        style={btnStyle(gridSnap)}
-      >
-        ⊞
-      </button>
-
-      {/* Disconnect mate */}
-      {selectedEdges.length > 0 && (
-        <>
-          {divider}
+      {/* Tools */}
+      <div style={clusterStyle}>
+        {tools.map(tool => (
           <button
-            title={`Disconnect (${selectedEdges.length} connection${selectedEdges.length > 1 ? 's' : ''})`}
-            onClick={disconnectSelected}
-            style={{
-              ...btnStyle(false),
-              color: '#ef4444',
-              fontSize: 16,
-            }}
+            key={tool.id}
+            title={tool.tooltip}
+            onClick={() => setActiveTool(tool.id)}
+            style={btnStyle(activeTool === tool.id)}
           >
-            ✂
+            {tool.icon}
           </button>
-        </>
-      )}
+        ))}
+      </div>
 
-      {divider}
+      <div style={dividerStyle} />
 
-      {/* Copy / Paste */}
-      <button
-        title="Copy (Ctrl+C)"
-        onClick={copySelected}
-        style={{ ...btnStyle(false), fontSize: 14, opacity: selectedObjectId ? 1 : 0.4 }}
-        disabled={!selectedObjectId}
-      >
-        📋
-      </button>
-      <button
-        title="Paste (Ctrl+V)"
-        onClick={pasteClipboard}
-        style={{ ...btnStyle(false), fontSize: 14, opacity: clipboard ? 1 : 0.4 }}
-        disabled={!clipboard}
-      >
-        📄
-      </button>
+      {/* Edit */}
+      <div style={clusterStyle}>
+        <button
+          title="Copy selected object(s) to clipboard (Ctrl+C)"
+          onClick={copySelected}
+          style={btnStyle(false, !selectedObjectId)}
+          disabled={!selectedObjectId}
+        >
+          <Copy size={16} />
+        </button>
+        <button
+          title="Paste copied object(s) from clipboard (Ctrl+V)"
+          onClick={pasteClipboard}
+          style={btnStyle(false, !clipboard)}
+          disabled={!clipboard}
+        >
+          <Download size={16} />
+        </button>
+        {selectedEdges.length > 0 && (
+          <button
+            title={`Disconnect selected object (${selectedEdges.length} connection${selectedEdges.length > 1 ? 's' : ''})`}
+            onClick={disconnectSelected}
+            style={{ ...btnStyle(false), color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
+        <button
+          title="Import custom 3D model (.GLB/.GLTF) into scene"
+          onClick={() => setShowImport(true)}
+          style={btnStyle(false)}
+        >
+          <Package size={16} />
+        </button>
+      </div>
 
-      {divider}
+      <div style={dividerStyle} />
 
-      {/* Import 3D Model */}
-      <button
-        title="Import 3D Model (.GLB)"
-        onClick={() => setShowImport(true)}
-        style={{ ...btnStyle(false), fontSize: 15 }}
-      >
-        📦
-      </button>
+      {/* View */}
+      <div style={clusterStyle}>
+        <button
+          title={`Toggle grid snapping for transforms (${gridSnap ? 'On' : 'Off'})`}
+          onClick={() => setGridSnap(!gridSnap)}
+          style={btnStyle(gridSnap)}
+        >
+          <Grid3X3 size={16} />
+        </button>
+        <button
+          title={overlaysHidden ? 'Show helpers: ports, connections, and overlays' : 'Hide helpers for a clean presentation view'}
+          onClick={toggleCleanView}
+          style={btnStyle(overlaysHidden)}
+        >
+          {overlaysHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+        <button
+          title={pathsVisible ? 'Hide path trajectories and waypoints' : 'Show path trajectories and waypoints'}
+          onClick={() => setPathsVisible(!pathsVisible)}
+          style={btnStyle(pathsVisible)}
+        >
+          <Route size={16} />
+        </button>
+      </div>
 
-      {divider}
+      <div style={dividerStyle} />
 
-      {/* Clean view */}
-      <button
-        title={overlaysHidden ? 'Show All (Sources, Sinks, Connections)' : 'Hide All (Clean View — models only)'}
-        onClick={toggleCleanView}
-        style={btnStyle(overlaysHidden)}
-      >
-        {overlaysHidden ? '👁‍🗨' : '👁'}
-      </button>
-
-      {/* Camera Views */}
-      <div style={{ marginLeft: 4 }}>
+      {/* Camera */}
+      <div style={clusterStyle}>
         <CameraViewToolbar />
       </div>
 

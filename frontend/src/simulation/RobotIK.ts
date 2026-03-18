@@ -93,7 +93,9 @@ export function solveIK(
   // For pick/place with tool pointing down:
   const j4 = 0; // no wrist roll needed
   // J5 compensates shoulder + elbow so tool stays vertical
-  const j5 = toolDown ? -(j2 + j3) - Math.PI / 2 : 0;
+  // Keep tool axis vertical during pick/place phases.
+  // The model's tool local axis requires PI compensation (not PI/2) to face down.
+  const j5 = toolDown ? -(j2 + j3) - Math.PI : 0;
   const j6 = 0; // no tool rotation
   
   return { j1, j2, j3, j4, j5, j6 };

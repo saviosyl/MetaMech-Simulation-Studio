@@ -12,20 +12,22 @@ import {
 } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { simulationEngine } from '../../simulation/SimulationEngine';
-import { isAccessoryType } from '../../lib/accessorySnap';
+import { shouldValidateFlowConnectivity } from '../../lib/validation/connectivityFilter';
 
 type Tab = 'overview' | 'flow' | 'kpi' | 'validation';
 
-const MIN_HEIGHT = 42;  // collapsed header only
-const DEFAULT_HEIGHT = 200;
+const MIN_HEIGHT = 32;  // collapsed header only
+const DEFAULT_HEIGHT = 156;
 const MAX_HEIGHT = 500;
 
 // ─── Styles ───
 const S = {
-  panel: (h: number) => ({
+  panel: (h: number, collapsed: boolean) => ({
     position: 'absolute' as const, bottom: 0, left: 0, right: 0, zIndex: 20,
     height: h, display: 'flex', flexDirection: 'column' as const,
-    background: 'var(--mm-bg-panel)', borderTop: '1px solid var(--mm-border)',
+    background: collapsed ? 'rgba(2,6,23,0.68)' : 'var(--mm-bg-panel)',
+    backdropFilter: collapsed ? 'blur(8px)' : undefined,
+    borderTop: '1px solid var(--mm-border)',
     transition: 'none',
   }),
   dragHandle: {
@@ -39,17 +41,17 @@ const S = {
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 16px', height: 36, flexShrink: 0,
+    padding: '0 10px', height: 28, flexShrink: 0,
     borderBottom: '1px solid var(--mm-border-subtle)',
     cursor: 'pointer',
   } as React.CSSProperties,
   tabs: {
-    display: 'flex', gap: 2, padding: '6px 16px 0',
+    display: 'flex', gap: 2, padding: '5px 12px 0',
     borderBottom: '1px solid var(--mm-border-subtle)',
     flexShrink: 0,
   } as React.CSSProperties,
   tab: (active: boolean) => ({
-    padding: '6px 14px', fontSize: 11, fontWeight: 600,
+    padding: '5px 10px', fontSize: 10, fontWeight: 600,
     fontFamily: "'Orbitron', monospace", borderRadius: '6px 6px 0 0',
     border: 'none', cursor: 'pointer',
     background: active ? 'var(--mm-bg-surface)' : 'transparent',
@@ -58,7 +60,7 @@ const S = {
     transition: 'all 0.15s',
   } as React.CSSProperties),
   content: {
-    flex: 1, overflowY: 'auto' as const, padding: '10px 16px',
+    flex: 1, overflowY: 'auto' as const, padding: '8px 12px',
     fontSize: 12, color: 'var(--mm-text-secondary)',
   } as React.CSSProperties,
   kpiCard: {
@@ -103,7 +105,11 @@ function validateScene(nodes: any[], edges: any[]): ValidationIssue[] {
   // Disconnected nodes
   const connectedIds = new Set<string>();
   edges.forEach((e: any) => { connectedIds.add(e.from); connectedIds.add(e.to); });
-  const disconnected = nodes.filter((n: any) => !connectedIds.has(n.id) && !['source', 'sink'].includes(n.type) && !isAccessoryType(n.type));
+  const disconnected = nodes.filter((n: any) =>
+    !connectedIds.has(n.id) &&
+    !['source', 'sink'].includes(n.type) &&
+    shouldValidateFlowConnectivity(n.type),
+  );
   for (const n of disconnected) {
     issues.push({ id: `disc-${n.id}`, severity: 'warning', title: `"${n.name}" not connected`, detail: 'This node has no edges — products cannot reach it.', nodeId: n.id });
   }
@@ -202,7 +208,7 @@ const BottomPanel: React.FC = () => {
   const actualHeight = collapsed ? MIN_HEIGHT : height;
 
   return (
-    <div style={S.panel(actualHeight)}>
+    <div style={S.panel(actualHeight, collapsed)} data-tour="bottom-panel">
       {/* Drag handle */}
       {!collapsed && (
         <div style={S.dragHandle} onMouseDown={onMouseDown}>

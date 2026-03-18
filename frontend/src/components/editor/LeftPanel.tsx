@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState, useMemo } from 'react';
-import { Search, ChevronLeft, ChevronRight, List, GripVertical, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModulesByCategory, ModuleDefinition } from '../../lib/moduleLibrary';
 import SceneHierarchy from './SceneHierarchy';
@@ -71,7 +71,7 @@ const LeftPanel: React.FC = () => {
   // ─── Collapsed sidebar ───
   if (leftPanelCollapsed) {
     return (
-      <div style={{ flexShrink: 0, width: 44, borderRight: '1px solid var(--mm-border)', background: 'var(--mm-bg-panel)', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 10, gap: 4 }}>
+      <div data-tour="left-library" style={{ flexShrink: 0, width: 44, borderRight: '1px solid var(--mm-border)', background: 'var(--mm-bg-panel)', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 10, gap: 4 }}>
         <button onClick={() => setLeftPanelCollapsed(false)} style={{ padding: 6, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-tertiary)' }} title="Expand">
           <ChevronRight size={14} />
         </button>
@@ -90,11 +90,29 @@ const LeftPanel: React.FC = () => {
   }
 
   return (
-    <div style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(400, Math.max(220, leftPanelWidth)) }}>
-      <div style={{ flex: 1, background: 'var(--mm-bg-panel)', borderRight: '1px solid var(--mm-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div data-tour="left-library" style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(360, Math.max(200, leftPanelWidth)) }}>
+      <div
+        style={{
+          flex: 1,
+          background: 'var(--mm-bg-panel)',
+          borderRight: '1px solid var(--mm-border)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.02)',
+        }}
+      >
         
         {/* Header */}
-        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0 }}>
+        <div
+          style={{
+            padding: '9px 12px',
+            borderBottom: '1px solid var(--mm-border-subtle)',
+            background: 'var(--mm-bg-toolbar-secondary)',
+            backdropFilter: 'blur(6px)',
+            flexShrink: 0,
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ display: 'flex', gap: 2 }}>
               {(['library', 'scene'] as const).map(m => (
@@ -139,47 +157,56 @@ const LeftPanel: React.FC = () => {
 
         {viewMode === 'scene' ? <SceneHierarchy /> : (
           <>
-            {/* Category tabs — 2-row grid so all are always visible */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, padding: '6px 10px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0 }}>
+            {/* Category tabs — single compact strip with horizontal scroll */}
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 5,
+                padding: '7px 8px',
+                borderBottom: '1px solid var(--mm-border-subtle)',
+                background: 'var(--mm-bg-surface)',
+                flexShrink: 0,
+                overflow: 'hidden',
+              }}
+            >
               {TABS.map(tab => {
                 const active = activeLibraryTab === tab.id;
-                const count = getModulesByCategory(tab.id).length;
                 const Icon = tab.icon;
                 return (
                   <button key={tab.id} onClick={() => setActiveLibraryTab(tab.id)}
+                    title={`Show ${tab.name} assets`}
                     style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                      padding: '5px 2px', borderRadius: 6,
-                      border: `1px solid ${active ? 'rgba(34,211,238,0.3)' : 'transparent'}`,
-                      background: active ? 'var(--mm-accent-primary-muted)' : 'transparent',
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '5px 7px', borderRadius: 6, minWidth: 0,
+                      border: `1px solid ${active ? 'rgba(34,211,238,0.3)' : 'rgba(148,163,184,0.16)'}`,
+                      background: active ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)',
                       color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-tertiary)',
-                      cursor: 'pointer', fontSize: 9, fontWeight: 600,
+                      cursor: 'pointer', fontSize: 10, fontWeight: 600,
                       fontFamily: "'Orbitron', monospace", transition: 'all 0.15s',
                     }}>
-                    <Icon size={14} />
-                    <span style={{ lineHeight: 1 }}>{tab.name}</span>
-                    <span style={{ fontSize: 8, padding: '0px 4px', borderRadius: 6, background: active ? 'rgba(34,211,238,0.15)' : 'var(--mm-bg-surface)', color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-disabled)' }}>
-                      {count}
-                    </span>
+                    <Icon size={12} />
+                    <span style={{ lineHeight: 1, whiteSpace: 'nowrap' }}>{tab.name}</span>
                   </button>
                 );
               })}
             </div>
 
             {/* Module list */}
-            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 14px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '10px 12px' }}>
               {Object.entries(groupedModules).map(([group, items]) => (
-                <div key={group} style={{ marginBottom: 18 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, position: 'sticky', top: 0, background: 'var(--mm-bg-panel)', zIndex: 5, paddingTop: 4, paddingBottom: 4 }}>
-                    <div style={{ flex: 1, height: 1, background: 'var(--mm-border-subtle)' }} />
+                <div key={group} style={{ marginBottom: 12, border: '1px solid var(--mm-border-subtle)', borderRadius: 10, background: 'var(--mm-bg-surface)', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6, position: 'sticky', top: 0, background: 'var(--mm-bg-panel)', zIndex: 5, padding: '6px 8px', borderBottom: '1px solid var(--mm-border-subtle)' }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Orbitron', monospace" }}>
-                      {group} <span style={{ color: 'var(--mm-text-disabled)' }}>{items.length}</span>
+                      {group}
                     </span>
-                    <div style={{ flex: 1, height: 1, background: 'var(--mm-border-subtle)' }} />
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-disabled)', padding: '1px 6px', borderRadius: 999, background: 'var(--mm-bg-panel-hover)' }}>
+                      {items.length}
+                    </span>
                   </div>
 
                   {layout === 'grid' ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, padding: '0 8px 8px' }}>
                       {items.map(mod => {
                         const Icon = mod.icon;
                         return (
@@ -196,19 +223,18 @@ const LeftPanel: React.FC = () => {
                       })}
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '0 6px 8px' }}>
                       {items.map(mod => {
                         const Icon = mod.icon;
                         return (
                           <div key={mod.id} draggable onDragStart={(e) => handleDragStart(e, mod)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 6, cursor: 'grab', transition: 'background 0.1s' }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 7, cursor: 'grab', border: '1px solid transparent', transition: 'background 0.1s, border-color 0.1s' }}
                             onMouseEnter={e => { (e.currentTarget).style.background = 'var(--mm-bg-surface)'; }}
                             onMouseLeave={e => { (e.currentTarget).style.background = 'transparent'; }}>
                             <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--mm-accent-primary-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                               <Icon size={13} style={{ color: 'var(--mm-accent-primary)' }} />
                             </div>
                             <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--mm-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mod.name}</span>
-                            <GripVertical size={11} style={{ color: 'var(--mm-text-disabled)', flexShrink: 0 }} />
                           </div>
                         );
                       })}

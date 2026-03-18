@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import api from '../utils/api';
-import { User, AuthContextType } from '../types';
+import { User, AuthContextType, RegisterResult } from '../types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -16,118 +16,68 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-// ─── Local auth (works without backend) ────────────────────────
-// Admin credentials are hashed for basic security.
-// In production, use the backend auth system with bcrypt + JWT.
-const LOCAL_USERS: Array<{ email: string; password: string; displayName: string; role: string }> = [
-  {
-    email: 'saviosyl@gmail.com',
-    password: '@Meta123456',
-    displayName: 'Savio',
-    role: 'admin',
-  },
-];
-
-const STORAGE_KEY = 'metamech_auth_user';
-
-function localLogin(email: string, password: string): User | null {
-  const found = LOCAL_USERS.find(u => u.email === email && u.password === password);
-  if (!found) return null;
-  return {
-    id: 1,
-    email: found.email,
-    displayName: found.displayName,
-    role: found.role,
-    createdAt: new Date().toISOString(),
-  };
-}
-
-function localRegister(email: string, _password: string, displayName: string): User {
-  return {
-    id: Date.now(),
-    email,
-    displayName,
-    role: 'user',
-    createdAt: new Date().toISOString(),
-  };
-}
-
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   const checkAuth = async () => {
-    // First check localStorage
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-        setLoading(false);
-        return;
-      } catch { /* fall through */ }
-    }
-
-    // Then try backend
     try {
       const response = await api.get('/auth/me');
       const u = response.data.user;
       setUser(u);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+      return u as User;
     } catch {
       setUser(null);
+      return null;
     } finally {
       setLoading(false);
     }
   };
 
   const login = async (email: string, password: string) => {
-    // Try backend first
+    const normalizedEmail = email.trim().toLowerCase();
     try {
-      const response = await api.post('/auth/login', { email, password });
-      const u = response.data.user;
+      const response = await api.post('/auth/login', { email: normalizedEmail, password });
+      const u = response.data.user as User;
       setUser(u);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
-      return;
-    } catch {
-      // Backend unavailable — try local auth
+      return u;
+    } catch (error: any) {
+      if (!error?.response) {
+        throw new Error('Unable to reach server. Check your connection and try again.');
+      }
+      const err = new Error(error?.response?.data?.error || 'Login failed');
+      (err as any).code = error?.response?.data?.code;
+      (err as any).email = error?.response?.data?.email || normalizedEmail;
+      throw err;
     }
-
-    // Local auth fallback
-    const localUser = localLogin(email, password);
-    if (localUser) {
-      setUser(localUser);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(localUser));
-      return;
-    }
-
-    throw new Error('Invalid email or password');
   };
 
   const register = async (email: string, password: string, displayName: string) => {
-    // Try backend first
+    const normalizedEmail = email.trim().toLowerCase();
     try {
-      const response = await api.post('/auth/register', { email, password, displayName });
-      const u = response.data.user;
-      setUser(u);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
-      return;
-    } catch {
-      // Backend unavailable — create local user
+      const response = await api.post('/auth/register', {
+        email: normalizedEmail,
+        password,
+        displayName: displayName.trim(),
+      });
+      setUser(null);
+      return response.data as RegisterResult;
+    } catch (error: any) {
+      if (!error?.response) {
+        throw new Error('Unable to reach server. Check your connection and try again.');
+      }
+      const err = new Error(error?.response?.data?.error || 'Registration failed');
+      (err as any).code = error?.response?.data?.code;
+      (err as any).email = error?.response?.data?.email || normalizedEmail;
+      throw err;
     }
-
-    const localUser = localRegister(email, password, displayName);
-    setUser(localUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(localUser));
   };
 
   const logout = async () => {
     try {
       await api.post('/auth/logout');
-    } catch {
-      // Ignore backend errors on logout
-    }
+    } catch { /* ignore logout errors */ }
     setUser(null);
-    localStorage.removeItem(STORAGE_KEY);
   };
 
   useEffect(() => {

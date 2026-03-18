@@ -1,6 +1,12 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import AuthPageLayout from '../components/auth/AuthPageLayout';
+import AuthCard from '../components/auth/AuthCard';
+import AuthHeader from '../components/auth/AuthHeader';
+import AuthInput from '../components/auth/AuthInput';
+import AuthButton from '../components/auth/AuthButton';
+import AuthMessage from '../components/auth/AuthMessage';
 
 const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -12,8 +18,33 @@ const RegisterPage: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { register } = useAuth();
+  const { register, user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const fromLocation = location.state?.from as { pathname: string; search?: string } | undefined;
+  const fromState = fromLocation ? `${fromLocation.pathname}${fromLocation.search || ''}` : undefined;
+  const nextParam = searchParams.get('next');
+  const rawFrom = nextParam || fromState || '/dashboard';
+  const from = (
+    rawFrom.startsWith('/login')
+    || rawFrom.startsWith('/register')
+    || rawFrom.startsWith('/verify-email')
+    || rawFrom.startsWith('/forgot-password')
+    || rawFrom.startsWith('/reset-password')
+  )
+    ? '/dashboard'
+    : rawFrom;
+
+  useEffect(() => {
+    if (loading || !user) return;
+    if (!user.emailVerified) {
+      navigate(`/verify-email?email=${encodeURIComponent(user.email)}&next=${encodeURIComponent(from)}`, { replace: true });
+      return;
+    }
+    if (user.subscription?.entitled) navigate(from, { replace: true });
+    else navigate(`/billing?next=${encodeURIComponent(from)}`, { replace: true });
+  }, [loading, user, navigate, from]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -44,8 +75,14 @@ const RegisterPage: React.FC = () => {
     setError('');
 
     try {
-      await register(formData.email, formData.password, formData.displayName);
-      navigate('/dashboard', { replace: true });
+      const created = await register(formData.email, formData.password, formData.displayName);
+      navigate(`/verify-email?email=${encodeURIComponent(created.email)}&next=${encodeURIComponent(from)}`, {
+        replace: true,
+        state: {
+          message: created.message,
+          devVerificationLink: created.devVerificationLink || '',
+        },
+      });
     } catch (error: any) {
       setError(error.message);
     } finally {
@@ -54,127 +91,79 @@ const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-6">
-      <div className="container mx-auto max-w-md">
-        {/* Logo/Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            <span className="text-teal-600">MetaMech</span> Studio
-          </h1>
-          <p className="text-gray-600">Industrial Simulation Platform</p>
-        </div>
+    <AuthPageLayout>
+      <AuthCard>
+        <AuthHeader
+          title="Create your MetaMech account"
+          subtitle="Design industrial layouts, validate flow, and run simulation workflows with engineering-grade controls."
+        />
 
-        {/* Register Form */}
-        <div className="bg-white shadow-lg rounded-xl p-8">
-          <h2 className="text-2xl font-semibold text-gray-900 text-center mb-6">
-            Create Account
-          </h2>
+        {error ? <AuthMessage tone="error">{error}</AuthMessage> : null}
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-              {error}
-            </div>
-          )}
+        <form onSubmit={handleSubmit}>
+          <AuthInput
+            id="displayName"
+            name="displayName"
+            label="Full name"
+            type="text"
+            value={formData.displayName}
+            onChange={handleChange}
+            placeholder="John Doe"
+            disabled={isLoading}
+          />
+          <AuthInput
+            id="email"
+            name="email"
+            label="Email address"
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="your@company.com"
+            autoComplete="email"
+            disabled={isLoading}
+          />
+          <AuthInput
+            id="password"
+            name="password"
+            label="Password"
+            type="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="Minimum 8 characters"
+            autoComplete="new-password"
+            disabled={isLoading}
+          />
+          <AuthInput
+            id="confirmPassword"
+            name="confirmPassword"
+            label="Confirm password"
+            type="password"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            placeholder="Re-enter your password"
+            autoComplete="new-password"
+            disabled={isLoading}
+          />
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name
-              </label>
-              <input
-                id="displayName"
-                name="displayName"
-                type="text"
-                value={formData.displayName}
-                onChange={handleChange}
-                placeholder="John Doe"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="your@company.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Minimum 8 characters"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="Confirm your password"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                disabled={isLoading}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-teal-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-teal-700 focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Creating Account...
-                </div>
-              ) : (
-                'Create Account'
-              )}
-            </button>
-          </form>
-
-          <div className="mt-8 text-center">
-            <p className="text-gray-600">
-              Already have an account?{' '}
-              <Link to="/login" className="text-teal-600 hover:text-teal-700 font-medium">
-                Sign In
-              </Link>
-            </p>
+          <div style={{ marginTop: 'var(--mm-space-6)' }}>
+            <AuthButton type="submit" isLoading={isLoading} loadingText="Creating account...">
+              Create account
+            </AuthButton>
           </div>
+        </form>
+
+        <div style={{ marginTop: 'var(--mm-space-5)', fontSize: 13, color: 'var(--mm-text-tertiary)', textAlign: 'center' }}>
+          Already have an account?{' '}
+          <Link to={`/login?next=${encodeURIComponent(from)}`} style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none' }}>
+            Sign in
+          </Link>
         </div>
 
-        {/* Footer */}
-        <div className="text-center mt-8">
-          <p className="text-sm text-gray-500">
-            © 2024 MetaMech Solutions. Premium industrial simulation platform.
-          </p>
-        </div>
-      </div>
-    </div>
+        <p style={{ marginTop: 'var(--mm-space-5)', fontSize: 12, color: 'var(--mm-text-disabled)', textAlign: 'center', lineHeight: 1.5 }}>
+          By creating an account, you agree to our Terms and Privacy Policy.
+        </p>
+      </AuthCard>
+    </AuthPageLayout>
   );
 };
 

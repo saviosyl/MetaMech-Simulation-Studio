@@ -10,15 +10,21 @@ import Viewport from '../components/editor/Viewport';
 import ContextMenu from '../components/editor/ContextMenu';
 import BottomPanel from '../components/editor/BottomPanel';
 import ShortcutsPanel from '../components/editor/ShortcutsPanel';
+import { takePendingFrameAssemblyExport } from '../lib/frameDesigner/sceneInterop';
+import HelpSupportModal from '../components/editor/HelpSupportModal';
+import OnboardingTour from '../components/editor/OnboardingTour';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const EditorPage: React.FC = () => {
+  const ONBOARDING_KEY = 'metamech_onboarding_v1_completed';
   const { id } = useParams<{ id: string }>();
 
   const [projectName, setProjectName] = useState('Untitled Project');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; objectId: string | null; objectType: 'process' | 'environment' | 'actor' | null } | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
   const lastChangeRef = useRef(0);
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -45,6 +51,12 @@ const EditorPage: React.FC = () => {
     presentationMode,
     setPresentationMode,
   } = useEditorStore();
+
+  const importPendingFrameAssembly = useCallback(() => {
+    const pending = takePendingFrameAssemblyExport();
+    if (!pending) return;
+    useEditorStore.getState().insertFrameAssembly(pending, [0, 0, 0]);
+  }, []);
 
   // Track changes for undo history
   useEffect(() => {
@@ -81,17 +93,37 @@ const EditorPage: React.FC = () => {
             }
           }
           loadScene(scene);
+          importPendingFrameAssembly();
           if (savedName) setProjectName(savedName);
         } catch {
           localStorage.removeItem('metamech_autosave');
           localStorage.removeItem('metamech_autosave_name');
           loadScene({});
+          importPendingFrameAssembly();
         }
       } else {
         loadScene({});
+        importPendingFrameAssembly();
       }
     }
   }, [id]);
+
+  // First-launch guided tour (runs once per browser profile)
+  useEffect(() => {
+    try {
+      const completed = localStorage.getItem(ONBOARDING_KEY) === '1';
+      if (completed) return;
+      const t = setTimeout(() => setTourOpen(true), 700);
+      return () => clearTimeout(t);
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  const completeTour = useCallback(() => {
+    try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch { /* ignore */ }
+    setTourOpen(false);
+  }, []);
 
   // Auto-save every 60 seconds (only when backend is available)
   useEffect(() => {
@@ -183,9 +215,11 @@ const EditorPage: React.FC = () => {
       const project = await getProject(projectId);
       setProjectName(project.name || 'Untitled Project');
       loadScene(project.data || {});
+      importPendingFrameAssembly();
     } catch (error) {
       console.error('Failed to load project:', error);
       loadScene({});
+      importPendingFrameAssembly();
     }
   };
 
@@ -253,6 +287,7 @@ const EditorPage: React.FC = () => {
           setProjectName={setProjectName}
           saveStatus={saveStatus}
           onSave={handleSave}
+          onOpenHelpSupport={() => setHelpOpen(true)}
         />
       )}
       <div className="flex-1 flex overflow-hidden min-h-0" style={{ borderTop: presentationMode ? 'none' : '1px solid var(--mm-border-subtle)' }}>
@@ -313,6 +348,23 @@ const EditorPage: React.FC = () => {
       )}
 
       {!presentationMode && <ShortcutsPanel />}
+      {!presentationMode && (
+        <>
+          <HelpSupportModal
+            open={helpOpen}
+            onClose={() => setHelpOpen(false)}
+            onStartTour={() => {
+              setHelpOpen(false);
+              setTourOpen(true);
+            }}
+          />
+          <OnboardingTour
+            open={tourOpen}
+            onClose={completeTour}
+            onComplete={completeTour}
+          />
+        </>
+      )}
 
       {contextMenu && !presentationMode && (
         <ContextMenu

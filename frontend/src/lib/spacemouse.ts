@@ -50,6 +50,8 @@ export interface SpaceMouseConfig {
   flyDamping: number;
   /** Dominant axis lock — only process the strongest axis */
   dominantAxis: boolean;
+  /** Input smoothing (0-1, higher = smoother) */
+  smoothing: number;
 }
 
 const DEFAULT_CONFIG: SpaceMouseConfig = {
@@ -61,7 +63,8 @@ const DEFAULT_CONFIG: SpaceMouseConfig = {
   invertPan: false,
   invertZoom: false,
   flyDamping: 0.92,
-  dominantAxis: false,
+  dominantAxis: true,
+  smoothing: 0.35,
 };
 
 /** Known 3Dconnexion identifiers */
@@ -82,7 +85,7 @@ function applyDeadZone(value: number, dz: number): number {
   return sign * ((Math.abs(value) - dz) / (1 - dz));
 }
 
-function applyDominantAxis(values: number[]): number[] {
+function applyDominantAxis(values: [number, number, number]): [number, number, number] {
   let maxIdx = 0;
   let maxVal = 0;
   for (let i = 0; i < values.length; i++) {
@@ -91,7 +94,7 @@ function applyDominantAxis(values: number[]): number[] {
       maxIdx = i;
     }
   }
-  return values.map((v, i) => i === maxIdx ? v : 0);
+  return values.map((v, i) => (i === maxIdx ? v : 0)) as [number, number, number];
 }
 
 export class SpaceMouseController {
@@ -102,6 +105,8 @@ export class SpaceMouseController {
   // Fly mode velocity (momentum)
   flyVelocity: [number, number, number] = [0, 0, 0];
   flyAngular: [number, number] = [0, 0]; // pitch, yaw
+  private filteredTrans: [number, number, number] = [0, 0, 0];
+  private filteredRot: [number, number, number] = [0, 0, 0];
 
   constructor(config?: Partial<SpaceMouseConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -143,12 +148,16 @@ export class SpaceMouseController {
   /** Read raw state from the gamepad. Call every frame. */
   poll(): SpaceMouseState {
     if (this.gamepadIndex === null) {
+      this.filteredTrans = [0, 0, 0];
+      this.filteredRot = [0, 0, 0];
       return { connected: false, translate: [0, 0, 0], rotate: [0, 0, 0], buttons: [] };
     }
 
     const gamepads = navigator.getGamepads();
     const gp = gamepads[this.gamepadIndex];
     if (!gp) {
+      this.filteredTrans = [0, 0, 0];
+      this.filteredRot = [0, 0, 0];
       return { connected: false, translate: [0, 0, 0], rotate: [0, 0, 0], buttons: [] };
     }
 
@@ -168,20 +177,27 @@ export class SpaceMouseController {
 
     // Dominant axis: only keep strongest
     if (this.config.dominantAxis) {
-      const all = [...trans, ...rot];
-      const dominant = applyDominantAxis(all);
-      trans = [dominant[0], dominant[1], dominant[2]];
-      rot = [dominant[3], dominant[4], dominant[5]];
+      // Apply per-channel (translation vs rotation) to reduce wobble while
+      // still allowing one translational and one rotational intent together.
+      trans = applyDominantAxis(trans);
+      rot = applyDominantAxis(rot);
     }
 
     // Apply inversion
     if (this.config.invertPan) { trans[0] *= -1; trans[1] *= -1; }
     if (this.config.invertZoom) { trans[2] *= -1; }
 
+    const smooth = Math.max(0, Math.min(0.95, this.config.smoothing));
+    const a = 1 - smooth;
+    for (let i = 0; i < 3; i++) {
+      this.filteredTrans[i] = this.filteredTrans[i] * smooth + trans[i] * a;
+      this.filteredRot[i] = this.filteredRot[i] * smooth + rot[i] * a;
+    }
+
     return {
       connected: true,
-      translate: trans,
-      rotate: rot,
+      translate: [...this.filteredTrans] as [number, number, number],
+      rotate: [...this.filteredRot] as [number, number, number],
       buttons: Array.from(gp.buttons).map(b => b.pressed),
     };
   }

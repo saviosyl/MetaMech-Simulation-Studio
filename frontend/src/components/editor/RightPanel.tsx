@@ -1,10 +1,11 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { Settings, Move3D, RotateCw, Maximize, Palette, Sliders, ChevronLeft, ChevronRight, Layers, ChevronDown, ChevronUp, Eye, EyeOff, Zap, Radio } from 'lucide-react';
-import { useEditorStore } from '../../store/editorStore';
+import { getConnectionPorts, useEditorStore } from '../../store/editorStore';
 import { getModuleDefinition } from '../../lib/moduleLibrary';
 import { getAssetById, ParametricAssetDef } from '../../lib/assetManifest';
 import { simulationEngine } from '../../simulation/SimulationEngine';
 import { mToMm, mmToM, radToDeg, degToRad } from '../../utils/units';
+import { getPortWorldPosition } from '../../lib/nodeTransform';
 import BOMPanel from './BOMPanel';
 import { generateBOM } from '../../lib/bom/bomEngine';
 
@@ -12,9 +13,18 @@ import { generateBOM } from '../../lib/bom/bomEngine';
 const Section: React.FC<{ title: string; icon?: any; children: React.ReactNode; defaultOpen?: boolean; badge?: string }> = ({ title, icon: Icon, children, defaultOpen = false, badge }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, overflow: 'hidden', marginBottom: 10 }}>
+    <div
+      style={{
+        border: '1px solid rgba(148,163,184,0.2)',
+        borderRadius: 10,
+        overflow: 'hidden',
+        marginBottom: 10,
+        background: 'var(--mm-bg-surface)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
+      }}
+    >
       <button onClick={() => setOpen(!open)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: open ? 'var(--mm-bg-surface)' : 'transparent', border: 'none', cursor: 'pointer', transition: 'background 0.1s' }}>
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: open ? 'var(--mm-bg-panel-hover)' : 'transparent', border: 'none', cursor: 'pointer', transition: 'background 0.1s' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {Icon && <Icon size={13} style={{ color: 'var(--mm-accent-primary)' }} />}
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)', letterSpacing: '0.05em', fontFamily: "'Orbitron', monospace" }}>{title.toUpperCase()}</span>
@@ -22,15 +32,16 @@ const Section: React.FC<{ title: string; icon?: any; children: React.ReactNode; 
         </span>
         {open ? <ChevronUp size={13} style={{ color: 'var(--mm-text-tertiary)' }} /> : <ChevronDown size={13} style={{ color: 'var(--mm-text-tertiary)' }} />}
       </button>
-      {open && <div style={{ padding: '8px 12px', borderTop: '1px solid var(--mm-border-subtle)' }}>{children}</div>}
+      {open && <div style={{ padding: '9px 12px', borderTop: '1px solid rgba(148,163,184,0.16)' }}>{children}</div>}
     </div>
   );
 };
 
 /* ─── Input helper ─── */
-const inputStyle: React.CSSProperties = { width: '100%', padding: '6px 10px', fontSize: 12, background: 'var(--mm-bg-input)', border: '1px solid var(--mm-border)', borderRadius: 6, color: 'var(--mm-text-primary)', outline: 'none' };
+const inputStyle: React.CSSProperties = { width: '100%', padding: '6px 10px', fontSize: 12, background: 'var(--mm-bg-input)', border: '1px solid rgba(148,163,184,0.26)', borderRadius: 7, color: 'var(--mm-text-primary)', outline: 'none' };
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: 'var(--mm-text-tertiary)', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' };
-const fieldGap: React.CSSProperties = { marginBottom: 12 };
+const fieldGap: React.CSSProperties = { marginBottom: 10 };
+const LENGTH_ANCHORED_TYPES = new Set(['conveyor', 'belt-conveyor', 'roller-conveyor', 'incline-conveyor', 'modular-conveyor-straight']);
 
 /* ─── Parameter grouper ─── */
 function groupParams(params: [string, any][]) {
@@ -38,7 +49,12 @@ function groupParams(params: [string, any][]) {
   const geoK = ['length','width','height','radius','angle','angleDeg','bendAngle','pitch','turns','drumDiameter','supportSpacing','conveyorType','driveType','showSupports','showLegs','showSideGuides','sideGuideHeight','adjustableFeetEnabled','footAdjustmentMm','supportType','legCount','ceilingHeight','hangerStyle','hangerCrossbar'];
   const simK = ['beltSpeed','speed','spawnRate','ppm','processTime','capacity','cycleTime','maxItems','productColor','productType','productLength','productWidth','productHeight','speedFactor','pickHeight','placeHeight','approachHeight','pickDelay','placeDelay','accumulationMode','accumulationZones'];
   const logK = ['stopperMode','stopperTag','triggerSensorTag','secondarySensorTag','stopCondition','releaseCondition','releaseDelay','stopCount','pusherMode','holdTime','releaseCount','openDuration','sensorTag','sensorType','detectColor','detectType','detectSize','colorFilter','typeFilter','cooldown','debounce','dwellTimeThreshold','onDwellEvent','showBeam','mountPosition','mountSide','mountHeight','parentConveyorId','lateralOffset','engaged','enabled','targetColor','targetProductType','routeBy','routeValues','stroke','side','runMode','blockedBySensorTag','dwellBlockThreshold','resumeDelay'];
-  const appK = ['beltColor','frameColor','color','materialColor','finish','wallColor','textureUrl','productTextureUrl','productLabel','wallLabel','labelFontSize','labelColor'];
+  const appK = [
+    'beltColor','frameColor','color','materialColor','finish',
+    'wallColor','textureUrl','wallImageMode','wallImageOpacity','wallPatternRepeat',
+    'wallLogoWidth','wallLogoHeight','wallLogoKeepAspect','wallLogoOffsetX','wallLogoOffsetY','wallLogoRotation',
+    'productTextureUrl','productLabel','wallLabel','labelFontSize','labelColor',
+  ];
   for (const [k, d] of params) {
     const kl = k.toLowerCase();
     if (geoK.some(g => kl.includes(g.toLowerCase()))) geo.push([k,d]);
@@ -73,6 +89,8 @@ const RightPanel: React.FC = () => {
   }, [selectedObjectId, selectedObjectType, processNodes, environmentAssets, actors]);
 
   const moduleDef = selectedObject ? getModuleDefinition(selectedObject.type) : null;
+  const widthMin = selectedObject ? 220 : 160;
+  const widthMax = selectedObject ? 380 : 260;
   const paramAssetDef = React.useMemo(() => {
     if (!selectedObject || !(selectedObject as any).assetId) return null;
     const d = getAssetById((selectedObject as any).assetId);
@@ -81,6 +99,75 @@ const RightPanel: React.FC = () => {
 
   const handleParam = (k: string, v: any) => {
     if (!selectedObject || !selectedObjectType) return;
+
+    // Keep conveyor infeed anchored while changing length, then carry downstream
+    // connected nodes by the resulting outfeed delta to preserve node continuity.
+    if (selectedObjectType === 'process' && k === 'length' && Number.isFinite(v)) {
+      const state = useEditorStore.getState();
+      const node = state.processNodes.find(n => n.id === selectedObject.id);
+      if (node && LENGTH_ANCHORED_TYPES.has(node.type)) {
+        const nextParameters = { ...node.parameters, [k]: v };
+        const oldPorts = getConnectionPorts(node.type, node.parameters, node.assetId);
+        const nextPorts = getConnectionPorts(node.type, nextParameters, node.assetId);
+        const oldIn = oldPorts.find(p => p.type === 'input');
+        const oldOut = oldPorts.find(p => p.type === 'output');
+        const nextIn = nextPorts.find(p => p.type === 'input');
+        const nextOut = nextPorts.find(p => p.type === 'output');
+
+        if (oldIn && oldOut && nextIn && nextOut) {
+          const inBefore = getPortWorldPosition(oldIn.localPosition, node);
+          const outBefore = getPortWorldPosition(oldOut.localPosition, node);
+
+          const previewNode = { ...node, parameters: nextParameters };
+          const inAfter = getPortWorldPosition(nextIn.localPosition, previewNode);
+          const anchorDelta: [number, number, number] = [
+            inBefore[0] - inAfter[0],
+            inBefore[1] - inAfter[1],
+            inBefore[2] - inAfter[2],
+          ];
+          const anchoredPosition: [number, number, number] = [
+            node.position[0] + anchorDelta[0],
+            node.position[1] + anchorDelta[1],
+            node.position[2] + anchorDelta[2],
+          ];
+          const anchoredNode = { ...previewNode, position: anchoredPosition };
+          const outAfter = getPortWorldPosition(nextOut.localPosition, anchoredNode);
+          const outDelta: [number, number, number] = [
+            outAfter[0] - outBefore[0],
+            outAfter[1] - outBefore[1],
+            outAfter[2] - outBefore[2],
+          ];
+
+          updateObject(node.id, 'process', { parameters: nextParameters, position: anchoredPosition });
+
+          const moved = new Set<string>();
+          const outputPortIds = new Set(nextPorts.filter(p => p.type === 'output').map(p => p.id));
+          const deltaMag = Math.abs(outDelta[0]) + Math.abs(outDelta[1]) + Math.abs(outDelta[2]);
+          if (deltaMag > 1e-6) {
+            for (const edge of state.edges) {
+              if (edge.from !== node.id) continue;
+              if (edge.fromPort && !outputPortIds.has(edge.fromPort)) continue;
+              if (moved.has(edge.to)) continue;
+              const downstream = state.processNodes.find(n => n.id === edge.to);
+              if (!downstream) continue;
+              moved.add(edge.to);
+              updateObject(downstream.id, 'process', {
+                position: [
+                  downstream.position[0] + outDelta[0],
+                  downstream.position[1] + outDelta[1],
+                  downstream.position[2] + outDelta[2],
+                ],
+              });
+            }
+          }
+          return;
+        }
+
+        updateObject(node.id, 'process', { parameters: nextParameters });
+        return;
+      }
+    }
+
     updateObject(selectedObject.id, selectedObjectType, { parameters: { ...selectedObject.parameters, [k]: v } });
   };
 
@@ -170,7 +257,7 @@ const RightPanel: React.FC = () => {
   // Collapsed
   if (rightPanelCollapsed) {
     return (
-      <div style={{ flexShrink: 0, width: 44, borderLeft: '1px solid var(--mm-border)', background: 'var(--mm-bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div data-tour="right-properties" style={{ flexShrink: 0, width: 44, borderLeft: '1px solid var(--mm-border)', background: 'var(--mm-bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <button onClick={() => setRightPanelCollapsed(false)} style={{ padding: 6, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-tertiary)' }} title="Expand">
           <ChevronLeft size={14} />
         </button>
@@ -179,16 +266,37 @@ const RightPanel: React.FC = () => {
   }
 
   return (
-    <div style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(400, Math.max(240, rightPanelWidth)) }}>
+    <div data-tour="right-properties" style={{ flexShrink: 0, display: 'flex', height: '100%', overflow: 'hidden', width: Math.min(widthMax, Math.max(widthMin, rightPanelWidth)) }}>
       {/* Resize handle */}
       <div style={{ width: 4, cursor: 'col-resize', flexShrink: 0, background: 'transparent', transition: 'background 0.15s' }}
         onMouseDown={handleResizeStart}
         onMouseEnter={e => { (e.currentTarget).style.background = 'var(--mm-accent-primary)'; }}
         onMouseLeave={e => { (e.currentTarget).style.background = 'transparent'; }} />
 
-      <div style={{ flex: 1, background: 'var(--mm-bg-panel)', borderLeft: '1px solid var(--mm-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div
+        style={{
+          flex: 1,
+          background: 'var(--mm-bg-panel)',
+          borderLeft: '1px solid var(--mm-border)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          boxShadow: 'inset 1px 0 0 rgba(255,255,255,0.02)',
+        }}
+      >
         {/* Header */}
-        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--mm-border-subtle)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div
+          style={{
+            padding: '10px 12px',
+            borderBottom: '1px solid var(--mm-border-subtle)',
+            background: 'var(--mm-bg-toolbar-secondary)',
+            backdropFilter: 'blur(6px)',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)', fontFamily: "'Orbitron', monospace", letterSpacing: '0.05em' }}>
             <Settings size={13} style={{ color: 'var(--mm-accent-primary)' }} /> PROPERTIES
           </span>
@@ -199,7 +307,7 @@ const RightPanel: React.FC = () => {
 
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
           {selectedObject ? (
-            <div style={{ padding: 14 }}>
+            <div style={{ padding: 12 }}>
               {/* Object info */}
               <Section title="Object" icon={Settings} defaultOpen={true}>
                 <div style={fieldGap}>
@@ -382,7 +490,7 @@ const RightPanel: React.FC = () => {
               })()}
             </div>
           ) : (
-            <div style={{ padding: 14 }}>
+            <div style={{ padding: 12 }}>
               {/* Scene settings */}
               <Section title="Scene" icon={Palette} defaultOpen={true}>
                 <div style={fieldGap}>
@@ -402,11 +510,16 @@ const RightPanel: React.FC = () => {
               </Section>
 
               {/* Empty state */}
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--mm-bg-surface)', border: '1px solid var(--mm-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                  <Sliders size={18} style={{ color: 'var(--mm-text-disabled)' }} />
+              <div style={{ textAlign: 'center', padding: '16px 0 4px' }}>
+                <div style={{ width: 100, margin: '0 auto', padding: '10px 10px 8px', borderRadius: 10, border: '1px dashed rgba(148,163,184,0.26)', background: 'var(--mm-bg-surface)' }}>
+                  <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--mm-bg-surface)', border: '1px solid var(--mm-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>
+                    <Sliders size={16} style={{ color: 'var(--mm-text-disabled)' }} />
+                  </div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--mm-text-disabled)', letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: "'Orbitron', monospace" }}>
+                    Inspector
+                  </div>
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)', marginBottom: 4 }}>No object selected</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)', marginTop: 10, marginBottom: 4 }}>No object selected</div>
                 <div style={{ fontSize: 11, color: 'var(--mm-text-disabled)' }}>Click an object to edit properties</div>
               </div>
             </div>
