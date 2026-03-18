@@ -7,6 +7,10 @@ interface ProtectedRouteProps {
   requireSubscription?: boolean;
 }
 
+// Temporary internal review override for the MetaMech admin account.
+// Keeps the commercial model unchanged for all regular users.
+const REVIEW_ADMIN_EMAILS = new Set(['saviosyl@gmail.com']);
+
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireSubscription = true }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -30,7 +34,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireSubscr
     return <Navigate to={`/verify-email?email=${encodeURIComponent(user.email)}&next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
 
-  if (requireSubscription && !user.subscription?.entitled) {
+  const isReviewAdmin =
+    user.role === 'admin' &&
+    REVIEW_ADMIN_EMAILS.has((user.email || '').trim().toLowerCase());
+
+  if (requireSubscription && !user.subscription?.entitled && !isReviewAdmin) {
     return <Navigate to={`/billing?next=${encodeURIComponent(location.pathname + location.search)}`} state={{ from: location }} replace />;
   }
 
