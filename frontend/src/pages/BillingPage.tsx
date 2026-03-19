@@ -54,9 +54,13 @@ const BillingPage: React.FC = () => {
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-6 py-12">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(6,182,212,0.15),transparent_35%),radial-gradient(circle_at_80%_85%,rgba(139,92,246,0.12),transparent_40%)] pointer-events-none" />
       <div className="relative z-10 w-full max-w-2xl bg-slate-900/95 rounded-2xl shadow-2xl border border-slate-700 p-8 text-slate-100">
-        <h1 className="text-2xl font-bold mb-2">
-          <span className="text-teal-400">MetaMech</span> Subscription Required
-        </h1>
+        <img
+          src="/simulation-studio-logo.png"
+          alt="Simulation Studio"
+          className="mb-4 h-14 w-full max-w-[340px] rounded-lg object-cover"
+          style={{ objectPosition: 'center 45%' }}
+        />
+        <h1 className="text-2xl font-bold mb-2">Simulation access required</h1>
         <p className="text-slate-300 mb-6">
           You are signed in, but this account currently does not have an active entitlement for the simulation workspace.
         </p>
