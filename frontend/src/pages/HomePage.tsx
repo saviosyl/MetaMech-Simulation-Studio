@@ -27,8 +27,8 @@ const HomePage: React.FC = () => {
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Link to="/simulation" style={ghostBtn}>Simulation Product</Link>
-            <Link to="/login" style={ghostBtn}>Log In</Link>
-            <Link to="/register" style={primaryBtn}>{simulationCtas.startTrial}</Link>
+            <Link to="/simulation/access?mode=signin" style={ghostBtn}>Sign in</Link>
+            <Link to="/simulation/access?mode=signup" style={primaryBtn}>{simulationCtas.startTrial}</Link>
           </div>
         </header>
 
@@ -49,7 +49,7 @@ const HomePage: React.FC = () => {
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <Link to="/simulation" style={primaryBtn}>Book Demo</Link>
-            <Link to="/login" style={ghostBtn}>Contact Sales</Link>
+            <Link to="/simulation/pricing" style={ghostBtn}>View Pricing</Link>
           </div>
         </section>
       </main>

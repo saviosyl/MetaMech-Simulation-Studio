@@ -50,8 +50,8 @@ const SimulationProductPage: React.FC = () => {
             />
           </Link>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Link to="/login" style={{ ...navBtn, background: 'var(--mm-bg-panel)' }}>Log In</Link>
-            <Link to="/register" style={{ ...navBtn, background: 'linear-gradient(135deg, #0891b2, #06b6d4)', color: '#fff', border: 'none' }}>
+            <Link to="/simulation/access?mode=signin" style={{ ...navBtn, background: 'var(--mm-bg-panel)' }}>Sign in</Link>
+            <Link to="/simulation/access?mode=signup" style={{ ...navBtn, background: 'linear-gradient(135deg, #0891b2, #06b6d4)', color: '#fff', border: 'none' }}>
               {simulationCtas.startTrial}
             </Link>
           </div>
@@ -66,7 +66,7 @@ const SimulationProductPage: React.FC = () => {
             {simulationHeroCopy.subheadline}
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
-            <Link to="/register" style={primaryBtn}>{simulationCtas.startTrial}</Link>
+            <Link to="/simulation/access?mode=signup" style={primaryBtn}>{simulationCtas.startTrial}</Link>
             <Link to="/simulation#final-cta" style={ghostBtn}>{simulationCtas.bookDemo}</Link>
           </div>
           <img
@@ -174,9 +174,9 @@ const SimulationProductPage: React.FC = () => {
             Start with a 1-Day Trial or book a focused demo tailored to your line.
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-            <Link to="/register" style={primaryBtn}>{simulationCtas.startTrial}</Link>
+            <Link to="/simulation/access?mode=signup" style={primaryBtn}>{simulationCtas.startTrial}</Link>
             <Link to="/simulation" style={ghostBtn}>{simulationCtas.bookDemo}</Link>
-            <Link to="/login" style={ghostBtn}>{simulationCtas.contactSales}</Link>
+            <Link to="/simulation/access?mode=signin" style={ghostBtn}>Sign in</Link>
           </div>
           <img
             src={simulationMarketingAssets.presentationProof}

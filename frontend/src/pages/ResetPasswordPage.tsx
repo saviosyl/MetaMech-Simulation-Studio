@@ -41,7 +41,7 @@ const ResetPasswordPage: React.FC = () => {
     try {
       const response = await api.post('/auth/reset-password', { token, password });
       setMessage(response.data.message || 'Password reset successful.');
-      setTimeout(() => navigate('/login', { replace: true }), 1200);
+      setTimeout(() => navigate('/simulation/access?mode=signin', { replace: true }), 1200);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Unable to reset password. The link may be invalid or expired.');
     } finally {
@@ -89,7 +89,7 @@ const ResetPasswordPage: React.FC = () => {
         </form>
 
         <div style={{ marginTop: 'var(--mm-space-5)', textAlign: 'center' }}>
-          <Link to="/login" style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>
+          <Link to="/simulation/access?mode=signin" style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>
             Back to sign in
           </Link>
         </div>

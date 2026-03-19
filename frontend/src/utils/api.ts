@@ -25,9 +25,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const currentPath = window.location.pathname;
-    const isAuthPage = currentPath.startsWith('/login')
-      || currentPath.startsWith('/register')
-      || currentPath.startsWith('/verify-email')
+    const isAuthPage = currentPath.startsWith('/simulation/access')
       || currentPath.startsWith('/forgot-password')
       || currentPath.startsWith('/reset-password');
 
@@ -36,19 +34,18 @@ api.interceptors.response.use(
     // Only redirect on actual 401 from a working backend
     // Don't redirect on network errors (ECONNREFUSED etc.)
     if (error.response?.status === 401 && !isAuthPage) {
-      window.location.href = `/login?next=${next}`;
+      window.location.href = `/simulation/access?mode=signin&next=${next}`;
     }
     if (
       error.response?.status === 403
       && error.response?.data?.code === 'EMAIL_VERIFICATION_REQUIRED'
       && !isAuthPage
-      && !currentPath.startsWith('/verify-email')
     ) {
       const email = encodeURIComponent(error.response?.data?.email || '');
-      window.location.href = `/verify-email?email=${email}&next=${next}`;
+      window.location.href = `/simulation/access?state=verify&email=${email}&next=${next}`;
     }
-    if (error.response?.status === 402 && !currentPath.startsWith('/billing')) {
-      window.location.href = `/billing?next=${next}`;
+    if (error.response?.status === 402 && !isAuthPage) {
+      window.location.href = `/simulation/access?state=membership&next=${next}`;
     }
     return Promise.reject(error);
   }
