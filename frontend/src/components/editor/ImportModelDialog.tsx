@@ -4,6 +4,7 @@
  * Large file safeguard: warns if file > 10MB, rejects > 50MB
  */
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Upload, X, AlertTriangle, FileBox, Check } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 
@@ -27,8 +28,17 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
 
   if (!isOpen) return null;
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
+  const handleClose = () => {
+    setImporting(false);
+    setError('');
+    setWarning('');
+    setFile(null);
+    setName('');
+    setCategory('custom');
+    onClose();
+  };
+
+  const processSelectedFile = (f: File | null | undefined) => {
     if (!f) return;
     setError('');
     setWarning('');
@@ -48,6 +58,10 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
     if (!name) setName(f.name.replace(/\.(glb|gltf)$/i, '').replace(/[_-]/g, ' '));
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    processSelectedFile(e.target.files?.[0]);
+  };
+
   const handleImport = async () => {
     if (!file) return;
     setImporting(true);
@@ -62,8 +76,7 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
         name: name || file.name, glbUrl: dataUrl, sourceFile: file.name, fileSize: file.size,
         position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1], parameters: {}, category,
       });
-      onClose();
-      setFile(null); setName(''); setError(''); setWarning('');
+      handleClose();
     } catch { setError('Failed to import. File may be corrupted.'); }
     finally { setImporting(false); }
   };
@@ -79,17 +92,17 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
     outline: 'none',
   };
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+  const dialog = (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18 }} onClick={handleClose}>
       {/* Backdrop */}
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(3, 10, 24, 0.42)' }} />
 
       {/* Dialog */}
       <div
         style={{
-          position: 'relative', width: 440, maxWidth: '95vw',
+          position: 'relative', width: 460, maxWidth: '96vw',
           background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)',
-          borderRadius: 14, boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+          borderRadius: 14, boxShadow: '0 14px 42px rgba(2, 12, 28, 0.32)',
           overflow: 'hidden',
         }}
         onClick={e => e.stopPropagation()}
@@ -97,16 +110,17 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 20px', borderBottom: '1px solid var(--mm-border-subtle)',
+          padding: '13px 18px', borderBottom: '1px solid var(--mm-border-subtle)',
+          background: 'var(--mm-bg-toolbar-secondary)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <FileBox size={16} style={{ color: 'var(--mm-accent-primary)' }} />
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--mm-text-primary)', fontFamily: "'Orbitron', monospace", letterSpacing: '0.05em' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--mm-text-primary)', fontFamily: "'Orbitron', monospace", letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
               IMPORT 3D MODEL
             </span>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             style={{ padding: 4, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-tertiary)' }}
           >
             <X size={14} />
@@ -135,23 +149,33 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
           </div>
 
           {/* File picker — AT BOTTOM of form fields */}
-          <div>
+          <div style={{ display: 'grid', gap: 8 }}>
             <label style={labelStyle}>3D Model File</label>
             <div
               onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'copy';
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                processSelectedFile(e.dataTransfer.files?.[0]);
+              }}
               style={{
-                border: '2px dashed var(--mm-border)', borderRadius: 10, padding: '20px 16px',
+                border: '1px dashed var(--mm-border-strong)', borderRadius: 10, padding: '14px 14px',
                 textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s',
                 background: file ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)',
               }}
               onMouseEnter={e => { (e.currentTarget).style.borderColor = 'var(--mm-accent-primary)'; }}
-              onMouseLeave={e => { (e.currentTarget).style.borderColor = 'var(--mm-border)'; }}
+              onMouseLeave={e => { (e.currentTarget).style.borderColor = 'var(--mm-border-strong)'; }}
             >
               {file ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 34 }}>
                   <Check size={16} style={{ color: 'var(--mm-accent-primary)' }} />
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--mm-text-primary)' }}>{file.name}</div>
+                  <div style={{ minWidth: 0, textAlign: 'left', maxWidth: '100%' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--mm-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</div>
                     <div style={{ fontSize: 10, color: 'var(--mm-text-secondary)', marginTop: 2 }}>
                       {(file.size / 1024 / 1024).toFixed(2)} MB
                     </div>
@@ -159,7 +183,7 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
                 </div>
               ) : (
                 <div>
-                  <Upload size={20} style={{ margin: '0 auto 6px', display: 'block', color: 'var(--mm-text-tertiary)' }} />
+                  <Upload size={18} style={{ margin: '0 auto 6px', display: 'block', color: 'var(--mm-text-tertiary)' }} />
                   <div style={{ fontSize: 12, color: 'var(--mm-text-secondary)', fontWeight: 500 }}>
                     Click to browse or drag .GLB / .GLTF
                   </div>
@@ -190,11 +214,12 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
         {/* Footer — Cancel and Import buttons AT BOTTOM */}
         <div style={{
           display: 'flex', justifyContent: 'flex-end', gap: 10,
-          padding: '12px 20px', borderTop: '1px solid var(--mm-border-subtle)',
+          alignItems: 'center',
+          padding: '11px 18px', borderTop: '1px solid var(--mm-border-subtle)',
           background: 'var(--mm-bg-surface)',
         }}>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             style={{
               padding: '8px 18px', fontSize: 11, fontWeight: 600,
               color: 'var(--mm-text-secondary)', background: 'var(--mm-bg-input)',
@@ -220,6 +245,8 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
       </div>
     </div>
   );
+
+  return createPortal(dialog, document.body);
 };
 
 export default ImportModelDialog;
