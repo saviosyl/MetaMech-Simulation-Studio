@@ -101,8 +101,8 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ open, onComplete, onClo
 
   if (!open) return null;
 
-  const cardW = 340;
-  const cardH = 210;
+  const cardW = 300;
+  const cardH = 188;
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 720;
 
@@ -146,8 +146,8 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ open, onComplete, onClo
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'rgba(2,6,23,0.74)',
-          backdropFilter: 'blur(2px)',
+          background: 'rgba(15,23,42,0.2)',
+          backdropFilter: 'blur(1px)',
         }}
       />
 
@@ -160,8 +160,8 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ open, onComplete, onClo
             width: targetRect.width + 8,
             height: targetRect.height + 8,
             borderRadius: 10,
-            border: '2px solid rgba(34,211,238,0.95)',
-            boxShadow: '0 0 0 200vmax rgba(2,6,23,0.35)',
+            border: '1px solid rgba(8,145,178,0.55)',
+            boxShadow: '0 0 0 200vmax rgba(15,23,42,0.12)',
             pointerEvents: 'none',
           }}
         />
@@ -173,37 +173,37 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ open, onComplete, onClo
           left: cardLeft,
           top: cardTop,
           width: cardW,
-          borderRadius: 12,
-          border: '1px solid rgba(148,163,184,0.3)',
-          background: 'linear-gradient(180deg, rgba(15,23,42,0.95), rgba(2,6,23,0.95))',
-          boxShadow: '0 16px 34px rgba(0,0,0,0.45)',
-          color: '#e2e8f0',
+          borderRadius: 11,
+          border: '1px solid var(--mm-border-subtle)',
+          background: 'color-mix(in oklab, var(--mm-bg-surface) 95%, transparent)',
+          boxShadow: 'var(--mm-shadow-sm)',
+          color: 'var(--mm-text-primary)',
           overflow: 'hidden',
         }}
       >
         <div
           style={{
-            height: 36,
+            height: 32,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            borderBottom: '1px solid rgba(148,163,184,0.2)',
-            padding: '0 10px',
-            background: 'rgba(15,23,42,0.5)',
+            borderBottom: '1px solid var(--mm-border-subtle)',
+            padding: '0 9px',
+            background: 'color-mix(in oklab, var(--mm-bg-panel) 85%, transparent)',
           }}
         >
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', fontFamily: "'Orbitron', monospace", color: '#67e8f9' }}>
-            METAMECH ONBOARDING
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', fontFamily: "'Inter', sans-serif", color: 'var(--mm-accent-primary)' }}>
+            QUICK TOUR
           </div>
           <button
             onClick={onClose}
             style={{
-              width: 24,
-              height: 24,
+              width: 22,
+              height: 22,
               borderRadius: 6,
-              border: '1px solid rgba(148,163,184,0.22)',
-              background: 'rgba(2,6,23,0.35)',
-              color: '#cbd5e1',
+              border: '1px solid var(--mm-border-subtle)',
+              background: 'var(--mm-bg-panel)',
+              color: 'var(--mm-text-secondary)',
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
@@ -211,16 +211,16 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ open, onComplete, onClo
             }}
             title="Skip tour"
           >
-            <X size={12} />
+            <X size={11} />
           </button>
         </div>
 
-        <div style={{ padding: '12px 12px 8px' }}>
-          <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 5 }}>
+        <div style={{ padding: '10px 11px 7px' }}>
+          <div style={{ fontSize: 10, color: 'var(--mm-text-tertiary)', marginBottom: 4 }}>
             Step {stepIndex + 1} of {TOUR_STEPS.length}
           </div>
-          <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>{step.title}</h3>
-          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: '#cbd5e1' }}>{step.body}</p>
+          <h3 style={{ margin: '0 0 6px', fontSize: 13 }}>{step.title}</h3>
+          <p style={{ margin: 0, fontSize: 11, lineHeight: 1.4, color: 'var(--mm-text-secondary)' }}>{step.body}</p>
         </div>
 
         <div
@@ -228,20 +228,20 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ open, onComplete, onClo
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '10px 12px 12px',
-            borderTop: '1px solid rgba(148,163,184,0.16)',
+            padding: '8px 11px 10px',
+            borderTop: '1px solid var(--mm-border-subtle)',
           }}
         >
           <button
             onClick={onClose}
             style={{
-              borderRadius: 8,
-              border: '1px solid rgba(148,163,184,0.22)',
-              background: 'rgba(15,23,42,0.42)',
-              color: '#cbd5e1',
-              fontSize: 11,
-              fontWeight: 700,
-              padding: '6px 10px',
+              borderRadius: 7,
+              border: '1px solid var(--mm-border-subtle)',
+              background: 'var(--mm-bg-panel)',
+              color: 'var(--mm-text-secondary)',
+              fontSize: 10,
+              fontWeight: 600,
+              padding: '5px 9px',
               cursor: 'pointer',
             }}
           >
@@ -253,32 +253,32 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ open, onComplete, onClo
               onClick={prev}
               disabled={stepIndex === 0}
               style={{
-                borderRadius: 8,
-                border: '1px solid rgba(148,163,184,0.22)',
-                background: stepIndex === 0 ? 'rgba(15,23,42,0.22)' : 'rgba(15,23,42,0.42)',
-                color: stepIndex === 0 ? '#64748b' : '#cbd5e1',
-                fontSize: 11,
-                fontWeight: 700,
-                padding: '6px 10px',
+                borderRadius: 7,
+                border: '1px solid var(--mm-border-subtle)',
+                background: stepIndex === 0 ? 'color-mix(in oklab, var(--mm-bg-panel) 70%, transparent)' : 'var(--mm-bg-panel)',
+                color: stepIndex === 0 ? 'var(--mm-text-disabled)' : 'var(--mm-text-secondary)',
+                fontSize: 10,
+                fontWeight: 600,
+                padding: '5px 9px',
                 cursor: stepIndex === 0 ? 'not-allowed' : 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 4,
               }}
             >
-              <ChevronLeft size={13} />
+              <ChevronLeft size={12} />
               Back
             </button>
             <button
               onClick={next}
               style={{
-                borderRadius: 8,
-                border: '1px solid rgba(34,211,238,0.45)',
-                background: 'rgba(34,211,238,0.18)',
-                color: '#67e8f9',
-                fontSize: 11,
-                fontWeight: 700,
-                padding: '6px 10px',
+                borderRadius: 7,
+                border: '1px solid color-mix(in oklab, var(--mm-accent-primary) 40%, var(--mm-border-subtle))',
+                background: 'color-mix(in oklab, var(--mm-accent-primary) 14%, transparent)',
+                color: 'var(--mm-accent-primary)',
+                fontSize: 10,
+                fontWeight: 600,
+                padding: '5px 9px',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -286,7 +286,7 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ open, onComplete, onClo
               }}
             >
               {stepIndex >= TOUR_STEPS.length - 1 ? 'Finish' : 'Next'}
-              <ChevronRight size={13} />
+              <ChevronRight size={12} />
             </button>
           </div>
         </div>

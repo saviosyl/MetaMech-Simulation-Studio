@@ -6,7 +6,6 @@ import {
   Environment, 
   ContactShadows,
   TransformControls,
-  Text,
   GizmoHelper,
   GizmoViewport,
   PerspectiveCamera,
@@ -645,19 +644,7 @@ const SceneContent: React.FC<{
       {/* Scene background color — adapts to theme */}
       <color attach="background" args={[themeMode === 'light' ? '#e0e4ea' : '#1e293b']} />
 
-      {/* Loading Placeholder */}
-      {processNodes.length === 0 && environmentAssets.length === 0 && actors.length === 0 && (
-        <group position={[0, 2, 0]}>
-          <Text
-            fontSize={1}
-            color="#6b7280"
-            anchorX="center"
-            anchorY="middle"
-          >
-            Drag modules from the library to get started
-          </Text>
-        </group>
-      )}
+      {/* Empty-scene 3D text intentionally removed for cleaner premium workspace */}
     </>
   );
 };
@@ -785,18 +772,28 @@ const Viewport: React.FC = () => {
       <ViewportToolbar />
       <OrientationPad />
 
-      {/* Viewport Overlay - Instructions */}
+      {/* Viewport Overlay - Lightweight empty-scene hint */}
       {processNodes.length === 0 && environmentAssets.length === 0 && actors.length === 0 && (
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center" style={{ zIndex: 10 }}>
-          <div className="bg-black/20 backdrop-blur-sm rounded-xl p-8 text-white text-center max-w-md">
-            <h3 className="text-xl font-semibold mb-4">Welcome to MetaMech Studio</h3>
-            <p className="text-sm opacity-90 mb-4">
-              Start building your industrial simulation by dragging modules from the library panel.
-            </p>
-            <div className="text-xs opacity-75 space-y-1">
-              <div>• Use W/E/R keys to switch transform modes</div>
-              <div>• Right-click to orbit, scroll to zoom</div>
-              <div>• Select objects to edit their properties</div>
+        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 10 }}>
+          <div
+            style={{
+              position: 'absolute',
+              left: 16,
+              top: 84,
+              maxWidth: 300,
+              borderRadius: 12,
+              padding: '10px 12px',
+              background: 'color-mix(in oklab, var(--mm-bg-surface) 88%, transparent)',
+              border: '1px solid var(--mm-border-subtle)',
+              boxShadow: 'var(--mm-shadow-sm)',
+              color: 'var(--mm-text-secondary)',
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--mm-text-primary)', marginBottom: 4 }}>
+              Start your layout
+            </div>
+            <div style={{ fontSize: 11, lineHeight: 1.45 }}>
+              Drag modules from the library to begin. Use right-drag to orbit and scroll to zoom.
             </div>
           </div>
         </div>
@@ -827,17 +824,18 @@ const OrientationPad: React.FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: 'clamp(92px, 13vh, 130px)',
-        right: 12,
+        top: 'clamp(72px, 9vw, 98px)',
+        right: 10,
         zIndex: 30,
         display: 'grid',
         gridTemplateColumns: 'repeat(2, auto)',
-        gap: 4,
-        padding: 6,
-        borderRadius: 10,
-        background: 'rgba(2,6,23,0.5)',
-        border: '1px solid rgba(148,163,184,0.22)',
+        gap: 3,
+        padding: 5,
+        borderRadius: 12,
+        background: 'var(--mm-bg-toolbar-secondary)',
+        border: '1px solid var(--mm-border-subtle)',
         backdropFilter: 'blur(8px)',
+        boxShadow: 'var(--mm-shadow-sm)',
       }}
       title="Orientation quick views"
     >
@@ -847,15 +845,19 @@ const OrientationPad: React.FC = () => {
           onClick={() => setCameraView(b.id)}
           title={b.tooltip}
           style={{
-            padding: '4px 7px',
-            borderRadius: 6,
-            border: '1px solid rgba(148,163,184,0.2)',
-            background: 'rgba(15,23,42,0.35)',
-            color: '#cbd5e1',
+            minWidth: 42,
+            height: 26,
+            padding: '0 8px',
+            borderRadius: 8,
+            border: '1px solid var(--mm-border-subtle)',
+            background: 'var(--mm-bg-panel)',
+            color: 'var(--mm-text-secondary)',
             cursor: 'pointer',
             fontSize: 10,
-            fontWeight: 700,
-            fontFamily: "'Orbitron', monospace",
+            fontWeight: 600,
+            fontFamily: "'Inter', sans-serif",
+            letterSpacing: '0.01em',
+            transition: 'all 0.15s',
           }}
         >
           {b.label}
