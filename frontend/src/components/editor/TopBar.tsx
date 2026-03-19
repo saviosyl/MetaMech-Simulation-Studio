@@ -360,6 +360,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
             ...S.strip,
             padding: '4px 6px',
             gap: 6,
+            flexWrap: 'nowrap',
             background: 'var(--mm-bg-surface)',
             border: '1px solid var(--mm-border-subtle)',
           }}
@@ -380,25 +381,23 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           {/* Divider */}
           <div style={{ width: 1, height: 20, background: 'var(--mm-border-subtle)' }} />
 
-          {/* Speed */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.05em' }}>Speed</span>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {speedOptions.map(o => (
-                <button key={o.value} onClick={() => setSimulationSpeed(o.value)}
-                  title={`Set simulation speed to ${o.label}`}
-                  style={{
-                    height: 24,
-                    padding: '0 7px', borderRadius: 8, border: '1px solid transparent', cursor: 'pointer',
-                    fontSize: 10, fontWeight: 600,
-                    background: simulationSpeed === o.value ? 'var(--mm-accent-primary)' : 'var(--mm-bg-surface)',
-                    color: simulationSpeed === o.value ? '#fff' : 'var(--mm-text-secondary)',
-                    transition: 'all 0.15s',
-                  }}>
-                  {o.label}
-                </button>
-              ))}
-            </div>
+          {/* Speed (single-row inline) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'nowrap' }}>
+            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.05em', flexShrink: 0 }}>Speed</span>
+            {speedOptions.map(o => (
+              <button key={o.value} onClick={() => setSimulationSpeed(o.value)}
+                title={`Set simulation speed to ${o.label}`}
+                style={{
+                  height: 24,
+                  padding: '0 7px', borderRadius: 8, border: '1px solid transparent', cursor: 'pointer',
+                  fontSize: 10, fontWeight: 600,
+                  background: simulationSpeed === o.value ? 'var(--mm-accent-primary)' : 'var(--mm-bg-surface)',
+                  color: simulationSpeed === o.value ? '#fff' : 'var(--mm-text-secondary)',
+                  transition: 'all 0.15s',
+                }}>
+                {o.label}
+              </button>
+            ))}
           </div>
 
           {/* Divider */}
