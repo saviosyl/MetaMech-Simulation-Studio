@@ -73,7 +73,7 @@ const ForgotPasswordPage: React.FC = () => {
               Request another link
             </AuthButton>
             <Link
-              to="/login"
+              to="/simulation/access?mode=signin"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -126,7 +126,7 @@ const ForgotPasswordPage: React.FC = () => {
         </form>
 
         <div style={{ marginTop: 'var(--mm-space-5)', textAlign: 'center' }}>
-          <Link to="/login" style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>
+          <Link to="/simulation/access?mode=signin" style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>
             Back to sign in
           </Link>
         </div>

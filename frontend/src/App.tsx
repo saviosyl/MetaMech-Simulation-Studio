@@ -1,15 +1,13 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
-import VerifyEmailPage from './pages/VerifyEmailPage';
-import BillingPage from './pages/BillingPage';
 import HomePage from './pages/HomePage';
 import SimulationProductPage from './pages/SimulationProductPage';
 import SimulationPricingPage from './pages/SimulationPricingPage';
+import SimulationAccessPage from './pages/SimulationAccessPage';
+import LegacyAccessRedirectPage from './pages/LegacyAccessRedirectPage';
 import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
 import FrameDesignerPage from './pages/FrameDesignerPage';
@@ -37,22 +35,19 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/simulation" element={<SimulationProductPage />} />
           <Route path="/simulation/pricing" element={<SimulationPricingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
-          
-          {/* Protected routes */}
-          <Route
-            path="/billing"
-            element={
-              <ProtectedRoute requireSubscription={false}>
-                <BillingPage />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/simulation/access" element={<SimulationAccessPage />} />
+          <Route path="/simulation/access/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/simulation/access/reset-password" element={<ResetPasswordPage />} />
 
+          {/* Legacy auth/access route redirects */}
+          <Route path="/login" element={<LegacyAccessRedirectPage target="signin" />} />
+          <Route path="/register" element={<LegacyAccessRedirectPage target="signup" />} />
+          <Route path="/verify-email" element={<LegacyAccessRedirectPage target="verify" />} />
+          <Route path="/billing" element={<LegacyAccessRedirectPage target="membership" />} />
+          <Route path="/forgot-password" element={<LegacyAccessRedirectPage target="forgot" />} />
+          <Route path="/reset-password" element={<LegacyAccessRedirectPage target="reset" />} />
+
+          {/* Protected routes */}
           <Route
             path="/dashboard"
             element={
