@@ -4,6 +4,7 @@ import { Plus, FolderOpen, Calendar, MoreHorizontal, Copy, Trash2, LogOut, User,
 import { useAuth } from '../contexts/AuthContext';
 import { Project } from '../types';
 import api from '../utils/api';
+import { simulationUrls } from '../content/simulationMarketingContent';
 
 const LOCAL_PROJECTS_KEY = 'metamech_projects';
 interface LocalProject { id: number; name: string; data: any; created_at: string; updated_at: string; }
@@ -148,7 +149,9 @@ const DashboardPage: React.FC = () => {
     <div style={S.page}>
       {/* Header */}
       <header style={S.header}>
-        <img src="/simulation-studio-logo.png" alt="Simulation Studio" style={S.brandLogo} />
+        <a href={simulationUrls.productHome} style={{ display: 'inline-flex', textDecoration: 'none' }} title="Simulation home">
+          <img src="/simulation-studio-logo.png" alt="Simulation Studio" style={S.brandLogo} />
+        </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--mm-text-secondary)' }}>
             <User size={14} />

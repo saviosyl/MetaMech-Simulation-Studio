@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import SimulationHomepageSection from '../components/marketing/simulation/SimulationHomepageSection';
-import { simulationCtas } from '../content/simulationMarketingContent';
+import { simulationCtas, simulationUrls } from '../content/simulationMarketingContent';
 
 const HomePage: React.FC = () => {
   return (
@@ -16,11 +16,13 @@ const HomePage: React.FC = () => {
       <main style={{ width: 'min(1200px, calc(100% - 32px))', margin: '0 auto', padding: '22px 0 42px', display: 'grid', gap: 18 }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ display: 'grid', gap: 8 }}>
-            <img
-              src="/simulation-studio-logo.png"
-              alt="Simulation Studio"
-              style={{ width: 'min(100%, 300px)', height: 58, objectFit: 'cover', objectPosition: 'center 45%', borderRadius: 10 }}
-            />
+            <a href={simulationUrls.productHome} style={{ display: 'inline-flex', textDecoration: 'none' }} title="Simulation home">
+              <img
+                src="/simulation-studio-logo.png"
+                alt="Simulation Studio"
+                style={{ width: 'min(100%, 300px)', height: 58, objectFit: 'cover', objectPosition: 'center 45%', borderRadius: 10 }}
+              />
+            </a>
             <h1 style={{ fontSize: 'clamp(30px, 4.5vw, 50px)', lineHeight: 1.05, marginTop: 4 }}>
               Simulation Studio
             </h1>

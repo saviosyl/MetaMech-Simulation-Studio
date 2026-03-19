@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { simulationCtas, simulationMarketingAssets } from '../../../content/simulationMarketingContent';
+import { simulationCtas, simulationMarketingAssets, simulationUrls } from '../../../content/simulationMarketingContent';
 
 const SimulationHomepageSection: React.FC = () => {
   return (
@@ -18,11 +18,13 @@ const SimulationHomepageSection: React.FC = () => {
     >
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 20 }}>
         <div>
-          <img
-            src="/simulation-studio-logo.png"
-            alt="Simulation Studio"
-            style={{ width: 'min(100%, 280px)', height: 52, objectFit: 'cover', objectPosition: 'center 45%', borderRadius: 10, marginBottom: 8 }}
-          />
+          <a href={simulationUrls.productHome} style={{ display: 'inline-flex', textDecoration: 'none' }} title="Simulation home">
+            <img
+              src="/simulation-studio-logo.png"
+              alt="Simulation Studio"
+              style={{ width: 'min(100%, 280px)', height: 52, objectFit: 'cover', objectPosition: 'center 45%', borderRadius: 10, marginBottom: 8 }}
+            />
+          </a>
           <h2 style={{ fontSize: 'clamp(28px, 5vw, 42px)', lineHeight: 1.1, marginBottom: 10, fontWeight: 700 }}>
             Industrial layout insight for faster, smarter decisions.
           </h2>

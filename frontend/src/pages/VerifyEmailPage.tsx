@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import { simulationUrls } from '../content/simulationMarketingContent';
 
 const VerifyEmailPage: React.FC = () => {
   const [params] = useSearchParams();
@@ -103,12 +104,14 @@ const VerifyEmailPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-6">
       <div className="container mx-auto max-w-md">
         <div className="text-center mb-8">
-          <img
-            src="/simulation-studio-logo.png"
-            alt="Simulation Studio"
-            className="mx-auto mb-3 h-14 w-full max-w-[320px] rounded-lg object-cover"
-            style={{ objectPosition: 'center 45%' }}
-          />
+          <a href={simulationUrls.productHome} className="inline-flex mx-auto mb-3" title="Simulation home">
+            <img
+              src="/simulation-studio-logo.png"
+              alt="Simulation Studio"
+              className="h-14 w-full max-w-[320px] rounded-lg object-cover"
+              style={{ objectPosition: 'center 45%' }}
+            />
+          </a>
           <p className="text-gray-600">Email verification required</p>
         </div>
 

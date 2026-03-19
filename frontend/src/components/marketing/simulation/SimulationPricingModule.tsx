@@ -29,11 +29,11 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
         >
           Simulation Tool Pricing
         </div>
-        <h2 style={{ fontSize: compact ? 28 : 34, lineHeight: 1.15, fontWeight: 700, marginBottom: 10 }}>
-          Straightforward pricing for engineering teams
+        <h2 style={{ fontSize: compact ? 28 : 34, lineHeight: 1.12, fontWeight: 760, marginBottom: 10, letterSpacing: '-0.014em' }}>
+          Simple access pricing for engineering teams
         </h2>
         <p style={{ fontSize: 15, color: 'var(--mm-text-secondary)', maxWidth: 760 }}>
-          Choose your access path: evaluate with a 1-Day Trial, then continue with Full Access monthly or yearly.
+          Start with a 1-Day Trial, then continue with Full Access monthly or yearly for ongoing project work.
         </p>
       </div>
 
@@ -163,6 +163,9 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
               {simulationStripeLinks.yearly.label}
             </a>
           </div>
+          <p style={{ marginTop: 10, fontSize: 12, color: 'var(--mm-text-tertiary)', lineHeight: 1.5 }}>
+            Secure checkout via Stripe.
+          </p>
         </article>
       </div>
 

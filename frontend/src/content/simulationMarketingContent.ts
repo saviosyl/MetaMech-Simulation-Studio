@@ -96,6 +96,10 @@ export const simulationCtas = {
   getFullAccess: 'Get Full Access',
 } as const;
 
+export const simulationUrls = {
+  productHome: 'https://app.metamechsolutions.com/simulation',
+} as const;
+
 export const simulationStripeLinks = {
   yearly: {
     url: 'https://buy.stripe.com/9B6eVcbm3fKN4At06U2Nq03',

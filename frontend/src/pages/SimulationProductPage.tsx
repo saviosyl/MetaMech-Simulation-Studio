@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   simulationCtas,
   simulationFaq,
+  simulationUrls,
 } from '../content/simulationMarketingContent';
 
 const visuals = {
@@ -67,13 +68,13 @@ const SimulationProductPage: React.FC = () => {
     >
       <main style={{ width: 'min(1240px, calc(100% - 40px))', margin: '0 auto', padding: '26px 0 56px', display: 'grid', gap: 24 }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <Link to="/" style={{ textDecoration: 'none' }}>
+          <a href={simulationUrls.productHome} style={{ textDecoration: 'none' }} title="Simulation home">
             <img
               src="/simulation-studio-logo.png"
               alt="Simulation Studio"
               style={{ width: 248, height: 52, objectFit: 'cover', objectPosition: 'center 45%', borderRadius: 10 }}
             />
-          </Link>
+          </a>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Link to="/simulation/access?mode=signin" style={{ ...navBtn, background: 'var(--mm-bg-panel)' }}>Sign in</Link>
             <Link to="/simulation/access?mode=signup" style={{ ...navBtn, background: 'linear-gradient(135deg, #0891b2, #06b6d4)', color: '#fff', border: 'none' }}>
