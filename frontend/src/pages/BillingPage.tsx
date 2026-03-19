@@ -1,13 +1,15 @@
 import React from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { simulationStripeLinks, simulationUrls } from '../content/simulationMarketingContent';
+import { simulationPlans, simulationUrls } from '../content/simulationMarketingContent';
+import { createCheckoutSession, createPortalSession, BillingPlan } from '../lib/billing';
 
 const BillingPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, checkAuth, logout } = useAuth();
+  const [checkoutLoading, setCheckoutLoading] = React.useState<BillingPlan | null>(null);
 
   const sub = user?.subscription;
   const status = sub?.status || 'none';
@@ -50,6 +52,31 @@ const BillingPage: React.FC = () => {
           : status === 'none'
             ? 'No active plan is linked to this account yet.'
             : 'Active subscription is required for editor and project APIs.';
+
+  const startCheckout = async (plan: BillingPlan) => {
+    setNotice('');
+    setCheckoutLoading(plan);
+    try {
+      const checkoutUrl = await createCheckoutSession(plan);
+      window.location.href = checkoutUrl;
+    } catch (error: any) {
+      const statusCode = error?.response?.status;
+      const code = error?.response?.data?.code;
+      if (statusCode === 409 && code === 'MANAGE_IN_PORTAL_REQUIRED') {
+        try {
+          const portalUrl = await createPortalSession();
+          window.location.href = portalUrl;
+          return;
+        } catch {
+          setNotice('Your subscription already exists. Please try opening the billing portal again.');
+          return;
+        }
+      }
+      setNotice(error?.response?.data?.error || error?.message || 'Unable to start secure checkout.');
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-6 py-12">
@@ -110,22 +137,26 @@ const BillingPage: React.FC = () => {
             I renewed — refresh access
           </button>
           <div className="w-full rounded-lg border border-slate-700 bg-slate-800/70 p-3">
-            <a
-              href={simulationStripeLinks.monthly.url}
-              className="w-full bg-slate-100 text-slate-900 py-2.5 rounded-lg font-semibold hover:bg-white transition-colors inline-flex items-center justify-center"
+            <button
+              type="button"
+              onClick={() => startCheckout('monthly')}
+              disabled={checkoutLoading !== null}
+              className="w-full bg-slate-100 text-slate-900 py-2.5 rounded-lg font-semibold hover:bg-white transition-colors inline-flex items-center justify-center disabled:opacity-70"
             >
-              MetaMech Simulation – Monthly
-            </a>
+              {checkoutLoading === 'monthly' ? 'Redirecting…' : simulationPlans.monthly.label}
+            </button>
             <div className="mt-2 text-2xl font-bold text-white">€49.00</div>
             <div className="mt-0.5 text-xs text-slate-300 font-semibold">per month</div>
           </div>
           <div className="w-full rounded-lg border border-slate-700 bg-slate-800/70 p-3">
-            <a
-              href={simulationStripeLinks.yearly.url}
-              className="w-full bg-slate-100 text-slate-900 py-2.5 rounded-lg font-semibold hover:bg-white transition-colors inline-flex items-center justify-center"
+            <button
+              type="button"
+              onClick={() => startCheckout('yearly')}
+              disabled={checkoutLoading !== null}
+              className="w-full bg-slate-100 text-slate-900 py-2.5 rounded-lg font-semibold hover:bg-white transition-colors inline-flex items-center justify-center disabled:opacity-70"
             >
-              Subscribe to MetaMech Simulation – Yearly
-            </a>
+              {checkoutLoading === 'yearly' ? 'Redirecting…' : simulationPlans.yearly.label}
+            </button>
             <div className="mt-2 text-2xl font-bold text-white">€499.00</div>
             <div className="mt-0.5 text-xs text-slate-300 font-semibold">per year</div>
             <div className="mt-0.5 text-xs text-teal-300 font-semibold">€41.58 / month billed annually</div>

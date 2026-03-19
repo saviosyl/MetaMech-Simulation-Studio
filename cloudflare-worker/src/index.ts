@@ -3,6 +3,7 @@ type UserRow = {
   email: string;
   password_hash: string;
   display_name: string;
+  stripe_customer_id: string | null;
   role: string;
   account_status: string;
   email_verified_at: string | null;
@@ -36,7 +37,13 @@ type Env = {
   ADMIN_TEST_EMAIL_KEY?: string;
   ENABLE_ADMIN_TEST_EMAIL?: string;
   INTERNAL_ADMIN_EMAILS?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PRICE_MONTHLY_ID?: string;
+  STRIPE_PRICE_YEARLY_ID?: string;
 };
+
+type BillingPlanInterval = 'monthly' | 'yearly';
 
 const textEncoder = new TextEncoder();
 
@@ -127,6 +134,19 @@ async function hmacSha256(data: string, secret: string): Promise<string> {
   );
   const signature = await crypto.subtle.sign('HMAC', key, textEncoder.encode(data));
   return base64UrlEncode(signature);
+}
+
+async function hmacSha256Hex(data: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    textEncoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, textEncoder.encode(data));
+  const bytes = new Uint8Array(signature);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 async function sha256Hex(data: string): Promise<string> {
@@ -493,6 +513,272 @@ async function getEntitlement(db: D1Database, userId: number, emailVerified: boo
     currentPeriodStart: row.current_period_start,
     currentPeriodEnd: row.current_period_end,
   };
+}
+
+type SubscriptionRow = {
+  id: number;
+  user_id: number;
+  status: string;
+  plan_code: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: number;
+  provider: string | null;
+  provider_subscription_id: string | null;
+  provider_customer_id: string | null;
+  provider_price_id: string | null;
+  checkout_session_id: string | null;
+};
+
+function planCodeFromInterval(plan: BillingPlanInterval): string {
+  return plan === 'monthly' ? 'full-access-monthly' : 'full-access-yearly';
+}
+
+function planCodeFromStripePrice(env: Env, priceId: string | null | undefined): string | null {
+  if (!priceId) return null;
+  const monthly = (env.STRIPE_PRICE_MONTHLY_ID || '').trim();
+  const yearly = (env.STRIPE_PRICE_YEARLY_ID || '').trim();
+  if (monthly && priceId === monthly) return 'full-access-monthly';
+  if (yearly && priceId === yearly) return 'full-access-yearly';
+  return null;
+}
+
+function normalizeStripeSubscriptionStatus(status: string | null | undefined): SubscriptionEntitlement['status'] {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'active') return 'active';
+  if (normalized === 'trialing') return 'trialing';
+  if (normalized === 'past_due' || normalized === 'unpaid' || normalized === 'incomplete') return 'past_due';
+  if (normalized === 'canceled' || normalized === 'incomplete_expired') return 'canceled';
+  return 'past_due';
+}
+
+async function stripeFormRequest(
+  env: Env,
+  method: 'POST' | 'GET',
+  path: string,
+  fields?: Record<string, string>
+): Promise<any> {
+  const secretKey = (env.STRIPE_SECRET_KEY || '').trim();
+  if (!secretKey) throw new Error('Missing STRIPE_SECRET_KEY');
+  const body = fields ? new URLSearchParams(fields).toString() : undefined;
+  const res = await fetch(`https://api.stripe.com/v1${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      ...(fields ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
+    },
+    body,
+  });
+  const text = await res.text();
+  let parsed: any = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = null;
+  }
+  if (!res.ok) {
+    const message = parsed?.error?.message || `Stripe API request failed (${res.status})`;
+    throw new Error(message);
+  }
+  return parsed;
+}
+
+async function getActiveSubscriptionRow(db: D1Database, userId: number): Promise<SubscriptionRow | null> {
+  return db
+    .prepare(
+      `SELECT id, user_id, status, plan_code, current_period_start, current_period_end,
+              cancel_at_period_end, provider, provider_subscription_id, provider_customer_id,
+              provider_price_id, checkout_session_id
+       FROM subscriptions
+       WHERE user_id = ?
+       LIMIT 1`
+    )
+    .bind(userId)
+    .first<SubscriptionRow>();
+}
+
+async function getOrCreateStripeCustomer(env: Env, user: UserRow): Promise<string> {
+  if (user.stripe_customer_id) return user.stripe_customer_id;
+
+  const customer = await stripeFormRequest(env, 'POST', '/customers', {
+    email: user.email,
+    name: user.display_name,
+    'metadata[user_id]': String(user.id),
+  });
+  const customerId = String(customer?.id || '');
+  if (!customerId) throw new Error('Stripe customer creation failed');
+
+  await env.DB
+    .prepare('UPDATE users SET stripe_customer_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .bind(customerId, user.id)
+    .run();
+  return customerId;
+}
+
+async function createCheckoutSession(env: Env, user: UserRow, plan: BillingPlanInterval): Promise<string> {
+  const existing = await getActiveSubscriptionRow(env.DB, user.id);
+  if (
+    existing
+    && existing.provider === 'stripe'
+    && existing.provider_subscription_id
+    && (existing.status === 'active' || existing.status === 'trialing' || existing.status === 'past_due')
+  ) {
+    const err: any = new Error('Manage existing subscription in billing portal');
+    err.code = 'MANAGE_IN_PORTAL_REQUIRED';
+    throw err;
+  }
+
+  const customerId = await getOrCreateStripeCustomer(env, user);
+  const successUrl = `${primaryFrontendOrigin(env)}/simulation/access?state=membership&checkout=success`;
+  const cancelUrl = `${primaryFrontendOrigin(env)}/simulation/access?state=membership&checkout=cancel`;
+  const isMonthly = plan === 'monthly';
+  const planLabel = isMonthly ? 'MetaMech Simulation – Monthly' : 'Subscribe to MetaMech Simulation – Yearly';
+  const unitAmount = isMonthly ? '4900' : '49900';
+  const interval = isMonthly ? 'month' : 'year';
+
+  const session = await stripeFormRequest(env, 'POST', '/checkout/sessions', {
+    mode: 'subscription',
+    customer: customerId,
+    'line_items[0][price_data][currency]': 'eur',
+    'line_items[0][price_data][unit_amount]': unitAmount,
+    'line_items[0][price_data][recurring][interval]': interval,
+    'line_items[0][price_data][product_data][name]': planLabel,
+    'line_items[0][quantity]': '1',
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    client_reference_id: String(user.id),
+    'metadata[user_id]': String(user.id),
+    'metadata[user_email]': user.email,
+    'metadata[plan_interval]': plan,
+    'metadata[plan_code]': planCodeFromInterval(plan),
+    'subscription_data[metadata][user_id]': String(user.id),
+    'subscription_data[metadata][plan_interval]': plan,
+    'subscription_data[metadata][plan_code]': planCodeFromInterval(plan),
+    allow_promotion_codes: 'true',
+  });
+  const checkoutUrl = String(session?.url || '');
+  if (!checkoutUrl) throw new Error('Stripe checkout URL missing');
+
+  if (session?.id) {
+    await env.DB
+      .prepare(
+        `UPDATE subscriptions
+         SET plan_code = ?, provider = 'stripe', provider_customer_id = ?, checkout_session_id = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = ?`
+      )
+      .bind(planCodeFromInterval(plan), customerId, String(session.id), user.id)
+      .run();
+  }
+  return checkoutUrl;
+}
+
+async function createPortalSession(env: Env, user: UserRow): Promise<string> {
+  const customerId = await getOrCreateStripeCustomer(env, user);
+  const returnUrl = `${primaryFrontendOrigin(env)}/simulation/access?state=membership&portal=return`;
+  const session = await stripeFormRequest(env, 'POST', '/billing_portal/sessions', {
+    customer: customerId,
+    return_url: returnUrl,
+  });
+  const url = String(session?.url || '');
+  if (!url) throw new Error('Stripe portal URL missing');
+  return url;
+}
+
+function stripeSignatureTimestampAndV1(signatureHeader: string): { t: string; v1: string } | null {
+  const parts = signatureHeader.split(',').map((p) => p.trim());
+  const t = parts.find((p) => p.startsWith('t='))?.slice(2) || '';
+  const v1 = parts.find((p) => p.startsWith('v1='))?.slice(2) || '';
+  if (!t || !v1) return null;
+  return { t, v1 };
+}
+
+async function verifyStripeWebhookSignature(payload: string, signatureHeader: string, secret: string): Promise<boolean> {
+  const parsed = stripeSignatureTimestampAndV1(signatureHeader);
+  if (!parsed) return false;
+  const signedPayload = `${parsed.t}.${payload}`;
+  const expected = await hmacSha256Hex(signedPayload, secret);
+  return safeEqual(expected, parsed.v1);
+}
+
+async function resolveUserIdFromStripeData(
+  env: Env,
+  customerId: string | null | undefined,
+  userIdFromMetadata: string | null | undefined
+): Promise<number | null> {
+  const candidateId = Number(userIdFromMetadata || 0);
+  if (candidateId) return candidateId;
+  if (!customerId) return null;
+  const user = await env.DB
+    .prepare('SELECT id FROM users WHERE stripe_customer_id = ? LIMIT 1')
+    .bind(customerId)
+    .first<{ id: number }>();
+  return user ? Number(user.id) : null;
+}
+
+async function upsertSubscriptionFromStripe(env: Env, params: {
+  userId: number;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  stripePriceId?: string | null;
+  checkoutSessionId?: string | null;
+  stripeStatus?: string | null;
+  currentPeriodStartUnix?: number | null;
+  currentPeriodEndUnix?: number | null;
+  cancelAtPeriodEnd?: boolean;
+  canceledAtUnix?: number | null;
+  planCodeHint?: string | null;
+}): Promise<void> {
+  const status = normalizeStripeSubscriptionStatus(params.stripeStatus);
+  const startIso = params.currentPeriodStartUnix
+    ? new Date(params.currentPeriodStartUnix * 1000).toISOString()
+    : null;
+  const endIso = params.currentPeriodEndUnix
+    ? new Date(params.currentPeriodEndUnix * 1000).toISOString()
+    : null;
+  const canceledAtIso = params.canceledAtUnix
+    ? new Date(params.canceledAtUnix * 1000).toISOString()
+    : null;
+  const derivedPlanCode =
+    params.planCodeHint
+    || planCodeFromStripePrice(env, params.stripePriceId)
+    || null;
+
+  await env.DB
+    .prepare(
+      `INSERT INTO subscriptions (
+         user_id, status, plan_code, current_period_start, current_period_end,
+         cancel_at_period_end, provider, provider_subscription_id, provider_customer_id,
+         provider_price_id, checkout_session_id, canceled_at, created_at, updated_at
+       )
+       VALUES (?, ?, ?, ?, ?, ?, 'stripe', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       ON CONFLICT(user_id) DO UPDATE SET
+         status = excluded.status,
+         plan_code = COALESCE(excluded.plan_code, subscriptions.plan_code),
+         current_period_start = COALESCE(excluded.current_period_start, subscriptions.current_period_start),
+         current_period_end = COALESCE(excluded.current_period_end, subscriptions.current_period_end),
+         cancel_at_period_end = excluded.cancel_at_period_end,
+         provider = 'stripe',
+         provider_subscription_id = COALESCE(excluded.provider_subscription_id, subscriptions.provider_subscription_id),
+         provider_customer_id = COALESCE(excluded.provider_customer_id, subscriptions.provider_customer_id),
+         provider_price_id = COALESCE(excluded.provider_price_id, subscriptions.provider_price_id),
+         checkout_session_id = COALESCE(excluded.checkout_session_id, subscriptions.checkout_session_id),
+         canceled_at = COALESCE(excluded.canceled_at, subscriptions.canceled_at),
+         updated_at = CURRENT_TIMESTAMP`
+    )
+    .bind(
+      params.userId,
+      status,
+      derivedPlanCode,
+      startIso,
+      endIso,
+      params.cancelAtPeriodEnd ? 1 : 0,
+      params.stripeSubscriptionId || null,
+      params.stripeCustomerId || null,
+      params.stripePriceId || null,
+      params.checkoutSessionId || null,
+      canceledAtIso
+    )
+    .run();
 }
 
 async function issueVerificationToken(env: Env, userId: number): Promise<{ rawToken: string; link: string }> {
@@ -896,6 +1182,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   const user = await env.DB
     .prepare(
       `SELECT id, email, password_hash, display_name, role, account_status, email_verified_at, token_version, created_at
+              , stripe_customer_id
        FROM users
        WHERE email = ?
        LIMIT 1`
@@ -961,6 +1248,7 @@ async function readAuthedUser(request: Request, env: Env): Promise<UserRow | nul
   const user = await env.DB
     .prepare(
       `SELECT id, email, password_hash, display_name, role, account_status, email_verified_at, token_version, created_at
+              , stripe_customer_id
        FROM users
        WHERE id = ?
        LIMIT 1`
@@ -998,6 +1286,203 @@ async function handleLogout(): Promise<Response> {
   return toJson({ message: 'Logout successful' }, 200, { 'Set-Cookie': clearCookieHeader() });
 }
 
+async function handleCreateCheckoutSession(request: Request, env: Env): Promise<Response> {
+  const user = await readAuthedUser(request, env);
+  if (!user) return toJson({ error: 'Authentication required' }, 401);
+  if (!user.email_verified_at && !isInternalAdminEmail(user.email, env)) {
+    return toJson({ error: 'Email verification required', code: 'EMAIL_VERIFICATION_REQUIRED', email: user.email }, 403);
+  }
+
+  const body = await readJson<{ plan?: BillingPlanInterval }>(request);
+  const plan = body?.plan;
+  if (plan !== 'monthly' && plan !== 'yearly') {
+    return toJson({ error: 'Validation failed: plan must be monthly or yearly' }, 400);
+  }
+
+  try {
+    const checkoutUrl = await createCheckoutSession(env, user, plan);
+    return toJson({ checkoutUrl, plan });
+  } catch (error: any) {
+    if (error?.code === 'MANAGE_IN_PORTAL_REQUIRED') {
+      return toJson({ error: 'Manage existing subscription in portal', code: 'MANAGE_IN_PORTAL_REQUIRED' }, 409);
+    }
+    return toJson({ error: error?.message || 'Unable to create checkout session' }, 500);
+  }
+}
+
+async function handleCreatePortalSession(request: Request, env: Env): Promise<Response> {
+  const user = await readAuthedUser(request, env);
+  if (!user) return toJson({ error: 'Authentication required' }, 401);
+  if (!user.email_verified_at && !isInternalAdminEmail(user.email, env)) {
+    return toJson({ error: 'Email verification required', code: 'EMAIL_VERIFICATION_REQUIRED', email: user.email }, 403);
+  }
+
+  try {
+    const portalUrl = await createPortalSession(env, user);
+    return toJson({ portalUrl });
+  } catch (error: any) {
+    return toJson({ error: error?.message || 'Unable to create billing portal session' }, 500);
+  }
+}
+
+async function processStripeEvent(env: Env, event: any): Promise<void> {
+  const type = String(event?.type || '');
+  const object = event?.data?.object || {};
+
+  if (type === 'checkout.session.completed') {
+    const customerId = typeof object.customer === 'string' ? object.customer : object.customer?.id;
+    const subscriptionId = typeof object.subscription === 'string' ? object.subscription : object.subscription?.id;
+    const userId = await resolveUserIdFromStripeData(
+      env,
+      customerId,
+      object?.metadata?.user_id || object?.client_reference_id
+    );
+    if (!userId) return;
+
+    if (customerId) {
+      await env.DB
+        .prepare('UPDATE users SET stripe_customer_id = COALESCE(stripe_customer_id, ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .bind(customerId, userId)
+        .run();
+    }
+
+    const planCodeHint = object?.metadata?.plan_code || (
+      object?.metadata?.plan_interval === 'monthly'
+        ? 'full-access-monthly'
+        : object?.metadata?.plan_interval === 'yearly'
+          ? 'full-access-yearly'
+          : null
+    );
+
+    await upsertSubscriptionFromStripe(env, {
+      userId,
+      stripeCustomerId: customerId || null,
+      stripeSubscriptionId: subscriptionId || null,
+      checkoutSessionId: object?.id ? String(object.id) : null,
+      stripeStatus: 'active',
+      planCodeHint,
+    });
+    return;
+  }
+
+  if (type === 'customer.subscription.created' || type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {
+    const customerId = typeof object.customer === 'string' ? object.customer : object.customer?.id;
+    const subscriptionId = object?.id ? String(object.id) : null;
+    const status = type === 'customer.subscription.deleted' ? 'canceled' : String(object?.status || '');
+    const priceId = object?.items?.data?.[0]?.price?.id ? String(object.items.data[0].price.id) : null;
+    const planCodeHint = object?.metadata?.plan_code || (
+      object?.metadata?.plan_interval === 'monthly'
+        ? 'full-access-monthly'
+        : object?.metadata?.plan_interval === 'yearly'
+          ? 'full-access-yearly'
+          : null
+    );
+    const userId = await resolveUserIdFromStripeData(env, customerId, object?.metadata?.user_id || null);
+    if (!userId) return;
+
+    if (customerId) {
+      await env.DB
+        .prepare('UPDATE users SET stripe_customer_id = COALESCE(stripe_customer_id, ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .bind(customerId, userId)
+        .run();
+    }
+
+    await upsertSubscriptionFromStripe(env, {
+      userId,
+      stripeCustomerId: customerId || null,
+      stripeSubscriptionId: subscriptionId,
+      stripePriceId: priceId,
+      stripeStatus: status,
+      currentPeriodStartUnix: Number(object?.current_period_start || 0) || null,
+      currentPeriodEndUnix: Number(object?.current_period_end || 0) || null,
+      cancelAtPeriodEnd: !!object?.cancel_at_period_end,
+      canceledAtUnix: Number(object?.canceled_at || 0) || null,
+      planCodeHint,
+    });
+    return;
+  }
+
+  if (type === 'invoice.payment_failed' || type === 'invoice.paid') {
+    const customerId = typeof object.customer === 'string' ? object.customer : object.customer?.id;
+    const subscriptionId = typeof object.subscription === 'string' ? object.subscription : object.subscription?.id;
+    const priceId = object?.lines?.data?.[0]?.price?.id ? String(object.lines.data[0].price.id) : null;
+    const periodStart = Number(object?.lines?.data?.[0]?.period?.start || 0) || null;
+    const periodEnd = Number(object?.lines?.data?.[0]?.period?.end || 0) || null;
+    const userId = await resolveUserIdFromStripeData(env, customerId, object?.metadata?.user_id || null);
+    if (!userId) return;
+
+    await upsertSubscriptionFromStripe(env, {
+      userId,
+      stripeCustomerId: customerId || null,
+      stripeSubscriptionId: subscriptionId || null,
+      stripePriceId: priceId,
+      stripeStatus: type === 'invoice.paid' ? 'active' : 'past_due',
+      currentPeriodStartUnix: periodStart,
+      currentPeriodEndUnix: periodEnd,
+    });
+  }
+}
+
+async function handleStripeWebhook(request: Request, env: Env): Promise<Response> {
+  const webhookSecret = (env.STRIPE_WEBHOOK_SECRET || '').trim();
+  if (!webhookSecret) {
+    return toJson({ error: 'Stripe webhook is not configured' }, 500);
+  }
+
+  const signature = request.headers.get('stripe-signature') || '';
+  if (!signature) return toJson({ error: 'Missing stripe-signature header' }, 400);
+
+  const payload = await request.text();
+  const validSignature = await verifyStripeWebhookSignature(payload, signature, webhookSecret);
+  if (!validSignature) return toJson({ error: 'Invalid Stripe signature' }, 400);
+
+  let event: any;
+  try {
+    event = JSON.parse(payload);
+  } catch {
+    return toJson({ error: 'Invalid webhook payload' }, 400);
+  }
+
+  const eventId = String(event?.id || '');
+  const eventType = String(event?.type || '');
+  if (!eventId || !eventType) return toJson({ error: 'Invalid event envelope' }, 400);
+
+  const inserted = await env.DB
+    .prepare(
+      `INSERT OR IGNORE INTO stripe_webhook_events (stripe_event_id, event_type, status)
+       VALUES (?, ?, 'received')`
+    )
+    .bind(eventId, eventType)
+    .run();
+
+  if (Number(inserted.meta.changes || 0) === 0) {
+    return toJson({ received: true, duplicate: true });
+  }
+
+  try {
+    await processStripeEvent(env, event);
+    await env.DB
+      .prepare(
+        `UPDATE stripe_webhook_events
+         SET status = 'processed', processed_at = CURRENT_TIMESTAMP, error_message = NULL
+         WHERE stripe_event_id = ?`
+      )
+      .bind(eventId)
+      .run();
+    return toJson({ received: true });
+  } catch (error: any) {
+    await env.DB
+      .prepare(
+        `UPDATE stripe_webhook_events
+         SET status = 'failed', processed_at = CURRENT_TIMESTAMP, error_message = ?
+         WHERE stripe_event_id = ?`
+      )
+      .bind(String(error?.message || 'Unknown webhook processing error').slice(0, 900), eventId)
+      .run();
+    return toJson({ error: 'Webhook processing failed' }, 500);
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method === 'OPTIONS') return optionsResponse(request, env);
@@ -1010,6 +1495,12 @@ export default {
       if (request.method === 'GET' && path === '/health') {
         response = toJson({ status: 'ok', timestamp: nowIso(), runtime: 'cloudflare-worker-d1' });
         return withCors(request, response, env);
+      }
+
+      if (request.method === 'POST' && path === '/webhooks/stripe') {
+        // Stripe does not require CORS; this endpoint validates Stripe signatures.
+        response = await handleStripeWebhook(request, env);
+        return response;
       }
 
       if (request.method === 'POST' && path === '/auth/register') {
@@ -1029,6 +1520,16 @@ export default {
 
       if (request.method === 'GET' && path === '/auth/me') {
         response = await handleMe(request, env);
+        return withCors(request, response, env);
+      }
+
+      if (request.method === 'POST' && path === '/billing/create-checkout-session') {
+        response = await handleCreateCheckoutSession(request, env);
+        return withCors(request, response, env);
+      }
+
+      if (request.method === 'POST' && path === '/billing/create-portal-session') {
+        response = await handleCreatePortalSession(request, env);
         return withCors(request, response, env);
       }
 
