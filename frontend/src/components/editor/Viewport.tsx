@@ -824,7 +824,7 @@ const OrientationPad: React.FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: 'clamp(54px, 6.8vw, 74px)',
+        top: 'clamp(46px, 5.9vw, 64px)',
         right: 10,
         zIndex: 30,
         display: 'grid',
