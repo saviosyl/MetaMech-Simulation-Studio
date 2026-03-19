@@ -103,7 +103,7 @@ const S = {
   } as React.CSSProperties,
   projectNameText: {
     display: 'inline-block',
-    maxWidth: 170,
+    maxWidth: 176,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
@@ -315,21 +315,23 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
   return (
     <div style={S.bar} data-tour="top-ribbon">
       {/* ════ LEFT: Project + Edit + Build ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifySelf: 'start', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifySelf: 'start', minWidth: 0 }}>
         {/* Brand */}
         <button onClick={() => navigate('/dashboard')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s', padding: '0 2px' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s', padding: '0 3px', minHeight: 30 }}
           title="Back to Dashboard">
           <ArrowLeft size={14} />
           <img
             src="/simulation-studio-logo.png"
             alt="Simulation Studio"
             style={{
-              width: 112,
-              height: 24,
-              borderRadius: 8,
+              width: 124,
+              height: 28,
+              borderRadius: 9,
               objectFit: 'cover',
-              objectPosition: 'center 45%',
+              objectPosition: '18% 45%',
+              padding: 1,
+              background: 'var(--mm-bg-panel)',
               border: '1px solid var(--mm-border-subtle)',
               boxShadow: 'var(--mm-shadow-sm)',
               flexShrink: 0,
@@ -337,7 +339,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           />
         </button>
 
-        <div style={S.divider} />
+        <div style={{ ...S.divider, margin: '0 2px' }} />
 
         {/* Project name */}
         {isEditing ? (
@@ -354,16 +356,18 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           </span>
         )}
 
-        <div style={S.divider} />
+        <div style={{ ...S.divider, margin: '0 1px 0 2px' }} />
 
         {/* Edit */}
-        <div style={S.strip}>
+        <div style={{ ...S.strip, marginLeft: 1 }}>
           <button onClick={handleUndo} style={S.iconBtn()} title="Undo (Ctrl+Z)"><Undo2 size={15} /></button>
           <button onClick={handleRedo} style={S.iconBtn()} title="Redo (Ctrl+Shift+Z)"><Redo2 size={15} /></button>
         </div>
 
         {/* Scenarios */}
-        <ScenarioLoader />
+        <div style={{ marginLeft: 2 }}>
+          <ScenarioLoader />
+        </div>
       </div>
 
       {/* ════ CENTER: Simulation (bigger, prominent) ════ */}
