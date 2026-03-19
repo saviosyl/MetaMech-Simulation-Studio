@@ -41,6 +41,7 @@ const ViewportToolbar: React.FC = () => {
   const setOverlaysHidden = useEditorStore(s => s.setOverlaysHidden);
   const pathsVisible = useEditorStore(s => s.pathsVisible);
   const setPathsVisible = useEditorStore(s => s.setPathsVisible);
+  const requestFocus = useEditorStore(s => s.requestFocus);
 
   // Check if selected node has any connections
   const selectedEdges = selectedObjectId
@@ -127,6 +128,13 @@ const ViewportToolbar: React.FC = () => {
             {tool.icon}
           </button>
         ))}
+        <button
+          title="Fit view to selected object or full layout (F)"
+          onClick={requestFocus}
+          style={btnStyle(false)}
+        >
+          <Maximize2 size={16} />
+        </button>
       </div>
 
       <div style={dividerStyle} />

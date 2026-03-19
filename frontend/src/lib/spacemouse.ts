@@ -30,6 +30,7 @@
  */
 
 export type SpaceMouseMode = 'object' | 'camera' | 'fly';
+export type SpaceMouseZoomDirection = 'forward-backward' | 'up-down';
 
 export interface SpaceMouseState {
   connected: boolean;
@@ -40,6 +41,8 @@ export interface SpaceMouseState {
 
 export interface SpaceMouseConfig {
   mode: SpaceMouseMode;
+  /** 3Dconnexion zoom direction preference */
+  zoomDirection: SpaceMouseZoomDirection;
   deadZone: number;
   translateSpeed: number;
   rotateSpeed: number;
@@ -56,6 +59,7 @@ export interface SpaceMouseConfig {
 
 const DEFAULT_CONFIG: SpaceMouseConfig = {
   mode: 'object',
+  zoomDirection: 'forward-backward',
   deadZone: 0.08,
   translateSpeed: 1.0,
   rotateSpeed: 1.0,
@@ -66,6 +70,29 @@ const DEFAULT_CONFIG: SpaceMouseConfig = {
   dominantAxis: true,
   smoothing: 0.35,
 };
+
+const CONFIG_STORAGE_KEY = 'metamech-spacemouse-config';
+
+function loadStoredConfig(): Partial<SpaceMouseConfig> {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Partial<SpaceMouseConfig>;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistConfig(config: SpaceMouseConfig) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
+  } catch {
+    // Ignore storage write failures
+  }
+}
 
 /** Known 3Dconnexion identifiers */
 const SPACEMOUSE_IDS = [
@@ -109,7 +136,7 @@ export class SpaceMouseController {
   private filteredRot: [number, number, number] = [0, 0, 0];
 
   constructor(config?: Partial<SpaceMouseConfig>) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = { ...DEFAULT_CONFIG, ...loadStoredConfig(), ...config };
     this._setupListeners();
   }
 
@@ -137,10 +164,14 @@ export class SpaceMouseController {
 
   onConnectionChange(cb: (connected: boolean) => void) { this._onConnect = cb; }
 
-  setMode(mode: SpaceMouseMode) { this.config.mode = mode; }
+  setMode(mode: SpaceMouseMode) {
+    this.config.mode = mode;
+    persistConfig(this.config);
+  }
 
   setConfig(cfg: Partial<SpaceMouseConfig>) {
     this.config = { ...this.config, ...cfg };
+    persistConfig(this.config);
   }
 
   isConnected(): boolean { return this.gamepadIndex !== null; }
@@ -182,10 +213,6 @@ export class SpaceMouseController {
       trans = applyDominantAxis(trans);
       rot = applyDominantAxis(rot);
     }
-
-    // Apply inversion
-    if (this.config.invertPan) { trans[0] *= -1; trans[1] *= -1; }
-    if (this.config.invertZoom) { trans[2] *= -1; }
 
     const smooth = Math.max(0, Math.min(0.95, this.config.smoothing));
     const a = 1 - smooth;

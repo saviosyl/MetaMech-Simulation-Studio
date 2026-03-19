@@ -111,7 +111,7 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
     }
 
     // 3Dconnexion SpaceMouse axis mapping:
-    //   translate: [X=left/right, Y=up/down, Z=push/pull(zoom)]
+    //   translate: [X=left/right, Y=up/down, Z=push/pull]
     //   rotate:    [rX=pitch(tilt), rY=roll, rZ=yaw(twist left/right)]
     //
     // For orbit: rZ (yaw/twist) = horizontal orbit, rX (pitch/tilt) = vertical orbit
@@ -123,6 +123,14 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
     if (!controls) return;
 
     const cfg = spaceMouse.config;
+    // Zoom direction modes:
+    // - forward-backward: zoom uses cap push/pull (Z axis), pan vertical uses Y axis
+    // - up-down:          zoom uses cap up/down (Y axis), pan vertical uses Z axis
+    const zoomRaw = cfg.zoomDirection === 'up-down' ? -ty : tz;
+    const panVerticalRaw = cfg.zoomDirection === 'up-down' ? tz : ty;
+    const panX = cfg.invertPan ? -tx : tx;
+    const panY = cfg.invertPan ? -panVerticalRaw : panVerticalRaw;
+    const zoomInput = cfg.invertZoom ? -zoomRaw : zoomRaw;
 
     // Get camera-relative directions
     camera.getWorldDirection(_fwd);
@@ -145,20 +153,20 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
       }
     }
 
-    // ── PAN: slide left/right (tx), up/down (ty) ──
-    if (Math.abs(tx) > 0.005 || Math.abs(ty) > 0.005) {
+    // ── PAN: slide left/right + vertical pan axis chosen by zoom direction mode ──
+    if (Math.abs(panX) > 0.005 || Math.abs(panY) > 0.005) {
       const panSpeed = dt * dist * 0.85 * cfg.translateSpeed;  // proportional to distance
       _v.set(0, 0, 0);
-      _v.addScaledVector(_right, -tx * panSpeed);   // negative: push right = pan right
-      _v.addScaledVector(_up, ty * panSpeed);
+      _v.addScaledVector(_right, -panX * panSpeed);   // negative: push right = pan right
+      _v.addScaledVector(_up, panY * panSpeed);
       camera.position.add(_v);
       controls.target.add(_v);
     }
 
-    // ── ZOOM: push/pull (tz) ──
-    if (Math.abs(tz) > 0.005) {
+    // ── ZOOM: mapped by configured direction mode ──
+    if (Math.abs(zoomInput) > 0.005) {
       const zoomSpeed = dt * dist * 1.1 * cfg.zoomSpeed;
-      const zoomAmount = tz * zoomSpeed;
+      const zoomAmount = zoomInput * zoomSpeed;
       // Move camera along the camera→target direction
       _offset.copy(camera.position).sub(controls.target);
       const newDist = Math.max(0.3, _offset.length() + zoomAmount);

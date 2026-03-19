@@ -4,6 +4,7 @@ import { getConnectionPorts, useEditorStore } from '../../store/editorStore';
 import { getModuleDefinition } from '../../lib/moduleLibrary';
 import { getAssetById, ParametricAssetDef } from '../../lib/assetManifest';
 import { simulationEngine } from '../../simulation/SimulationEngine';
+import { spaceMouse, SpaceMouseZoomDirection } from '../../lib/spacemouse';
 import { mToMm, mmToM, radToDeg, degToRad } from '../../utils/units';
 import { getPortWorldPosition } from '../../lib/nodeTransform';
 import BOMPanel from './BOMPanel';
@@ -191,6 +192,16 @@ const RightPanel: React.FC = () => {
   const allSensorTags = processNodes
     .filter(n => n.type === 'sensor' && n.parameters?.sensorTag)
     .map(n => n.parameters.sensorTag as string);
+
+  const setZoomDirection = (mode: SpaceMouseZoomDirection) => {
+    spaceMouse.setConfig({ zoomDirection: mode });
+    forceUpdate(n => n + 1);
+  };
+
+  const setInvertZoom = (invert: boolean) => {
+    spaceMouse.setConfig({ invertZoom: invert });
+    forceUpdate(n => n + 1);
+  };
 
   const renderInput = (key: string, def: any) => {
     const val = selectedObject?.parameters[key];
@@ -477,6 +488,37 @@ const RightPanel: React.FC = () => {
                 ))}
               </Section>
 
+              <Section title="Navigation" icon={Move3D} defaultOpen={false}>
+                <div style={fieldGap}>
+                  <label style={labelStyle}>SpaceMouse zoom direction</label>
+                  <select
+                    value={spaceMouse.config.zoomDirection}
+                    onChange={e => setZoomDirection(e.target.value as SpaceMouseZoomDirection)}
+                    style={inputStyle}
+                  >
+                    <option value="forward-backward" style={{ background: 'var(--mm-bg-panel)' }}>
+                      Forward / Backward
+                    </option>
+                    <option value="up-down" style={{ background: 'var(--mm-bg-panel)' }}>
+                      Up / Down
+                    </option>
+                  </select>
+                  <div style={{ marginTop: 6, fontSize: 10, color: 'var(--mm-text-disabled)', lineHeight: 1.4 }}>
+                    Forward / Backward uses cap push-pull for zoom. Up / Down uses cap lift-drop for zoom.
+                  </div>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={spaceMouse.config.invertZoom}
+                    onChange={e => setInvertZoom(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 12, color: 'var(--mm-text-secondary)' }}>
+                    Invert SpaceMouse zoom
+                  </span>
+                </label>
+              </Section>
+
               {/* Module params — always show grouped (covers both parametric + non-parametric) */}
               {moduleDef && (() => {
                 const g = groupParams(Object.entries(moduleDef.parameters));
@@ -507,6 +549,37 @@ const RightPanel: React.FC = () => {
                     <span style={{ fontSize: 12, color: 'var(--mm-text-secondary)' }}>{item.label}</span>
                   </label>
                 ))}
+              </Section>
+
+              <Section title="Navigation" icon={Move3D} defaultOpen={false}>
+                <div style={fieldGap}>
+                  <label style={labelStyle}>SpaceMouse zoom direction</label>
+                  <select
+                    value={spaceMouse.config.zoomDirection}
+                    onChange={e => setZoomDirection(e.target.value as SpaceMouseZoomDirection)}
+                    style={inputStyle}
+                  >
+                    <option value="forward-backward" style={{ background: 'var(--mm-bg-panel)' }}>
+                      Forward / Backward
+                    </option>
+                    <option value="up-down" style={{ background: 'var(--mm-bg-panel)' }}>
+                      Up / Down
+                    </option>
+                  </select>
+                  <div style={{ marginTop: 6, fontSize: 10, color: 'var(--mm-text-disabled)', lineHeight: 1.4 }}>
+                    Forward / Backward uses cap push-pull for zoom. Up / Down uses cap lift-drop for zoom.
+                  </div>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={spaceMouse.config.invertZoom}
+                    onChange={e => setInvertZoom(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 12, color: 'var(--mm-text-secondary)' }}>
+                    Invert SpaceMouse zoom
+                  </span>
+                </label>
               </Section>
 
               {/* Empty state */}
