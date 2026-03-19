@@ -8,6 +8,7 @@ import AuthButton from '../components/auth/AuthButton';
 import AuthMessage from '../components/auth/AuthMessage';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
+import { simulationStripeLinks } from '../content/simulationMarketingContent';
 
 type AccessMode = 'signin' | 'signup';
 type AccessState = 'verify' | 'membership' | null;
@@ -467,6 +468,42 @@ const SimulationAccessPage: React.FC = () => {
             >
               View pricing
             </Link>
+            <a
+              href={simulationStripeLinks.monthly.url}
+              style={{
+                height: 44,
+                borderRadius: 12,
+                border: 'none',
+                background: '#0f172a',
+                color: '#fff',
+                textDecoration: 'none',
+                fontSize: 13,
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {simulationStripeLinks.monthly.label}
+            </a>
+            <a
+              href={simulationStripeLinks.yearly.url}
+              style={{
+                height: 44,
+                borderRadius: 12,
+                border: '1px solid var(--mm-border)',
+                background: 'var(--mm-bg-panel)',
+                color: 'var(--mm-text-secondary)',
+                textDecoration: 'none',
+                fontSize: 13,
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {simulationStripeLinks.yearly.label}
+            </a>
             <button
               onClick={async () => {
                 await logout();

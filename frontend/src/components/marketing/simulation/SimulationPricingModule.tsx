@@ -1,5 +1,5 @@
 import React from 'react';
-import { simulationCtas, simulationMarketingAssets } from '../../../content/simulationMarketingContent';
+import { simulationCtas, simulationMarketingAssets, simulationStripeLinks } from '../../../content/simulationMarketingContent';
 
 interface SimulationPricingModuleProps {
   compact?: boolean;
@@ -123,20 +123,46 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
             <li>Yearly billing option</li>
             <li>Recommended yearly for ongoing usage</li>
           </ul>
-          <button
-            style={{
-              width: '100%',
-              height: 44,
-              borderRadius: 12,
-              border: 'none',
-              background: '#0f172a',
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 700,
-            }}
-          >
-            {simulationCtas.getFullAccess}
-          </button>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <a
+              href={simulationStripeLinks.monthly.url}
+              style={{
+                width: '100%',
+                height: 44,
+                borderRadius: 12,
+                border: 'none',
+                background: '#0f172a',
+                color: '#fff',
+                fontSize: 14,
+                fontWeight: 700,
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {simulationStripeLinks.monthly.label}
+            </a>
+            <a
+              href={simulationStripeLinks.yearly.url}
+              style={{
+                width: '100%',
+                height: 44,
+                borderRadius: 12,
+                border: '1px solid var(--mm-border)',
+                background: 'var(--mm-bg-panel)',
+                color: 'var(--mm-text-primary)',
+                fontSize: 14,
+                fontWeight: 700,
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {simulationStripeLinks.yearly.label}
+            </a>
+          </div>
         </article>
       </div>
 

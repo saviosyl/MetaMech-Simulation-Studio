@@ -3,14 +3,12 @@
   "short_name": "MetaMech",
   "icons": [
     {
-      "src": "/android-chrome-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png"
+      "src": "/channels4_profile.jpg",
+      "type": "image/jpeg"
     },
     {
-      "src": "/android-chrome-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "/channels4_profile.jpg",
+      "type": "image/jpeg"
     }
   ],
   "theme_color": "#0b1220",
