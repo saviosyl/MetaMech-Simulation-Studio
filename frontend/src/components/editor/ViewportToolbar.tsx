@@ -94,7 +94,7 @@ const ViewportToolbar: React.FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: 'clamp(38px, 4.9vw, 48px)',
+        top: 'clamp(32px, 4.2vw, 42px)',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 45,
