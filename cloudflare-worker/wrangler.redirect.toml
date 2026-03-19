@@ -1,0 +1,5 @@
+name = "metamech-site-redirect"
+main = "src/siteRedirectWorker.js"
+compatibility_date = "2026-03-19"
+account_id = "236ff37f66350c3b71348834a5b3d6bf"
+
