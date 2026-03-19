@@ -42,8 +42,12 @@ const SimulationProductPage: React.FC = () => {
     >
       <main style={{ width: 'min(1200px, calc(100% - 32px))', margin: '0 auto', padding: '22px 0 42px', display: 'grid', gap: 18 }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <Link to="/" style={{ textDecoration: 'none', color: 'var(--mm-text-primary)', fontWeight: 700, fontSize: 18 }}>
-            MetaMech Studio
+          <Link to="/" style={{ textDecoration: 'none' }}>
+            <img
+              src="/simulation-studio-logo.png"
+              alt="Simulation Studio"
+              style={{ width: 232, height: 48, objectFit: 'cover', objectPosition: 'center 45%', borderRadius: 10 }}
+            />
           </Link>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Link to="/login" style={{ ...navBtn, background: 'var(--mm-bg-panel)' }}>Log In</Link>

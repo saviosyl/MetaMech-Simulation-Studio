@@ -19,7 +19,6 @@ import {
   VIDEO_QUALITY_PRESET_ORDER,
   resolveRecordingMimeType,
 } from '../../lib/videoExportPresets';
-import metamechHeaderLogo from '../../../../Model/channels4_profile.jpg';
 
 interface TopBarProps {
   projectName: string;
@@ -319,24 +318,23 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifySelf: 'start', minWidth: 0 }}>
         {/* Brand */}
         <button onClick={() => navigate('/dashboard')}
-          style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s', padding: '0 2px' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s', padding: '0 2px' }}
           title="Back to Dashboard">
           <ArrowLeft size={14} />
           <img
-            src={metamechHeaderLogo}
-            alt="MetaMech logo"
+            src="/simulation-studio-logo.png"
+            alt="Simulation Studio"
             style={{
-              width: 20,
-              height: 20,
-              borderRadius: 6,
+              width: 112,
+              height: 24,
+              borderRadius: 8,
               objectFit: 'cover',
-              objectPosition: 'center',
+              objectPosition: 'center 45%',
               border: '1px solid var(--mm-border-subtle)',
               boxShadow: 'var(--mm-shadow-sm)',
               flexShrink: 0,
             }}
           />
-          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.01em' }}>MetaMech</span>
         </button>
 
         <div style={S.divider} />

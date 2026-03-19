@@ -652,6 +652,7 @@ const SceneContent: React.FC<{
 const Viewport: React.FC = () => {
   const orbitRef = useRef<any>(null);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [hasPlacedModule, setHasPlacedModule] = useState(false);
   
   const {
     processNodes,
@@ -689,6 +690,7 @@ const Viewport: React.FC = () => {
           -(((event.clientY - rect.top) / rect.height) * 2 + 1) * 8,
         ];
         
+        let addedModule = false;
         switch (data.category) {
           case 'process':
           case 'robots':
@@ -696,13 +698,19 @@ const Viewport: React.FC = () => {
           case 'fmcg':
           case 'medical':
             addProcessNode(data.moduleId, position);
+            addedModule = true;
             break;
           case 'environment':
             addEnvironmentAsset(data.moduleId, position);
+            addedModule = true;
             break;
           case 'actors':
             addActor(data.moduleId, position);
+            addedModule = true;
             break;
+        }
+        if (addedModule) {
+          setHasPlacedModule(true);
         }
       }
     } catch (error) {
@@ -727,6 +735,13 @@ const Viewport: React.FC = () => {
   };
 
   const selectedObject = getSelectedObject();
+  const isSceneEmpty = processNodes.length === 0 && environmentAssets.length === 0 && actors.length === 0;
+
+  useEffect(() => {
+    if (!hasPlacedModule && !isSceneEmpty) {
+      setHasPlacedModule(true);
+    }
+  }, [hasPlacedModule, isSceneEmpty]);
 
   return (
     <div 
@@ -773,8 +788,35 @@ const Viewport: React.FC = () => {
       <OrientationPad />
 
       {/* Viewport Overlay - Lightweight empty-scene hint */}
-      {processNodes.length === 0 && environmentAssets.length === 0 && actors.length === 0 && (
+      {isSceneEmpty && (
         <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 10 }}>
+          {!hasPlacedModule && (
+            <div
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: 'clamp(340px, 44vw, 620px)',
+                aspectRatio: '2.8 / 1',
+                opacity: 0.18,
+                mixBlendMode: 'screen',
+                overflow: 'hidden',
+              }}
+            >
+              <img
+                src="/simulation-studio-logo.png"
+                alt="Simulation Studio"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center 45%',
+                  filter: 'saturate(0.95)',
+                }}
+              />
+            </div>
+          )}
           <div
             style={{
               position: 'absolute',
