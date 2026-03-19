@@ -244,7 +244,7 @@ const SimulationAccessPage: React.FC = () => {
           onClick={() => gotoAccess({ mode: 'signin' })}
           style={{
             flex: 1,
-            height: 40,
+            height: 42,
             borderRadius: 10,
             border: '1px solid var(--mm-border)',
             background: mode === 'signin' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)',
@@ -260,7 +260,7 @@ const SimulationAccessPage: React.FC = () => {
           onClick={() => gotoAccess({ mode: 'signup' })}
           style={{
             flex: 1,
-            height: 40,
+            height: 42,
             borderRadius: 10,
             border: '1px solid var(--mm-border)',
             background: mode === 'signup' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)',
@@ -273,6 +273,10 @@ const SimulationAccessPage: React.FC = () => {
           Create account
         </button>
       </div>
+
+      <AuthMessage tone="info">
+        One clean Simulation access flow: account first, then workspace access. The 1-Day Trial starts after email verification.
+      </AuthMessage>
 
       {formError ? <AuthMessage tone="error">{formError}</AuthMessage> : null}
       {formInfo ? <AuthMessage tone="info">{formInfo}</AuthMessage> : null}
@@ -368,6 +372,11 @@ const SimulationAccessPage: React.FC = () => {
 
   const renderVerifyState = () => (
     <>
+      {!tokenParam ? (
+        <AuthMessage tone="info">
+          Enter your email below to resend a verification link and activate your Simulation access.
+        </AuthMessage>
+      ) : null}
       {verifyLoading ? <AuthMessage tone="info">Verifying your email…</AuthMessage> : null}
       {verifyError ? <AuthMessage tone="error">{verifyError}</AuthMessage> : null}
       {verifyMessage ? <AuthMessage tone="success">{verifyMessage}</AuthMessage> : null}
@@ -446,9 +455,6 @@ const SimulationAccessPage: React.FC = () => {
       <div style={{ display: 'grid', gap: 10 }}>
         {user ? (
           <>
-            <AuthButton type="button" onClick={refreshMembership}>
-              I updated access — refresh
-            </AuthButton>
             <Link
               to="/simulation/pricing"
               style={{
@@ -467,6 +473,9 @@ const SimulationAccessPage: React.FC = () => {
             >
               View pricing
             </Link>
+            <AuthButton type="button" onClick={refreshMembership}>
+              I updated access — refresh
+            </AuthButton>
             <button
               onClick={async () => {
                 await logout();
@@ -522,10 +531,10 @@ const SimulationAccessPage: React.FC = () => {
           }
           subtitle={
             accessState === 'verify'
-              ? 'Verify your email to activate trial access and continue.'
+              ? 'Verify your email to activate your one-time trial and continue.'
               : accessState === 'membership'
-                ? 'Continue with active Simulation access to enter the workspace.'
-                : 'Use one unified access flow for trial, sign in, and workspace entry.'
+                ? 'Continue with Full Access to enter the Simulation workspace.'
+                : 'Sign in or create your account to enter Simulation Studio.'
           }
         />
 

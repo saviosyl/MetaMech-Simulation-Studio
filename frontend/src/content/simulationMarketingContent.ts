@@ -95,3 +95,7 @@ export const simulationCtas = {
   contactSales: 'Contact Sales',
   getFullAccess: 'Get Full Access',
 } as const;
+
+export const simulationUrls = {
+  productHome: 'https://app.metamechsolutions.com/simulation',
+} as const;

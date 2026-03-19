@@ -90,6 +90,24 @@ const ForgotPasswordPage: React.FC = () => {
             >
               Back to sign in
             </Link>
+            <Link
+              to="/simulation"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: 44,
+                borderRadius: 'var(--mm-radius-md)',
+                textDecoration: 'none',
+                color: 'var(--mm-accent-primary)',
+                background: 'transparent',
+                fontSize: 13,
+                fontWeight: 700,
+                border: '1px dashed var(--mm-border)',
+              }}
+            >
+              Back to Simulation home
+            </Link>
           </div>
         </AuthCard>
       </AuthPageLayout>
@@ -126,9 +144,14 @@ const ForgotPasswordPage: React.FC = () => {
         </form>
 
         <div style={{ marginTop: 'var(--mm-space-5)', textAlign: 'center' }}>
-          <Link to="/simulation/access?mode=signin" style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>
-            Back to sign in
-          </Link>
+          <div style={{ display: 'inline-flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Link to="/simulation/access?mode=signin" style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>
+              Back to sign in
+            </Link>
+            <Link to="/simulation" style={{ color: 'var(--mm-text-secondary)', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>
+              Simulation home
+            </Link>
+          </div>
         </div>
       </AuthCard>
     </AuthPageLayout>
