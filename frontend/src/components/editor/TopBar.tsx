@@ -404,18 +404,13 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           {/* Divider */}
           <div style={{ width: 1, height: 20, background: 'var(--mm-border-subtle)' }} />
 
-          {/* Export quality / format */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 138 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Film size={12} style={{ color: 'var(--mm-text-tertiary)' }} />
-              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.03em' }}>
-                Export
-              </span>
-            </div>
+          {/* Export quality / format (single-row inline group) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, flexWrap: 'nowrap' }}>
+            <Film size={12} style={{ color: 'var(--mm-text-tertiary)', flexShrink: 0 }} />
             <select
               value={captureQualityPreset}
               onChange={(e) => setCaptureQualityPreset(e.target.value as VideoQualityPreset)}
-              style={S.compactSelect}
+              style={{ ...S.compactSelect, minWidth: 104 }}
               title="Recording quality preset: higher settings increase resolution, bitrate, shadows, and reflections."
             >
               {VIDEO_QUALITY_PRESET_ORDER.map((key) => (
@@ -427,7 +422,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
             <select
               value={videoFormatPreference}
               onChange={(e) => setVideoFormatPreference(e.target.value as VideoFormatPreference)}
-              style={S.compactSelect}
+              style={{ ...S.compactSelect, minWidth: 100 }}
               title="Preferred export format. MP4 is used when browser support is available."
             >
               <option value="auto">Auto (prefer MP4)</option>
