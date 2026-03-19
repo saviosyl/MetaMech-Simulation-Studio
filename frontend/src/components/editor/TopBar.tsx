@@ -19,6 +19,7 @@ import {
   VIDEO_QUALITY_PRESET_ORDER,
   resolveRecordingMimeType,
 } from '../../lib/videoExportPresets';
+import { simulationUrls } from '../../content/simulationMarketingContent';
 
 interface TopBarProps {
   projectName: string;
@@ -317,10 +318,15 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
       {/* ════ LEFT: Project + Edit + Build ════ */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifySelf: 'start', minWidth: 0 }}>
         {/* Brand */}
-        <button onClick={() => navigate('/dashboard')}
-          style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s', padding: '0 3px', minHeight: 30 }}
-          title="Back to Dashboard">
-          <ArrowLeft size={14} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={() => navigate('/dashboard')}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, background: 'none', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, cursor: 'pointer', color: 'var(--mm-text-secondary)', transition: 'color 0.15s' }}
+            title="Back to Dashboard"
+          >
+            <ArrowLeft size={14} />
+          </button>
+          <a href={simulationUrls.productHome} style={{ display: 'inline-flex', textDecoration: 'none', padding: '0 2px' }} title="Simulation home">
           <img
             src="/simulation-studio-logo.png"
             alt="Simulation Studio"
@@ -337,7 +343,8 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
               flexShrink: 0,
             }}
           />
-        </button>
+          </a>
+        </div>
 
         <div style={{ ...S.divider, margin: '0 2px' }} />
 

@@ -54,7 +54,7 @@ const ResetPasswordPage: React.FC = () => {
       <AuthCard>
         <AuthHeader
           title="Set a new password"
-          subtitle="Choose a strong password for your MetaMech account."
+          subtitle="Choose a strong password for your Simulation account."
         />
 
         {error ? <AuthMessage tone="error">{error}</AuthMessage> : null}
@@ -89,9 +89,14 @@ const ResetPasswordPage: React.FC = () => {
         </form>
 
         <div style={{ marginTop: 'var(--mm-space-5)', textAlign: 'center' }}>
-          <Link to="/simulation/access?mode=signin" style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>
-            Back to sign in
-          </Link>
+          <div style={{ display: 'inline-flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Link to="/simulation/access?mode=signin" style={{ color: 'var(--mm-accent-primary)', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>
+              Back to sign in
+            </Link>
+            <Link to="/simulation" style={{ color: 'var(--mm-text-secondary)', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>
+              Simulation home
+            </Link>
+          </div>
         </div>
       </AuthCard>
     </AuthPageLayout>
