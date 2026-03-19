@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { simulationCtas, simulationMarketingAssets, simulationStripeLinks } from '../../../content/simulationMarketingContent';
 
 interface SimulationPricingModuleProps {
@@ -76,7 +77,8 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
             <li>Use your own realistic layout context</li>
             <li>Fast fit-check for your team</li>
           </ul>
-          <button
+          <Link
+            to="/simulation/access?mode=signup"
             style={{
               width: '100%',
               height: 44,
@@ -86,10 +88,14 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
               color: '#fff',
               fontSize: 14,
               fontWeight: 700,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             {simulationCtas.startTrial}
-          </button>
+          </Link>
         </article>
 
         <article

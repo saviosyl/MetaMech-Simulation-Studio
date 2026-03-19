@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { simulationUrls } from '../content/simulationMarketingContent';
+import { simulationStripeLinks, simulationUrls } from '../content/simulationMarketingContent';
 
 const BillingPage: React.FC = () => {
   const location = useLocation();
@@ -109,12 +109,18 @@ const BillingPage: React.FC = () => {
           >
             I renewed — refresh access
           </button>
-          <button
-            onClick={() => setNotice('Billing portal integration is in Phase 2. For now, update subscription status in the database/admin backend.')}
-            className="w-full bg-slate-100 text-slate-900 py-3 rounded-lg font-semibold hover:bg-white transition-colors"
+          <a
+            href={simulationStripeLinks.monthly.url}
+            className="w-full bg-slate-100 text-slate-900 py-3 rounded-lg font-semibold hover:bg-white transition-colors inline-flex items-center justify-center"
           >
-            Renew / Manage Subscription
-          </button>
+            {simulationStripeLinks.monthly.label}
+          </a>
+          <a
+            href={simulationStripeLinks.yearly.url}
+            className="w-full bg-slate-100 text-slate-900 py-3 rounded-lg font-semibold hover:bg-white transition-colors inline-flex items-center justify-center"
+          >
+            {simulationStripeLinks.yearly.label}
+          </a>
           <button
             onClick={async () => {
               await logout();
