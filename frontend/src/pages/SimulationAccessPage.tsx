@@ -456,42 +456,53 @@ const SimulationAccessPage: React.FC = () => {
       <div style={{ display: 'grid', gap: 10 }}>
         {user ? (
           <>
-            <a
-              href={simulationStripeLinks.monthly.url}
-              style={{
-                height: 44,
-                borderRadius: 12,
-                border: 'none',
-                background: '#0f172a',
-                color: '#fff',
-                textDecoration: 'none',
-                fontSize: 13,
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {simulationStripeLinks.monthly.label}
-            </a>
-            <a
-              href={simulationStripeLinks.yearly.url}
-              style={{
-                height: 44,
-                borderRadius: 12,
-                border: '1px solid var(--mm-border)',
-                background: 'var(--mm-bg-panel)',
-                color: 'var(--mm-text-secondary)',
-                textDecoration: 'none',
-                fontSize: 13,
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {simulationStripeLinks.yearly.label}
-            </a>
+            <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 12, background: 'var(--mm-bg-panel)', padding: '10px 10px 9px' }}>
+              <a
+                href={simulationStripeLinks.monthly.url}
+                style={{
+                  height: 42,
+                  borderRadius: 10,
+                  border: 'none',
+                  background: '#0f172a',
+                  color: '#fff',
+                  textDecoration: 'none',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%',
+                }}
+              >
+                MetaMech Simulation – Monthly
+              </a>
+              <div style={{ marginTop: 8, fontSize: 20, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.014em' }}>€49.00</div>
+              <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)' }}>per month</div>
+            </div>
+            <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 12, background: 'var(--mm-bg-panel)', padding: '10px 10px 9px' }}>
+              <a
+                href={simulationStripeLinks.yearly.url}
+                style={{
+                  height: 42,
+                  borderRadius: 10,
+                  border: '1px solid var(--mm-border)',
+                  background: 'var(--mm-bg-surface)',
+                  color: 'var(--mm-text-secondary)',
+                  textDecoration: 'none',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%',
+                }}
+              >
+                Subscribe to MetaMech Simulation – Yearly
+              </a>
+              <div style={{ marginTop: 8, fontSize: 20, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.014em' }}>€499.00</div>
+              <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)' }}>per year</div>
+              <div style={{ marginTop: 2, fontSize: 12, fontWeight: 600, color: 'var(--mm-accent-primary)' }}>€41.58 / month billed annually</div>
+            </div>
             <Link
               to="/simulation/pricing"
               style={{

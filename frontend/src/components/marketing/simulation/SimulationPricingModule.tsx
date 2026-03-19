@@ -129,45 +129,55 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
             <li>Yearly billing option</li>
             <li>Recommended yearly for ongoing usage</li>
           </ul>
-          <div style={{ display: 'grid', gap: 8 }}>
-            <a
-              href={simulationStripeLinks.monthly.url}
-              style={{
-                width: '100%',
-                height: 44,
-                borderRadius: 12,
-                border: 'none',
-                background: '#0f172a',
-                color: '#fff',
-                fontSize: 14,
-                fontWeight: 700,
-                textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {simulationStripeLinks.monthly.label}
-            </a>
-            <a
-              href={simulationStripeLinks.yearly.url}
-              style={{
-                width: '100%',
-                height: 44,
-                borderRadius: 12,
-                border: '1px solid var(--mm-border)',
-                background: 'var(--mm-bg-panel)',
-                color: 'var(--mm-text-primary)',
-                fontSize: 14,
-                fontWeight: 700,
-                textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {simulationStripeLinks.yearly.label}
-            </a>
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 12, background: 'var(--mm-bg-surface)', padding: '10px 10px 9px' }}>
+              <a
+                href={simulationStripeLinks.monthly.url}
+                style={{
+                  width: '100%',
+                  height: 42,
+                  borderRadius: 10,
+                  border: 'none',
+                  background: '#0f172a',
+                  color: '#fff',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                MetaMech Simulation – Monthly
+              </a>
+              <div style={{ marginTop: 8, fontSize: 23, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.015em', color: 'var(--mm-text-primary)' }}>€49.00</div>
+              <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)' }}>per month</div>
+            </div>
+
+            <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 12, background: 'var(--mm-bg-surface)', padding: '10px 10px 9px' }}>
+              <a
+                href={simulationStripeLinks.yearly.url}
+                style={{
+                  width: '100%',
+                  height: 42,
+                  borderRadius: 10,
+                  border: '1px solid var(--mm-border)',
+                  background: 'var(--mm-bg-panel)',
+                  color: 'var(--mm-text-primary)',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                Subscribe to MetaMech Simulation – Yearly
+              </a>
+              <div style={{ marginTop: 8, fontSize: 23, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.015em', color: 'var(--mm-text-primary)' }}>€499.00</div>
+              <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)' }}>per year</div>
+              <div style={{ marginTop: 2, fontSize: 12, fontWeight: 600, color: 'var(--mm-accent-primary)' }}>€41.58 / month billed annually</div>
+            </div>
           </div>
           <p style={{ marginTop: 10, fontSize: 12, color: 'var(--mm-text-tertiary)', lineHeight: 1.5 }}>
             Secure checkout via Stripe.

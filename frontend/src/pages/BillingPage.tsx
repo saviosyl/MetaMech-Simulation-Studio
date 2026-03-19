@@ -109,18 +109,27 @@ const BillingPage: React.FC = () => {
           >
             I renewed — refresh access
           </button>
-          <a
-            href={simulationStripeLinks.monthly.url}
-            className="w-full bg-slate-100 text-slate-900 py-3 rounded-lg font-semibold hover:bg-white transition-colors inline-flex items-center justify-center"
-          >
-            {simulationStripeLinks.monthly.label}
-          </a>
-          <a
-            href={simulationStripeLinks.yearly.url}
-            className="w-full bg-slate-100 text-slate-900 py-3 rounded-lg font-semibold hover:bg-white transition-colors inline-flex items-center justify-center"
-          >
-            {simulationStripeLinks.yearly.label}
-          </a>
+          <div className="w-full rounded-lg border border-slate-700 bg-slate-800/70 p-3">
+            <a
+              href={simulationStripeLinks.monthly.url}
+              className="w-full bg-slate-100 text-slate-900 py-2.5 rounded-lg font-semibold hover:bg-white transition-colors inline-flex items-center justify-center"
+            >
+              MetaMech Simulation – Monthly
+            </a>
+            <div className="mt-2 text-2xl font-bold text-white">€49.00</div>
+            <div className="mt-0.5 text-xs text-slate-300 font-semibold">per month</div>
+          </div>
+          <div className="w-full rounded-lg border border-slate-700 bg-slate-800/70 p-3">
+            <a
+              href={simulationStripeLinks.yearly.url}
+              className="w-full bg-slate-100 text-slate-900 py-2.5 rounded-lg font-semibold hover:bg-white transition-colors inline-flex items-center justify-center"
+            >
+              Subscribe to MetaMech Simulation – Yearly
+            </a>
+            <div className="mt-2 text-2xl font-bold text-white">€499.00</div>
+            <div className="mt-0.5 text-xs text-slate-300 font-semibold">per year</div>
+            <div className="mt-0.5 text-xs text-teal-300 font-semibold">€41.58 / month billed annually</div>
+          </div>
           <button
             onClick={async () => {
               await logout();
