@@ -48,7 +48,7 @@ const HomePage: React.FC = () => {
             Book a guided demo to review layout flow, simulation behavior, and presentation-ready output using your engineering context.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <Link to="/simulation" style={primaryBtn}>Book Demo</Link>
+            <a href="https://metamechsolutions.com/contact/" style={primaryBtn}>Book Demo</a>
             <Link to="/simulation/pricing" style={ghostBtn}>View Pricing</Link>
           </div>
         </section>

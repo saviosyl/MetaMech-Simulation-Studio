@@ -55,7 +55,7 @@ const SimulationHomepageSection: React.FC = () => {
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <Link
-            to="/simulation"
+            to="/simulation/access?mode=signup"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -72,8 +72,8 @@ const SimulationHomepageSection: React.FC = () => {
           >
             {simulationCtas.startTrial}
           </Link>
-          <Link
-            to="/simulation"
+          <a
+            href="https://metamechsolutions.com/contact/"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -90,7 +90,7 @@ const SimulationHomepageSection: React.FC = () => {
             }}
           >
             {simulationCtas.bookDemo}
-          </Link>
+          </a>
         </div>
 
         <img

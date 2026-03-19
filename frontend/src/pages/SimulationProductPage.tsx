@@ -57,8 +57,9 @@ const SimulationProductPage: React.FC = () => {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        height: '100vh',
         overflowY: 'auto',
+        overflowX: 'hidden',
         background:
           'radial-gradient(1200px 620px at -8% -10%, rgba(8,145,178,0.16), transparent 64%), radial-gradient(1000px 640px at 108% -2%, rgba(37,99,235,0.12), transparent 66%), linear-gradient(180deg, color-mix(in oklab, var(--mm-bg-app) 86%, #f1f5f9 14%) 0%, var(--mm-bg-app) 48%, var(--mm-bg-app) 100%)',
         color: 'var(--mm-text-primary)',
@@ -85,19 +86,19 @@ const SimulationProductPage: React.FC = () => {
           <div style={{ display: 'grid', gap: 24, gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 0.95fr)' }}>
             <div style={{ display: 'grid', alignContent: 'start' }}>
               <div style={eyebrow}>Simulation intro</div>
-              <h1 style={{ fontSize: 'clamp(38px, 5.4vw, 64px)', lineHeight: 1.02, letterSpacing: '-0.02em', marginBottom: 14, maxWidth: 620 }}>
+              <h1 style={{ fontSize: 'clamp(40px, 5.6vw, 66px)', lineHeight: 1.01, letterSpacing: '-0.022em', marginBottom: 14, maxWidth: 620, fontWeight: 800 }}>
                 Industrial simulation for decisions you can defend.
               </h1>
-              <p style={{ fontSize: 18, color: 'var(--mm-text-secondary)', lineHeight: 1.62, maxWidth: 620, marginBottom: 20 }}>
+              <p style={{ fontSize: 17, color: 'var(--mm-text-secondary)', lineHeight: 1.68, maxWidth: 620, marginBottom: 20, fontWeight: 500 }}>
                 MetaMech Simulation Studio helps engineering teams design layouts, validate flow behavior, and present clear implementation decisions with confidence.
               </p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                 <Link to="/simulation/access?mode=signup" style={primaryBtn}>{simulationCtas.startTrial}</Link>
                 <Link to="/simulation/access?mode=signin" style={ghostBtn}>Sign in</Link>
                 <Link to="/simulation/pricing" style={ghostBtn}>View pricing</Link>
-                <Link to="#how-it-works" style={ghostBtn}>{simulationCtas.bookDemo}</Link>
+                <a href="https://metamechsolutions.com/contact/" style={ghostBtn}>{simulationCtas.bookDemo}</a>
               </div>
-              <div style={{ fontSize: 13, color: 'var(--mm-text-tertiary)', fontWeight: 600 }}>
+              <div style={{ fontSize: 13, color: 'var(--mm-text-tertiary)', fontWeight: 600, lineHeight: 1.5 }}>
                 Product-led intro first. Access when you are ready.
               </div>
             </div>
@@ -136,8 +137,8 @@ const SimulationProductPage: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
             {benefits.map((benefit) => (
               <article key={benefit.title} style={{ borderRadius: 14, border: '1px solid var(--mm-border-subtle)', background: 'var(--mm-bg-panel)', padding: '14px 14px 12px' }}>
-                <h3 style={{ fontSize: 18, marginBottom: 7, letterSpacing: '-0.01em' }}>{benefit.title}</h3>
-                <p style={{ fontSize: 14, color: 'var(--mm-text-secondary)', lineHeight: 1.58 }}>{benefit.body}</p>
+                <h3 style={{ fontSize: 18, marginBottom: 7, letterSpacing: '-0.01em', fontWeight: 750 }}>{benefit.title}</h3>
+                <p style={{ fontSize: 14, color: 'var(--mm-text-secondary)', lineHeight: 1.62, fontWeight: 500 }}>{benefit.body}</p>
               </article>
             ))}
           </div>
@@ -164,8 +165,8 @@ const SimulationProductPage: React.FC = () => {
               {steps.map((step, index) => (
                 <div key={step.title} style={{ borderRadius: 12, background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border-subtle)', padding: '12px 13px' }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-tertiary)', marginBottom: 4, letterSpacing: '0.08em' }}>STEP {index + 1}</div>
-                  <h3 style={{ fontSize: 16, marginBottom: 4 }}>{step.title}</h3>
-                  <p style={{ fontSize: 14, color: 'var(--mm-text-secondary)', lineHeight: 1.52 }}>{step.body}</p>
+                  <h3 style={{ fontSize: 16, marginBottom: 4, fontWeight: 750 }}>{step.title}</h3>
+                  <p style={{ fontSize: 14, color: 'var(--mm-text-secondary)', lineHeight: 1.58, fontWeight: 500 }}>{step.body}</p>
                 </div>
               ))}
             </div>
@@ -181,13 +182,13 @@ const SimulationProductPage: React.FC = () => {
 
         <section style={sectionCard}>
           <div style={eyebrow}>Use cases</div>
-          <h2 style={{ fontSize: 'clamp(28px, 3.8vw, 44px)', lineHeight: 1.1, marginBottom: 12, letterSpacing: '-0.015em' }}>
+          <h2 style={{ fontSize: 'clamp(30px, 4vw, 46px)', lineHeight: 1.08, marginBottom: 12, letterSpacing: '-0.018em', fontWeight: 800 }}>
             Built for real engineering review cycles
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
             {useCases.map((useCase) => (
               <div key={useCase} style={{ borderRadius: 12, background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border-subtle)', padding: '12px 12px 10px' }}>
-                <h3 style={{ fontSize: 15, margin: 0 }}>{useCase}</h3>
+                <h3 style={{ fontSize: 15, margin: 0, fontWeight: 700, lineHeight: 1.45 }}>{useCase}</h3>
               </div>
             ))}
           </div>
@@ -195,14 +196,14 @@ const SimulationProductPage: React.FC = () => {
 
         <section style={sectionCard}>
           <div style={eyebrow}>Trial and access</div>
-          <h2 style={{ fontSize: 'clamp(28px, 3.8vw, 42px)', lineHeight: 1.1, marginBottom: 12, letterSpacing: '-0.015em' }}>
+          <h2 style={{ fontSize: 'clamp(30px, 4vw, 44px)', lineHeight: 1.08, marginBottom: 12, letterSpacing: '-0.018em', fontWeight: 800 }}>
             Start quickly, then continue with Full Access
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
             <article style={{ borderRadius: 14, border: '1px solid var(--mm-border-subtle)', background: 'var(--mm-bg-panel)', padding: '16px 16px 14px' }}>
               <div style={pill}>1-Day Trial</div>
-              <h3 style={{ fontSize: 22, marginBottom: 8 }}>Evaluate in one focused day</h3>
-              <p style={{ color: 'var(--mm-text-secondary)', fontSize: 14, lineHeight: 1.58, marginBottom: 12 }}>
+              <h3 style={{ fontSize: 22, marginBottom: 8, fontWeight: 780, letterSpacing: '-0.01em' }}>Evaluate in one focused day</h3>
+              <p style={{ color: 'var(--mm-text-secondary)', fontSize: 14, lineHeight: 1.62, marginBottom: 12, fontWeight: 500 }}>
                 Full Simulation access to validate your workflow using realistic line scenarios.
               </p>
               <Link to="/simulation/access?mode=signup" style={{ ...primaryBtn, width: '100%' }}>
@@ -211,8 +212,8 @@ const SimulationProductPage: React.FC = () => {
             </article>
             <article style={{ borderRadius: 14, border: '1px solid var(--mm-border-subtle)', background: 'var(--mm-bg-panel)', padding: '16px 16px 14px' }}>
               <div style={pill}>Full Access</div>
-              <h3 style={{ fontSize: 22, marginBottom: 8 }}>Monthly or yearly</h3>
-              <p style={{ color: 'var(--mm-text-secondary)', fontSize: 14, lineHeight: 1.58, marginBottom: 12 }}>
+              <h3 style={{ fontSize: 22, marginBottom: 8, fontWeight: 780, letterSpacing: '-0.01em' }}>Monthly or yearly</h3>
+              <p style={{ color: 'var(--mm-text-secondary)', fontSize: 14, lineHeight: 1.62, marginBottom: 12, fontWeight: 500 }}>
                 Continue with ongoing Simulation use for engineering, review, and presentation work.
               </p>
               <div style={{ display: 'grid', gap: 8 }}>
@@ -240,25 +241,25 @@ const SimulationProductPage: React.FC = () => {
                   padding: '10px 12px',
                 }}
               >
-                <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 15 }}>{item.q}</summary>
-                <p style={{ marginTop: 8, fontSize: 14, color: 'var(--mm-text-secondary)', lineHeight: 1.6 }}>{item.a}</p>
+                <summary style={{ cursor: 'pointer', fontWeight: 750, fontSize: 15, lineHeight: 1.4 }}>{item.q}</summary>
+                <p style={{ marginTop: 8, fontSize: 14, color: 'var(--mm-text-secondary)', lineHeight: 1.66, fontWeight: 500 }}>{item.a}</p>
               </details>
             ))}
           </div>
         </section>
 
         <section id="final-cta" style={{ ...sectionCard, textAlign: 'center' }}>
-          <h2 style={{ fontSize: 'clamp(34px, 5vw, 52px)', lineHeight: 1.04, marginBottom: 10, letterSpacing: '-0.02em' }}>
+          <h2 style={{ fontSize: 'clamp(36px, 5.2vw, 56px)', lineHeight: 1.03, marginBottom: 10, letterSpacing: '-0.022em', fontWeight: 800 }}>
             Ready to validate your layout with confidence?
           </h2>
-          <p style={{ fontSize: 16, color: 'var(--mm-text-secondary)', marginBottom: 16 }}>
+          <p style={{ fontSize: 16, color: 'var(--mm-text-secondary)', marginBottom: 16, lineHeight: 1.64, fontWeight: 500 }}>
             Start your 1-Day Trial, sign in to continue, or review pricing for Full Access.
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
             <Link to="/simulation/access?mode=signup" style={primaryBtn}>{simulationCtas.startTrial}</Link>
             <Link to="/simulation/access?mode=signin" style={ghostBtn}>Sign in</Link>
             <Link to="/simulation/pricing" style={ghostBtn}>View pricing</Link>
-            <Link to="#how-it-works" style={ghostBtn}>{simulationCtas.bookDemo}</Link>
+            <a href="https://metamechsolutions.com/contact/" style={ghostBtn}>{simulationCtas.bookDemo}</a>
           </div>
         </section>
       </main>
