@@ -25,9 +25,9 @@ const CameraViewToolbar: React.FC = () => {
   const updateMenuPos = useCallback(() => {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const panelWidth = 220;
+    const panelWidth = 200;
     const left = Math.max(8, Math.min(window.innerWidth - panelWidth - 8, rect.right - panelWidth));
-    const top = rect.bottom + 6;
+    const top = rect.bottom + 5;
     setMenuPos({ top, left });
   }, []);
 
@@ -62,15 +62,15 @@ const CameraViewToolbar: React.FC = () => {
         onClick={() => setOpen(v => !v)}
         style={{
           display: 'flex', alignItems: 'center', gap: 5,
-          height: 28, padding: '0 8px', fontSize: 10, fontWeight: 600,
-          color: '#cbd5e1', background: 'rgba(15,23,42,0.3)',
-          border: '1px solid transparent', borderRadius: 8, cursor: 'pointer',
+          height: 32, padding: '0 9px', fontSize: 10, fontWeight: 600,
+          color: 'var(--mm-text-secondary)', background: 'var(--mm-bg-panel)',
+          border: '1px solid var(--mm-border-subtle)', borderRadius: 9, cursor: 'pointer',
           fontFamily: "'Inter', sans-serif", letterSpacing: '0.01em',
           transition: 'all 0.15s',
         }}
         title="Open camera presets (normal views and perspective)"
       >
-        <Eye size={13} style={{ color: '#67e8f9' }} />
+        <Eye size={12} style={{ color: 'var(--mm-accent-primary)' }} />
         <span>{cameraMode === 'orthographic' ? 'Ortho' : '3D'}</span>
         <ChevronDown size={10} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
@@ -82,10 +82,10 @@ const CameraViewToolbar: React.FC = () => {
             position: 'fixed',
             top: menuPos.top,
             left: menuPos.left,
-            width: 220,
+            width: 200,
             background: 'var(--mm-bg-panel)',
             border: '1px solid var(--mm-border)',
-            borderRadius: 10,
+            borderRadius: 9,
             boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
             zIndex: 130,
             overflow: 'hidden',
