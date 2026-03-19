@@ -114,7 +114,7 @@ const DashboardPage: React.FC = () => {
   const S: Record<string, React.CSSProperties> = {
     page: { minHeight: '100vh', background: 'var(--mm-bg-app)', fontFamily: "'Inter', sans-serif", color: 'var(--mm-text-primary)' },
     header: { background: 'var(--mm-bg-panel)', borderBottom: '1px solid var(--mm-border)', padding: '12px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-    brand: { fontSize: 16, fontWeight: 700, fontFamily: "'Orbitron', monospace", letterSpacing: '0.04em', color: 'var(--mm-text-primary)' },
+    brandLogo: { width: 204, height: 40, objectFit: 'cover' as const, objectPosition: 'center 45%' as const, borderRadius: 10 },
     section: { padding: '28px 32px' },
     sectionTitle: { fontSize: 18, fontWeight: 700, color: 'var(--mm-text-primary)', marginBottom: 4, fontFamily: "'Orbitron', monospace" },
     sectionSub: { fontSize: 13, color: 'var(--mm-text-tertiary)', marginBottom: 20 },
@@ -148,7 +148,7 @@ const DashboardPage: React.FC = () => {
     <div style={S.page}>
       {/* Header */}
       <header style={S.header}>
-        <span style={S.brand}>MetaMech Studio</span>
+        <img src="/simulation-studio-logo.png" alt="Simulation Studio" style={S.brandLogo} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--mm-text-secondary)' }}>
             <User size={14} />

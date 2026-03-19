@@ -18,18 +18,11 @@ const SimulationHomepageSection: React.FC = () => {
     >
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 20 }}>
         <div>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              color: 'var(--mm-text-tertiary)',
-              marginBottom: 8,
-            }}
-          >
-            MetaMech Studio
-          </div>
+          <img
+            src="/simulation-studio-logo.png"
+            alt="Simulation Studio"
+            style={{ width: 'min(100%, 280px)', height: 52, objectFit: 'cover', objectPosition: 'center 45%', borderRadius: 10, marginBottom: 8 }}
+          />
           <h2 style={{ fontSize: 'clamp(28px, 5vw, 42px)', lineHeight: 1.1, marginBottom: 10, fontWeight: 700 }}>
             Industrial layout insight for faster, smarter decisions.
           </h2>

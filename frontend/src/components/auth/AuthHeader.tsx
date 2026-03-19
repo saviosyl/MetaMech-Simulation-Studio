@@ -8,9 +8,16 @@ interface AuthHeaderProps {
 const AuthHeader: React.FC<AuthHeaderProps> = ({ title, subtitle }) => (
   <div style={{ textAlign: 'center', marginBottom: 'var(--mm-space-6)' }}>
     <img
-      src="/metamech-logo.png"
-      alt="MetaMech"
-      style={{ height: 44, maxWidth: 220, objectFit: 'contain', margin: '0 auto 16px' }}
+      src="/simulation-studio-logo.png"
+      alt="Simulation Studio"
+      style={{
+        width: 'min(100%, 320px)',
+        height: 56,
+        objectFit: 'cover',
+        objectPosition: 'center 45%',
+        margin: '0 auto 14px',
+        borderRadius: 10,
+      }}
     />
     <h1
       style={{

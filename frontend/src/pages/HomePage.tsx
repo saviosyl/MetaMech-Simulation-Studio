@@ -15,10 +15,12 @@ const HomePage: React.FC = () => {
     >
       <main style={{ width: 'min(1200px, calc(100% - 32px))', margin: '0 auto', padding: '22px 0 42px', display: 'grid', gap: 18 }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              MetaMech Solutions
-            </div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <img
+              src="/simulation-studio-logo.png"
+              alt="Simulation Studio"
+              style={{ width: 'min(100%, 300px)', height: 58, objectFit: 'cover', objectPosition: 'center 45%', borderRadius: 10 }}
+            />
             <h1 style={{ fontSize: 'clamp(30px, 4.5vw, 50px)', lineHeight: 1.05, marginTop: 4 }}>
               Simulation Studio
             </h1>

@@ -7,8 +7,12 @@ const SimulationPricingPage: React.FC = () => {
     <div style={{ height: '100vh', overflowY: 'auto', background: 'var(--mm-bg-app)' }}>
       <main style={{ width: 'min(1100px, calc(100% - 32px))', margin: '0 auto', padding: '22px 0 42px' }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
-          <Link to="/" style={{ textDecoration: 'none', fontWeight: 700, color: 'var(--mm-text-primary)' }}>
-            ← MetaMech Home
+          <Link to="/" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+            <img
+              src="/simulation-studio-logo.png"
+              alt="Simulation Studio"
+              style={{ width: 210, height: 44, objectFit: 'cover', objectPosition: 'center 45%', borderRadius: 10 }}
+            />
           </Link>
           <Link
             to="/simulation"

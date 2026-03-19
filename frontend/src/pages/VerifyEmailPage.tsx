@@ -103,9 +103,12 @@ const VerifyEmailPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-6">
       <div className="container mx-auto max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            <span className="text-teal-600">MetaMech</span> Studio
-          </h1>
+          <img
+            src="/simulation-studio-logo.png"
+            alt="Simulation Studio"
+            className="mx-auto mb-3 h-14 w-full max-w-[320px] rounded-lg object-cover"
+            style={{ objectPosition: 'center 45%' }}
+          />
           <p className="text-gray-600">Email verification required</p>
         </div>
 
