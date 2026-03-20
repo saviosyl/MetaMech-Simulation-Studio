@@ -313,6 +313,35 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     }
   };
 
+  const licenseStatus = (() => {
+    const sub = user?.subscription;
+    if (!sub) {
+      return { label: 'License Unknown', detail: '', color: 'var(--mm-text-tertiary)' };
+    }
+    const planCode = (sub.planCode || '').toLowerCase();
+    const end = sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
+    const validUntil = end && !Number.isNaN(end.getTime())
+      ? `Valid until: ${end.toLocaleDateString()}`
+      : '';
+
+    if (sub.status === 'trialing') {
+      return { label: 'Trial Active', detail: validUntil, color: 'var(--mm-accent-primary)' };
+    }
+    if (sub.status === 'active') {
+      if (planCode === 'internal-full-access') {
+        return { label: 'Full Access Active', detail: 'Internal access', color: '#10b981' };
+      }
+      return { label: 'License Active', detail: validUntil || 'Full access', color: '#10b981' };
+    }
+    if (sub.status === 'pending_verification') {
+      return { label: 'Verification Required', detail: 'Verify email to activate access', color: '#f59e0b' };
+    }
+    if (sub.status === 'none') {
+      return { label: 'No Active License', detail: 'Upgrade required', color: '#f59e0b' };
+    }
+    return { label: 'Expired', detail: validUntil || 'Renew required', color: '#ef4444' };
+  })();
+
   return (
     <div style={S.bar} data-tour="top-ribbon">
       {/* ════ LEFT: Project + Edit + Build ════ */}
@@ -503,6 +532,26 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           {saveIcon()}
           {saveStatus === 'saving' ? 'SAVING' : saveStatus === 'saved' ? 'SAVED' : 'SAVE'}
         </button>
+
+        <div
+          style={{
+            minWidth: 152,
+            padding: '5px 10px',
+            borderRadius: 10,
+            border: '1px solid var(--mm-border-subtle)',
+            background: 'var(--mm-bg-surface)',
+            display: 'grid',
+            gap: 2,
+          }}
+          title={licenseStatus.detail || licenseStatus.label}
+        >
+          <div style={{ fontSize: 10, fontWeight: 700, color: licenseStatus.color, letterSpacing: '0.01em', lineHeight: 1.15 }}>
+            {licenseStatus.label}
+          </div>
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--mm-text-tertiary)', lineHeight: 1.15 }}>
+            {licenseStatus.detail || ' '}
+          </div>
+        </div>
 
         {/* Help / Support */}
         <button
