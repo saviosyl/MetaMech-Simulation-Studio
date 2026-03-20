@@ -241,21 +241,71 @@ function buildDriveAssembly(params: ConveyorParams): THREE.Group {
 
   // SEW-style geared motor
   const sewMotor = buildSEWMotor(1.0);
-  const motorSideZ = params.motorSide === 'right'
-    ? widthM / 2 + 0.06
-    : -(widthM / 2 + 0.06);
-  sewMotor.position.set(driveX, heightM - 0.05, motorSideZ);
-  sewMotor.rotation.set(0, params.motorSide === 'right' ? -Math.PI / 2 : Math.PI / 2, 0);
+  const motorSideSign = params.motorSide === 'right' ? 1 : -1;
+  const motorSideZ = motorSideSign * (widthM / 2 + 0.07);
+  // Align gearbox output centerline with the drive roller axis for a proper end-drive look.
+  sewMotor.position.set(driveX, heightM + 0.005, motorSideZ);
+  sewMotor.rotation.set(0, motorSideSign > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
   group.add(sewMotor);
+
+  // Short coupling between gearbox output and drive roller shaft.
+  const couplingStartZ = motorSideSign * (widthM / 2 + 0.012);
+  const couplingEndZ = motorSideSign * (widthM / 2 + 0.064);
+  const couplingLen = Math.abs(couplingEndZ - couplingStartZ);
+  if (couplingLen > 0.001) {
+    const couplingGeo = new THREE.CylinderGeometry(0.011, 0.011, couplingLen, 14);
+    couplingGeo.rotateX(Math.PI / 2);
+    const coupling = new THREE.Mesh(couplingGeo, matRoller);
+    coupling.position.set(driveX, heightM, (couplingStartZ + couplingEndZ) / 2);
+    coupling.castShadow = true;
+    group.add(coupling);
+  }
+
+  // Motor mount plate and gusset to integrate drive package with frame rail.
+  const mountPlate = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.01, 0.08), matFrame);
+  mountPlate.position.set(driveX, heightM - 0.065, motorSideSign * (widthM / 2 + 0.05));
+  mountPlate.castShadow = true;
+  group.add(mountPlate);
+  const gusset = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.01), matFrame);
+  gusset.position.set(driveX, heightM - 0.045, motorSideSign * (widthM / 2 + 0.028));
+  gusset.castShadow = true;
+  group.add(gusset);
+
+  const addEndRefinement = (x: number, endRollerR: number) => {
+    // End plate with bearing blocks to avoid placeholder-looking conveyor ends.
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.075, widthM + 0.08), matDrive);
+    plate.position.set(x, heightM - 0.028, 0);
+    plate.castShadow = true;
+    group.add(plate);
+
+    // Rounded nose cap around each roller to keep the family look clean and engineered.
+    const noseGeo = new THREE.CylinderGeometry(endRollerR + 0.012, endRollerR + 0.012, widthM + 0.05, 20, 1, true);
+    noseGeo.rotateX(Math.PI / 2);
+    const nose = new THREE.Mesh(noseGeo, matFrame);
+    nose.position.set(x, heightM, 0);
+    nose.castShadow = true;
+    group.add(nose);
+
+    for (const side of [-1, 1]) {
+      const bearingBlock = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.032, 0.04), matDrive);
+      bearingBlock.position.set(x, heightM - 0.004, side * (widthM / 2 + 0.02));
+      bearingBlock.castShadow = true;
+      group.add(bearingBlock);
+    }
+  };
+
+  addEndRefinement(driveX, rollerR);
 
   // Tail/deflection roller (only for end drive)
   if (params.driveType === 'end') {
     const tailGeo = new THREE.CylinderGeometry(rollerR * 0.8, rollerR * 0.8, widthM + 0.02, 16);
     tailGeo.rotateX(Math.PI / 2);
     const tail = new THREE.Mesh(tailGeo, matDrive);
-    tail.position.set(-lengthM / 2 + 0.02, heightM, 0);
+    const tailX = -lengthM / 2 + 0.02;
+    tail.position.set(tailX, heightM, 0);
     tail.castShadow = true;
     group.add(tail);
+    addEndRefinement(tailX, rollerR * 0.8);
   }
 
   return group;

@@ -457,19 +457,7 @@ export function buildCurvedSupports(p: BendConveyorParams): THREE.Group | null {
       }
     }
 
-    // Cross brace between posts
-    const [xi, zi] = arcXZ(a, R - halfW - railD - postSize / 2, p.bendDirection);
-    const [xo, zo] = arcXZ(a, R + halfW + railD + postSize / 2, p.bendDirection);
-    const braceLen = Math.sqrt((xo - xi) ** 2 + (zo - zi) ** 2);
-    const braceAng = Math.atan2(xo - xi, zo - zi);
-
-    const brace = new THREE.Mesh(
-      new THREE.BoxGeometry(postSize * 0.7, postSize * 0.7, braceLen),
-      matAluminum,
-    );
-    brace.position.set((xi + xo) / 2, H * 0.3, (zi + zo) / 2);
-    brace.rotation.y = -braceAng;
-    station.add(brace);
+    // Intentionally omit the center tie member to keep the curved support frame cleaner.
 
     group.add(station);
   }

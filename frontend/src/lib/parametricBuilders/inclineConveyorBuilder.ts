@@ -135,16 +135,19 @@ export function buildInclineConveyor(params: Record<string, any>): BuilderResult
   const frameDrop = 0.062;
   const railDepth = 0.05;
   const frameZ = width / 2 + 0.03;
+  const endRollerR = 0.072;
+  const topInStart: Vec3 = [x0 + endRollerR, inY, 0];
+  const topOutEnd: Vec3 = [x3 - endRollerR, outY, 0];
 
   // Top chain surface (3 sections)
-  addBeamBetween(group, p0, p1, chainThickness, width * 0.96, chain);
+  addBeamBetween(group, topInStart, p1, chainThickness, width * 0.96, chain);
   addBeamBetween(group, p1, p2, chainThickness, width * 0.96, chain);
-  addBeamBetween(group, p2, p3, chainThickness, width * 0.96, chain);
+  addBeamBetween(group, p2, topOutEnd, chainThickness, width * 0.96, chain);
 
   if (chainType === 'Friction Top Chain') {
-    addBeamBetween(group, p0, p1, chainThickness * 0.5, width * 0.72, chainFriction, chainThickness * 0.45);
+    addBeamBetween(group, topInStart, p1, chainThickness * 0.5, width * 0.72, chainFriction, chainThickness * 0.45);
     addBeamBetween(group, p1, p2, chainThickness * 0.5, width * 0.72, chainFriction, chainThickness * 0.45);
-    addBeamBetween(group, p2, p3, chainThickness * 0.5, width * 0.72, chainFriction, chainThickness * 0.45);
+    addBeamBetween(group, p2, topOutEnd, chainThickness * 0.5, width * 0.72, chainFriction, chainThickness * 0.45);
   } else {
     const seg = new THREE.Vector3().subVectors(new THREE.Vector3(...p2), new THREE.Vector3(...p1));
     const segLen = seg.length();
@@ -186,21 +189,38 @@ export function buildInclineConveyor(params: Record<string, any>): BuilderResult
   const r1: Vec3 = [p1[0], p1[1] - returnDrop, 0];
   const r2: Vec3 = [p2[0], p2[1] - returnDrop, 0];
   const r3: Vec3 = [p3[0], p3[1] - returnDrop, 0];
-  addBeamBetween(group, r0, r1, 0.014, width * 0.72, chainFriction);
+  const returnInStart: Vec3 = [r0[0] + endRollerR, r0[1], 0];
+  const returnOutEnd: Vec3 = [r3[0] - endRollerR, r3[1], 0];
+  addBeamBetween(group, returnInStart, r1, 0.014, width * 0.72, chainFriction);
   addBeamBetween(group, r1, r2, 0.014, width * 0.72, chainFriction);
-  addBeamBetween(group, r2, r3, 0.014, width * 0.72, chainFriction);
+  addBeamBetween(group, r2, returnOutEnd, 0.014, width * 0.72, chainFriction);
 
-  // End housings + bracket plates (clean profile, no exposed round cross-bars)
+  // Rounded roller-based end treatment for a smoother premium conveyor profile.
   for (const [x, y] of [[x0, inY], [x3, outY]] as [number, number][]) {
-    addMesh(group, new THREE.BoxGeometry(0.075, 0.09, width + 0.06), frameLight, [x, y, 0]);
-    addMesh(group, new THREE.BoxGeometry(0.025, 0.12, width + 0.12), frame, [x, y - 0.06, 0]);
+    const topRollerGeo = new THREE.CylinderGeometry(endRollerR, endRollerR, width * 0.94, 24);
+    topRollerGeo.rotateX(Math.PI / 2);
+    addMesh(group, topRollerGeo, frameLight, [x, y, 0]);
+
+    const returnRollerGeo = new THREE.CylinderGeometry(endRollerR * 0.8, endRollerR * 0.8, width * 0.82, 20);
+    returnRollerGeo.rotateX(Math.PI / 2);
+    addMesh(group, returnRollerGeo, frame, [x, y - returnDrop, 0]);
+
+    const shroudGeo = new THREE.CylinderGeometry(
+      endRollerR + 0.014,
+      endRollerR + 0.014,
+      width + 0.08,
+      28,
+      1,
+      true,
+      0,
+      Math.PI,
+    );
+    shroudGeo.rotateX(Math.PI / 2);
+    addMesh(group, shroudGeo, frame, [x, y - 0.004, 0]);
+
     for (const s of [-1, 1]) {
-      addMesh(
-        group,
-        new THREE.BoxGeometry(0.04, 0.05, 0.04),
-        frameLight,
-        [x, y - 0.01, s * (width / 2 + 0.03)],
-      );
+      addMesh(group, new THREE.BoxGeometry(0.026, 0.044, 0.038), frameLight, [x, y - 0.004, s * (width / 2 + 0.03)]);
+      addMesh(group, new THREE.BoxGeometry(0.032, 0.01, 0.05), frame, [x, y - 0.06, s * (width / 2 + 0.03)]);
     }
   }
 
