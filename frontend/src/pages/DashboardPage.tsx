@@ -121,15 +121,15 @@ const DashboardPage: React.FC = () => {
     sectionSub: { fontSize: 13, color: 'var(--mm-text-tertiary)', marginBottom: 20 },
     btnPrimary: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 18px', fontSize: 13, fontWeight: 600, color: '#fff', background: 'linear-gradient(135deg, #0891b2, #06b6d4)', border: 'none', borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s' },
     btnGhost: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 13, fontWeight: 500, color: 'var(--mm-text-secondary)', background: 'var(--mm-bg-surface)', border: '1px solid var(--mm-border)', borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s' },
-    card: { background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 10, overflow: 'hidden', transition: 'box-shadow 0.15s, border-color 0.15s', cursor: 'pointer' },
-    cardBody: { padding: '16px 18px' },
+    card: { background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 10, overflow: 'visible', position: 'relative', transition: 'box-shadow 0.15s, border-color 0.15s', cursor: 'pointer' },
+    cardBody: { padding: '16px 18px', position: 'relative' },
     cardTitle: { fontSize: 14, fontWeight: 600, color: 'var(--mm-text-primary)', marginBottom: 4 },
     cardDate: { fontSize: 11, color: 'var(--mm-text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 },
-    cardThumb: { height: 100, background: 'var(--mm-bg-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--mm-border-subtle)' },
+    cardThumb: { height: 100, background: 'var(--mm-bg-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--mm-border-subtle)', borderTopLeftRadius: 10, borderTopRightRadius: 10 },
     templateCard: { background: 'var(--mm-bg-surface)', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: '14px 16px', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'flex-start', gap: 12 },
     modal: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 24 },
     modalCard: { background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: '28px 24px', width: '100%', maxWidth: 400 },
-    dropdown: { position: 'absolute' as const, right: 0, top: 32, background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 8, boxShadow: 'var(--mm-shadow-lg)', zIndex: 20, minWidth: 160, padding: '4px 0' },
+    dropdown: { position: 'absolute' as const, right: 0, top: 30, background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 8, boxShadow: 'var(--mm-shadow-lg)', zIndex: 220, minWidth: 160, padding: '4px 0' },
     dropItem: { display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', fontSize: 13, color: 'var(--mm-text-secondary)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' as const },
   };
 
@@ -252,7 +252,7 @@ const DashboardPage: React.FC = () => {
                       </div>
                       <div style={{ position: 'relative' }}>
                         <button onClick={(e) => { e.stopPropagation(); setShowMenu(showMenu === project.id ? null : project.id); }}
-                          style={{ background: 'none', border: 'none', padding: 4, borderRadius: 4, cursor: 'pointer', color: 'var(--mm-text-tertiary)' }}>
+                          style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--mm-bg-surface)', border: '1px solid var(--mm-border-subtle)', padding: 0, borderRadius: 6, cursor: 'pointer', color: 'var(--mm-text-tertiary)' }}>
                           <MoreHorizontal size={14} />
                         </button>
                         {showMenu === project.id && (
@@ -295,7 +295,7 @@ const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {showMenu && <div style={{ position: 'fixed', inset: 0, zIndex: 0 }} onClick={() => setShowMenu(null)} />}
+      {showMenu && <div style={{ position: 'fixed', inset: 0, zIndex: 120 }} onClick={() => setShowMenu(null)} />}
     </div>
   );
 };
