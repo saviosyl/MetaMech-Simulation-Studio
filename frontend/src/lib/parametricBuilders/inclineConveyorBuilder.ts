@@ -180,15 +180,15 @@ export function buildInclineConveyor(params: Record<string, any>): BuilderResult
     addBeamBetween(group, [p2[0], p2[1] + off[1], off[2]], [p3[0], p3[1] + off[1], off[2]], 0.035, railDepth, frame);
   }
 
-  // Return path (lower chain track)
+  // Return path (lower chain track) — keep intentional, avoid ultra-thin rod look
   const returnDrop = 0.18;
   const r0: Vec3 = [p0[0], p0[1] - returnDrop, 0];
   const r1: Vec3 = [p1[0], p1[1] - returnDrop, 0];
   const r2: Vec3 = [p2[0], p2[1] - returnDrop, 0];
   const r3: Vec3 = [p3[0], p3[1] - returnDrop, 0];
-  addBeamBetween(group, r0, r1, 0.008, width * 0.72, chainFriction);
-  addBeamBetween(group, r1, r2, 0.008, width * 0.72, chainFriction);
-  addBeamBetween(group, r2, r3, 0.008, width * 0.72, chainFriction);
+  addBeamBetween(group, r0, r1, 0.014, width * 0.72, chainFriction);
+  addBeamBetween(group, r1, r2, 0.014, width * 0.72, chainFriction);
+  addBeamBetween(group, r2, r3, 0.014, width * 0.72, chainFriction);
 
   // End housings + bracket plates (clean profile, no exposed round cross-bars)
   for (const [x, y] of [[x0, inY], [x3, outY]] as [number, number][]) {
@@ -238,11 +238,12 @@ export function buildInclineConveyor(params: Record<string, any>): BuilderResult
 
     addMesh(group, new THREE.BoxGeometry(legT * 0.8, legT * 0.8, supportZ * 2), frameLight, [x, Math.max(0.04, legH - 0.03), 0]);
 
-    if (supportMode !== 'Minimal') {
+    // Keep extra bracing only in heavy-duty mode to avoid stray thin-bar visuals in standard mode.
+    if (supportMode === 'Heavy Duty') {
       const diagLen = Math.sqrt((supportZ * 2) ** 2 + (legH * 0.55) ** 2);
       addMesh(
         group,
-        new THREE.BoxGeometry(0.014, diagLen, 0.014),
+        new THREE.BoxGeometry(0.024, diagLen, 0.024),
         frameLight,
         [x, legH * 0.42, 0],
         [Math.PI / 2, 0, Math.atan2(supportZ * 2, legH * 0.55)],
@@ -270,7 +271,6 @@ export function buildInclineConveyor(params: Record<string, any>): BuilderResult
   const motorZ = driveSide * (width / 2 + 0.16);
   addMesh(group, new THREE.BoxGeometry(0.22, 0.14, 0.11), motorMat, [motorX, motorY, motorZ]);
   addMesh(group, new THREE.BoxGeometry(0.12, 0.09, 0.09), frameLight, [motorX + 0.08, motorY + 0.01, motorZ]);
-  addBeamBetween(group, [motorX, motorY - 0.01, driveSide * (width / 2 + 0.1)], [motorX, motorY - 0.01, driveSide * (width / 2 + 0.03)], 0.02, 0.02, frame);
 
   const bounds = new THREE.Box3().setFromObject(group);
   const ports: ConnectionPort[] = [
