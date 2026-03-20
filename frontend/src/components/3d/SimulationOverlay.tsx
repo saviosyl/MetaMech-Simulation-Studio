@@ -52,24 +52,48 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
   const groupRef = useRef<THREE.Group>(null);
   const [pL, pW, pH] = product.size;
   const halfH = pH / 2;
+  const mathRef = useRef({
+    forward: new THREE.Vector3(),
+    right: new THREE.Vector3(),
+    up: new THREE.Vector3(),
+    worldUp: new THREE.Vector3(0, 1, 0),
+    targetQ: new THREE.Quaternion(),
+    basis: new THREE.Matrix4(),
+  });
 
   // Update position and rotation every frame via ref (no re-render needed)
   useFrame(() => {
     if (groupRef.current) {
+      const math = mathRef.current;
+      const fallbackYaw = product.currentRotationY ?? 0;
+      const tangent = product.currentTangent ?? [Math.sin(fallbackYaw), 0, Math.cos(fallbackYaw)];
+
+      math.forward.set(tangent[0], tangent[1], tangent[2]);
+      if (math.forward.lengthSq() < 1e-8) {
+        math.forward.set(Math.sin(fallbackYaw), 0, Math.cos(fallbackYaw));
+      }
+      math.forward.normalize();
+
+      // Build a stable orientation basis: Z-forward along path, Y-up constrained to world-up as much as possible.
+      math.right.crossVectors(math.worldUp, math.forward);
+      if (math.right.lengthSq() < 1e-8) {
+        math.right.set(1, 0, 0).cross(math.forward);
+      }
+      math.right.normalize();
+      math.up.crossVectors(math.forward, math.right).normalize();
+
+      math.basis.makeBasis(math.right, math.up, math.forward);
+      math.targetQ.setFromRotationMatrix(math.basis);
+
+      // Smooth transition across straight↔incline segment boundaries.
+      groupRef.current.quaternion.slerp(math.targetQ, 0.18);
+
+      // Place center so product sits on conveyor surface even when tilted.
       groupRef.current.position.set(
-        product.currentPosition[0],
-        product.currentPosition[1] + halfH,
-        product.currentPosition[2]
+        product.currentPosition[0] + math.up.x * halfH,
+        product.currentPosition[1] + math.up.y * halfH,
+        product.currentPosition[2] + math.up.z * halfH,
       );
-      // Smooth rotation: follow path tangent (Y-axis rotation)
-      const targetRot = product.currentRotationY ?? 0;
-      const currentRot = groupRef.current.rotation.y;
-      // Lerp rotation for smooth transitions (avoid snapping)
-      let delta = targetRot - currentRot;
-      // Normalize to [-PI, PI]
-      while (delta > Math.PI) delta -= Math.PI * 2;
-      while (delta < -Math.PI) delta += Math.PI * 2;
-      groupRef.current.rotation.y = currentRot + delta * 0.15;
     }
   });
 

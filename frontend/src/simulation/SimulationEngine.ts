@@ -555,7 +555,13 @@ export class SimulationEngine {
       if (path) {
         product.currentPosition = path.getWorldPosition(t, node.position, node.rotation, node.scale);
         const tangent = path.getWorldTangent(t, node.rotation);
-        product.currentRotationY = Math.atan2(tangent[0], tangent[2]);
+        const tdx = tangent[0];
+        const tdy = tangent[1];
+        const tdz = tangent[2];
+        const tmag = Math.sqrt(tdx * tdx + tdy * tdy + tdz * tdz) || 1;
+        const tn: [number, number, number] = [tdx / tmag, tdy / tmag, tdz / tmag];
+        product.currentTangent = tn;
+        product.currentRotationY = Math.atan2(tn[0], tn[2]);
       } else {
         const ports = getConnectionPorts(node.type, node.parameters);
         const inputPort = ports.find(p => p.type === 'input');
@@ -569,7 +575,10 @@ export class SimulationEngine {
             inWorld[2] + (outWorld[2] - inWorld[2]) * t,
           ];
           const dx = outWorld[0] - inWorld[0];
+          const dy = outWorld[1] - inWorld[1];
           const dz = outWorld[2] - inWorld[2];
+          const mag = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+          product.currentTangent = [dx / mag, dy / mag, dz / mag];
           product.currentRotationY = Math.atan2(dx, dz);
         }
       }
@@ -805,6 +814,7 @@ export class SimulationEngine {
 
       // Compute rotation from edge direction
       if (dist > 0.01) {
+        product.currentTangent = [dx / dist, dy / dist, dz / dist];
         product.currentRotationY = Math.atan2(dx, dz);
       }
 
@@ -996,6 +1006,7 @@ export class SimulationEngine {
                 palletNode.position[2] + slot.z,
               ];
               placed.currentRotationY = slot.rotationY;
+              placed.currentTangent = [Math.sin(slot.rotationY), 0, Math.cos(slot.rotationY)];
               placed.state = 'completed';
               fillSlot(palletState, placedId);
               placedOnPallet = true;
@@ -1006,6 +1017,7 @@ export class SimulationEngine {
         if (!placedOnPallet) {
           // Place exactly at resolved outfeed target.
           placed.currentPosition = [...rState.placePosition];
+          placed.currentTangent = [Math.sin(placed.currentRotationY), 0, Math.cos(placed.currentRotationY)];
           placed.currentEdgeId = null;
           if (anchors.preferredOutEdge) {
             // Transfer directly onto connected downstream node at its true input node.
@@ -1692,6 +1704,7 @@ export class SimulationEngine {
       size: [pL, pW, pH],
       currentPosition: [...node.position] as [number, number, number],
       currentRotationY: 0,
+      currentTangent: [0, 0, 1],
       targetPosition: [0, 0, 0],
       progress: 0,
       currentNodeId: node.id,
