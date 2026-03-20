@@ -363,6 +363,20 @@ const SceneContent: React.FC<{
   const keyShadowMapSize = isExportRendering ? exportPreset.shadowMapSize : (isMobileSafari ? 1024 : 4096);
   const contactShadowRes = isExportRendering ? exportPreset.contactShadowResolution : (isMobileSafari ? 256 : 512);
   const contactShadowBlur = isExportRendering ? exportPreset.contactShadowBlur : 2.0;
+  const minorCellSize = Math.max(
+    0.25,
+    Math.min(1, sceneSettings.grid.size / Math.max(sceneSettings.grid.divisions, 1)),
+  );
+  const majorSectionSize = minorCellSize * 4;
+  const gridPalette = themeMode === 'light'
+    ? {
+        cell: '#c7d2de',
+        section: '#9fb0c4',
+      }
+    : {
+        cell: '#4f5f76',
+        section: '#758aa7',
+      };
 
   // Disable orbit rotation when a 3D object is selected AND a manipulation tool is active
   // Click empty space to deselect → orbit re-enables
@@ -429,14 +443,14 @@ const SceneContent: React.FC<{
         <Grid
           position={[0, 0, 0]}
           args={[sceneSettings.grid.size, sceneSettings.grid.divisions]}
-          cellSize={1}
-          cellThickness={0.5}
-          cellColor={themeMode === 'light' ? '#b0b0b0' : '#6f6f6f'}
-          sectionSize={10}
-          sectionThickness={1}
-          sectionColor={themeMode === 'light' ? '#8a8a8a' : '#9d4b4b'}
-          fadeDistance={50}
-          fadeStrength={1}
+          cellSize={minorCellSize}
+          cellThickness={0.34}
+          cellColor={gridPalette.cell}
+          sectionSize={majorSectionSize}
+          sectionThickness={0.9}
+          sectionColor={gridPalette.section}
+          fadeDistance={68}
+          fadeStrength={1.18}
           infiniteGrid
         />
       )}
@@ -642,7 +656,7 @@ const SceneContent: React.FC<{
       />
 
       {/* Scene background color — adapts to theme */}
-      <color attach="background" args={[themeMode === 'light' ? '#e0e4ea' : '#1e293b']} />
+      <color attach="background" args={[themeMode === 'light' ? '#e7edf4' : '#1d2635']} />
 
       {/* Empty-scene 3D text intentionally removed for cleaner premium workspace */}
     </>
