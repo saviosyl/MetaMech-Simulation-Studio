@@ -178,9 +178,11 @@ export function buildInclineConveyor(params: Record<string, any>): BuilderResult
   // Frame side rails (offset from chain line)
   for (const s of [-1, 1]) {
     const off: Vec3 = [0, -frameDrop, s * frameZ];
-    addBeamBetween(group, [p0[0], p0[1] + off[1], off[2]], [p1[0], p1[1] + off[1], off[2]], 0.035, railDepth, frame);
+    const frameInStartX = p0[0] + endRollerR * 0.8;
+    const frameOutEndX = p3[0] - endRollerR * 0.8;
+    addBeamBetween(group, [frameInStartX, p0[1] + off[1], off[2]], [p1[0], p1[1] + off[1], off[2]], 0.035, railDepth, frame);
     addBeamBetween(group, [p1[0], p1[1] + off[1], off[2]], [p2[0], p2[1] + off[1], off[2]], 0.035, railDepth, frame);
-    addBeamBetween(group, [p2[0], p2[1] + off[1], off[2]], [p3[0], p3[1] + off[1], off[2]], 0.035, railDepth, frame);
+    addBeamBetween(group, [p2[0], p2[1] + off[1], off[2]], [frameOutEndX, p3[1] + off[1], off[2]], 0.035, railDepth, frame);
   }
 
   // Return path (lower chain track) — keep intentional, avoid ultra-thin rod look
@@ -228,9 +230,11 @@ export function buildInclineConveyor(params: Record<string, any>): BuilderResult
   if (sideGuidesEnabled && sideGuideHeight > 0.001) {
     for (const s of [-1, 1]) {
       const z = s * (width / 2 - 0.008);
-      addBeamBetween(group, [p0[0], p0[1] + sideGuideHeight / 2, z], [p1[0], p1[1] + sideGuideHeight / 2, z], sideGuideHeight, 0.006, guideMat);
+      const guideInStartX = p0[0] + endRollerR * 0.68;
+      const guideOutEndX = p3[0] - endRollerR * 0.68;
+      addBeamBetween(group, [guideInStartX, p0[1] + sideGuideHeight / 2, z], [p1[0], p1[1] + sideGuideHeight / 2, z], sideGuideHeight, 0.006, guideMat);
       addBeamBetween(group, [p1[0], p1[1] + sideGuideHeight / 2, z], [p2[0], p2[1] + sideGuideHeight / 2, z], sideGuideHeight, 0.006, guideMat);
-      addBeamBetween(group, [p2[0], p2[1] + sideGuideHeight / 2, z], [p3[0], p3[1] + sideGuideHeight / 2, z], sideGuideHeight, 0.006, guideMat);
+      addBeamBetween(group, [p2[0], p2[1] + sideGuideHeight / 2, z], [guideOutEndX, p3[1] + sideGuideHeight / 2, z], sideGuideHeight, 0.006, guideMat);
     }
   }
 

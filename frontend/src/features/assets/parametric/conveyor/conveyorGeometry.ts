@@ -242,15 +242,17 @@ function buildDriveAssembly(params: ConveyorParams): THREE.Group {
   // SEW-style geared motor
   const sewMotor = buildSEWMotor(1.0);
   const motorSideSign = params.motorSide === 'right' ? 1 : -1;
-  const motorSideZ = motorSideSign * (widthM / 2 + 0.07);
+  const motorSideZ = motorSideSign * (widthM / 2 + 0.19);
+  const rollerShaftEndZ = motorSideSign * (widthM / 2 + 0.012);
+  const motorOutputShaftCenterZ = motorSideSign * (widthM / 2 + 0.045);
   // Align gearbox output centerline with the drive roller axis for a proper end-drive look.
   sewMotor.position.set(driveX, heightM + 0.005, motorSideZ);
   sewMotor.rotation.set(0, motorSideSign > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
   group.add(sewMotor);
 
   // Short coupling between gearbox output and drive roller shaft.
-  const couplingStartZ = motorSideSign * (widthM / 2 + 0.012);
-  const couplingEndZ = motorSideSign * (widthM / 2 + 0.064);
+  const couplingStartZ = rollerShaftEndZ;
+  const couplingEndZ = motorOutputShaftCenterZ;
   const couplingLen = Math.abs(couplingEndZ - couplingStartZ);
   if (couplingLen > 0.001) {
     const couplingGeo = new THREE.CylinderGeometry(0.011, 0.011, couplingLen, 14);
@@ -263,11 +265,11 @@ function buildDriveAssembly(params: ConveyorParams): THREE.Group {
 
   // Motor mount plate and gusset to integrate drive package with frame rail.
   const mountPlate = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.01, 0.08), matFrame);
-  mountPlate.position.set(driveX, heightM - 0.065, motorSideSign * (widthM / 2 + 0.05));
+  mountPlate.position.set(driveX, heightM - 0.065, motorSideSign * (widthM / 2 + 0.115));
   mountPlate.castShadow = true;
   group.add(mountPlate);
   const gusset = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.01), matFrame);
-  gusset.position.set(driveX, heightM - 0.045, motorSideSign * (widthM / 2 + 0.028));
+  gusset.position.set(driveX, heightM - 0.045, motorSideSign * (widthM / 2 + 0.082));
   gusset.castShadow = true;
   group.add(gusset);
 
