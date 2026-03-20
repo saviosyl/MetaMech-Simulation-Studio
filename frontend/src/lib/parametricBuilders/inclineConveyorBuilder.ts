@@ -190,10 +190,18 @@ export function buildInclineConveyor(params: Record<string, any>): BuilderResult
   addBeamBetween(group, r1, r2, 0.008, width * 0.72, chainFriction);
   addBeamBetween(group, r2, r3, 0.008, width * 0.72, chainFriction);
 
-  // End drums/shafts + bracket plates
+  // End housings + bracket plates (clean profile, no exposed round cross-bars)
   for (const [x, y] of [[x0, inY], [x3, outY]] as [number, number][]) {
-    addMesh(group, new THREE.CylinderGeometry(0.055, 0.055, width + 0.09, 18), frameLight, [x, y, 0], [0, 0, Math.PI / 2]);
+    addMesh(group, new THREE.BoxGeometry(0.075, 0.09, width + 0.06), frameLight, [x, y, 0]);
     addMesh(group, new THREE.BoxGeometry(0.025, 0.12, width + 0.12), frame, [x, y - 0.06, 0]);
+    for (const s of [-1, 1]) {
+      addMesh(
+        group,
+        new THREE.BoxGeometry(0.04, 0.05, 0.04),
+        frameLight,
+        [x, y - 0.01, s * (width / 2 + 0.03)],
+      );
+    }
   }
 
   // Side guides
@@ -225,7 +233,7 @@ export function buildInclineConveyor(params: Record<string, any>): BuilderResult
       const z = s * supportZ;
       addMesh(group, new THREE.BoxGeometry(legT, legH, legT), frame, [x, legH / 2, z]);
       addMesh(group, new THREE.BoxGeometry(0.13, 0.012, 0.13), footMat, [x, 0.006, z]);
-      addMesh(group, new THREE.CylinderGeometry(0.018, 0.018, 0.024, 10), footMat, [x, 0.024, z]);
+      addMesh(group, new THREE.BoxGeometry(0.032, 0.024, 0.032), footMat, [x, 0.024, z]);
     }
 
     addMesh(group, new THREE.BoxGeometry(legT * 0.8, legT * 0.8, supportZ * 2), frameLight, [x, Math.max(0.04, legH - 0.03), 0]);
@@ -261,7 +269,7 @@ export function buildInclineConveyor(params: Record<string, any>): BuilderResult
   const motorY = yAtX(motorX, x0, x1, x2, x3, inY, outY) - frameDrop - 0.045;
   const motorZ = driveSide * (width / 2 + 0.16);
   addMesh(group, new THREE.BoxGeometry(0.22, 0.14, 0.11), motorMat, [motorX, motorY, motorZ]);
-  addMesh(group, new THREE.CylinderGeometry(0.045, 0.045, 0.13, 14), frameLight, [motorX + 0.08, motorY + 0.01, motorZ], [0, Math.PI / 2, 0]);
+  addMesh(group, new THREE.BoxGeometry(0.12, 0.09, 0.09), frameLight, [motorX + 0.08, motorY + 0.01, motorZ]);
   addBeamBetween(group, [motorX, motorY - 0.01, driveSide * (width / 2 + 0.1)], [motorX, motorY - 0.01, driveSide * (width / 2 + 0.03)], 0.02, 0.02, frame);
 
   const bounds = new THREE.Box3().setFromObject(group);
