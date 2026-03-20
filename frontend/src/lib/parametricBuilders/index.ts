@@ -8,6 +8,7 @@ import { buildTransferBridge, buildPopupTransfer, buildPusherTransfer, buildMerg
 import { buildSpiralConveyor } from './spiralConveyorBuilder';
 import { buildVerticalLifter } from './verticalLifterBuilder';
 import { buildFrameAssembly } from './frameAssemblyBuilder';
+import { buildInclineConveyor } from './inclineConveyorBuilder';
 
 export type { BuilderResult, ConnectionPort } from './beltConveyorBuilder';
 
@@ -55,6 +56,7 @@ const registry: Record<string, BuilderFunction> = {
   pusherTransferBuilder: buildPusherTransfer,
   mergeDivertBuilder: buildMergeDivert,
   spiralConveyorBuilder: buildSpiralConveyor,
+  inclineConveyorBuilder: buildInclineConveyor,
   verticalLifterBuilder: buildVerticalLifter,
   frameAssemblyBuilder: buildFrameAssembly,
 };

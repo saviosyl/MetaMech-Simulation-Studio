@@ -43,6 +43,15 @@ const inputStyle: React.CSSProperties = { width: '100%', padding: '6px 10px', fo
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: 'var(--mm-text-tertiary)', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' };
 const fieldGap: React.CSSProperties = { marginBottom: 10 };
 const LENGTH_ANCHORED_TYPES = new Set(['conveyor', 'belt-conveyor', 'roller-conveyor', 'incline-conveyor', 'modular-conveyor-straight']);
+const INCLINE_PARAM_GROUPS: Array<{ title: string; icon: any; keys: string[]; defaultOpen?: boolean }> = [
+  { title: 'Dimensions', icon: Maximize, defaultOpen: true, keys: ['conveyorWidth', 'overallLength', 'infeedStraightLength', 'inclinedLength', 'outfeedStraightLength', 'inclineAngle'] },
+  { title: 'Heights', icon: Move3D, defaultOpen: true, keys: ['infeedHeightFromFloor', 'outfeedHeightFromFloor'] },
+  { title: 'Chain Type', icon: Sliders, defaultOpen: true, keys: ['chainType', 'cleatPitch'] },
+  { title: 'Side Guides', icon: Settings, defaultOpen: true, keys: ['sideGuidesEnabled', 'sideGuideHeight'] },
+  { title: 'Supports', icon: Settings, defaultOpen: true, keys: ['supportMode', 'supportSpacing'] },
+  { title: 'Drive & Motor', icon: Zap, defaultOpen: true, keys: ['driveSide', 'motorPosition'] },
+  { title: 'Materials', icon: Palette, defaultOpen: true, keys: ['frameFinish'] },
+];
 
 /* ─── Parameter grouper ─── */
 function groupParams(params: [string, any][]) {
@@ -100,6 +109,39 @@ const RightPanel: React.FC = () => {
 
   const handleParam = (k: string, v: any) => {
     if (!selectedObject || !selectedObjectType) return;
+
+    if (selectedObjectType === 'process' && selectedObject.type === 'incline-conveyor') {
+      const nextParams = { ...selectedObject.parameters, [k]: v } as Record<string, any>;
+
+      // Keep section-length model coherent.
+      if (k === 'overallLength') {
+        const overall = Math.max(600, Number(nextParams.overallLength) || 600);
+        const infeed = Math.max(200, Number(nextParams.infeedStraightLength) || 1200);
+        const outfeed = Math.max(200, Number(nextParams.outfeedStraightLength) || 1400);
+        nextParams.inclinedLength = Math.max(200, overall - infeed - outfeed);
+      } else if (k === 'infeedStraightLength' || k === 'inclinedLength' || k === 'outfeedStraightLength') {
+        const infeed = Math.max(200, Number(nextParams.infeedStraightLength) || 1200);
+        const incline = Math.max(200, Number(nextParams.inclinedLength) || 2600);
+        const outfeed = Math.max(200, Number(nextParams.outfeedStraightLength) || 1400);
+        nextParams.overallLength = infeed + incline + outfeed;
+      }
+
+      // Keep angle/heights synchronized for predictable incline editing.
+      const infeedH = Number(nextParams.infeedHeightFromFloor ?? 800);
+      const outfeedH = Number(nextParams.outfeedHeightFromFloor ?? 1500);
+      const inclineLenM = Math.max(0.2, Number(nextParams.inclinedLength ?? 2600) / 1000);
+      if (k === 'inclineAngle') {
+        const angleRad = (Math.max(0, Number(nextParams.inclineAngle) || 0) * Math.PI) / 180;
+        nextParams.outfeedHeightFromFloor = Math.round(infeedH + Math.sin(angleRad) * inclineLenM * 1000);
+      } else {
+        const riseM = (outfeedH - infeedH) / 1000;
+        const ratio = Math.max(-1, Math.min(1, riseM / inclineLenM));
+        nextParams.inclineAngle = Math.round((Math.asin(ratio) * 180 / Math.PI) * 10) / 10;
+      }
+
+      updateObject(selectedObject.id, selectedObjectType, { parameters: nextParams });
+      return;
+    }
 
     // Keep conveyor infeed anchored while changing length, then carry downstream
     // connected nodes by the resulting outfeed delta to preserve node continuity.
@@ -521,6 +563,30 @@ const RightPanel: React.FC = () => {
 
               {/* Module params — always show grouped (covers both parametric + non-parametric) */}
               {moduleDef && (() => {
+                if (selectedObject.type === 'incline-conveyor') {
+                  const paramEntries = Object.entries(moduleDef.parameters);
+                  const byKey = new Map(paramEntries);
+                  return (
+                    <>
+                      {INCLINE_PARAM_GROUPS.map(section => {
+                        const items = section.keys
+                          .map(key => [key, byKey.get(key)] as [string, any])
+                          .filter(([, def]) => Boolean(def));
+                        if (items.length === 0) return null;
+                        return (
+                          <Section key={section.title} title={section.title} icon={section.icon} defaultOpen={section.defaultOpen}>
+                            {items.map(([k, d]) => (
+                              <div key={k} style={fieldGap}>
+                                <label style={labelStyle}>{d.label}</label>
+                                {renderInput(k, d)}
+                              </div>
+                            ))}
+                          </Section>
+                        );
+                      })}
+                    </>
+                  );
+                }
                 const g = groupParams(Object.entries(moduleDef.parameters));
                 return (<>
                   {g.geo.length > 0 && <Section title="Geometry" icon={Maximize} defaultOpen={true}>{g.geo.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}

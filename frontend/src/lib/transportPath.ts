@@ -99,6 +99,104 @@ export class StraightPath implements TransportPath {
   }
 }
 
+// ─── Segmented Incline Path (flat + incline + flat) ────────────
+
+export class SegmentedInclinePath implements TransportPath {
+  length: number;
+  private x0: number;
+  private x1: number;
+  private x2: number;
+  private x3: number;
+  private inY: number;
+  private outY: number;
+  private infeedLen: number;
+  private inclineLen: number;
+  private outfeedLen: number;
+  private inclineHoriz: number;
+  private rise: number;
+
+  constructor(
+    infeedStraightLengthMm: number,
+    inclinedLengthMm: number,
+    outfeedStraightLengthMm: number,
+    infeedHeightMm: number,
+    outfeedHeightMm: number,
+    overallLengthMm?: number,
+  ) {
+    const infeedRaw = Math.max(0.2, infeedStraightLengthMm / 1000);
+    const inclineRaw = Math.max(0.2, inclinedLengthMm / 1000);
+    const outfeedRaw = Math.max(0.2, outfeedStraightLengthMm / 1000);
+    const sumRaw = infeedRaw + inclineRaw + outfeedRaw;
+    const overall = overallLengthMm && Number.isFinite(overallLengthMm)
+      ? Math.max(0.6, overallLengthMm / 1000)
+      : sumRaw;
+    const scale = overall / Math.max(0.001, sumRaw);
+
+    this.infeedLen = infeedRaw * scale;
+    this.inclineLen = inclineRaw * scale;
+    this.outfeedLen = outfeedRaw * scale;
+    this.inY = infeedHeightMm / 1000;
+    this.outY = outfeedHeightMm / 1000;
+    this.rise = this.outY - this.inY;
+
+    if (Math.abs(this.rise) >= this.inclineLen) {
+      this.inclineLen = Math.abs(this.rise) + 0.08;
+    }
+    this.inclineHoriz = Math.sqrt(Math.max(0.05 * 0.05, this.inclineLen * this.inclineLen - this.rise * this.rise));
+
+    const totalHoriz = this.infeedLen + this.inclineHoriz + this.outfeedLen;
+    this.x0 = -totalHoriz / 2;
+    this.x1 = this.x0 + this.infeedLen;
+    this.x2 = this.x1 + this.inclineHoriz;
+    this.x3 = this.x2 + this.outfeedLen;
+
+    this.length = this.infeedLen + this.inclineLen + this.outfeedLen;
+  }
+
+  getLocalPosition(t: number): Vec3 {
+    const s = Math.max(0, Math.min(1, t)) * this.length;
+    if (s <= this.infeedLen) {
+      return [this.x0 + s, this.inY, 0];
+    }
+    if (s <= this.infeedLen + this.inclineLen) {
+      const u = (s - this.infeedLen) / Math.max(1e-6, this.inclineLen);
+      return [this.x1 + this.inclineHoriz * u, this.inY + this.rise * u, 0];
+    }
+    const u = (s - this.infeedLen - this.inclineLen) / Math.max(1e-6, this.outfeedLen);
+    return [this.x2 + this.outfeedLen * u, this.outY, 0];
+  }
+
+  getLocalTangent(t: number): Vec3 {
+    const s = Math.max(0, Math.min(1, t)) * this.length;
+    if (s <= this.infeedLen) return [1, 0, 0];
+    if (s <= this.infeedLen + this.inclineLen) {
+      const mag = Math.sqrt(this.inclineHoriz * this.inclineHoriz + this.rise * this.rise) || 1;
+      return [this.inclineHoriz / mag, this.rise / mag, 0];
+    }
+    return [1, 0, 0];
+  }
+
+  getLocalUp(_t: number): Vec3 {
+    return [0, 1, 0];
+  }
+
+  getWorldPosition(t: number, nodePosition: Vec3, nodeRotation: Vec3, nodeScale?: Vec3): Vec3 {
+    return localToWorld(this.getLocalPosition(t), nodePosition, nodeRotation, nodeScale);
+  }
+
+  getWorldTangent(t: number, nodeRotation: Vec3): Vec3 {
+    return localToWorld(this.getLocalTangent(t), [0, 0, 0], nodeRotation);
+  }
+
+  getInfeedWorld(nodePosition: Vec3, nodeRotation: Vec3, nodeScale?: Vec3): Vec3 {
+    return this.getWorldPosition(0, nodePosition, nodeRotation, nodeScale);
+  }
+
+  getOutfeedWorld(nodePosition: Vec3, nodeRotation: Vec3, nodeScale?: Vec3): Vec3 {
+    return this.getWorldPosition(1, nodePosition, nodeRotation, nodeScale);
+  }
+}
+
 // ─── Curved Path (Bend Conveyor) ───────────────────────────────
 
 export class CurvedPath implements TransportPath {
@@ -314,6 +412,17 @@ export function createTransportPath(type: string, params: Record<string, any>): 
       const outfeedHeight = params.outfeedHeight ?? 3800;
       const direction = params.direction ?? 'up';
       return new SpiralPath(beltWidth, turns, outfeedAngle, infeedHeight, outfeedHeight, direction);
+    }
+
+    case 'incline-conveyor': {
+      return new SegmentedInclinePath(
+        params.infeedStraightLength ?? 1200,
+        params.inclinedLength ?? 2600,
+        params.outfeedStraightLength ?? 1400,
+        params.infeedHeightFromFloor ?? 800,
+        params.outfeedHeightFromFloor ?? 1500,
+        params.overallLength,
+      );
     }
 
     default:

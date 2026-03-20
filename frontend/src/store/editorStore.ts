@@ -269,6 +269,29 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
         { id: 'output', type: 'output', localPosition: [pL / 2 - portInset, pOutH, 0] },
       ];
     }
+    case 'incline-conveyor': {
+      const infeedLenMm = Number(params?.infeedStraightLength ?? 1200);
+      const inclineLenMm = Number(params?.inclinedLength ?? 2600);
+      const outfeedLenMm = Number(params?.outfeedStraightLength ?? 1400);
+      const overallLenMm = Number(params?.overallLength ?? (infeedLenMm + inclineLenMm + outfeedLenMm));
+      const segSum = Math.max(1, infeedLenMm + inclineLenMm + outfeedLenMm);
+      const segScale = overallLenMm / segSum;
+      const infeedLen = (infeedLenMm * segScale) / 1000;
+      let inclineLen = (inclineLenMm * segScale) / 1000;
+      const outfeedLen = (outfeedLenMm * segScale) / 1000;
+      const inY = Number(params?.infeedHeightFromFloor ?? params?.infeedHeight ?? 800) / 1000;
+      const outY = Number(params?.outfeedHeightFromFloor ?? params?.outfeedHeight ?? 1500) / 1000;
+      const rise = outY - inY;
+      if (Math.abs(rise) >= inclineLen) inclineLen = Math.abs(rise) + 0.08;
+      const inclineHoriz = Math.sqrt(Math.max(0.05 * 0.05, inclineLen * inclineLen - rise * rise));
+      const totalHoriz = infeedLen + inclineHoriz + outfeedLen;
+      const x0 = -totalHoriz / 2;
+      const x3 = totalHoriz / 2;
+      return [
+        { id: 'input', type: 'input', localPosition: [x0 + 0.01, inY, 0] },
+        { id: 'output', type: 'output', localPosition: [x3 - 0.01, outY, 0] },
+      ];
+    }
     case 'modular-conveyor-90-curve':
     case 'modular-conveyor-45-curve':
     case 'bend-conveyor': {
@@ -1412,6 +1435,25 @@ function getDefaultParameters(type: string): Record<string, any> {
     sink: { capacity: 100 },
     conveyor: { length: 5000, width: 1000, speed: 20 },
     'belt-conveyor': { width: 600, length: 3000, height: 800, angle: 0, beltSpeed: 20, sideGuides: true, driveEnd: 'right', supportSpacing: 1500, showLegs: true, adjustableFeetEnabled: true },
+    'incline-conveyor': {
+      conveyorWidth: 650,
+      overallLength: 5200,
+      infeedStraightLength: 1200,
+      inclinedLength: 2600,
+      outfeedStraightLength: 1400,
+      infeedHeightFromFloor: 800,
+      outfeedHeightFromFloor: 1500,
+      inclineAngle: 16,
+      sideGuideHeight: 90,
+      sideGuidesEnabled: true,
+      chainType: 'Friction Top Chain',
+      cleatPitch: 240,
+      supportMode: 'Standard',
+      supportSpacing: 1500,
+      driveSide: 'Right',
+      motorPosition: 'Outfeed',
+      frameFinish: 'Powder-Coated Steel',
+    },
     'roller-conveyor': { width: 600, length: 3000, height: 800, rollerPitch: 100, driven: true, sideRails: true, showLegs: true, adjustableFeetEnabled: true },
     'industrial-robot': {},
     'machine-static': {},
