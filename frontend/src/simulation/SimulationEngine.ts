@@ -46,7 +46,14 @@ export class SimulationEngine {
   sensorSignals: Map<string, { active: boolean; productId: string | null; productColor: string | null; productType: string | null; activeSince: number }> = new Map();
   
   // Stopper state (by stopper node id) — avoids node parameter reference issues
-  private stopperState: Map<string, { latched: boolean; lastReleaseTime: number; cooldownSec: number }> = new Map();
+  private stopperState: Map<string, {
+    latched: boolean;
+    lastReleaseTime: number;
+    cooldownSec: number;
+    // For two-sensor release: allow exactly one release while secondary zone is clear,
+    // then require secondary to become occupied again before next release.
+    secondaryCycleArmed: boolean;
+  }> = new Map();
   // Sensor dwell state (by sensor node id)
   private sensorDwellFired: Map<string, boolean> = new Map();
   simTime: number = 0;
@@ -478,8 +485,21 @@ export class SimulationEngine {
         // Get/init stopper state from engine map (NOT node params)
         let ss = this.stopperState.get(n.id);
         if (!ss) {
-          ss = { latched: false, lastReleaseTime: 0, cooldownSec: n.parameters.releaseDelay || 3 };
+          ss = {
+            latched: false,
+            lastReleaseTime: 0,
+            cooldownSec: n.parameters.releaseDelay || 3,
+            secondaryCycleArmed: true,
+          };
           this.stopperState.set(n.id, ss);
+        }
+
+        // Keep two-sensor release cycle armed whenever the secondary zone becomes occupied.
+        const secTag = n.parameters.secondarySensorTag || '';
+        const relCond = n.parameters.releaseCondition || '';
+        if (secTag && relCond === 'sensor-clear') {
+          const secActive = this.sensorSignals.get(secTag)?.active ?? false;
+          if (secActive) ss.secondaryCycleArmed = true;
         }
         
         // Cooldown: barrier stays OPEN for cooldownSec after release
@@ -1120,6 +1140,7 @@ export class SimulationEngine {
     const releaseDelay = node.parameters.releaseDelay || 0;
     const releaseCondition = node.parameters.releaseCondition || 'timed';
     const isMounted = !!node.parameters.parentConveyorId;
+    const secondaryTag = node.parameters.secondarySensorTag || '';
 
     if (!enabled) {
       this.releaseAllStopped(node, stats);
@@ -1147,6 +1168,22 @@ export class SimulationEngine {
 
     // Collect all products stopped by this stopper
     const stopped = this.products.filter(p => p.stoppedBy === node.id);
+
+    // Two-sensor mode re-arm: when secondary zone is occupied, arm exactly one next release.
+    if (secondaryTag && releaseCondition === 'sensor-clear') {
+      let ss = this.stopperState.get(node.id);
+      if (!ss) {
+        ss = {
+          latched: false,
+          lastReleaseTime: 0,
+          cooldownSec: node.parameters.releaseDelay || 3,
+          secondaryCycleArmed: true,
+        };
+        this.stopperState.set(node.id, ss);
+      }
+      const secActive = this.sensorSignals.get(secondaryTag)?.active ?? false;
+      if (secActive) ss.secondaryCycleArmed = true;
+    }
 
     // ── Determine if stopper should be ENGAGED (blocking) or RELEASED ──
     let shouldRelease = false;
@@ -1252,8 +1289,19 @@ export class SimulationEngine {
         return heldDuration >= releaseDelay;
       }
       case 'sensor-clear':
-        // Release when the trigger sensor is NO LONGER active
-        return !sensorActive && heldDuration >= releaseDelay;
+        // One-sensor fallback: release when trigger sensor goes clear.
+        // Two-sensor mode: release when trigger queue exists AND secondary zone is clear.
+        {
+          const secTag = node.parameters?.secondarySensorTag || '';
+          if (!secTag) {
+            return !sensorActive && heldDuration >= releaseDelay;
+          }
+          const secActive = this.sensorSignals.get(secTag)?.active ?? false;
+          const queueExists = node.parameters?.triggerSensorTag ? sensorActive : true;
+          const ss = this.stopperState.get(node.id);
+          const cycleArmed = ss?.secondaryCycleArmed ?? true;
+          return queueExists && !secActive && cycleArmed && heldDuration >= releaseDelay;
+        }
       case 'sensor-dwell': {
         // Release when secondary sensor dwell threshold is met
         const secTag = node.parameters?.secondarySensorTag || '';
@@ -1284,6 +1332,9 @@ export class SimulationEngine {
     if (ss) {
       ss.latched = false;
       ss.lastReleaseTime = this.simTime;
+      if ((node.parameters?.releaseCondition || '') === 'sensor-clear' && node.parameters?.secondarySensorTag) {
+        ss.secondaryCycleArmed = false;
+      }
     }
     this.addFlowEvent(stats, 'released', `Product ${product.id.slice(0, 8)} released`);
 
