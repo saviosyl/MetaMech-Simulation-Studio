@@ -270,14 +270,19 @@ function buildDriveAssembly(params: ConveyorParams): THREE.Group {
   }
 
   // Motor mount plate and gusset to integrate drive package with frame rail.
-  const mountPlate = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.01, 0.08), matFrame);
-  mountPlate.position.set(driveX, heightM - 0.065, motorSideSign * (driveRollerFaceW / 2 + 0.108));
+  // Keep this compact so the drive-end silhouette stays clean and premium.
+  const mountPlate = new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.012, 0.07), matFrame);
+  mountPlate.position.set(driveX, heightM - 0.06, motorSideSign * (driveRollerFaceW / 2 + 0.102));
   mountPlate.castShadow = true;
   group.add(mountPlate);
-  const gusset = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.01), matFrame);
-  gusset.position.set(driveX, heightM - 0.045, motorSideSign * (driveRollerFaceW / 2 + 0.074));
+  const gusset = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.032, 0.012), matFrame);
+  gusset.position.set(driveX, heightM - 0.04, motorSideSign * (driveRollerFaceW / 2 + 0.078));
+  const gussetCap = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.018), matFrame);
+  gussetCap.position.set(driveX, heightM - 0.022, motorSideSign * (driveRollerFaceW / 2 + 0.086));
   gusset.castShadow = true;
   group.add(gusset);
+  gussetCap.castShadow = true;
+  group.add(gussetCap);
 
   const addEndRefinement = (x: number, endRollerR: number, rollerFaceW: number) => {
     // End plate with bearing blocks to avoid placeholder-looking conveyor ends.
