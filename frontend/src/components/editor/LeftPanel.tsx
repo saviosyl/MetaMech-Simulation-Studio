@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState, useMemo } from 'react';
-import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield, Columns } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModulesByCategory, ModuleDefinition } from '../../lib/moduleLibrary';
 import SceneHierarchy from './SceneHierarchy';
@@ -10,6 +10,7 @@ type ViewLayout = 'compact' | 'grid';
 
 const TABS = [
   { id: 'process' as const, name: 'Process', icon: Factory },
+  { id: 'modular' as const, name: 'Standard Modular Conveyor', icon: Columns },
   { id: 'fmcg' as const, name: 'FMCG', icon: Package },
   { id: 'medical' as const, name: 'Medical', icon: Shield },
   { id: 'robots' as const, name: 'Robots', icon: Cpu },
@@ -20,6 +21,9 @@ const TABS = [
 
 function getSubcategory(module: ModuleDefinition): string {
   const n = module.id.toLowerCase();
+  if (module.category === 'modular' && n.startsWith('mm85-')) {
+    return 'MM-85';
+  }
   if (n.includes('conveyor') || n.includes('belt') || n.includes('roller') || n.includes('modular')) return 'Conveyors';
   if (n.includes('stopper') || n.includes('pusher-module')) return 'Accessories';
   if (n.includes('transfer') || n.includes('merge') || n.includes('divert') || n.includes('pusher') || n.includes('popup')) return 'Transfers';

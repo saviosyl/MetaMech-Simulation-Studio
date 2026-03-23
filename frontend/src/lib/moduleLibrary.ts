@@ -2,6 +2,7 @@ import {
   Cog, 
   Package, 
   ArrowRight, 
+  ArrowLeft,
   ArrowDown,
   Database, 
   GitBranch,
@@ -20,7 +21,7 @@ import {
 export interface ModuleDefinition {
   id: string;
   name: string;
-  category: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
+  category: 'process' | 'modular' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
   icon: any;
   description: string;
   assetId?: string; // references AssetDef.id in manifest
@@ -233,6 +234,94 @@ export const moduleLibrary: ModuleDefinition[] = [
       guideHeight: { type: 'number', label: 'Guide Height (mm)', default: 100, min: 40, max: 250, step: 10 },
       showLegs: { type: 'boolean', label: 'Show Supports', default: true },
       centerStructure: { type: 'select', label: 'Center Structure', default: 'column', options: ['column', 'framed-core'] },
+    },
+  },
+  {
+    id: 'mm85-conveyor-section',
+    name: 'MM-85 Conveyor Section',
+    category: 'modular',
+    icon: ArrowRight,
+    description: 'MetaMech MM-85 straight conveyor section building block',
+    assetId: 'mm85-conveyor-section',
+    parameters: {
+      sectionLength: { type: 'number', label: 'Section Length (mm)', default: 1000, min: 300, max: 6000, step: 50 },
+      chainWidth: { type: 'number', label: 'Chain Width (mm)', default: 85, min: 60, max: 220, step: 5 },
+      elevation: { type: 'number', label: 'Elevation (mm)', default: 850, min: 250, max: 2500, step: 25 },
+      sectionStyle: { type: 'select', label: 'Section Style', default: 'Standard', options: ['Standard', 'Heavy Duty'] },
+      sideGuidesEnabled: { type: 'boolean', label: 'Side Guides', default: true },
+      guideHeight: { type: 'number', label: 'Guide Height (mm)', default: 35, min: 10, max: 120, step: 5 },
+    },
+  },
+  {
+    id: 'mm85-drive-end',
+    name: 'MM-85 Drive End',
+    category: 'modular',
+    icon: ArrowRight,
+    description: 'MetaMech MM-85 motorized drive end module',
+    assetId: 'mm85-drive-end',
+    parameters: {
+      moduleLength: { type: 'number', label: 'Module Length (mm)', default: 450, min: 280, max: 1200, step: 20 },
+      chainWidth: { type: 'number', label: 'Chain Width (mm)', default: 85, min: 60, max: 220, step: 5 },
+      elevation: { type: 'number', label: 'Elevation (mm)', default: 850, min: 250, max: 2500, step: 25 },
+      motorSide: { type: 'select', label: 'Motor Side', default: 'Right', options: ['Left', 'Right'] },
+      includeEncoder: { type: 'boolean', label: 'Include Encoder', default: true },
+    },
+  },
+  {
+    id: 'mm85-idler-end',
+    name: 'MM-85 Idler End',
+    category: 'modular',
+    icon: ArrowLeft,
+    description: 'MetaMech MM-85 idler end transfer module',
+    assetId: 'mm85-idler-end',
+    parameters: {
+      moduleLength: { type: 'number', label: 'Module Length (mm)', default: 420, min: 260, max: 1200, step: 20 },
+      chainWidth: { type: 'number', label: 'Chain Width (mm)', default: 85, min: 60, max: 220, step: 5 },
+      elevation: { type: 'number', label: 'Elevation (mm)', default: 850, min: 250, max: 2500, step: 25 },
+      withProtectionCover: { type: 'boolean', label: 'Protection Cover', default: true },
+    },
+  },
+  {
+    id: 'mm85-guide-rail',
+    name: 'MM-85 Guide Rails',
+    category: 'modular',
+    icon: ArrowRightLeft,
+    description: 'MetaMech MM-85 side guide rail assemblies',
+    assetId: 'mm85-guide-rail',
+    parameters: {
+      railLength: { type: 'number', label: 'Rail Length (mm)', default: 1000, min: 300, max: 6000, step: 50 },
+      railSpacing: { type: 'number', label: 'Rail Spacing (mm)', default: 130, min: 80, max: 350, step: 5 },
+      railHeight: { type: 'number', label: 'Rail Height (mm)', default: 35, min: 15, max: 120, step: 5 },
+      elevation: { type: 'number', label: 'Elevation (mm)', default: 900, min: 250, max: 2500, step: 25 },
+      railType: { type: 'select', label: 'Rail Type', default: 'Fixed Aluminium', options: ['Fixed Aluminium', 'Fixed Plastic'] },
+    },
+  },
+  {
+    id: 'mm85-support-leg',
+    name: 'MM-85 Support Leg',
+    category: 'modular',
+    icon: ArrowDown,
+    description: 'MetaMech MM-85 standard floor support leg',
+    assetId: 'mm85-support-leg',
+    parameters: {
+      supportHeight: { type: 'number', label: 'Support Height (mm)', default: 850, min: 350, max: 2500, step: 25 },
+      supportSpan: { type: 'number', label: 'Support Span (mm)', default: 220, min: 120, max: 550, step: 10 },
+      braceMode: { type: 'select', label: 'Brace Mode', default: 'Cross Brace', options: ['Cross Brace', 'No Brace'] },
+      footSize: { type: 'number', label: 'Foot Size (mm)', default: 80, min: 50, max: 180, step: 5 },
+    },
+  },
+  {
+    id: 'mm85-end-drive-support',
+    name: 'MM-85 End Drive Support',
+    category: 'modular',
+    icon: ArrowDown,
+    description: 'MetaMech MM-85 reinforced support for drive end',
+    assetId: 'mm85-end-drive-support',
+    parameters: {
+      supportHeight: { type: 'number', label: 'Support Height (mm)', default: 850, min: 350, max: 2500, step: 25 },
+      supportSpan: { type: 'number', label: 'Support Span (mm)', default: 260, min: 140, max: 650, step: 10 },
+      heavyDuty: { type: 'boolean', label: 'Heavy Duty', default: true },
+      footSize: { type: 'number', label: 'Foot Size (mm)', default: 90, min: 50, max: 180, step: 5 },
     },
   },
   {

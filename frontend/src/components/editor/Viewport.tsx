@@ -707,6 +707,7 @@ const Viewport: React.FC = () => {
         let addedModule = false;
         switch (data.category) {
           case 'process':
+          case 'modular':
           case 'robots':
           case 'pallets':
           case 'fmcg':
