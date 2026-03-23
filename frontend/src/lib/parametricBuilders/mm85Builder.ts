@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TDSLoader } from 'three/examples/jsm/loaders/TDSLoader.js';
 import type { BuilderResult, ConnectionPort } from './beltConveyorBuilder';
 
 export interface MM85SourceMappingEntry {
@@ -54,27 +55,97 @@ export const MM85_SOURCE_NAME_MAP: MM85SourceMappingEntry[] = [
   },
 ];
 
-const matFrame = () => new THREE.MeshStandardMaterial({ color: 0x4f5b66, metalness: 0.72, roughness: 0.34 });
-const matChain = () => new THREE.MeshStandardMaterial({ color: 0x2f353c, metalness: 0.22, roughness: 0.68 });
-const matSteel = () => new THREE.MeshStandardMaterial({ color: 0xa7b0ba, metalness: 0.86, roughness: 0.22 });
-const matGuide = () => new THREE.MeshStandardMaterial({ color: 0xd1d5db, metalness: 0.5, roughness: 0.4 });
-const matMotor = () => new THREE.MeshStandardMaterial({ color: 0x2463eb, metalness: 0.65, roughness: 0.36 });
-const matFoot = () => new THREE.MeshStandardMaterial({ color: 0x3f4953, metalness: 0.58, roughness: 0.42 });
+type Axis = 'x' | 'y' | 'z';
 
-function addMesh(
-  group: THREE.Group,
-  geometry: THREE.BufferGeometry,
-  material: THREE.Material,
-  position: [number, number, number],
-  rotation?: [number, number, number],
-) {
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.set(...position);
-  if (rotation) mesh.rotation.set(...rotation);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  group.add(mesh);
-  return mesh;
+const SOURCE_FILES = {
+  'mm85-conveyor-section': '/models/mm85/conveyor-beam-straight.stl',
+  'mm85-drive-end': '/models/mm85/drive-end-unit.stl',
+  'mm85-idler-end': '/models/mm85/idler-end-unit.stl',
+  'mm85-guide-rail-fixed-aluminium': '/models/mm85/guide-rail-fixed-aluminium.stl',
+  'mm85-guide-rail-fixed-plastic': '/models/mm85/guide-rail-fixed-plastic.stl',
+  'mm85-support-leg': '/models/mm85/support-leg-single.stl',
+  'mm85-end-drive-support': '/models/mm85/support-end-drive.stl',
+} as const;
+
+type SourceKey = keyof typeof SOURCE_FILES;
+
+const SOURCE_AXES: Record<SourceKey, { lengthAxis: Axis; widthAxis?: Axis; heightAxis: Axis }> = {
+  'mm85-conveyor-section': { lengthAxis: 'x', widthAxis: 'y', heightAxis: 'z' },
+  'mm85-drive-end': { lengthAxis: 'x', widthAxis: 'y', heightAxis: 'z' },
+  'mm85-idler-end': { lengthAxis: 'x', widthAxis: 'y', heightAxis: 'z' },
+  'mm85-guide-rail-fixed-aluminium': { lengthAxis: 'z', widthAxis: 'x', heightAxis: 'y' },
+  'mm85-guide-rail-fixed-plastic': { lengthAxis: 'z', widthAxis: 'x', heightAxis: 'y' },
+  'mm85-support-leg': { lengthAxis: 'z', widthAxis: 'x', heightAxis: 'y' },
+  'mm85-end-drive-support': { lengthAxis: 'z', widthAxis: 'x', heightAxis: 'y' },
+};
+
+const sourceTemplateCache = new Map<SourceKey, THREE.Group>();
+const sourceBoundsCache = new Map<SourceKey, THREE.Box3>();
+const sourceLoadPromises = new Map<SourceKey, Promise<void>>();
+const sourceLoadFailures = new Set<SourceKey>();
+let sourceReadyVersion = 0;
+
+export function getMM85SourceReadyVersion(): number {
+  return sourceReadyVersion;
+}
+
+function axisIndex(axis: Axis): number {
+  return axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
+}
+
+function cloneWithMaterials(group: THREE.Group): THREE.Group {
+  const clone = group.clone(true);
+  clone.traverse((node) => {
+    if ((node as THREE.Mesh).isMesh) {
+      const mesh = node as THREE.Mesh;
+      if (Array.isArray(mesh.material)) {
+        mesh.material = mesh.material.map((m) => m.clone());
+      } else if (mesh.material) {
+        mesh.material = (mesh.material as THREE.Material).clone();
+      }
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    }
+  });
+  return clone;
+}
+
+function triggerSourceLoad(key: SourceKey): void {
+  if (sourceTemplateCache.has(key) || sourceLoadPromises.has(key) || sourceLoadFailures.has(key)) return;
+  const loader = new TDSLoader();
+  const loadPromise = loader
+    .loadAsync(SOURCE_FILES[key])
+    .then((loaded) => {
+      loaded.traverse((node) => {
+        if ((node as THREE.Mesh).isMesh) {
+          const mesh = node as THREE.Mesh;
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+        }
+      });
+      sourceTemplateCache.set(key, loaded);
+      sourceBoundsCache.set(key, new THREE.Box3().setFromObject(loaded));
+      sourceReadyVersion += 1;
+    })
+    .catch((error) => {
+      sourceLoadFailures.add(key);
+      // Keep this warn explicit to make source-asset load failures easy to diagnose.
+      console.warn(`[MM85] Failed to load source model ${key}:`, error);
+    })
+    .finally(() => {
+      sourceLoadPromises.delete(key);
+    });
+  sourceLoadPromises.set(key, loadPromise);
+}
+
+function getSourceClone(key: SourceKey): { group: THREE.Group; bounds: THREE.Box3 } | null {
+  const template = sourceTemplateCache.get(key);
+  const bounds = sourceBoundsCache.get(key);
+  if (!template || !bounds) {
+    triggerSourceLoad(key);
+    return null;
+  }
+  return { group: cloneWithMaterials(template), bounds: bounds.clone() };
 }
 
 function createBounds(group: THREE.Group): THREE.Box3 {
@@ -89,298 +160,196 @@ function straightPorts(lengthM: number, elevationM: number): ConnectionPort[] {
   ];
 }
 
-export function buildMM85ConveyorSection(params: Record<string, any>): BuilderResult {
-  const lengthM = Math.max(0.35, Number(params.sectionLength ?? params.length ?? 1000) / 1000);
-  const chainWidthM = Math.max(0.06, Number(params.chainWidth ?? 85) / 1000);
-  const elevationM = Math.max(0.25, Number(params.elevation ?? params.height ?? 850) / 1000);
-  const sectionStyle = String(params.sectionStyle ?? 'Standard');
-  const sideGuidesEnabled = Boolean(params.sideGuidesEnabled ?? true);
-  const guideHeightM = Math.max(0.015, Number(params.guideHeight ?? 35) / 1000);
+function setScaleOnAxis(target: THREE.Vector3, axis: Axis, value: number): void {
+  target.setComponent(axisIndex(axis), value);
+}
 
+function makeLoadingPlaceholder(lengthM: number, topY: number, widthM = 0.1): THREE.Group {
   const group = new THREE.Group();
-
-  const frameSpan = chainWidthM + 0.085;
-  const sideRailZ = frameSpan / 2;
-  const frameDepth = 0.024;
-  const frameHeight = sectionStyle === 'Heavy Duty' ? 0.064 : 0.054;
-  const beltTopY = elevationM;
-  const frameY = beltTopY - frameHeight / 2;
-  const halfL = lengthM / 2;
-
-  for (const side of [-1, 1]) {
-    addMesh(
-      group,
-      new THREE.BoxGeometry(lengthM, frameHeight, frameDepth),
-      matFrame(),
-      [0, frameY, side * sideRailZ],
-    );
-  }
-
-  const tieCount = Math.max(2, Math.floor(lengthM / 0.35));
-  const tieGeo = new THREE.BoxGeometry(0.02, 0.03, frameSpan + 0.005);
-  for (let i = 0; i <= tieCount; i++) {
-    const x = -halfL + (lengthM * i) / tieCount;
-    addMesh(group, tieGeo, matFrame(), [x, beltTopY - frameHeight + 0.012, 0]);
-  }
-
-  addMesh(
-    group,
-    new THREE.BoxGeometry(lengthM - 0.02, 0.01, chainWidthM),
-    matChain(),
-    [0, beltTopY + 0.005, 0],
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(Math.max(0.2, lengthM), 0.04, Math.max(0.08, widthM)),
+    new THREE.MeshStandardMaterial({ color: 0x4f5b66, metalness: 0.45, roughness: 0.5 })
   );
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.position.set(0, topY - 0.02, 0);
+  group.add(mesh);
+  return group;
+}
 
-  const chainPitch = 0.04;
-  const lugGeo = new THREE.BoxGeometry(0.018, 0.007, chainWidthM - 0.01);
-  const lugCount = Math.max(4, Math.floor((lengthM - 0.04) / chainPitch));
-  for (let i = 0; i < lugCount; i++) {
-    const x = -halfL + 0.02 + i * chainPitch;
-    addMesh(group, lugGeo, matSteel(), [x, beltTopY + 0.011, 0]);
+function fitFlowComponentFromSource(
+  key: SourceKey,
+  source: { group: THREE.Group; bounds: THREE.Box3 },
+  options: {
+    targetLengthMm: number;
+    targetTopYMm: number;
+    targetWidthMm?: number;
+    mirrorZ?: boolean;
   }
+): THREE.Group {
+  const { group } = source;
+  const sourceSize = new THREE.Vector3();
+  source.bounds.getSize(sourceSize);
+  const axes = SOURCE_AXES[key];
 
-  if (sideGuidesEnabled) {
-    for (const side of [-1, 1]) {
-      const z = side * (chainWidthM / 2 + 0.014);
-      addMesh(
-        group,
-        new THREE.BoxGeometry(lengthM - 0.04, guideHeightM, 0.006),
-        matGuide(),
-        [0, beltTopY + guideHeightM / 2 + 0.006, z],
-      );
+  const scaled = new THREE.Vector3(0.001, 0.001, 0.001);
+  const lengthIdx = axisIndex(axes.lengthAxis);
+  const rawLength = sourceSize.getComponent(lengthIdx);
+  if (rawLength > 0.0001) {
+    scaled.setComponent(lengthIdx, scaled.getComponent(lengthIdx) * (options.targetLengthMm / rawLength));
+  }
+  if (options.targetWidthMm && axes.widthAxis) {
+    const widthIdx = axisIndex(axes.widthAxis);
+    const rawWidth = sourceSize.getComponent(widthIdx);
+    if (rawWidth > 0.0001) {
+      const widthScale = 0.001 * (options.targetWidthMm / rawWidth);
+      scaled.setComponent(widthIdx, widthScale);
     }
   }
+  group.scale.copy(scaled);
+  if (options.mirrorZ) group.scale.z *= -1;
+
+  const fittedBounds = new THREE.Box3().setFromObject(group);
+  const center = new THREE.Vector3();
+  fittedBounds.getCenter(center);
+  const targetTopY = options.targetTopYMm / 1000;
+  const yShift = targetTopY - fittedBounds.max.y;
+  group.position.set(-center.x, yShift, -center.z);
+
+  return group;
+}
+
+function fitGroundedComponentFromSource(
+  key: SourceKey,
+  source: { group: THREE.Group; bounds: THREE.Box3 },
+  options?: { targetHeightMm?: number }
+): THREE.Group {
+  const { group } = source;
+  const sourceSize = new THREE.Vector3();
+  source.bounds.getSize(sourceSize);
+  const axes = SOURCE_AXES[key];
+
+  const scaled = new THREE.Vector3(0.001, 0.001, 0.001);
+  if (options?.targetHeightMm) {
+    const hIdx = axisIndex(axes.heightAxis);
+    const rawH = sourceSize.getComponent(hIdx);
+    if (rawH > 0.0001) {
+      scaled.setComponent(hIdx, scaled.getComponent(hIdx) * (options.targetHeightMm / rawH));
+    }
+  }
+  group.scale.copy(scaled);
+
+  const fittedBounds = new THREE.Box3().setFromObject(group);
+  const center = new THREE.Vector3();
+  fittedBounds.getCenter(center);
+  group.position.set(-center.x, -fittedBounds.min.y, -center.z);
+
+  return group;
+}
+
+export function buildMM85ConveyorSection(params: Record<string, any>): BuilderResult {
+  const lengthMm = Math.max(350, Number(params.sectionLength ?? params.length ?? 1000));
+  const lengthM = lengthMm / 1000;
+  const chainWidthMm = Math.max(60, Number(params.chainWidth ?? 85));
+  const beltTopMm = Math.max(250, Number(params.elevation ?? params.height ?? 850));
+
+  const source = getSourceClone('mm85-conveyor-section');
+  const group = source
+    ? fitFlowComponentFromSource('mm85-conveyor-section', source, {
+        targetLengthMm: lengthMm,
+        targetTopYMm: beltTopMm,
+        targetWidthMm: chainWidthMm,
+      })
+    : makeLoadingPlaceholder(lengthM, beltTopMm / 1000, chainWidthMm / 1000);
 
   return {
     group,
-    ports: straightPorts(lengthM, beltTopY),
+    ports: straightPorts(lengthM, beltTopMm / 1000),
     bounds: createBounds(group),
     pathLength: lengthM,
   };
 }
 
 export function buildMM85DriveEnd(params: Record<string, any>): BuilderResult {
-  const moduleLengthM = Math.max(0.28, Number(params.moduleLength ?? 450) / 1000);
-  const chainWidthM = Math.max(0.06, Number(params.chainWidth ?? 85) / 1000);
-  const elevationM = Math.max(0.25, Number(params.elevation ?? params.height ?? 850) / 1000);
+  const moduleLengthMm = Math.max(280, Number(params.moduleLength ?? 450));
+  const moduleLengthM = moduleLengthMm / 1000;
+  const chainWidthMm = Math.max(60, Number(params.chainWidth ?? 85));
+  const beltTopMm = Math.max(250, Number(params.elevation ?? params.height ?? 850));
   const motorSide = String(params.motorSide ?? 'Right');
-  const includeEncoder = Boolean(params.includeEncoder ?? true);
-
-  const group = new THREE.Group();
-  const frameSpan = chainWidthM + 0.085;
-  const halfL = moduleLengthM / 2;
-  const frameHeight = 0.058;
-  const frameDepth = 0.024;
-  const rollerR = 0.038;
-  const beltTopY = elevationM;
-
-  for (const side of [-1, 1]) {
-    addMesh(
-      group,
-      new THREE.BoxGeometry(moduleLengthM, frameHeight, frameDepth),
-      matFrame(),
-      [0, beltTopY - frameHeight / 2, side * frameSpan / 2],
-    );
-  }
-
-  addMesh(
-    group,
-    new THREE.CylinderGeometry(rollerR, rollerR, chainWidthM + 0.02, 20),
-    matSteel(),
-    [halfL - 0.05, beltTopY, 0],
-    [0, 0, Math.PI / 2],
-  );
-
-  addMesh(
-    group,
-    new THREE.BoxGeometry(moduleLengthM - 0.02, 0.01, chainWidthM),
-    matChain(),
-    [0, beltTopY + 0.005, 0],
-  );
-
-  const sideSign = motorSide.toLowerCase() === 'left' ? -1 : 1;
-  addMesh(
-    group,
-    new THREE.BoxGeometry(0.11, 0.08, 0.07),
-    matMotor(),
-    [halfL - 0.08, beltTopY - 0.03, sideSign * (frameSpan / 2 + 0.055)],
-  );
-  addMesh(
-    group,
-    new THREE.CylinderGeometry(0.012, 0.012, 0.05, 12),
-    matSteel(),
-    [halfL - 0.05, beltTopY, sideSign * (chainWidthM / 2 + 0.025)],
-    [0, 0, Math.PI / 2],
-  );
-
-  if (includeEncoder) {
-    addMesh(
-      group,
-      new THREE.CylinderGeometry(0.02, 0.02, 0.03, 14),
-      matSteel(),
-      [halfL - 0.05, beltTopY, -sideSign * (chainWidthM / 2 + 0.035)],
-      [0, 0, Math.PI / 2],
-    );
-  }
+  const source = getSourceClone('mm85-drive-end');
+  const group = source
+    ? fitFlowComponentFromSource('mm85-drive-end', source, {
+        targetLengthMm: moduleLengthMm,
+        targetTopYMm: beltTopMm,
+        targetWidthMm: chainWidthMm,
+        mirrorZ: motorSide.toLowerCase() === 'left',
+      })
+    : makeLoadingPlaceholder(moduleLengthM, beltTopMm / 1000, chainWidthMm / 1000);
 
   return {
     group,
-    ports: straightPorts(moduleLengthM, beltTopY),
+    ports: straightPorts(moduleLengthM, beltTopMm / 1000),
     bounds: createBounds(group),
     pathLength: moduleLengthM,
   };
 }
 
 export function buildMM85IdlerEnd(params: Record<string, any>): BuilderResult {
-  const moduleLengthM = Math.max(0.26, Number(params.moduleLength ?? 420) / 1000);
-  const chainWidthM = Math.max(0.06, Number(params.chainWidth ?? 85) / 1000);
-  const elevationM = Math.max(0.25, Number(params.elevation ?? params.height ?? 850) / 1000);
-  const withProtectionCover = Boolean(params.withProtectionCover ?? true);
+  const moduleLengthMm = Math.max(260, Number(params.moduleLength ?? 420));
+  const moduleLengthM = moduleLengthMm / 1000;
+  const chainWidthMm = Math.max(60, Number(params.chainWidth ?? 85));
+  const beltTopMm = Math.max(250, Number(params.elevation ?? params.height ?? 850));
 
-  const group = new THREE.Group();
-  const frameSpan = chainWidthM + 0.085;
-  const halfL = moduleLengthM / 2;
-  const frameHeight = 0.056;
-  const frameDepth = 0.024;
-  const rollerR = 0.034;
-  const beltTopY = elevationM;
-
-  for (const side of [-1, 1]) {
-    addMesh(
-      group,
-      new THREE.BoxGeometry(moduleLengthM, frameHeight, frameDepth),
-      matFrame(),
-      [0, beltTopY - frameHeight / 2, side * frameSpan / 2],
-    );
-  }
-
-  addMesh(
-    group,
-    new THREE.CylinderGeometry(rollerR, rollerR, chainWidthM + 0.018, 18),
-    matSteel(),
-    [halfL - 0.045, beltTopY, 0],
-    [0, 0, Math.PI / 2],
-  );
-
-  addMesh(
-    group,
-    new THREE.BoxGeometry(moduleLengthM - 0.02, 0.01, chainWidthM),
-    matChain(),
-    [0, beltTopY + 0.005, 0],
-  );
-
-  if (withProtectionCover) {
-    addMesh(
-      group,
-      new THREE.BoxGeometry(0.08, 0.045, chainWidthM + 0.03),
-      matFrame(),
-      [halfL - 0.035, beltTopY + 0.008, 0],
-    );
-  }
+  const source = getSourceClone('mm85-idler-end');
+  const group = source
+    ? fitFlowComponentFromSource('mm85-idler-end', source, {
+        targetLengthMm: moduleLengthMm,
+        targetTopYMm: beltTopMm,
+        targetWidthMm: chainWidthMm,
+      })
+    : makeLoadingPlaceholder(moduleLengthM, beltTopMm / 1000, chainWidthMm / 1000);
 
   return {
     group,
-    ports: straightPorts(moduleLengthM, beltTopY),
+    ports: straightPorts(moduleLengthM, beltTopMm / 1000),
     bounds: createBounds(group),
     pathLength: moduleLengthM,
   };
 }
 
 export function buildMM85GuideRail(params: Record<string, any>): BuilderResult {
-  const railLengthM = Math.max(0.3, Number(params.railLength ?? 1000) / 1000);
-  const railSpacingM = Math.max(0.08, Number(params.railSpacing ?? 130) / 1000);
-  const railHeightM = Math.max(0.02, Number(params.railHeight ?? 35) / 1000);
-  const elevationM = Math.max(0.2, Number(params.elevation ?? 900) / 1000);
+  const railLengthMm = Math.max(300, Number(params.railLength ?? 1000));
+  const railLengthM = railLengthMm / 1000;
+  const railSpacingMm = Math.max(80, Number(params.railSpacing ?? 130));
+  const railHeightMm = Math.max(15, Number(params.railHeight ?? 35));
+  const topMm = Math.max(200, Number(params.elevation ?? 900)) + railHeightMm;
   const railType = String(params.railType ?? 'Fixed Aluminium');
-
-  const group = new THREE.Group();
-  const halfL = railLengthM / 2;
-  const railY = elevationM + railHeightM / 2;
-  const railZ = railSpacingM / 2;
-  const isPlastic = railType.toLowerCase().includes('plastic');
-  const railThickness = isPlastic ? 0.007 : 0.006;
-
-  for (const side of [-1, 1]) {
-    addMesh(
-      group,
-      new THREE.BoxGeometry(railLengthM, railHeightM, railThickness),
-      matGuide(),
-      [0, railY, side * railZ],
-    );
-  }
-
-  if (isPlastic) {
-    // Add a subtle center runner in plastic mode to differentiate the family variant visually.
-    addMesh(
-      group,
-      new THREE.BoxGeometry(railLengthM - 0.06, 0.006, 0.02),
-      matGuide(),
-      [0, railY + railHeightM * 0.2, 0],
-    );
-  }
-
-  const bracketCount = Math.max(2, Math.floor(railLengthM / 0.35));
-  for (let i = 0; i <= bracketCount; i++) {
-    const x = -halfL + (railLengthM * i) / bracketCount;
-    addMesh(
-      group,
-      new THREE.BoxGeometry(0.016, railHeightM + 0.03, railSpacingM + 0.01),
-      matSteel(),
-      [x, elevationM + (railHeightM + 0.03) / 2, 0],
-    );
-  }
+  const key: SourceKey = railType.toLowerCase().includes('plastic')
+    ? 'mm85-guide-rail-fixed-plastic'
+    : 'mm85-guide-rail-fixed-aluminium';
+  const source = getSourceClone(key);
+  const group = source
+    ? fitFlowComponentFromSource(key, source, {
+        targetLengthMm: railLengthMm,
+        targetTopYMm: topMm,
+        targetWidthMm: railSpacingMm,
+      })
+    : makeLoadingPlaceholder(railLengthM, topMm / 1000, Math.max(0.08, railSpacingMm / 1000));
 
   return {
     group,
-    ports: straightPorts(railLengthM, elevationM + 0.02),
+    ports: straightPorts(railLengthM, topMm / 1000),
     bounds: createBounds(group),
     pathLength: railLengthM,
   };
 }
 
 export function buildMM85SupportLeg(params: Record<string, any>): BuilderResult {
-  const supportHeightM = Math.max(0.35, Number(params.supportHeight ?? 850) / 1000);
-  const supportSpanM = Math.max(0.12, Number(params.supportSpan ?? 220) / 1000);
-  const braceMode = String(params.braceMode ?? 'Cross Brace');
-  const footSizeM = Math.max(0.05, Number(params.footSize ?? 80) / 1000);
-
-  const group = new THREE.Group();
-  const legSize = 0.04;
-
-  for (const side of [-1, 1]) {
-    const z = side * supportSpanM / 2;
-    addMesh(
-      group,
-      new THREE.BoxGeometry(legSize, supportHeightM, legSize),
-      matFoot(),
-      [0, supportHeightM / 2, z],
-    );
-    addMesh(
-      group,
-      new THREE.BoxGeometry(footSizeM, 0.01, footSizeM),
-      matFoot(),
-      [0, 0.005, z],
-    );
-  }
-
-  addMesh(
-    group,
-    new THREE.BoxGeometry(0.05, 0.03, supportSpanM + 0.02),
-    matFrame(),
-    [0, supportHeightM - 0.015, 0],
-  );
-
-  if (braceMode.toLowerCase().includes('cross')) {
-    const braceL = Math.sqrt((supportHeightM * 0.75) ** 2 + supportSpanM ** 2);
-    for (const sign of [-1, 1]) {
-      addMesh(
-        group,
-        new THREE.BoxGeometry(0.012, braceL, 0.012),
-        matSteel(),
-        [0, supportHeightM * 0.45, 0],
-        [0, 0, sign * Math.atan2(supportSpanM, supportHeightM * 0.75)],
-      );
-    }
-  }
+  const supportHeightMm = Math.max(350, Number(params.supportHeight ?? 850));
+  const source = getSourceClone('mm85-support-leg');
+  const group = source
+    ? fitGroundedComponentFromSource('mm85-support-leg', source, { targetHeightMm: supportHeightMm })
+    : makeLoadingPlaceholder(0.2, supportHeightMm / 1000, 0.12);
 
   return {
     group,
@@ -391,44 +360,11 @@ export function buildMM85SupportLeg(params: Record<string, any>): BuilderResult 
 }
 
 export function buildMM85EndDriveSupport(params: Record<string, any>): BuilderResult {
-  const supportHeightM = Math.max(0.35, Number(params.supportHeight ?? 850) / 1000);
-  const supportSpanM = Math.max(0.14, Number(params.supportSpan ?? 260) / 1000);
-  const heavyDuty = Boolean(params.heavyDuty ?? true);
-  const footSizeM = Math.max(0.05, Number(params.footSize ?? 90) / 1000);
-
-  const group = new THREE.Group();
-  const legSize = heavyDuty ? 0.045 : 0.04;
-  const beamHeight = heavyDuty ? 0.04 : 0.032;
-
-  for (const side of [-1, 1]) {
-    const z = side * supportSpanM / 2;
-    addMesh(
-      group,
-      new THREE.BoxGeometry(legSize, supportHeightM, legSize),
-      matFoot(),
-      [0, supportHeightM / 2, z],
-    );
-    addMesh(
-      group,
-      new THREE.BoxGeometry(footSizeM, 0.012, footSizeM),
-      matFoot(),
-      [0, 0.006, z],
-    );
-  }
-
-  addMesh(
-    group,
-    new THREE.BoxGeometry(0.08, beamHeight, supportSpanM + 0.03),
-    matFrame(),
-    [0, supportHeightM - beamHeight / 2, 0],
-  );
-
-  addMesh(
-    group,
-    new THREE.BoxGeometry(0.06, 0.02, supportSpanM + 0.05),
-    matSteel(),
-    [0, supportHeightM + 0.012, 0],
-  );
+  const supportHeightMm = Math.max(350, Number(params.supportHeight ?? 850));
+  const source = getSourceClone('mm85-end-drive-support');
+  const group = source
+    ? fitGroundedComponentFromSource('mm85-end-drive-support', source, { targetHeightMm: supportHeightMm })
+    : makeLoadingPlaceholder(0.3, supportHeightMm / 1000, 0.18);
 
   return {
     group,

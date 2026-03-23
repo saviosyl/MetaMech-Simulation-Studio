@@ -15,6 +15,7 @@ import {
   buildMM85GuideRail,
   buildMM85SupportLeg,
   buildMM85EndDriveSupport,
+  getMM85SourceReadyVersion,
 } from './mm85Builder';
 
 export type { BuilderResult, ConnectionPort } from './beltConveyorBuilder';
@@ -84,4 +85,11 @@ export function runBuilder(name: string, params: Record<string, any>): BuilderRe
     return null;
   }
   return fn(params);
+}
+
+export function getBuilderRenderVersion(name: string): number {
+  if (name.startsWith('mm85')) {
+    return getMM85SourceReadyVersion();
+  }
+  return 0;
 }
