@@ -9,6 +9,14 @@ import { buildSpiralConveyor } from './spiralConveyorBuilder';
 import { buildVerticalLifter } from './verticalLifterBuilder';
 import { buildFrameAssembly } from './frameAssemblyBuilder';
 import { buildInclineConveyor } from './inclineConveyorBuilder';
+import {
+  buildMM85ConveyorSection,
+  buildMM85DriveEnd,
+  buildMM85IdlerEnd,
+  buildMM85GuideRail,
+  buildMM85SupportLeg,
+  buildMM85EndDriveSupport,
+} from './mm85Builder';
 
 export type { BuilderResult, ConnectionPort } from './beltConveyorBuilder';
 
@@ -59,6 +67,12 @@ const registry: Record<string, BuilderFunction> = {
   inclineConveyorBuilder: buildInclineConveyor,
   verticalLifterBuilder: buildVerticalLifter,
   frameAssemblyBuilder: buildFrameAssembly,
+  mm85ConveyorSectionBuilder: buildMM85ConveyorSection,
+  mm85DriveEndBuilder: buildMM85DriveEnd,
+  mm85IdlerEndBuilder: buildMM85IdlerEnd,
+  mm85GuideRailBuilder: buildMM85GuideRail,
+  mm85SupportLegBuilder: buildMM85SupportLeg,
+  mm85EndDriveSupportBuilder: buildMM85EndDriveSupport,
 };
 
 export function getBuilder(name: string): BuilderFunction | undefined {

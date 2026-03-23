@@ -396,6 +396,20 @@ export function createTransportPath(type: string, params: Record<string, any>): 
       return new StraightPath(length, infeedHeight, outfeedHeight);
     }
 
+    case 'mm85-conveyor-section':
+    case 'mm85-drive-end':
+    case 'mm85-idler-end': {
+      const length = params.sectionLength ?? params.moduleLength ?? params.length ?? 1000;
+      const elevation = params.elevation ?? params.height ?? 850;
+      return new StraightPath(length, elevation, elevation);
+    }
+
+    case 'mm85-guide-rail': {
+      const length = params.railLength ?? params.length ?? 1000;
+      const elevation = (params.elevation ?? 900) + 20;
+      return new StraightPath(length, elevation, elevation);
+    }
+
     case 'bend-conveyor': {
       const radius = params.radius || params.radiusMm || 1000;
       const angle = parseInt(params.bendAngle || params.bendAngleDeg || '90', 10);

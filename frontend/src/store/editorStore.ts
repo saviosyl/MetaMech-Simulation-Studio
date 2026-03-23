@@ -17,6 +17,9 @@ export interface ProcessNode {
         'belt-conveyor' | 'roller-conveyor' | 'industrial-robot' | 'machine-static' |
         'stopper' | 'pusher' | 'bend-conveyor' | 'sensor' |
         'modular-conveyor-straight' | 'modular-conveyor-90-curve' | 'modular-conveyor-45-curve' | 'incline-conveyor' |
+        'mm85-conveyor-section' | 'mm85-drive-end' | 'mm85-idler-end' |
+        'mm85-guide-rail' |
+        'mm85-support-leg' | 'mm85-end-drive-support' |
         'cartesian-robot' | 'cobot' | 'robot-5axis' | 'robot-6axis' |
         'eur-pallet' | 'standard-pallet' | 'custom-pallet' |
         'carton-erector' | 'case-packer' | 'checkweigher' | 'metal-detector' |
@@ -46,7 +49,7 @@ export interface SceneObject {
   scale: [number, number, number];
   parameters: Record<string, any>;
   name: string;
-  category: 'process' | 'environment' | 'actors';
+  category: 'process' | 'modular' | 'environment' | 'actors';
 }
 
 export interface EnvironmentAsset {
@@ -269,6 +272,28 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
         { id: 'output', type: 'output', localPosition: [pL / 2 - portInset, pOutH, 0] },
       ];
     }
+    case 'mm85-conveyor-section':
+    case 'mm85-drive-end':
+    case 'mm85-idler-end': {
+      const pL = ((params?.sectionLength || params?.moduleLength || params?.length || 1000) / 1000);
+      const pH = ((params?.elevation || params?.height || 850) / 1000);
+      const portInset = 0.01;
+      return [
+        { id: 'input', type: 'input', localPosition: [-pL / 2 + portInset, pH, 0] },
+        { id: 'output', type: 'output', localPosition: [pL / 2 - portInset, pH, 0] },
+      ];
+    }
+    case 'mm85-guide-rail': {
+      const pL = ((params?.railLength || params?.length || 1000) / 1000);
+      const pH = ((params?.elevation || params?.height || 900) / 1000) + 0.02;
+      return [
+        { id: 'input', type: 'input', localPosition: [-pL / 2 + 0.01, pH, 0] },
+        { id: 'output', type: 'output', localPosition: [pL / 2 - 0.01, pH, 0] },
+      ];
+    }
+    case 'mm85-support-leg':
+    case 'mm85-end-drive-support':
+      return [];
     case 'incline-conveyor': {
       const infeedLenMm = Number(params?.infeedStraightLength ?? 1200);
       const inclineLenMm = Number(params?.inclinedLength ?? 2600);
@@ -614,7 +639,7 @@ interface EditorState {
   simulationSpeed: number;
   
   // UI state
-  activeLibraryTab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
+  activeLibraryTab: 'process' | 'modular' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
   showPropertiesPanel: boolean;
   
   // Panel state
@@ -675,7 +700,7 @@ interface EditorState {
   setPathsVisible: (visible: boolean) => void;
   
   setSceneSettings: (settings: Partial<SceneSettings>) => void;
-  setActiveLibraryTab: (tab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical') => void;
+  setActiveLibraryTab: (tab: 'process' | 'modular' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical') => void;
   
   // Panel actions
   setLeftPanelWidth: (width: number) => void;
@@ -866,7 +891,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addProcessNode: (type, position) => {
     // Check if there's a matching asset in the manifest
     const manifest = get().assetManifest;
-    const matchingAsset = manifest.find(a => a.id === type && a.category === 'process');
+    const matchingAsset = manifest.find(a => a.id === type && (a.category === 'process' || a.category === 'modular'));
     const isParametric = matchingAsset?.assetType === 'parametric';
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
@@ -1435,6 +1460,46 @@ function getDefaultParameters(type: string): Record<string, any> {
     sink: { capacity: 100 },
     conveyor: { length: 5000, width: 1000, speed: 20 },
     'belt-conveyor': { width: 600, length: 3000, height: 800, angle: 0, beltSpeed: 20, sideGuides: true, driveEnd: 'right', supportSpacing: 1500, showLegs: true, adjustableFeetEnabled: true },
+    'mm85-conveyor-section': {
+      sectionLength: 1000,
+      chainWidth: 85,
+      elevation: 850,
+      sectionStyle: 'Standard',
+      sideGuidesEnabled: true,
+      guideHeight: 35,
+    },
+    'mm85-drive-end': {
+      moduleLength: 450,
+      chainWidth: 85,
+      elevation: 850,
+      motorSide: 'Right',
+      includeEncoder: true,
+    },
+    'mm85-idler-end': {
+      moduleLength: 420,
+      chainWidth: 85,
+      elevation: 850,
+      withProtectionCover: true,
+    },
+    'mm85-guide-rail': {
+      railLength: 1000,
+      railSpacing: 130,
+      railHeight: 35,
+      elevation: 900,
+      railType: 'Fixed Aluminium',
+    },
+    'mm85-support-leg': {
+      supportHeight: 850,
+      supportSpan: 220,
+      braceMode: 'Cross Brace',
+      footSize: 80,
+    },
+    'mm85-end-drive-support': {
+      supportHeight: 850,
+      supportSpan: 260,
+      heavyDuty: true,
+      footSize: 90,
+    },
     'incline-conveyor': {
       conveyorWidth: 650,
       overallLength: 5200,

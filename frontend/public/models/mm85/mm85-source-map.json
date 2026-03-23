@@ -1,0 +1,55 @@
+{
+  "family": "MM-85",
+  "sourceRoot": "Simulation-3d-Models-/3D Models",
+  "components": [
+    {
+      "id": "conveyor-beam-straight",
+      "sourceArchive": "X85/Beam.vcm",
+      "sourceAsset": "flexlink_xbcb_1a85.stl",
+      "exportedAsset": "conveyor-beam-straight.stl",
+      "bytes": 34462
+    },
+    {
+      "id": "drive-end-unit",
+      "sourceArchive": "X85/EndDrive.vcm",
+      "sourceAsset": "xbeb_0a85cnrp.stl",
+      "exportedAsset": "drive-end-unit.stl",
+      "bytes": 349000
+    },
+    {
+      "id": "idler-end-unit",
+      "sourceArchive": "X85/Idler.vcm",
+      "sourceAsset": "xbej_a85.stl",
+      "exportedAsset": "idler-end-unit.stl",
+      "bytes": 460211
+    },
+    {
+      "id": "guide-rail-fixed-aluminium",
+      "sourceArchive": "Guide Rails/FixedAluminium.vcm",
+      "sourceAsset": "flexlink_xlrb_48x30.stl",
+      "exportedAsset": "guide-rail-fixed-aluminium.stl",
+      "bytes": 10682
+    },
+    {
+      "id": "guide-rail-fixed-plastic",
+      "sourceArchive": "Guide Rails/FixedPlastic.vcm",
+      "sourceAsset": "flexlink_xlrb_16x42_c_0.stl",
+      "exportedAsset": "guide-rail-fixed-plastic.stl",
+      "bytes": 5356
+    },
+    {
+      "id": "support-leg-single",
+      "sourceArchive": "Support/SingleSupport.vcm",
+      "sourceAsset": "xucs_44_-_5112469_01-1.stl",
+      "exportedAsset": "support-leg-single.stl",
+      "bytes": 355847
+    },
+    {
+      "id": "support-end-drive",
+      "sourceArchive": "Support/EndDriveSupport.vcm",
+      "sourceAsset": "flexlink_5116741.stl",
+      "exportedAsset": "support-end-drive.stl",
+      "bytes": 33392
+    }
+  ]
+}
