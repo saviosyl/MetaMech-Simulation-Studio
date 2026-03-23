@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { TDSLoader } from 'three/examples/jsm/loaders/TDSLoader.js';
 import type { BuilderResult, ConnectionPort } from './beltConveyorBuilder';
 
 export interface MM85SourceMappingEntry {
@@ -112,21 +111,22 @@ function cloneWithMaterials(group: THREE.Group): THREE.Group {
 
 function triggerSourceLoad(key: SourceKey): void {
   if (sourceTemplateCache.has(key) || sourceLoadPromises.has(key) || sourceLoadFailures.has(key)) return;
-  const loader = new TDSLoader();
-  const loadPromise = loader
-    .loadAsync(SOURCE_FILES[key])
-    .then((loaded) => {
-      loaded.traverse((node) => {
-        if ((node as THREE.Mesh).isMesh) {
-          const mesh = node as THREE.Mesh;
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-        }
-      });
-      sourceTemplateCache.set(key, loaded);
-      sourceBoundsCache.set(key, new THREE.Box3().setFromObject(loaded));
-      sourceReadyVersion += 1;
-    })
+  const loadPromise = (async () => {
+    // Lazy-load TDS parser so a loader/module issue cannot block the full app shell.
+    const { TDSLoader } = await import('three/examples/jsm/loaders/TDSLoader.js');
+    const loader = new TDSLoader();
+    const loaded = await loader.loadAsync(SOURCE_FILES[key]);
+    loaded.traverse((node) => {
+      if ((node as THREE.Mesh).isMesh) {
+        const mesh = node as THREE.Mesh;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+      }
+    });
+    sourceTemplateCache.set(key, loaded);
+    sourceBoundsCache.set(key, new THREE.Box3().setFromObject(loaded));
+    sourceReadyVersion += 1;
+  })()
     .catch((error) => {
       sourceLoadFailures.add(key);
       // Keep this warn explicit to make source-asset load failures easy to diagnose.
