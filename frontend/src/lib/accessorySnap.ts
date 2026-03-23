@@ -17,7 +17,18 @@ import { createTransportPath } from './transportPath';
 type Vec3 = [number, number, number];
 
 const ACCESSORY_TYPES = ['sensor', 'stopper', 'pusher'];
-const CONVEYOR_TYPES = ['conveyor', 'belt-conveyor', 'roller-conveyor', 'bend-conveyor', 'spiral-conveyor'];
+const CONVEYOR_TYPES = [
+  'conveyor',
+  'belt-conveyor',
+  'roller-conveyor',
+  'bend-conveyor',
+  'spiral-conveyor',
+  'incline-conveyor',
+  'mm85-conveyor-section',
+  'mm85-drive-end',
+  'mm85-idler-end',
+  'mm85-guide-rail',
+];
 const SNAP_RANGE = 2.0; // meters — max distance to snap
 
 export type MountSide = 'left' | 'right' | 'center' | 'top';

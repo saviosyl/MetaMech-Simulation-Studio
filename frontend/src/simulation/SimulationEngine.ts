@@ -28,7 +28,21 @@ const COLOR_MAP: Record<string, string> = {
 };
 const RANDOM_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
 
-const CONVEYOR_TYPES = ['conveyor', 'belt-conveyor', 'roller-conveyor', 'bend-conveyor', 'modular-conveyor-straight', 'modular-conveyor-90-curve', 'modular-conveyor-45-curve', 'spiral-conveyor', 'incline-conveyor'];
+const CONVEYOR_TYPES = [
+  'conveyor',
+  'belt-conveyor',
+  'roller-conveyor',
+  'bend-conveyor',
+  'modular-conveyor-straight',
+  'modular-conveyor-90-curve',
+  'modular-conveyor-45-curve',
+  'spiral-conveyor',
+  'incline-conveyor',
+  'mm85-conveyor-section',
+  'mm85-drive-end',
+  'mm85-idler-end',
+  'mm85-guide-rail',
+];
 const MAX_FLOW_EVENTS = 200; // cap event log size
 
 export class SimulationEngine {
@@ -208,6 +222,10 @@ export class SimulationEngine {
         case 'modular-conveyor-45-curve':
         case 'spiral-conveyor':
         case 'incline-conveyor':
+        case 'mm85-conveyor-section':
+        case 'mm85-drive-end':
+        case 'mm85-idler-end':
+        case 'mm85-guide-rail':
           if (node.parameters.accumulationMode) {
             this.tickAccumulationConveyor(node, stats, elapsed);
           } else {
