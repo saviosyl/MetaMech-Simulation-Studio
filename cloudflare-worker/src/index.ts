@@ -1508,12 +1508,28 @@ export default {
         return withCors(request, response, env);
       }
 
+      // Backward-compatible aliases for legacy frontend paths that prepend /api.
+      if (request.method === 'POST' && path === '/api/auth/register') {
+        response = await handleRegister(request, env);
+        return withCors(request, response, env);
+      }
+
       if (request.method === 'POST' && path === '/auth/login') {
         response = await handleLogin(request, env);
         return withCors(request, response, env);
       }
 
+      if (request.method === 'POST' && path === '/api/auth/login') {
+        response = await handleLogin(request, env);
+        return withCors(request, response, env);
+      }
+
       if (request.method === 'POST' && path === '/auth/logout') {
+        response = await handleLogout();
+        return withCors(request, response, env);
+      }
+
+      if (request.method === 'POST' && path === '/api/auth/logout') {
         response = await handleLogout();
         return withCors(request, response, env);
       }
@@ -1530,6 +1546,11 @@ export default {
 
       if (request.method === 'POST' && path === '/billing/create-portal-session') {
         response = await handleCreatePortalSession(request, env);
+        return withCors(request, response, env);
+      }
+
+      if (request.method === 'GET' && path === '/api/auth/me') {
+        response = await handleMe(request, env);
         return withCors(request, response, env);
       }
 
