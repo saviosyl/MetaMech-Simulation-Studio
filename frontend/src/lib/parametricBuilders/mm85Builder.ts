@@ -67,6 +67,12 @@ const SOURCE_FILES = {
 } as const;
 
 type SourceKey = keyof typeof SOURCE_FILES;
+type MM85FlowKey =
+  | 'mm85-conveyor-section'
+  | 'mm85-drive-end'
+  | 'mm85-idler-end'
+  | 'mm85-guide-rail-fixed-aluminium'
+  | 'mm85-guide-rail-fixed-plastic';
 
 const SOURCE_AXES: Record<SourceKey, { lengthAxis: Axis; widthAxis?: Axis; heightAxis: Axis }> = {
   'mm85-conveyor-section': { lengthAxis: 'x', widthAxis: 'y', heightAxis: 'z' },
@@ -76,6 +82,16 @@ const SOURCE_AXES: Record<SourceKey, { lengthAxis: Axis; widthAxis?: Axis; heigh
   'mm85-guide-rail-fixed-plastic': { lengthAxis: 'z', widthAxis: 'x', heightAxis: 'y' },
   'mm85-support-leg': { lengthAxis: 'z', widthAxis: 'x', heightAxis: 'y' },
   'mm85-end-drive-support': { lengthAxis: 'z', widthAxis: 'x', heightAxis: 'y' },
+};
+
+// Nominal source heights (in source millimeters). These keep MM-85 at realistic
+// world scale even if parser quirks produce unusual raw source dimensions.
+const FLOW_NOMINAL_HEIGHT_MM: Record<MM85FlowKey, number> = {
+  'mm85-conveyor-section': 74,
+  'mm85-drive-end': 213.21,
+  'mm85-idler-end': 151.856,
+  'mm85-guide-rail-fixed-aluminium': 52.5,
+  'mm85-guide-rail-fixed-plastic': 35.52,
 };
 
 const sourceTemplateCache = new Map<SourceKey, THREE.Group>();
@@ -160,6 +176,28 @@ function straightPorts(lengthM: number, elevationM: number): ConnectionPort[] {
   ];
 }
 
+function hasFiniteBounds(bounds: THREE.Box3): boolean {
+  return (
+    Number.isFinite(bounds.min.x) &&
+    Number.isFinite(bounds.min.y) &&
+    Number.isFinite(bounds.min.z) &&
+    Number.isFinite(bounds.max.x) &&
+    Number.isFinite(bounds.max.y) &&
+    Number.isFinite(bounds.max.z)
+  );
+}
+
+function portsFromBoundsCenterline(bounds: THREE.Box3, infeedTopM: number, outfeedTopM: number): ConnectionPort[] {
+  if (!hasFiniteBounds(bounds) || bounds.isEmpty()) return [];
+  const spanX = Math.max(0.02, bounds.max.x - bounds.min.x);
+  const inset = Math.min(0.02, spanX * 0.1);
+  const zCenter = (bounds.min.z + bounds.max.z) / 2;
+  return [
+    { id: 'input', type: 'input', localPosition: [bounds.min.x + inset, infeedTopM, zCenter] },
+    { id: 'output', type: 'output', localPosition: [bounds.max.x - inset, outfeedTopM, zCenter] },
+  ];
+}
+
 function setScaleOnAxis(target: THREE.Vector3, axis: Axis, value: number): void {
   target.setComponent(axisIndex(axis), value);
 }
@@ -171,12 +209,14 @@ function makeDeferredSourceGroup(): THREE.Group {
 }
 
 function fitFlowComponentFromSource(
-  key: SourceKey,
+  key: MM85FlowKey,
   source: { group: THREE.Group; bounds: THREE.Box3 },
   options: {
     targetLengthMm: number;
-    targetTopYMm: number;
+    targetTopStartYMm: number;
+    targetTopEndYMm: number;
     targetWidthMm?: number;
+    targetHeightMm?: number;
     mirrorZ?: boolean;
   }
 ): THREE.Group {
@@ -199,13 +239,32 @@ function fitFlowComponentFromSource(
       scaled.setComponent(widthIdx, widthScale);
     }
   }
+  if (options.targetHeightMm) {
+    const heightIdx = axisIndex(axes.heightAxis);
+    const rawHeight = sourceSize.getComponent(heightIdx);
+    if (rawHeight > 0.0001) {
+      const heightScale = 0.001 * (options.targetHeightMm / rawHeight);
+      scaled.setComponent(heightIdx, heightScale);
+    }
+  }
   group.scale.copy(scaled);
   if (options.mirrorZ) group.scale.z *= -1;
 
-  const fittedBounds = new THREE.Box3().setFromObject(group);
+  let fittedBounds = new THREE.Box3().setFromObject(group);
+  if (hasFiniteBounds(fittedBounds) && !fittedBounds.isEmpty()) {
+    const size = new THREE.Vector3();
+    fittedBounds.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    // Guard against parser-induced runaway dimensions that break editor zoom.
+    if (maxDim > 8) {
+      const correction = 8 / maxDim;
+      group.scale.multiplyScalar(correction);
+      fittedBounds = new THREE.Box3().setFromObject(group);
+    }
+  }
   const center = new THREE.Vector3();
   fittedBounds.getCenter(center);
-  const targetTopY = options.targetTopYMm / 1000;
+  const targetTopY = ((options.targetTopStartYMm + options.targetTopEndYMm) * 0.5) / 1000;
   const yShift = targetTopY - fittedBounds.max.y;
   group.position.set(-center.x, yShift, -center.z);
 
@@ -244,22 +303,29 @@ export function buildMM85ConveyorSection(params: Record<string, any>): BuilderRe
   const lengthMm = Math.max(350, Number(params.sectionLength ?? params.length ?? 1000));
   const lengthM = lengthMm / 1000;
   const chainWidthMm = Math.max(60, Number(params.chainWidth ?? 85));
-  const beltTopMm = Math.max(250, Number(params.elevation ?? params.height ?? 850));
+  const infeedTopMm = Math.max(250, Number(params.infeedHeight ?? params.elevation ?? params.height ?? 850));
+  const outfeedTopMm = Math.max(250, Number(params.outfeedHeight ?? infeedTopMm));
 
   const source = getSourceClone('mm85-conveyor-section');
   const group = source
     ? fitFlowComponentFromSource('mm85-conveyor-section', source, {
         targetLengthMm: lengthMm,
-        targetTopYMm: beltTopMm,
+        targetTopStartYMm: infeedTopMm,
+        targetTopEndYMm: outfeedTopMm,
         targetWidthMm: chainWidthMm,
+        targetHeightMm: FLOW_NOMINAL_HEIGHT_MM['mm85-conveyor-section'],
       })
     : makeDeferredSourceGroup();
+  const bounds = createBounds(group);
+  const ports = portsFromBoundsCenterline(bounds, infeedTopMm / 1000, outfeedTopMm / 1000);
+  const resolvedPorts = ports.length > 0 ? ports : straightPorts(lengthM, infeedTopMm / 1000);
+  const pathLength = Math.abs(resolvedPorts[1].localPosition[0] - resolvedPorts[0].localPosition[0]);
 
   return {
     group,
-    ports: straightPorts(lengthM, beltTopMm / 1000),
-    bounds: createBounds(group),
-    pathLength: lengthM,
+    ports: resolvedPorts,
+    bounds,
+    pathLength: Math.max(0.05, pathLength),
   };
 }
 
@@ -267,23 +333,30 @@ export function buildMM85DriveEnd(params: Record<string, any>): BuilderResult {
   const moduleLengthMm = Math.max(280, Number(params.moduleLength ?? 450));
   const moduleLengthM = moduleLengthMm / 1000;
   const chainWidthMm = Math.max(60, Number(params.chainWidth ?? 85));
-  const beltTopMm = Math.max(250, Number(params.elevation ?? params.height ?? 850));
+  const infeedTopMm = Math.max(250, Number(params.infeedHeight ?? params.elevation ?? params.height ?? 850));
+  const outfeedTopMm = Math.max(250, Number(params.outfeedHeight ?? infeedTopMm));
   const motorSide = String(params.motorSide ?? 'Right');
   const source = getSourceClone('mm85-drive-end');
   const group = source
     ? fitFlowComponentFromSource('mm85-drive-end', source, {
         targetLengthMm: moduleLengthMm,
-        targetTopYMm: beltTopMm,
+        targetTopStartYMm: infeedTopMm,
+        targetTopEndYMm: outfeedTopMm,
         targetWidthMm: chainWidthMm,
+        targetHeightMm: FLOW_NOMINAL_HEIGHT_MM['mm85-drive-end'],
         mirrorZ: motorSide.toLowerCase() === 'left',
       })
     : makeDeferredSourceGroup();
+  const bounds = createBounds(group);
+  const ports = portsFromBoundsCenterline(bounds, infeedTopMm / 1000, outfeedTopMm / 1000);
+  const resolvedPorts = ports.length > 0 ? ports : straightPorts(moduleLengthM, infeedTopMm / 1000);
+  const pathLength = Math.abs(resolvedPorts[1].localPosition[0] - resolvedPorts[0].localPosition[0]);
 
   return {
     group,
-    ports: straightPorts(moduleLengthM, beltTopMm / 1000),
-    bounds: createBounds(group),
-    pathLength: moduleLengthM,
+    ports: resolvedPorts,
+    bounds,
+    pathLength: Math.max(0.05, pathLength),
   };
 }
 
@@ -291,22 +364,29 @@ export function buildMM85IdlerEnd(params: Record<string, any>): BuilderResult {
   const moduleLengthMm = Math.max(260, Number(params.moduleLength ?? 420));
   const moduleLengthM = moduleLengthMm / 1000;
   const chainWidthMm = Math.max(60, Number(params.chainWidth ?? 85));
-  const beltTopMm = Math.max(250, Number(params.elevation ?? params.height ?? 850));
+  const infeedTopMm = Math.max(250, Number(params.infeedHeight ?? params.elevation ?? params.height ?? 850));
+  const outfeedTopMm = Math.max(250, Number(params.outfeedHeight ?? infeedTopMm));
 
   const source = getSourceClone('mm85-idler-end');
   const group = source
     ? fitFlowComponentFromSource('mm85-idler-end', source, {
         targetLengthMm: moduleLengthMm,
-        targetTopYMm: beltTopMm,
+        targetTopStartYMm: infeedTopMm,
+        targetTopEndYMm: outfeedTopMm,
         targetWidthMm: chainWidthMm,
+        targetHeightMm: FLOW_NOMINAL_HEIGHT_MM['mm85-idler-end'],
       })
     : makeDeferredSourceGroup();
+  const bounds = createBounds(group);
+  const ports = portsFromBoundsCenterline(bounds, infeedTopMm / 1000, outfeedTopMm / 1000);
+  const resolvedPorts = ports.length > 0 ? ports : straightPorts(moduleLengthM, infeedTopMm / 1000);
+  const pathLength = Math.abs(resolvedPorts[1].localPosition[0] - resolvedPorts[0].localPosition[0]);
 
   return {
     group,
-    ports: straightPorts(moduleLengthM, beltTopMm / 1000),
-    bounds: createBounds(group),
-    pathLength: moduleLengthM,
+    ports: resolvedPorts,
+    bounds,
+    pathLength: Math.max(0.05, pathLength),
   };
 }
 
@@ -324,8 +404,10 @@ export function buildMM85GuideRail(params: Record<string, any>): BuilderResult {
   const group = source
     ? fitFlowComponentFromSource(key, source, {
         targetLengthMm: railLengthMm,
-        targetTopYMm: topMm,
+        targetTopStartYMm: topMm,
+        targetTopEndYMm: topMm,
         targetWidthMm: railSpacingMm,
+        targetHeightMm: FLOW_NOMINAL_HEIGHT_MM[key],
       })
     : makeDeferredSourceGroup();
 
