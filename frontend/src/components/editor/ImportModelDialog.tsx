@@ -4,6 +4,7 @@
  * Large file safeguard: warns if file > 10MB, rejects > 50MB
  */
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Upload, X, AlertTriangle, FileBox, Check } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 
@@ -26,6 +27,7 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
   const { addCustomModel } = useEditorStore();
 
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -71,7 +73,7 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
   const labelStyle: React.CSSProperties = {
     display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--mm-text-tertiary)',
     marginBottom: 6, letterSpacing: '0.06em', textTransform: 'uppercase',
-    fontFamily: "'Orbitron', monospace",
+    fontFamily: "'Orbitron', monospace", lineHeight: 1.2,
   };
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '8px 12px', fontSize: 12, background: 'var(--mm-bg-input)',
@@ -79,7 +81,7 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
     outline: 'none',
   };
 
-  return (
+  return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
       {/* Backdrop */}
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} />
@@ -87,10 +89,13 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
       {/* Dialog */}
       <div
         style={{
-          position: 'relative', width: 440, maxWidth: '95vw',
+          position: 'relative',
+          width: 'min(560px, calc(100vw - 40px))',
+          maxWidth: 560,
+          maxHeight: 'min(92vh, 780px)',
           background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)',
           borderRadius: 14, boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
-          overflow: 'hidden',
+          overflow: 'hidden', display: 'flex', flexDirection: 'column',
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -101,7 +106,7 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <FileBox size={16} style={{ color: 'var(--mm-accent-primary)' }} />
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--mm-text-primary)', fontFamily: "'Orbitron', monospace", letterSpacing: '0.05em' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--mm-text-primary)', fontFamily: "'Orbitron', monospace", letterSpacing: '0.05em', lineHeight: 1.2 }}>
               IMPORT 3D MODEL
             </span>
           </div>
@@ -114,7 +119,7 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
         </div>
 
         {/* Body */}
-        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
           {/* Name */}
           <div>
             <label style={labelStyle}>Model Name</label>
@@ -136,7 +141,7 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
 
           {/* File picker — AT BOTTOM of form fields */}
           <div>
-            <label style={labelStyle}>3D Model File</label>
+            <label style={{ ...labelStyle, textAlign: 'center', marginBottom: 8 }}>3D Model File</label>
             <div
               onClick={() => fileRef.current?.click()}
               style={{
@@ -218,7 +223,8 @@ const ImportModelDialog: React.FC<ImportModelDialogProps> = ({ isOpen, onClose }
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
