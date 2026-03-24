@@ -31,6 +31,10 @@ function mmToM(value: number): number {
   return value / 1000;
 }
 
+function mToMm(value: number): number {
+  return value * 1000;
+}
+
 function applyMotionPreview(
   targetRoot: THREE.Object3D,
   part: AssetMovingPart | null,
@@ -55,16 +59,46 @@ function applyMotionPreview(
 const ModelPreview: React.FC<{
   modelUrl: string | null;
   nodes: AssetDefinitionNode[];
+  selectedNodeIndex: number;
+  onSelectNode: (index: number) => void;
+  onPlaceNodeAtMm: (positionMm: [number, number, number]) => void;
+  onMoveNodeToMm: (index: number, positionMm: [number, number, number]) => void;
+  setObjectNames: (names: string[]) => void;
+  highlightedObjectNames: string[];
+  setHighlightedObjectNames: (names: string[]) => void;
   movingParts: AssetMovingPart[];
   previewPartIndex: number;
   previewT: number;
-}> = ({ modelUrl, nodes, movingParts, previewPartIndex, previewT }) => {
+}> = ({
+  modelUrl,
+  nodes,
+  selectedNodeIndex,
+  onSelectNode,
+  onPlaceNodeAtMm,
+  onMoveNodeToMm,
+  setObjectNames,
+  highlightedObjectNames,
+  setHighlightedObjectNames,
+  movingParts,
+  previewPartIndex,
+  previewT,
+}) => {
   const [loadedRoot, setLoadedRoot] = useState<THREE.Object3D | null>(null);
+  const [loadError, setLoadError] = useState<string>('');
+  const previewGroupRef = useRef<THREE.Group | null>(null);
+  const dragStateRef = useRef<{ index: number; offset: THREE.Vector3 } | null>(null);
+  const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
+  const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
+  const dragPlaneRef = useRef<THREE.Plane>(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+  const pointerDownRef = useRef(false);
+  const clickMovedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     if (!modelUrl) {
       setLoadedRoot(null);
+      setObjectNames([]);
+      setLoadError('');
       return () => {
         cancelled = true;
       };
@@ -77,16 +111,27 @@ const ModelPreview: React.FC<{
       (gltf) => {
         if (cancelled) return;
         setLoadedRoot(gltf.scene);
+        const names: string[] = [];
+        gltf.scene.traverse((child) => {
+          const c = child as THREE.Object3D & { isMesh?: boolean };
+          if (c.isMesh && c.name) names.push(c.name);
+        });
+        setObjectNames(Array.from(new Set(names)).sort((a, b) => a.localeCompare(b)));
+        setLoadError('');
       },
       undefined,
-      () => {
-        if (!cancelled) setLoadedRoot(null);
+      (err) => {
+        if (!cancelled) {
+          setLoadedRoot(null);
+          setObjectNames([]);
+          setLoadError(err?.message || 'Model could not be loaded');
+        }
       }
     );
     return () => {
       cancelled = true;
     };
-  }, [modelUrl]);
+  }, [modelUrl, setObjectNames]);
 
   const previewRoot = useMemo(() => {
     if (!loadedRoot) return null;
@@ -108,20 +153,103 @@ const ModelPreview: React.FC<{
         const mesh = child as THREE.Mesh;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        const material = mesh.material as THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[] | undefined;
+        const matList = Array.isArray(material) ? material : (material ? [material] : []);
+        const shouldHighlight = highlightedObjectNames.includes(mesh.name);
+        for (const mat of matList) {
+          if (!mat) continue;
+          mat.emissive = new THREE.Color(shouldHighlight ? '#1dd5ff' : '#000000');
+          mat.emissiveIntensity = shouldHighlight ? 0.45 : 0;
+          mat.needsUpdate = true;
+        }
       }
     });
     const part = movingParts[previewPartIndex] || null;
     applyMotionPreview(clone, part, previewT);
     return clone;
-  }, [loadedRoot, movingParts, previewPartIndex, previewT]);
+  }, [loadedRoot, movingParts, previewPartIndex, previewT, highlightedObjectNames]);
+
+  function getPlaneIntersection(event: THREE.Event): THREE.Vector3 | null {
+    const e = event as THREE.Event & { point?: THREE.Vector3 };
+    if (e.point && Number.isFinite(e.point.x) && Number.isFinite(e.point.y) && Number.isFinite(e.point.z)) {
+      return e.point.clone();
+    }
+    const pe = event.nativeEvent as PointerEvent | undefined;
+    if (!pe || !previewGroupRef.current) return null;
+    const canvas = pe.target as HTMLCanvasElement;
+    if (!canvas || typeof canvas.getBoundingClientRect !== 'function') return null;
+    const rect = canvas.getBoundingClientRect();
+    mouseRef.current.x = ((pe.clientX - rect.left) / rect.width) * 2 - 1;
+    mouseRef.current.y = -((pe.clientY - rect.top) / rect.height) * 2 + 1;
+    const camera = (event as unknown as { camera?: THREE.Camera }).camera;
+    if (!camera) return null;
+    raycasterRef.current.setFromCamera(mouseRef.current, camera);
+    const hit = new THREE.Vector3();
+    return raycasterRef.current.ray.intersectPlane(dragPlaneRef.current, hit) ? hit : null;
+  }
+
+  function snapPosition(positionM: THREE.Vector3): [number, number, number] {
+    const snapStepM = 0.05;
+    const sx = Math.round(positionM.x / snapStepM) * snapStepM;
+    const sy = Math.max(0, Math.round(positionM.y / snapStepM) * snapStepM);
+    const sz = Math.round(positionM.z / snapStepM) * snapStepM;
+    return [mToMm(sx), mToMm(sy), mToMm(sz)];
+  }
 
   return (
-    <Canvas shadows camera={{ position: [2.5, 2, 2.5], fov: 45 }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <Canvas shadows camera={{ position: [2.5, 2, 2.5], fov: 45 }}>
       <ambientLight intensity={0.65} />
       <directionalLight castShadow position={[3, 5, 2]} intensity={1.1} />
       <Grid args={[10, 10]} cellColor="#6b7280" sectionColor="#334155" fadeDistance={18} fadeStrength={1.2} />
       {previewRoot ? (
-        <primitive object={previewRoot} />
+        <group
+          ref={previewGroupRef}
+          onPointerDown={(event) => {
+            pointerDownRef.current = true;
+            clickMovedRef.current = false;
+            const point = getPlaneIntersection(event);
+            if (!point) return;
+            const hoveredName = (event.object as THREE.Object3D | undefined)?.name;
+            if (hoveredName) setHighlightedObjectNames([hoveredName]);
+            if (selectedNodeIndex >= 0 && nodes[selectedNodeIndex]) {
+              const node = nodes[selectedNodeIndex];
+              const nodePos = new THREE.Vector3(mmToM(node.position[0]), mmToM(node.position[1]), mmToM(node.position[2]));
+              const dist = point.distanceTo(nodePos);
+              if (dist < 0.13) {
+                dragStateRef.current = { index: selectedNodeIndex, offset: nodePos.clone().sub(point) };
+                event.stopPropagation();
+              }
+            }
+          }}
+          onPointerMove={(event) => {
+            if (!pointerDownRef.current) return;
+            clickMovedRef.current = true;
+            const drag = dragStateRef.current;
+            if (!drag) return;
+            const point = getPlaneIntersection(event);
+            if (!point) return;
+            const moved = point.clone().add(drag.offset);
+            onMoveNodeToMm(drag.index, snapPosition(moved));
+          }}
+          onPointerUp={(event) => {
+            pointerDownRef.current = false;
+            const drag = dragStateRef.current;
+            dragStateRef.current = null;
+            if (drag) return;
+            if (clickMovedRef.current) return;
+            const point = getPlaneIntersection(event);
+            if (!point) return;
+            onPlaceNodeAtMm(snapPosition(point));
+          }}
+          onPointerMissed={() => {
+            pointerDownRef.current = false;
+            dragStateRef.current = null;
+            setHighlightedObjectNames([]);
+          }}
+        >
+          <primitive object={previewRoot} />
+        </group>
       ) : (
         <mesh castShadow receiveShadow>
           <boxGeometry args={[1.2, 0.8, 0.8]} />
@@ -130,19 +258,35 @@ const ModelPreview: React.FC<{
       )}
       {nodes.map((node, index) => {
         const p = node.position || [0, 0, 0];
+        const selected = selectedNodeIndex === index;
         return (
           <mesh
             key={`${node.id || 'node'}-${index}`}
             position={[mmToM(Number(p[0]) || 0), mmToM(Number(p[1]) || 0), mmToM(Number(p[2]) || 0)]}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectNode(index);
+            }}
           >
-            <sphereGeometry args={[0.05, 12, 10]} />
-            <meshStandardMaterial color={String(node.type || '').toLowerCase().includes('in') ? '#34d399' : '#22d3ee'} />
+            <sphereGeometry args={[selected ? 0.07 : 0.05, 14, 12]} />
+            <meshStandardMaterial color={selected ? '#f59e0b' : (String(node.type || '').toLowerCase().includes('in') ? '#34d399' : '#22d3ee')} />
           </mesh>
         );
       })}
       <Environment preset="city" />
       <OrbitControls makeDefault />
-    </Canvas>
+      </Canvas>
+      {loadError && (
+        <div style={{ position: 'absolute', left: 12, right: 12, top: 12, border: '1px solid color-mix(in oklab, var(--mm-accent-danger) 35%, transparent)', borderRadius: 8, background: 'var(--mm-accent-danger-muted)', color: 'var(--mm-accent-danger)', fontSize: 12, padding: '8px 10px' }}>
+          GLB preview failed: {loadError}
+        </div>
+      )}
+      {!modelUrl && (
+        <div style={{ position: 'absolute', left: 12, right: 12, top: 12, border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', color: 'var(--mm-text-secondary)', fontSize: 12, padding: '8px 10px' }}>
+          Upload a GLB to preview and author nodes/moving parts.
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -169,6 +313,10 @@ const AdminAssetEditorPage: React.FC = () => {
   const [selectedNodeIndex, setSelectedNodeIndex] = useState<number>(-1);
   const [previewPartIndex, setPreviewPartIndex] = useState<number>(-1);
   const [previewT, setPreviewT] = useState<number>(0.5);
+  const [objectNames, setObjectNames] = useState<string[]>([]);
+  const [objectFilter, setObjectFilter] = useState('');
+  const [selectedObjectName, setSelectedObjectName] = useState('');
+  const [highlightedObjectNames, setHighlightedObjectNames] = useState<string[]>([]);
 
   const metadata = useMemo<AssetMetadata>(() => {
     return {
@@ -256,6 +404,31 @@ const AdminAssetEditorPage: React.FC = () => {
   function updateNode(index: number, updates: Partial<AssetDefinitionNode>): void {
     setNodes((prev) => prev.map((node, i) => (i === index ? { ...node, ...updates } : node)));
   }
+
+  function placeSelectedNodeAt(positionMm: [number, number, number]): void {
+    if (selectedNodeIndex < 0 || !nodes[selectedNodeIndex]) {
+      const id = `NODE_${nodes.length + 1}`;
+      const kind = nodes.length === 0 ? 'infeed' : (nodes.length === 1 ? 'outfeed' : 'center');
+      const next: AssetDefinitionNode = {
+        id,
+        label: id,
+        type: kind,
+        position: positionMm,
+        rotation: [0, 0, 0],
+        direction: [1, 0, 0],
+      };
+      setNodes((prev) => [...prev, next]);
+      setSelectedNodeIndex(nodes.length);
+      return;
+    }
+    updateNode(selectedNodeIndex, { position: positionMm });
+  }
+
+  const filteredObjectNames = useMemo(() => {
+    const q = objectFilter.trim().toLowerCase();
+    if (!q) return objectNames;
+    return objectNames.filter((name) => name.toLowerCase().includes(q));
+  }, [objectFilter, objectNames]);
 
   function addMovingPart(): void {
     setMovableParts((prev) => [
@@ -439,6 +612,13 @@ const AdminAssetEditorPage: React.FC = () => {
             <ModelPreview
               modelUrl={asset?.modelUrl || null}
               nodes={nodes}
+              selectedNodeIndex={selectedNodeIndex}
+              onSelectNode={setSelectedNodeIndex}
+              onPlaceNodeAtMm={placeSelectedNodeAt}
+              onMoveNodeToMm={(index, positionMm) => updateNode(index, { position: positionMm })}
+              setObjectNames={setObjectNames}
+              highlightedObjectNames={highlightedObjectNames}
+              setHighlightedObjectNames={setHighlightedObjectNames}
               movingParts={movableParts}
               previewPartIndex={previewPartIndex}
               previewT={previewT}
@@ -494,6 +674,12 @@ const AdminAssetEditorPage: React.FC = () => {
                     Add Node
                   </button>
                 </div>
+                <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Visual Placement</div>
+                  <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4 }}>
+                    Click in viewport to place selected node. Drag selected node to reposition. Placement snaps to 50mm increments for guided alignment.
+                  </div>
+                </div>
                 <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
                   {nodes.map((node, index) => (
                     <button key={`${node.id || 'node'}-${index}`} type="button" onClick={() => setSelectedNodeIndex(index)} style={{ textAlign: 'left', border: `1px solid ${selectedNodeIndex === index ? 'color-mix(in oklab, var(--mm-accent-primary) 40%, transparent)' : 'var(--mm-border-subtle)'}`, borderRadius: 8, padding: 8, background: selectedNodeIndex === index ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)' }}>
@@ -547,6 +733,76 @@ const AdminAssetEditorPage: React.FC = () => {
                     <Plus size={12} />
                     Add Part
                   </button>
+                </div>
+                <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Model Object Hierarchy (mesh/object names)</div>
+                  <input
+                    value={objectFilter}
+                    onChange={(e) => setObjectFilter(e.target.value)}
+                    placeholder="Filter object names"
+                    style={{ fontSize: 12 }}
+                  />
+                  <div style={{ maxHeight: 130, overflowY: 'auto', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, background: 'var(--mm-bg-panel)' }}>
+                    {filteredObjectNames.length === 0 ? (
+                      <div style={{ padding: 8, fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                        {objectNames.length === 0 ? 'No named mesh objects found in current GLB.' : 'No objects match this filter.'}
+                      </div>
+                    ) : (
+                      filteredObjectNames.map((name) => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => {
+                            setSelectedObjectName(name);
+                            setHighlightedObjectNames([name]);
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '6px 8px',
+                            border: 'none',
+                            borderBottom: '1px solid var(--mm-border-subtle)',
+                            background: selectedObjectName === name ? 'var(--mm-accent-primary-muted)' : 'transparent',
+                            color: selectedObjectName === name ? 'var(--mm-accent-primary)' : 'var(--mm-text-secondary)',
+                            fontSize: 11,
+                          }}
+                        >
+                          {name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!selectedObjectName) return;
+                        setMovableParts((prev) => [
+                          ...prev,
+                          {
+                            objectName: selectedObjectName,
+                            motionType: 'translate',
+                            axis: 'x',
+                            min: 0,
+                            max: 100,
+                            default: 0,
+                            speed: 10,
+                          },
+                        ]);
+                      }}
+                      disabled={!selectedObjectName}
+                      style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11 }}
+                    >
+                      Add Selected Object as Moving Part
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHighlightedObjectNames([])}
+                      style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11 }}
+                    >
+                      Clear Highlight
+                    </button>
+                  </div>
                 </div>
                 <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
                   {movableParts.map((part, index) => (
