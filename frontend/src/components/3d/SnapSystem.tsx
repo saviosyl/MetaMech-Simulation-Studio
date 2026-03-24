@@ -15,7 +15,7 @@ const MACHINE_TYPES = new Set([
 const CONVEYOR_TYPES_SET = new Set([
   'conveyor', 'belt-conveyor', 'roller-conveyor', 'modular-conveyor-straight',
   'modular-conveyor-90-curve', 'modular-conveyor-45-curve', 'incline-conveyor',
-  'pallet-conveyor', 'bend-conveyor', 'spiral-conveyor',
+  'pallet-conveyor', 'bend-conveyor', 'spiral-conveyor', 'spiral-vyeor-conveyor',
   'transfer-bridge', 'popup-transfer', 'pusher-transfer', 'merge-divert', 'stainless-conveyor',
 ]);
 
@@ -77,7 +77,7 @@ function getMachineConveyorHeightAdjustments(
 
 function isHeightAdjustableForSpiralMate(nodeType: string): boolean {
   // Exclude spiral itself; the non-spiral counterpart should adapt to the spiral endpoint.
-  if (nodeType === 'spiral-conveyor') return false;
+  if (nodeType === 'spiral-conveyor' || nodeType === 'spiral-vyeor-conveyor') return false;
   return CONVEYOR_TYPES_SET.has(nodeType) || MACHINE_TYPES.has(nodeType);
 }
 
@@ -158,7 +158,11 @@ const SnapSystem: React.FC = () => {
               const dz = mpWorld[2] - opWorld[2];
               const planarDist = Math.sqrt(dx * dx + dz * dz);
               const dist3d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-              const spiralPair = node.type === 'spiral-conveyor' || other.type === 'spiral-conveyor';
+              const spiralPair =
+                node.type === 'spiral-conveyor' ||
+                node.type === 'spiral-vyeor-conveyor' ||
+                other.type === 'spiral-conveyor' ||
+                other.type === 'spiral-vyeor-conveyor';
               const usePlanarDist =
                 spiralPair &&
                 (isHeightAdjustableForSpiralMate(node.type) || isHeightAdjustableForSpiralMate(other.type));
@@ -469,7 +473,10 @@ export function checkSnap(
           (dpWorld[2] - opWorld[2]) ** 2
         );
         const spiralPair =
-          draggedNode.type === 'spiral-conveyor' || otherNode.type === 'spiral-conveyor';
+          draggedNode.type === 'spiral-conveyor' ||
+          draggedNode.type === 'spiral-vyeor-conveyor' ||
+          otherNode.type === 'spiral-conveyor' ||
+          otherNode.type === 'spiral-vyeor-conveyor';
         const fullDist = Math.sqrt(
           (dpWorld[0] - opWorld[0]) ** 2 +
           (dpWorld[1] - opWorld[1]) ** 2 +
@@ -482,7 +489,10 @@ export function checkSnap(
 
         if (effectiveDist < SNAP_THRESHOLD) {
           const spiralConnection =
-            draggedNode.type === 'spiral-conveyor' || otherNode.type === 'spiral-conveyor';
+            draggedNode.type === 'spiral-conveyor' ||
+            draggedNode.type === 'spiral-vyeor-conveyor' ||
+            otherNode.type === 'spiral-conveyor' ||
+            otherNode.type === 'spiral-vyeor-conveyor';
 
           // Spiral connections should align inline with the spiral tangent direction.
           if (spiralConnection) {

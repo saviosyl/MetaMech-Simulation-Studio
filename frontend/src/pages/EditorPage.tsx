@@ -78,7 +78,7 @@ const EditorPage: React.FC = () => {
           const scene = data.scene || data;
           const nodes = scene.processNodes || scene.nodes || [];
           for (const n of nodes) {
-            if (n.type === 'spiral-conveyor' && n.parameters) {
+            if ((n.type === 'spiral-conveyor' || n.type === 'spiral-vyeor-conveyor') && n.parameters) {
               const p = n.parameters;
               // Migrate old params: diameter/totalHeight/infeedAngle → new params
               if (p.diameter && !p.infeedHeight) {

@@ -13,7 +13,7 @@ export interface ProcessNode {
   id: string;
   type: 'source' | 'sink' | 'conveyor' | 'buffer' | 'machine' | 'router' | 
         'transfer-bridge' | 'popup-transfer' | 'pusher-transfer' | 'merge-divert' |
-        'spiral-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
+        'spiral-conveyor' | 'spiral-vyeor-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
         'belt-conveyor' | 'roller-conveyor' | 'industrial-robot' | 'machine-static' |
         'stopper' | 'pusher' | 'bend-conveyor' | 'sensor' |
         'modular-conveyor-straight' | 'modular-conveyor-90-curve' | 'modular-conveyor-45-curve' | 'incline-conveyor' |
@@ -223,7 +223,7 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
   // Spiral ports must always come from the shared spiral transfer geometry so
   // markers, snapping, and visible model endpoints stay in the same frame.
   // Do this before asset-builder lookup (spiral builder ports use a different schema).
-  if (type === 'spiral-conveyor') {
+  if (type === 'spiral-conveyor' || type === 'spiral-vyeor-conveyor') {
     const spiral = computeSpiralTransferGeometry(params ?? {}, 0.35);
     return [
       { id: 'input', type: 'input', localPosition: spiral.input.port, direction: spiral.input.direction },
@@ -1401,7 +1401,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // Migrate old spiral-conveyor params to new format
     const nodes = data.processNodes || [];
     for (const n of nodes) {
-      if (n.type === 'spiral-conveyor' && n.parameters) {
+      if ((n.type === 'spiral-conveyor' || n.type === 'spiral-vyeor-conveyor') && n.parameters) {
         const p = n.parameters;
         if ((p.diameter || p.totalHeight || p.infeedAngle !== undefined) && !p.outfeedAngle) {
           p.infeedHeight = p.infeedHeight || 800;
@@ -1534,6 +1534,7 @@ function getDefaultParameters(type: string): Record<string, any> {
     pusher: { enabled: true, side: 'right', stroke: 300, plateWidth: 250, plateHeight: 100, mountHeight: 800, extended: false, mountPosition: 0.5, heightOffset: 0, flip: false },
     sensor: { sensorType: 'through-beam', triggered: false, mountHeight: 800, sensorHeight: 80, beltWidth: 600, showBeam: true, mountPosition: 0.5, mountSide: 'center', heightOffset: 0, flip: false },
     'spiral-conveyor': { beltWidth: 400, turns: 3, infeedHeight: 800, outfeedHeight: 3800, outfeedAngle: 180, direction: 'up', speed: 1, sideGuides: true, guideHeight: 80, showLegs: true, centerStructure: 'column' },
+    'spiral-vyeor-conveyor': { beltWidth: 400, turns: 3, infeedHeight: 800, outfeedHeight: 3800, outfeedAngle: 180, direction: 'up', speed: 1, sideGuides: true, guideHeight: 80, showLegs: true, centerStructure: 'column' },
     'vertical-lifter': { platformWidth: 1000, platformDepth: 1000, infeedHeight: 0, outfeedHeight: 3000, liftDirection: 'up', speed: 20, loadDirection: 'front', fenceEnabled: true, capacity: 4 },
     'pick-and-place': { reach: 3, speed: 1.0 },
     palletizer: { palletSize: [1.2, 0.8], stackHeight: 1.5 },

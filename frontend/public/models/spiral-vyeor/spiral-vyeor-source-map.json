@@ -1,0 +1,34 @@
+{
+  "family": "Spiral Vyeor",
+  "sourceRoot": "Simulation-3d-Models-/3D Models",
+  "sourceArchive": "SpiralVyeor.vcmx",
+  "extraction": {
+    "method": "Unzipped .vcmx and parsed geo-* chunks via TDSLoader; merged and exported to GLB",
+    "extractedGeoFiles": 77,
+    "parsedGeoFiles": 76,
+    "failedGeoFiles": [
+      "geo-6a6bb138-4302-402b-91be-2bec30970ebb"
+    ]
+  },
+  "runtimeAsset": {
+    "format": "glb",
+    "file": "spiral-vyeor.glb",
+    "boundsMeters": {
+      "min": [
+        -0.8720939636230469,
+        0,
+        -0.8771886901855471
+      ],
+      "max": [
+        0.8720939636230469,
+        3.5989999999999998,
+        0.8771886901855471
+      ],
+      "size": [
+        1.7441879272460938,
+        3.5989999999999998,
+        1.7543773803710943
+      ]
+    }
+  }
+}

@@ -846,6 +846,37 @@ function loadInlineManifest(): AssetDef[] {
         speed: { type: 'number', label: 'Speed', unit: 'm/min', step: 1 },
       },
     },
+    {
+      id: 'spiral-vyeor-conveyor',
+      assetType: 'parametric',
+      category: 'process',
+      sourceMap: {
+        sourcePlatform: 'Simulation-3d-Models-',
+        sourceFolder: '3D Models',
+        sourceArchive: 'SpiralVyeor.vcmx',
+        sourceAsset: 'geo-* (merged)',
+      },
+      name: 'Spiral Vyeor Conveyor',
+      description: 'Spiral conveyor using the extracted SpiralVyeor source model',
+      builder: 'spiralConveyorBuilder',
+      parts: {},
+      thumbnailUrl: '',
+      defaults: { beltWidth: 400, turns: 3, infeedHeight: 800, outfeedHeight: 3800, outfeedAngle: 180, direction: 'up', speed: 20, sideGuides: true, guideHeight: 100, showLegs: true, centerStructure: 'column' },
+      limits: { beltWidth: [150, 800], turns: [0.5, 10], infeedHeight: [0, 6000], outfeedHeight: [0, 15000], outfeedAngle: [0, 360], speed: [1, 60], guideHeight: [40, 250] },
+      parameterDefs: {
+        direction: { type: 'select', label: 'Direction', options: ['up', 'down'] },
+        beltWidth: { type: 'number', label: 'Belt Width', unit: 'mm', step: 50 },
+        turns: { type: 'number', label: 'Turns', step: 0.5 },
+        outfeedAngle: { type: 'number', label: 'Outfeed Angle', unit: '°', step: 15 },
+        infeedHeight: { type: 'number', label: 'Infeed Height', unit: 'mm', step: 50 },
+        outfeedHeight: { type: 'number', label: 'Outfeed Height', unit: 'mm', step: 50 },
+        speed: { type: 'number', label: 'Speed', unit: 'm/min', step: 1 },
+        sideGuides: { type: 'boolean', label: 'Side Guides' },
+        guideHeight: { type: 'number', label: 'Guide Height', unit: 'mm', step: 10 },
+        showLegs: { type: 'boolean', label: 'Show Supports' },
+        centerStructure: { type: 'select', label: 'Center Structure', options: ['column', 'framed-core'] },
+      },
+    },
 
     // === PARAMETRIC: Vertical Lifter ===
     {

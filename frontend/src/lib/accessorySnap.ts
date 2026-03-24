@@ -23,6 +23,7 @@ const CONVEYOR_TYPES = [
   'roller-conveyor',
   'bend-conveyor',
   'spiral-conveyor',
+  'spiral-vyeor-conveyor',
   'incline-conveyor',
   'mm85-conveyor-section',
   'mm85-drive-end',

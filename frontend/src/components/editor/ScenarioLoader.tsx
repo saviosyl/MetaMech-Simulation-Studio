@@ -170,7 +170,7 @@ const ScenarioLoader: React.FC = () => {
       const processTypes = new Set([
         'source', 'sink', 'conveyor', 'belt-conveyor', 'roller-conveyor', 'buffer', 'machine',
         'router', 'transfer-bridge', 'popup-transfer', 'pusher-transfer', 'merge-divert',
-        'spiral-conveyor', 'vertical-lifter', 'pick-and-place', 'palletizer',
+        'spiral-conveyor', 'spiral-vyeor-conveyor', 'vertical-lifter', 'pick-and-place', 'palletizer',
         'modular-conveyor-straight', 'modular-conveyor-90-curve', 'modular-conveyor-45-curve',
         'bend-conveyor', 'stopper', 'pusher', 'sensor', 'industrial-robot', 'machine-static',
         'cartesian-robot', 'cobot', 'robot-5axis', 'robot-6axis',

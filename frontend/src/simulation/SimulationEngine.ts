@@ -37,6 +37,7 @@ const CONVEYOR_TYPES = [
   'modular-conveyor-90-curve',
   'modular-conveyor-45-curve',
   'spiral-conveyor',
+  'spiral-vyeor-conveyor',
   'incline-conveyor',
   'mm85-conveyor-section',
   'mm85-drive-end',
@@ -221,6 +222,7 @@ export class SimulationEngine {
         case 'modular-conveyor-90-curve':
         case 'modular-conveyor-45-curve':
         case 'spiral-conveyor':
+        case 'spiral-vyeor-conveyor':
         case 'incline-conveyor':
         case 'mm85-conveyor-section':
         case 'mm85-drive-end':

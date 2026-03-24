@@ -320,7 +320,8 @@ export function createTransportPath(type: string, params: Record<string, any>): 
       return new CurvedPath(radius, angle, height, direction);
     }
 
-    case 'spiral-conveyor': {
+    case 'spiral-conveyor':
+    case 'spiral-vyeor-conveyor': {
       const beltWidth = params.beltWidth ?? 400;
       const turns = params.turns ?? 3;
       const outfeedAngle = params.outfeedAngle ?? 180;
