@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Save, Shield, Trash2, Upload, User } from 'lucide-reac
 import { Canvas } from '@react-three/fiber';
 import { Environment, Grid, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { useAuth } from '../contexts/AuthContext';
 import {
   listLibraryAssets,
