@@ -164,17 +164,10 @@ function setScaleOnAxis(target: THREE.Vector3, axis: Axis, value: number): void 
   target.setComponent(axisIndex(axis), value);
 }
 
-function makeLoadingPlaceholder(lengthM: number, topY: number, widthM = 0.1): THREE.Group {
-  const group = new THREE.Group();
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(Math.max(0.2, lengthM), 0.04, Math.max(0.08, widthM)),
-    new THREE.MeshStandardMaterial({ color: 0x4f5b66, metalness: 0.45, roughness: 0.5 })
-  );
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  mesh.position.set(0, topY - 0.02, 0);
-  group.add(mesh);
-  return group;
+function makeDeferredSourceGroup(): THREE.Group {
+  // MM-85 visuals must come from extracted source meshes only.
+  // While source assets are still loading, render no placeholder geometry.
+  return new THREE.Group();
 }
 
 function fitFlowComponentFromSource(
@@ -260,7 +253,7 @@ export function buildMM85ConveyorSection(params: Record<string, any>): BuilderRe
         targetTopYMm: beltTopMm,
         targetWidthMm: chainWidthMm,
       })
-    : makeLoadingPlaceholder(lengthM, beltTopMm / 1000, chainWidthMm / 1000);
+    : makeDeferredSourceGroup();
 
   return {
     group,
@@ -284,7 +277,7 @@ export function buildMM85DriveEnd(params: Record<string, any>): BuilderResult {
         targetWidthMm: chainWidthMm,
         mirrorZ: motorSide.toLowerCase() === 'left',
       })
-    : makeLoadingPlaceholder(moduleLengthM, beltTopMm / 1000, chainWidthMm / 1000);
+    : makeDeferredSourceGroup();
 
   return {
     group,
@@ -307,7 +300,7 @@ export function buildMM85IdlerEnd(params: Record<string, any>): BuilderResult {
         targetTopYMm: beltTopMm,
         targetWidthMm: chainWidthMm,
       })
-    : makeLoadingPlaceholder(moduleLengthM, beltTopMm / 1000, chainWidthMm / 1000);
+    : makeDeferredSourceGroup();
 
   return {
     group,
@@ -334,7 +327,7 @@ export function buildMM85GuideRail(params: Record<string, any>): BuilderResult {
         targetTopYMm: topMm,
         targetWidthMm: railSpacingMm,
       })
-    : makeLoadingPlaceholder(railLengthM, topMm / 1000, Math.max(0.08, railSpacingMm / 1000));
+    : makeDeferredSourceGroup();
 
   return {
     group,
@@ -349,7 +342,7 @@ export function buildMM85SupportLeg(params: Record<string, any>): BuilderResult 
   const source = getSourceClone('mm85-support-leg');
   const group = source
     ? fitGroundedComponentFromSource('mm85-support-leg', source, { targetHeightMm: supportHeightMm })
-    : makeLoadingPlaceholder(0.2, supportHeightMm / 1000, 0.12);
+    : makeDeferredSourceGroup();
 
   return {
     group,
@@ -364,7 +357,7 @@ export function buildMM85EndDriveSupport(params: Record<string, any>): BuilderRe
   const source = getSourceClone('mm85-end-drive-support');
   const group = source
     ? fitGroundedComponentFromSource('mm85-end-drive-support', source, { targetHeightMm: supportHeightMm })
-    : makeLoadingPlaceholder(0.3, supportHeightMm / 1000, 0.18);
+    : makeDeferredSourceGroup();
 
   return {
     group,
