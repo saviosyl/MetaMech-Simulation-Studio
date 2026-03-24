@@ -38,6 +38,8 @@ export interface ModuleDefinition {
   };
 }
 
+let _runtimeExternalModules: ModuleDefinition[] = [];
+
 export const moduleLibrary: ModuleDefinition[] = [
   // Process Modules
   {
@@ -1537,9 +1539,13 @@ export const moduleLibrary: ModuleDefinition[] = [
 ];
 
 export function getModuleDefinition(id: string): ModuleDefinition | undefined {
-  return moduleLibrary.find(module => module.id === id);
+  return [...moduleLibrary, ..._runtimeExternalModules].find(module => module.id === id);
 }
 
 export function getModulesByCategory(category: string): ModuleDefinition[] {
-  return moduleLibrary.filter(module => module.category === category);
+  return [...moduleLibrary, ..._runtimeExternalModules].filter(module => module.category === category);
+}
+
+export function setRuntimeExternalModules(nextModules: ModuleDefinition[]): void {
+  _runtimeExternalModules = Array.isArray(nextModules) ? [...nextModules] : [];
 }
