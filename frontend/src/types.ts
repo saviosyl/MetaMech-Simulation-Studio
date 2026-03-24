@@ -40,3 +40,81 @@ export interface AuthContextType {
   logout: () => Promise<void>;
   checkAuth: () => Promise<User | null>;
 }
+
+export type AssetStatus = 'draft' | 'published' | 'archived';
+export type SceneCategory =
+  | 'process'
+  | 'modular'
+  | 'environment'
+  | 'actors'
+  | 'robots'
+  | 'pallets'
+  | 'fmcg'
+  | 'medical';
+
+export interface AssetCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  sceneCategory: SceneCategory;
+  sortOrder: number;
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssetDefinitionNode {
+  id: string;
+  label?: string;
+  type: string;
+  position: [number, number, number];
+  rotation?: [number, number, number];
+  direction?: [number, number, number];
+  compatibility?: Record<string, unknown>;
+}
+
+export interface AssetMovingPart {
+  objectName: string;
+  motionType: 'translate' | 'rotate';
+  axis: 'x' | 'y' | 'z';
+  min: number;
+  max: number;
+  default: number;
+  speed: number;
+}
+
+export interface AssetMetadata {
+  nodes?: AssetDefinitionNode[];
+  movableParts?: AssetMovingPart[];
+  parameters?: Record<string, number | string | boolean>;
+  [key: string]: unknown;
+}
+
+export interface LibraryAsset {
+  id: string;
+  dbId: number;
+  name: string;
+  slug: string;
+  status: AssetStatus;
+  version: number;
+  sortOrder: number;
+  categoryId: number;
+  categoryName: string | null;
+  categorySlug: string | null;
+  sceneCategory: SceneCategory;
+  modelKey: string;
+  modelUrl: string;
+  thumbnailKey: string | null;
+  thumbnailUrl: string | null;
+  previewKey: string | null;
+  previewUrl: string | null;
+  description: string;
+  tags: string[];
+  metadata: AssetMetadata;
+  publishedAt: string | null;
+  archivedAt: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

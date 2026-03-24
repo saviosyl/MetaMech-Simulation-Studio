@@ -231,9 +231,11 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     ];
   }
 
-  // Check asset manifest first
-  if (assetId) {
-    const assetDef = getAssetById(assetId);
+  // Check asset manifest first. For runtime-published assets, node.type is often
+  // the same as the asset id, so we also attempt lookup by type when assetId is absent.
+  const resolvedAssetId = assetId || type;
+  if (resolvedAssetId) {
+    const assetDef = getAssetById(resolvedAssetId);
     if (assetDef) {
       if (assetDef.assetType === 'static' && assetDef.connectionPorts) {
         return assetDef.connectionPorts;
@@ -891,7 +893,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addProcessNode: (type, position) => {
     // Check if there's a matching asset in the manifest
     const manifest = get().assetManifest;
-    const matchingAsset = manifest.find(a => a.id === type && (a.category === 'process' || a.category === 'modular'));
+    const matchingAsset = manifest.find(
+      (a) =>
+        a.id === type
+        && (
+          a.category === 'process'
+          || a.category === 'modular'
+          || a.category === 'robots'
+          || a.category === 'pallets'
+          || a.category === 'fmcg'
+          || a.category === 'medical'
+          || a.category === 'actors'
+        )
+    );
     const isParametric = matchingAsset?.assetType === 'parametric';
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }

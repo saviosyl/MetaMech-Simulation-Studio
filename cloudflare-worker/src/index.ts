@@ -19,8 +19,59 @@ type SubscriptionEntitlement = {
   currentPeriodEnd: string | null;
 };
 
+type AssetCategoryRow = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  scene_category: string;
+  sort_order: number;
+  is_archived: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type AssetRow = {
+  id: number;
+  uuid: string;
+  name: string;
+  slug: string;
+  category_id: number;
+  status: 'draft' | 'published' | 'archived';
+  version: number;
+  sort_order: number;
+  model_r2_key: string;
+  model_url: string;
+  thumbnail_r2_key: string | null;
+  thumbnail_url: string | null;
+  preview_r2_key: string | null;
+  preview_url: string | null;
+  description: string;
+  tags: string;
+  metadata: string;
+  published_at: string | null;
+  archived_at: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+  category_name?: string;
+  category_slug?: string;
+  category_scene_category?: string;
+};
+
+type SceneCategory =
+  | 'process'
+  | 'modular'
+  | 'environment'
+  | 'actors'
+  | 'robots'
+  | 'pallets'
+  | 'fmcg'
+  | 'medical';
+
 type Env = {
   DB: D1Database;
+  ASSETS_BUCKET: R2Bucket;
   JWT_SECRET: string;
   ZEPTO_TOKEN?: string;
   ZEPTO_API_URL?: string;
@@ -35,6 +86,7 @@ type Env = {
   NODE_ENV?: string;
   ADMIN_TEST_EMAIL_KEY?: string;
   ENABLE_ADMIN_TEST_EMAIL?: string;
+  ASSETS_PUBLIC_BASE_URL?: string;
 };
 
 const textEncoder = new TextEncoder();
@@ -582,6 +634,14 @@ async function readJson<T>(request: Request): Promise<T | null> {
   }
 }
 
+async function safeReadFormData(request: Request): Promise<FormData | null> {
+  try {
+    return await request.formData();
+  } catch {
+    return null;
+  }
+}
+
 async function handleRegister(request: Request, env: Env): Promise<Response> {
   const body = await readJson<{ email?: string; password?: string; displayName?: string }>(request);
   const email = normalizeEmail(body?.email || '');
@@ -944,6 +1004,763 @@ async function readAuthedUser(request: Request, env: Env): Promise<UserRow | nul
   return user;
 }
 
+const SCENE_CATEGORIES: SceneCategory[] = [
+  'process',
+  'modular',
+  'environment',
+  'actors',
+  'robots',
+  'pallets',
+  'fmcg',
+  'medical',
+];
+const SCENE_CATEGORY_SET = new Set<SceneCategory>(SCENE_CATEGORIES);
+
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'asset';
+}
+
+function asSceneCategory(input: string | null | undefined): SceneCategory {
+  const value = (input || '').trim().toLowerCase() as SceneCategory;
+  return SCENE_CATEGORY_SET.has(value) ? value : 'process';
+}
+
+function safeJsonParse<T>(raw: string | null | undefined, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeTags(input: unknown): string[] {
+  if (Array.isArray(input)) {
+    return input
+      .map((tag) => String(tag || '').trim())
+      .filter((tag) => tag.length > 0)
+      .slice(0, 50);
+  }
+  if (typeof input === 'string') {
+    return input
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0)
+      .slice(0, 50);
+  }
+  return [];
+}
+
+function normalizeMetadata(input: unknown): Record<string, unknown> {
+  if (!input) return {};
+  if (typeof input === 'string') {
+    return safeJsonParse<Record<string, unknown>>(input, {});
+  }
+  if (typeof input === 'object' && !Array.isArray(input)) {
+    return input as Record<string, unknown>;
+  }
+  return {};
+}
+
+async function requireAdminUser(request: Request, env: Env): Promise<UserRow | null> {
+  const user = await readAuthedUser(request, env);
+  if (!user) return null;
+  if (user.role !== 'admin') return null;
+  return user;
+}
+
+async function uniqueCategorySlug(env: Env, baseName: string, exceptId?: number): Promise<string> {
+  const base = slugify(baseName || 'category');
+  let attempt = base;
+  let idx = 2;
+  while (true) {
+    const existing = await env.DB
+      .prepare('SELECT id FROM asset_categories WHERE slug = ? LIMIT 1')
+      .bind(attempt)
+      .first<{ id: number }>();
+    if (!existing || (exceptId && Number(existing.id) === exceptId)) return attempt;
+    attempt = `${base}-${idx++}`;
+  }
+}
+
+async function uniqueAssetSlug(env: Env, baseName: string, exceptId?: number): Promise<string> {
+  const base = slugify(baseName || 'asset');
+  let attempt = base;
+  let idx = 2;
+  while (true) {
+    const existing = await env.DB
+      .prepare('SELECT id FROM assets WHERE slug = ? LIMIT 1')
+      .bind(attempt)
+      .first<{ id: number }>();
+    if (!existing || (exceptId && Number(existing.id) === exceptId)) return attempt;
+    attempt = `${base}-${idx++}`;
+  }
+}
+
+function assetObjectUrl(request: Request, kind: 'model' | 'thumbnail' | 'preview', assetUuid: string, version: number): string {
+  const base = new URL(request.url).origin;
+  return `${base}/assets/published/${encodeURIComponent(assetUuid)}/${kind}?v=${version}`;
+}
+
+function serializeCategory(row: AssetCategoryRow): Record<string, unknown> {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    description: row.description,
+    sceneCategory: row.scene_category,
+    sortOrder: row.sort_order,
+    isArchived: !!row.is_archived,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function serializeAsset(row: AssetRow, request: Request): Record<string, unknown> {
+  const tags = safeJsonParse<string[]>(row.tags, []);
+  const metadata = safeJsonParse<Record<string, unknown>>(row.metadata, {});
+  const base = new URL(request.url).origin;
+  const publishedModelUrl = assetObjectUrl(request, 'model', row.uuid, row.version);
+  const publishedThumbnailUrl = row.thumbnail_r2_key ? assetObjectUrl(request, 'thumbnail', row.uuid, row.version) : null;
+  const publishedPreviewUrl = row.preview_r2_key ? assetObjectUrl(request, 'preview', row.uuid, row.version) : null;
+  const adminModelUrl = `${base}/admin/assets/${encodeURIComponent(row.uuid)}/model`;
+  const adminThumbnailUrl = row.thumbnail_r2_key
+    ? `${base}/admin/assets/${encodeURIComponent(row.uuid)}/thumbnail`
+    : null;
+  const adminPreviewUrl = row.preview_r2_key
+    ? `${base}/admin/assets/${encodeURIComponent(row.uuid)}/preview`
+    : null;
+  const usePublished = row.status === 'published' && !row.deleted_at;
+  return {
+    id: row.uuid,
+    dbId: row.id,
+    name: row.name,
+    slug: row.slug,
+    status: row.status,
+    version: row.version,
+    sortOrder: row.sort_order,
+    categoryId: row.category_id,
+    categoryName: row.category_name ?? null,
+    categorySlug: row.category_slug ?? null,
+    sceneCategory: row.category_scene_category ?? 'process',
+    modelKey: row.model_r2_key,
+    modelUrl: usePublished ? publishedModelUrl : adminModelUrl,
+    thumbnailKey: row.thumbnail_r2_key,
+    thumbnailUrl: usePublished ? publishedThumbnailUrl : adminThumbnailUrl,
+    previewKey: row.preview_r2_key,
+    previewUrl: usePublished ? publishedPreviewUrl : adminPreviewUrl,
+    description: row.description,
+    tags,
+    metadata,
+    publishedAt: row.published_at,
+    archivedAt: row.archived_at,
+    deletedAt: row.deleted_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function readCategoryById(env: Env, categoryId: number): Promise<AssetCategoryRow | null> {
+  return env.DB
+    .prepare(
+      `SELECT id, name, slug, description, scene_category, sort_order, is_archived, created_at, updated_at
+       FROM asset_categories
+       WHERE id = ?
+       LIMIT 1`
+    )
+    .bind(categoryId)
+    .first<AssetCategoryRow>();
+}
+
+async function readAssetByUuid(env: Env, assetUuid: string): Promise<AssetRow | null> {
+  return env.DB
+    .prepare(
+      `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.status, a.version, a.sort_order,
+              a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
+              a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
+              c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category
+       FROM assets a
+       JOIN asset_categories c ON c.id = a.category_id
+       WHERE a.uuid = ?
+       LIMIT 1`
+    )
+    .bind(assetUuid)
+    .first<AssetRow>();
+}
+
+function validateMetadataForPublish(metadata: Record<string, unknown>): string | null {
+  const nodes = Array.isArray(metadata.nodes) ? metadata.nodes : [];
+  const ids = new Set<string>();
+  for (const entry of nodes) {
+    if (!entry || typeof entry !== 'object') continue;
+    const id = String((entry as Record<string, unknown>).id || '').trim();
+    if (!id) continue;
+    if (ids.has(id)) return `Duplicate node id: ${id}`;
+    ids.add(id);
+  }
+  return null;
+}
+
+async function handleAdminListCategories(request: Request, env: Env, admin: UserRow): Promise<Response> {
+  const url = new URL(request.url);
+  const includeArchived = url.searchParams.get('includeArchived') === 'true';
+  const rows = await env.DB
+    .prepare(
+      `SELECT id, name, slug, description, scene_category, sort_order, is_archived, created_at, updated_at
+       FROM asset_categories
+       ${includeArchived ? '' : 'WHERE is_archived = 0'}
+       ORDER BY sort_order ASC, id ASC`
+    )
+    .all<AssetCategoryRow>();
+  return toJson({
+    categories: (rows.results || []).map(serializeCategory),
+    adminUserId: admin.id,
+  });
+}
+
+async function handleAdminCreateCategory(request: Request, env: Env, admin: UserRow): Promise<Response> {
+  const body = await readJson<{ name?: string; description?: string; sceneCategory?: string }>(request);
+  const name = (body?.name || '').trim();
+  if (!name) return toJson({ error: 'Category name is required' }, 400);
+  const slug = await uniqueCategorySlug(env, name);
+  const description = (body?.description || '').trim();
+  const sceneCategory = asSceneCategory(body?.sceneCategory);
+  const maxOrder = await env.DB
+    .prepare('SELECT COALESCE(MAX(sort_order), 0) AS max_order FROM asset_categories')
+    .first<{ max_order: number }>();
+  const sortOrder = Number(maxOrder?.max_order || 0) + 1;
+
+  const inserted = await env.DB
+    .prepare(
+      `INSERT INTO asset_categories
+       (name, slug, description, scene_category, sort_order, is_archived, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 0, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    )
+    .bind(name, slug, description, sceneCategory, sortOrder, admin.id, admin.id)
+    .run();
+  const row = await readCategoryById(env, Number(inserted.meta.last_row_id));
+  return toJson({ category: row ? serializeCategory(row) : null }, 201);
+}
+
+async function handleAdminUpdateCategory(
+  request: Request,
+  env: Env,
+  admin: UserRow,
+  categoryId: number
+): Promise<Response> {
+  const existing = await readCategoryById(env, categoryId);
+  if (!existing) return toJson({ error: 'Category not found' }, 404);
+  const body = await readJson<{ name?: string; description?: string; sceneCategory?: string; isArchived?: boolean }>(request);
+  const nextName = (body?.name ?? existing.name).trim();
+  if (!nextName) return toJson({ error: 'Category name is required' }, 400);
+  const slug = nextName === existing.name ? existing.slug : await uniqueCategorySlug(env, nextName, existing.id);
+  const nextDescription = (body?.description ?? existing.description).trim();
+  const nextSceneCategory = body?.sceneCategory ? asSceneCategory(body.sceneCategory) : asSceneCategory(existing.scene_category);
+  const nextArchived = typeof body?.isArchived === 'boolean' ? (body.isArchived ? 1 : 0) : existing.is_archived;
+
+  await env.DB
+    .prepare(
+      `UPDATE asset_categories
+       SET name = ?, slug = ?, description = ?, scene_category = ?, is_archived = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+    .bind(nextName, slug, nextDescription, nextSceneCategory, nextArchived, admin.id, existing.id)
+    .run();
+
+  const row = await readCategoryById(env, existing.id);
+  return toJson({ category: row ? serializeCategory(row) : null });
+}
+
+async function handleAdminDeleteCategory(env: Env, categoryId: number): Promise<Response> {
+  const inUse = await env.DB
+    .prepare('SELECT COUNT(*) AS count FROM assets WHERE category_id = ? AND deleted_at IS NULL')
+    .bind(categoryId)
+    .first<{ count: number }>();
+  if (Number(inUse?.count || 0) > 0) {
+    return toJson({ error: 'Cannot delete a category with active assets' }, 400);
+  }
+  await env.DB.prepare('DELETE FROM asset_categories WHERE id = ?').bind(categoryId).run();
+  return toJson({ success: true });
+}
+
+async function handleAdminReorderCategories(request: Request, env: Env, admin: UserRow): Promise<Response> {
+  const body = await readJson<{ orderedIds?: number[] }>(request);
+  const orderedIds = Array.isArray(body?.orderedIds) ? body!.orderedIds.map((v) => Number(v)).filter((v) => Number.isFinite(v) && v > 0) : [];
+  if (orderedIds.length === 0) return toJson({ error: 'orderedIds is required' }, 400);
+  for (let i = 0; i < orderedIds.length; i += 1) {
+    await env.DB
+      .prepare('UPDATE asset_categories SET sort_order = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .bind(i + 1, admin.id, orderedIds[i])
+      .run();
+  }
+  return toJson({ success: true });
+}
+
+async function handleAdminListAssets(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
+  const status = (url.searchParams.get('status') || '').trim();
+  const categoryId = Number(url.searchParams.get('categoryId') || 0);
+  const tag = (url.searchParams.get('tag') || '').trim().toLowerCase();
+  const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+
+  const clauses: string[] = [];
+  const binds: unknown[] = [];
+  if (!includeDeleted) clauses.push('a.deleted_at IS NULL');
+  if (status) {
+    clauses.push('a.status = ?');
+    binds.push(status);
+  }
+  if (categoryId > 0) {
+    clauses.push('a.category_id = ?');
+    binds.push(categoryId);
+  }
+  if (tag) {
+    clauses.push('LOWER(a.tags) LIKE ?');
+    binds.push(`%"${tag}"%`);
+  }
+  if (q) {
+    clauses.push('(LOWER(a.name) LIKE ? OR LOWER(a.description) LIKE ?)');
+    binds.push(`%${q}%`, `%${q}%`);
+  }
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = await env.DB
+    .prepare(
+      `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.status, a.version, a.sort_order,
+              a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
+              a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
+              c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category
+       FROM assets a
+       JOIN asset_categories c ON c.id = a.category_id
+       ${where}
+       ORDER BY a.sort_order ASC, a.updated_at DESC, a.id DESC`
+    )
+    .bind(...binds)
+    .all<AssetRow>();
+  return toJson({ assets: (rows.results || []).map((row) => serializeAsset(row, request)) });
+}
+
+async function handleAdminReorderAssets(request: Request, env: Env, admin: UserRow): Promise<Response> {
+  const body = await readJson<{ orderedIds?: string[]; categoryId?: number }>(request);
+  const orderedIds = Array.isArray(body?.orderedIds)
+    ? body!.orderedIds.map((v) => String(v || '').trim()).filter((v) => v.length > 0)
+    : [];
+  if (orderedIds.length === 0) return toJson({ error: 'orderedIds is required' }, 400);
+  const categoryId = Number(body?.categoryId || 0);
+
+  for (let i = 0; i < orderedIds.length; i += 1) {
+    if (categoryId > 0) {
+      await env.DB
+        .prepare(
+          `UPDATE assets
+           SET sort_order = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE uuid = ? AND category_id = ?`
+        )
+        .bind(i + 1, admin.id, orderedIds[i], categoryId)
+        .run();
+    } else {
+      await env.DB
+        .prepare(
+          `UPDATE assets
+           SET sort_order = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE uuid = ?`
+        )
+        .bind(i + 1, admin.id, orderedIds[i])
+        .run();
+    }
+  }
+  return toJson({ success: true });
+}
+
+async function handleAdminUploadAsset(request: Request, env: Env, admin: UserRow): Promise<Response> {
+  const form = await request.formData();
+  const model = form.get('model');
+  if (!(model instanceof File)) return toJson({ error: 'model file is required' }, 400);
+  const categoryId = Number(form.get('categoryId') || 0);
+  if (!categoryId) return toJson({ error: 'categoryId is required' }, 400);
+  const category = await readCategoryById(env, categoryId);
+  if (!category) return toJson({ error: 'Category not found' }, 404);
+
+  const sourceName = String(form.get('name') || model.name || 'Unnamed Asset').trim();
+  const name = sourceName || 'Unnamed Asset';
+  const slug = await uniqueAssetSlug(env, name);
+  const description = String(form.get('description') || '').trim();
+  const tags = normalizeTags(form.get('tags'));
+  const metadata = normalizeMetadata(form.get('metadata'));
+  const uuid = crypto.randomUUID();
+  const ext = (model.name.split('.').pop() || '').toLowerCase();
+  if (ext && ext !== 'glb') {
+    return toJson({ error: 'Only .glb uploads are supported in v1' }, 400);
+  }
+
+  const key = `assets/${category.slug}/${uuid}/v1/model.glb`;
+  const bytes = await model.arrayBuffer();
+  await env.ASSETS_BUCKET.put(key, bytes, {
+    httpMetadata: {
+      contentType: model.type || 'model/gltf-binary',
+    },
+  });
+
+  const maxOrder = await env.DB
+    .prepare('SELECT COALESCE(MAX(sort_order), 0) AS max_order FROM assets')
+    .first<{ max_order: number }>();
+  const sortOrder = Number(maxOrder?.max_order || 0) + 1;
+
+  await env.DB
+    .prepare(
+      `INSERT INTO assets
+       (uuid, name, slug, category_id, status, version, sort_order, model_r2_key, model_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'draft', 0, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    )
+    .bind(
+      uuid,
+      name,
+      slug,
+      categoryId,
+      sortOrder,
+      key,
+      key,
+      description,
+      JSON.stringify(tags),
+      JSON.stringify(metadata),
+      admin.id,
+      admin.id
+    )
+    .run();
+
+  const row = await readAssetByUuid(env, uuid);
+  return toJson({ asset: row ? serializeAsset(row, request) : null }, 201);
+}
+
+async function handleAdminUpdateAsset(
+  request: Request,
+  env: Env,
+  admin: UserRow,
+  assetUuid: string
+): Promise<Response> {
+  const existing = await readAssetByUuid(env, assetUuid);
+  if (!existing || existing.deleted_at) return toJson({ error: 'Asset not found' }, 404);
+  const body = await readJson<{
+    name?: string;
+    description?: string;
+    tags?: unknown;
+    metadata?: unknown;
+    categoryId?: number;
+    sortOrder?: number;
+  }>(request);
+  const nextName = String(body?.name ?? existing.name).trim();
+  if (!nextName) return toJson({ error: 'Asset name is required' }, 400);
+  const slug = nextName === existing.name ? existing.slug : await uniqueAssetSlug(env, nextName, existing.id);
+  const nextDescription = String(body?.description ?? existing.description).trim();
+  const nextCategoryId = Number(body?.categoryId || existing.category_id);
+  if (!nextCategoryId) return toJson({ error: 'categoryId is required' }, 400);
+  const category = await readCategoryById(env, nextCategoryId);
+  if (!category) return toJson({ error: 'Category not found' }, 404);
+  const nextSortOrder = Number.isFinite(Number(body?.sortOrder))
+    ? Number(body?.sortOrder)
+    : existing.sort_order;
+  const tags = body?.tags === undefined ? safeJsonParse<string[]>(existing.tags, []) : normalizeTags(body.tags);
+  const metadata = body?.metadata === undefined
+    ? safeJsonParse<Record<string, unknown>>(existing.metadata, {})
+    : normalizeMetadata(body.metadata);
+
+  await env.DB
+    .prepare(
+      `UPDATE assets
+       SET name = ?, slug = ?, category_id = ?, description = ?, tags = ?, metadata = ?, sort_order = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+    .bind(
+      nextName,
+      slug,
+      nextCategoryId,
+      nextDescription,
+      JSON.stringify(tags),
+      JSON.stringify(metadata),
+      nextSortOrder,
+      admin.id,
+      existing.id
+    )
+    .run();
+
+  const row = await readAssetByUuid(env, assetUuid);
+  return toJson({ asset: row ? serializeAsset(row, request) : null });
+}
+
+async function handleAdminPublishAsset(env: Env, request: Request, admin: UserRow, assetUuid: string): Promise<Response> {
+  const existing = await readAssetByUuid(env, assetUuid);
+  if (!existing || existing.deleted_at) return toJson({ error: 'Asset not found' }, 404);
+  const metadata = safeJsonParse<Record<string, unknown>>(existing.metadata, {});
+  const validationError = validateMetadataForPublish(metadata);
+  if (validationError) return toJson({ error: validationError }, 400);
+
+  const nextVersion = Number(existing.version || 0) + 1;
+  await env.DB
+    .prepare(
+      `UPDATE assets
+       SET status = 'published',
+           version = ?,
+           published_at = CURRENT_TIMESTAMP,
+           archived_at = NULL,
+           updated_by = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+    .bind(nextVersion, admin.id, existing.id)
+    .run();
+
+  await env.DB
+    .prepare(
+      `INSERT INTO asset_versions
+       (asset_id, version, name, slug, category_id, status, model_r2_key, model_url, thumbnail_r2_key, thumbnail_url, preview_r2_key, preview_url, description, tags, metadata, published_by, published_at, created_at)
+       VALUES (?, ?, ?, ?, ?, 'published', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    )
+    .bind(
+      existing.id,
+      nextVersion,
+      existing.name,
+      existing.slug,
+      existing.category_id,
+      existing.model_r2_key,
+      existing.model_url,
+      existing.thumbnail_r2_key,
+      existing.thumbnail_url,
+      existing.preview_r2_key,
+      existing.preview_url,
+      existing.description,
+      existing.tags,
+      existing.metadata,
+      admin.id
+    )
+    .run();
+
+  const row = await readAssetByUuid(env, assetUuid);
+  return toJson({ asset: row ? serializeAsset(row, request) : null });
+}
+
+async function handleAdminArchiveAsset(env: Env, request: Request, admin: UserRow, assetUuid: string): Promise<Response> {
+  const existing = await readAssetByUuid(env, assetUuid);
+  if (!existing || existing.deleted_at) return toJson({ error: 'Asset not found' }, 404);
+  await env.DB
+    .prepare(
+      `UPDATE assets
+       SET status = 'archived', archived_at = CURRENT_TIMESTAMP, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+    .bind(admin.id, existing.id)
+    .run();
+  const row = await readAssetByUuid(env, assetUuid);
+  return toJson({ asset: row ? serializeAsset(row, request) : null });
+}
+
+async function handleAdminRestoreAsset(env: Env, request: Request, admin: UserRow, assetUuid: string): Promise<Response> {
+  const existing = await readAssetByUuid(env, assetUuid);
+  if (!existing) return toJson({ error: 'Asset not found' }, 404);
+  await env.DB
+    .prepare(
+      `UPDATE assets
+       SET status = 'draft',
+           archived_at = NULL,
+           deleted_at = NULL,
+           updated_by = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+    .bind(admin.id, existing.id)
+    .run();
+  const row = await readAssetByUuid(env, assetUuid);
+  return toJson({ asset: row ? serializeAsset(row, request) : null });
+}
+
+async function handleAdminDuplicateAsset(env: Env, request: Request, admin: UserRow, assetUuid: string): Promise<Response> {
+  const source = await readAssetByUuid(env, assetUuid);
+  if (!source || source.deleted_at) return toJson({ error: 'Asset not found' }, 404);
+  const category = await readCategoryById(env, source.category_id);
+  if (!category) return toJson({ error: 'Category not found' }, 404);
+  const object = await env.ASSETS_BUCKET.get(source.model_r2_key);
+  if (!object) return toJson({ error: 'Source model file missing in storage' }, 400);
+
+  const duplicateName = `${source.name} Copy`;
+  const duplicateSlug = await uniqueAssetSlug(env, duplicateName);
+  const uuid = crypto.randomUUID();
+  const key = `assets/${category.slug}/${uuid}/v1/model.glb`;
+  await env.ASSETS_BUCKET.put(key, await object.arrayBuffer(), {
+    httpMetadata: {
+      contentType: object.httpMetadata?.contentType || 'model/gltf-binary',
+    },
+  });
+  const maxOrder = await env.DB
+    .prepare('SELECT COALESCE(MAX(sort_order), 0) AS max_order FROM assets')
+    .first<{ max_order: number }>();
+  const sortOrder = Number(maxOrder?.max_order || 0) + 1;
+
+  await env.DB
+    .prepare(
+      `INSERT INTO assets
+       (uuid, name, slug, category_id, status, version, sort_order, model_r2_key, model_url, thumbnail_r2_key, thumbnail_url, preview_r2_key, preview_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'draft', 0, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    )
+    .bind(
+      uuid,
+      duplicateName,
+      duplicateSlug,
+      source.category_id,
+      sortOrder,
+      key,
+      key,
+      source.description,
+      source.tags,
+      source.metadata,
+      admin.id,
+      admin.id
+    )
+    .run();
+
+  const row = await readAssetByUuid(env, uuid);
+  return toJson({ asset: row ? serializeAsset(row, request) : null }, 201);
+}
+
+async function handleAdminSoftDeleteAsset(env: Env, admin: UserRow, assetUuid: string): Promise<Response> {
+  const existing = await readAssetByUuid(env, assetUuid);
+  if (!existing || existing.deleted_at) return toJson({ error: 'Asset not found' }, 404);
+  await env.DB
+    .prepare(
+      `UPDATE assets
+       SET deleted_at = CURRENT_TIMESTAMP, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+    .bind(admin.id, existing.id)
+    .run();
+  return toJson({ success: true });
+}
+
+async function handleAdminUploadThumbnail(env: Env, request: Request, admin: UserRow, assetUuid: string): Promise<Response> {
+  const existing = await readAssetByUuid(env, assetUuid);
+  if (!existing || existing.deleted_at) return toJson({ error: 'Asset not found' }, 404);
+  const category = await readCategoryById(env, existing.category_id);
+  if (!category) return toJson({ error: 'Category not found' }, 404);
+  const form = await request.formData();
+  const thumbnail = form.get('thumbnail');
+  if (!(thumbnail instanceof File)) return toJson({ error: 'thumbnail file is required' }, 400);
+  const ext = (thumbnail.name.split('.').pop() || 'png').toLowerCase();
+  if (!['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+    return toJson({ error: 'Only png/jpg/webp thumbnails are supported' }, 400);
+  }
+  const key = `assets/${category.slug}/${existing.uuid}/v${Math.max(1, existing.version)}/thumbnail.${ext}`;
+  await env.ASSETS_BUCKET.put(key, await thumbnail.arrayBuffer(), {
+    httpMetadata: {
+      contentType: thumbnail.type || `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+    },
+  });
+  await env.DB
+    .prepare(
+      `UPDATE assets
+       SET thumbnail_r2_key = ?, thumbnail_url = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+    .bind(key, key, admin.id, existing.id)
+    .run();
+  const row = await readAssetByUuid(env, assetUuid);
+  return toJson({ asset: row ? serializeAsset(row, request) : null });
+}
+
+async function handleAdminAssetFile(
+  env: Env,
+  assetUuid: string,
+  kind: 'model' | 'thumbnail' | 'preview'
+): Promise<Response> {
+  const row = await env.DB
+    .prepare(
+      `SELECT uuid, deleted_at, model_r2_key, thumbnail_r2_key, preview_r2_key
+       FROM assets
+       WHERE uuid = ?
+       LIMIT 1`
+    )
+    .bind(assetUuid)
+    .first<{
+      uuid: string;
+      deleted_at: string | null;
+      model_r2_key: string;
+      thumbnail_r2_key: string | null;
+      preview_r2_key: string | null;
+    }>();
+  if (!row || row.deleted_at) return toJson({ error: 'Asset not found' }, 404);
+  const key = kind === 'model' ? row.model_r2_key : (kind === 'thumbnail' ? row.thumbnail_r2_key : row.preview_r2_key);
+  if (!key) return toJson({ error: 'File not found' }, 404);
+  const object = await env.ASSETS_BUCKET.get(key);
+  if (!object) return toJson({ error: 'File not found' }, 404);
+
+  const headers = new Headers();
+  headers.set('Cache-Control', 'private, max-age=60');
+  const contentType = object.httpMetadata?.contentType
+    || (kind === 'model' ? 'model/gltf-binary' : 'application/octet-stream');
+  headers.set('Content-Type', contentType);
+  return new Response(object.body, { status: 200, headers });
+}
+
+async function handlePublishedAssets(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const sceneCategoryFilter = (url.searchParams.get('sceneCategory') || '').trim();
+  const clauses = ["a.status = 'published'", 'a.deleted_at IS NULL', 'c.is_archived = 0'];
+  const binds: unknown[] = [];
+  if (sceneCategoryFilter) {
+    clauses.push('c.scene_category = ?');
+    binds.push(asSceneCategory(sceneCategoryFilter));
+  }
+  const rows = await env.DB
+    .prepare(
+      `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.status, a.version, a.sort_order,
+              a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
+              a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
+              c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category
+       FROM assets a
+       JOIN asset_categories c ON c.id = a.category_id
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY c.sort_order ASC, a.sort_order ASC, a.name ASC`
+    )
+    .bind(...binds)
+    .all<AssetRow>();
+
+  const serialized = (rows.results || []).map((row) => serializeAsset(row, request));
+  return toJson({ assets: serialized });
+}
+
+async function handlePublishedAssetFile(request: Request, env: Env, assetUuid: string, kind: 'model' | 'thumbnail' | 'preview'): Promise<Response> {
+  const row = await env.DB
+    .prepare(
+      `SELECT uuid, status, deleted_at, model_r2_key, thumbnail_r2_key, preview_r2_key
+       FROM assets
+       WHERE uuid = ?
+       LIMIT 1`
+    )
+    .bind(assetUuid)
+    .first<{
+      uuid: string;
+      status: string;
+      deleted_at: string | null;
+      model_r2_key: string;
+      thumbnail_r2_key: string | null;
+      preview_r2_key: string | null;
+    }>();
+  if (!row || row.deleted_at || row.status !== 'published') return toJson({ error: 'Asset not found' }, 404);
+  const key = kind === 'model' ? row.model_r2_key : (kind === 'thumbnail' ? row.thumbnail_r2_key : row.preview_r2_key);
+  if (!key) return toJson({ error: 'File not found' }, 404);
+  const object = await env.ASSETS_BUCKET.get(key);
+  if (!object) return toJson({ error: 'File not found' }, 404);
+
+  const headers = new Headers();
+  headers.set('Cache-Control', 'public, max-age=300');
+  const contentType = object.httpMetadata?.contentType
+    || (kind === 'model' ? 'model/gltf-binary' : 'application/octet-stream');
+  headers.set('Content-Type', contentType);
+  return new Response(object.body, { status: 200, headers });
+}
+
 async function handleMe(request: Request, env: Env): Promise<Response> {
   const user = await readAuthedUser(request, env);
   if (!user) return toJson({ error: 'Authentication required' }, 401);
@@ -977,6 +1794,17 @@ export default {
 
       if (request.method === 'GET' && path === '/health') {
         response = toJson({ status: 'ok', timestamp: nowIso(), runtime: 'cloudflare-worker-d1' });
+        return withCors(request, response, env);
+      }
+
+      if (request.method === 'GET' && path === '/assets/published') {
+        response = await handlePublishedAssets(request, env);
+        return withCors(request, response, env);
+      }
+      const publishedFileMatch = path.match(/^\/assets\/published\/([^/]+)\/(model|thumbnail|preview)$/);
+      if (request.method === 'GET' && publishedFileMatch) {
+        const [, assetUuid, kind] = publishedFileMatch;
+        response = await handlePublishedAssetFile(request, env, decodeURIComponent(assetUuid), kind as 'model' | 'thumbnail' | 'preview');
         return withCors(request, response, env);
       }
 
@@ -1021,6 +1849,108 @@ export default {
       if (request.method === 'GET' && path === '/admin/test-email') {
         response = await handleAdminTestEmail(request, env);
         return withCors(request, response, env);
+      }
+
+      const adminAssetFileMatch = path.match(/^\/admin\/assets\/([^/]+)\/(model|thumbnail|preview)$/);
+      const categoryIdMatch = path.match(/^\/admin\/asset-categories\/(\d+)$/);
+      const assetActionMatch = path.match(/^\/admin\/assets\/([^/]+)\/(publish|archive|restore|duplicate|thumbnail)$/);
+      const assetIdMatch = path.match(/^\/admin\/assets\/([^/]+)$/);
+      if (
+        adminAssetFileMatch
+        || 
+        path === '/admin/asset-categories'
+        || path === '/admin/asset-categories/reorder'
+        || categoryIdMatch
+        || path === '/admin/assets'
+        || path === '/admin/assets/reorder'
+        || path === '/admin/assets/upload'
+        || assetActionMatch
+        || assetIdMatch
+      ) {
+        const admin = await requireAdminUser(request, env);
+        if (!admin) {
+          response = toJson({ error: 'Admin access required' }, 403);
+          return withCors(request, response, env);
+        }
+
+        if (adminAssetFileMatch && request.method === 'GET') {
+          const assetUuid = decodeURIComponent(adminAssetFileMatch[1]);
+          const kind = adminAssetFileMatch[2] as 'model' | 'thumbnail' | 'preview';
+          response = await handleAdminAssetFile(env, assetUuid, kind);
+          return withCors(request, response, env);
+        }
+
+        if (path === '/admin/asset-categories' && request.method === 'GET') {
+          response = await handleAdminListCategories(request, env, admin);
+          return withCors(request, response, env);
+        }
+        if (path === '/admin/asset-categories' && request.method === 'POST') {
+          response = await handleAdminCreateCategory(request, env, admin);
+          return withCors(request, response, env);
+        }
+        if (path === '/admin/asset-categories/reorder' && request.method === 'POST') {
+          response = await handleAdminReorderCategories(request, env, admin);
+          return withCors(request, response, env);
+        }
+        if (categoryIdMatch) {
+          const categoryId = Number(categoryIdMatch[1]);
+          if (request.method === 'PUT') {
+            response = await handleAdminUpdateCategory(request, env, admin, categoryId);
+            return withCors(request, response, env);
+          }
+          if (request.method === 'DELETE') {
+            response = await handleAdminDeleteCategory(env, categoryId);
+            return withCors(request, response, env);
+          }
+        }
+
+        if (path === '/admin/assets' && request.method === 'GET') {
+          response = await handleAdminListAssets(request, env);
+          return withCors(request, response, env);
+        }
+        if (path === '/admin/assets/upload' && request.method === 'POST') {
+          response = await handleAdminUploadAsset(request, env, admin);
+          return withCors(request, response, env);
+        }
+        if (path === '/admin/assets/reorder' && request.method === 'POST') {
+          response = await handleAdminReorderAssets(request, env, admin);
+          return withCors(request, response, env);
+        }
+        if (assetActionMatch) {
+          const assetUuid = decodeURIComponent(assetActionMatch[1]);
+          const action = assetActionMatch[2];
+          if (action === 'publish' && request.method === 'POST') {
+            response = await handleAdminPublishAsset(env, request, admin, assetUuid);
+            return withCors(request, response, env);
+          }
+          if (action === 'archive' && request.method === 'POST') {
+            response = await handleAdminArchiveAsset(env, request, admin, assetUuid);
+            return withCors(request, response, env);
+          }
+          if (action === 'restore' && request.method === 'POST') {
+            response = await handleAdminRestoreAsset(env, request, admin, assetUuid);
+            return withCors(request, response, env);
+          }
+          if (action === 'duplicate' && request.method === 'POST') {
+            response = await handleAdminDuplicateAsset(env, request, admin, assetUuid);
+            return withCors(request, response, env);
+          }
+          if (action === 'thumbnail' && request.method === 'POST') {
+            response = await handleAdminUploadThumbnail(env, request, admin, assetUuid);
+            return withCors(request, response, env);
+          }
+        }
+        if (assetIdMatch) {
+          const assetUuid = decodeURIComponent(assetIdMatch[1]);
+          if (request.method === 'PUT') {
+            response = await handleAdminUpdateAsset(request, env, admin, assetUuid);
+            return withCors(request, response, env);
+          }
+          if (request.method === 'DELETE') {
+            response = await handleAdminSoftDeleteAsset(env, admin, assetUuid);
+            return withCors(request, response, env);
+          }
+        }
       }
 
       response = toJson({ error: 'Route not found' }, 404);

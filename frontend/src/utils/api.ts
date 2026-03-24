@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import axios from 'axios';
+import { AssetCategory, AssetMetadata, AssetStatus, LibraryAsset, SceneCategory } from '../types';
 
 const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
 // Dev fallback stays localhost, but production must never default to localhost.
@@ -75,6 +76,145 @@ export async function deleteProject(id: string) {
 export async function listProjects() {
   const res = await api.get('/projects');
   return res.data;
+}
+
+// Admin asset library APIs
+export interface ListAssetCategoriesOptions {
+  includeArchived?: boolean;
+}
+
+export async function listAssetCategories(options: ListAssetCategoriesOptions = {}): Promise<AssetCategory[]> {
+  const params = new URLSearchParams();
+  if (options.includeArchived) params.set('includeArchived', 'true');
+  const res = await api.get('/admin/asset-categories', { params });
+  return (res.data?.categories || []) as AssetCategory[];
+}
+
+export async function createAssetCategory(payload: {
+  name: string;
+  description?: string;
+  sceneCategory: SceneCategory;
+}): Promise<AssetCategory> {
+  const res = await api.post('/admin/asset-categories', payload);
+  return res.data.category as AssetCategory;
+}
+
+export async function updateAssetCategory(
+  id: number,
+  payload: Partial<{ name: string; description: string; sceneCategory: SceneCategory; isArchived: boolean }>
+): Promise<AssetCategory> {
+  const res = await api.put(`/admin/asset-categories/${id}`, payload);
+  return res.data.category as AssetCategory;
+}
+
+export async function deleteAssetCategory(id: number): Promise<void> {
+  await api.delete(`/admin/asset-categories/${id}`);
+}
+
+export async function reorderAssetCategories(orderedIds: number[]): Promise<void> {
+  await api.post('/admin/asset-categories/reorder', { orderedIds });
+}
+
+export interface ListAssetsOptions {
+  q?: string;
+  categoryId?: number;
+  status?: AssetStatus;
+  tag?: string;
+  includeDeleted?: boolean;
+}
+
+export async function listLibraryAssets(options: ListAssetsOptions = {}): Promise<LibraryAsset[]> {
+  const params = new URLSearchParams();
+  if (options.q) params.set('q', options.q);
+  if (options.categoryId) params.set('categoryId', String(options.categoryId));
+  if (options.status) params.set('status', options.status);
+  if (options.tag) params.set('tag', options.tag);
+  if (options.includeDeleted) params.set('includeDeleted', 'true');
+  const res = await api.get('/admin/assets', { params });
+  return (res.data?.assets || []) as LibraryAsset[];
+}
+
+export interface UploadAssetPayload {
+  file: File;
+  categoryId: number;
+  name?: string;
+  description?: string;
+  tags?: string[];
+  metadata?: AssetMetadata;
+}
+
+export async function uploadLibraryAsset(payload: UploadAssetPayload): Promise<LibraryAsset> {
+  const formData = new FormData();
+  formData.append('model', payload.file);
+  formData.append('categoryId', String(payload.categoryId));
+  if (payload.name) formData.append('name', payload.name);
+  if (payload.description) formData.append('description', payload.description);
+  if (payload.tags && payload.tags.length > 0) formData.append('tags', payload.tags.join(','));
+  if (payload.metadata) formData.append('metadata', JSON.stringify(payload.metadata));
+
+  const res = await api.post('/admin/assets/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data.asset as LibraryAsset;
+}
+
+export async function updateLibraryAsset(
+  id: string,
+  payload: Partial<{
+    name: string;
+    description: string;
+    tags: string[];
+    metadata: AssetMetadata;
+    categoryId: number;
+    sortOrder: number;
+  }>
+): Promise<LibraryAsset> {
+  const res = await api.put(`/admin/assets/${encodeURIComponent(id)}`, payload);
+  return res.data.asset as LibraryAsset;
+}
+
+export async function reorderLibraryAssets(orderedIds: string[], categoryId?: number): Promise<void> {
+  await api.post('/admin/assets/reorder', { orderedIds, categoryId });
+}
+
+export async function publishLibraryAsset(id: string): Promise<LibraryAsset> {
+  const res = await api.post(`/admin/assets/${encodeURIComponent(id)}/publish`);
+  return res.data.asset as LibraryAsset;
+}
+
+export async function archiveLibraryAsset(id: string): Promise<LibraryAsset> {
+  const res = await api.post(`/admin/assets/${encodeURIComponent(id)}/archive`);
+  return res.data.asset as LibraryAsset;
+}
+
+export async function restoreLibraryAsset(id: string): Promise<LibraryAsset> {
+  const res = await api.post(`/admin/assets/${encodeURIComponent(id)}/restore`);
+  return res.data.asset as LibraryAsset;
+}
+
+export async function duplicateLibraryAsset(id: string): Promise<LibraryAsset> {
+  const res = await api.post(`/admin/assets/${encodeURIComponent(id)}/duplicate`);
+  return res.data.asset as LibraryAsset;
+}
+
+export async function deleteLibraryAsset(id: string): Promise<void> {
+  await api.delete(`/admin/assets/${encodeURIComponent(id)}`);
+}
+
+export async function uploadAssetThumbnail(id: string, file: File): Promise<LibraryAsset> {
+  const formData = new FormData();
+  formData.append('thumbnail', file);
+  const res = await api.post(`/admin/assets/${encodeURIComponent(id)}/thumbnail`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data.asset as LibraryAsset;
+}
+
+export async function listPublishedAssets(sceneCategory?: SceneCategory): Promise<LibraryAsset[]> {
+  const params = new URLSearchParams();
+  if (sceneCategory) params.set('sceneCategory', sceneCategory);
+  const res = await api.get('/assets/published', { params });
+  return (res.data?.assets || []) as LibraryAsset[];
 }
 
 export default api;

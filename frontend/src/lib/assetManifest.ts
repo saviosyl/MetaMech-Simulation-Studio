@@ -53,6 +53,7 @@ export type AssetDef = StaticAssetDef | ParametricAssetDef;
 export const ASSET_BASE_URL = '/assets';
 
 let _manifest: AssetDef[] | null = null;
+let _runtimeExternalAssets: AssetDef[] = [];
 
 function loadInlineManifest(): AssetDef[] {
   return [
@@ -956,7 +957,15 @@ function loadInlineManifest(): AssetDef[] {
 
 export function getAssetManifest(): AssetDef[] {
   if (!_manifest) {
-    _manifest = loadInlineManifest();
+    const base = loadInlineManifest();
+    if (_runtimeExternalAssets.length > 0) {
+      const dedup = new Map<string, AssetDef>();
+      for (const item of base) dedup.set(item.id, item);
+      for (const item of _runtimeExternalAssets) dedup.set(item.id, item);
+      _manifest = Array.from(dedup.values());
+    } else {
+      _manifest = base;
+    }
   }
   return _manifest;
 }
@@ -967,4 +976,9 @@ export function getAssetById(id: string): AssetDef | undefined {
 
 export function getAssetsByCategory(category: string): AssetDef[] {
   return getAssetManifest().filter(a => a.category === category);
+}
+
+export function setRuntimeExternalAssets(nextAssets: AssetDef[]): void {
+  _runtimeExternalAssets = Array.isArray(nextAssets) ? [...nextAssets] : [];
+  _manifest = null;
 }

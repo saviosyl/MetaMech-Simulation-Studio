@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import HomePage from './pages/HomePage';
@@ -11,6 +12,8 @@ import LegacyAccessRedirectPage from './pages/LegacyAccessRedirectPage';
 import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
 import FrameDesignerPage from './pages/FrameDesignerPage';
+import AdminAssetLibraryPage from './pages/AdminAssetLibraryPage';
+import AdminAssetEditorPage from './pages/AdminAssetEditorPage';
 import './index.css';
 
 const THEME_STORAGE_KEY = 'metamech-theme';
@@ -72,6 +75,32 @@ function App() {
               <ProtectedRoute>
                 <FrameDesignerPage />
               </ProtectedRoute>
+            }
+          />
+
+          {/* Admin-only asset authoring flows */}
+          <Route
+            path="/admin/assets"
+            element={
+              <AdminRoute>
+                <AdminAssetLibraryPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/assets/editor"
+            element={
+              <AdminRoute>
+                <AdminAssetEditorPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/assets/editor/:assetId"
+            element={
+              <AdminRoute>
+                <AdminAssetEditorPage />
+              </AdminRoute>
             }
           />
 
