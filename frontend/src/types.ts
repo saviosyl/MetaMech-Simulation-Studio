@@ -97,6 +97,7 @@ export interface LibraryAsset {
   name: string;
   slug: string;
   status: AssetStatus;
+  visibleInRuntimeLibrary?: boolean;
   version: number;
   sortOrder: number;
   categoryId: number;
