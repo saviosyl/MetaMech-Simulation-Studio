@@ -25,6 +25,7 @@ import {
   publishLibraryAsset,
   reorderAssetCategories,
   reorderLibraryAssets,
+  setLibraryAssetRuntimeVisibility,
   restoreLibraryAsset,
   uploadLibraryAsset,
   updateAssetCategory,
@@ -638,6 +639,12 @@ const AdminAssetLibraryPage: React.FC = () => {
                   Status: <strong style={{ color: 'var(--mm-text-secondary)' }}>{selectedAsset.status}</strong> • Version: {selectedAsset.version}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4 }}>
+                  Runtime visibility:{' '}
+                  <strong style={{ color: selectedAsset.visibleInRuntimeLibrary ? 'var(--mm-accent-success)' : 'var(--mm-text-secondary)' }}>
+                    {selectedAsset.visibleInRuntimeLibrary ? 'live (/demo visible)' : 'internal-only'}
+                  </strong>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4 }}>
                   Updated: {formatDate(selectedAsset.updatedAt)}
                 </div>
               </div>
@@ -681,6 +688,48 @@ const AdminAssetLibraryPage: React.FC = () => {
                 >
                   <Plus size={13} />
                   Publish
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (selectedAsset.status !== 'published') return;
+                    setBusy(true);
+                    setError('');
+                    try {
+                      await setLibraryAssetRuntimeVisibility(
+                        selectedAsset.id,
+                        !selectedAsset.visibleInRuntimeLibrary
+                      );
+                      await loadAssets();
+                      await refreshRuntimePublishedAssets().catch(() => undefined);
+                      setMessage(
+                        !selectedAsset.visibleInRuntimeLibrary
+                          ? 'Asset is now visible in runtime/demo library'
+                          : 'Asset is now internal-only and hidden from runtime/demo'
+                      );
+                    } catch (e) {
+                      setError(errorMessage(e, 'Failed to update runtime visibility'));
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  disabled={busy || selectedAsset.status !== 'published'}
+                  style={{
+                    gridColumn: '1 / span 2',
+                    border: '1px solid color-mix(in oklab, var(--mm-accent-primary) 30%, transparent)',
+                    borderRadius: 8,
+                    padding: '8px 10px',
+                    background: 'var(--mm-accent-primary-muted)',
+                    color: 'var(--mm-accent-primary)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    justifyContent: 'center',
+                  }}
+                >
+                  {selectedAsset.visibleInRuntimeLibrary ? 'Hide from Demo Runtime' : 'Show in Demo Runtime'}
                 </button>
                 <button
                   type="button"

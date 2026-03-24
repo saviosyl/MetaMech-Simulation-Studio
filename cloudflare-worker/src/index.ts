@@ -38,6 +38,7 @@ type AssetRow = {
   slug: string;
   category_id: number;
   status: 'draft' | 'published' | 'archived';
+  visible_in_runtime_library: number;
   version: number;
   sort_order: number;
   model_r2_key: string;
@@ -1135,13 +1136,14 @@ function serializeAsset(row: AssetRow, request: Request): Record<string, unknown
   const adminPreviewUrl = row.preview_r2_key
     ? `${base}/admin/assets/${encodeURIComponent(row.uuid)}/preview`
     : null;
-  const usePublished = row.status === 'published' && !row.deleted_at;
+  const usePublished = row.status === 'published' && !row.deleted_at && Number(row.visible_in_runtime_library) === 1;
   return {
     id: row.uuid,
     dbId: row.id,
     name: row.name,
     slug: row.slug,
     status: row.status,
+    visibleInRuntimeLibrary: Number(row.visible_in_runtime_library) === 1,
     version: row.version,
     sortOrder: row.sort_order,
     categoryId: row.category_id,
@@ -1181,6 +1183,7 @@ async function readAssetByUuid(env: Env, assetUuid: string): Promise<AssetRow | 
   return env.DB
     .prepare(
       `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.status, a.version, a.sort_order,
+              a.visible_in_runtime_library,
               a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
               a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
               c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category
@@ -1332,6 +1335,7 @@ async function handleAdminListAssets(request: Request, env: Env): Promise<Respon
   const rows = await env.DB
     .prepare(
       `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.status, a.version, a.sort_order,
+              a.visible_in_runtime_library,
               a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
               a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
               c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category
@@ -1504,6 +1508,7 @@ async function handleAdminPublishAsset(env: Env, request: Request, admin: UserRo
     .prepare(
       `UPDATE assets
        SET status = 'published',
+           visible_in_runtime_library = 0,
            version = ?,
            published_at = CURRENT_TIMESTAMP,
            archived_at = NULL,
@@ -1543,13 +1548,46 @@ async function handleAdminPublishAsset(env: Env, request: Request, admin: UserRo
   return toJson({ asset: row ? serializeAsset(row, request) : null });
 }
 
+async function handleAdminSetAssetRuntimeVisibility(
+  env: Env,
+  request: Request,
+  admin: UserRow,
+  assetUuid: string
+): Promise<Response> {
+  const existing = await readAssetByUuid(env, assetUuid);
+  if (!existing || existing.deleted_at) return toJson({ error: 'Asset not found' }, 404);
+  if (existing.status !== 'published') {
+    return toJson({ error: 'Only published assets can be marked visible in runtime library' }, 400);
+  }
+  const body = await readJson<{ visibleInRuntimeLibrary?: boolean }>(request);
+  if (typeof body?.visibleInRuntimeLibrary !== 'boolean') {
+    return toJson({ error: 'visibleInRuntimeLibrary boolean is required' }, 400);
+  }
+  await env.DB
+    .prepare(
+      `UPDATE assets
+       SET visible_in_runtime_library = ?,
+           updated_by = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+    .bind(body.visibleInRuntimeLibrary ? 1 : 0, admin.id, existing.id)
+    .run();
+  const row = await readAssetByUuid(env, assetUuid);
+  return toJson({ asset: row ? serializeAsset(row, request) : null });
+}
+
 async function handleAdminArchiveAsset(env: Env, request: Request, admin: UserRow, assetUuid: string): Promise<Response> {
   const existing = await readAssetByUuid(env, assetUuid);
   if (!existing || existing.deleted_at) return toJson({ error: 'Asset not found' }, 404);
   await env.DB
     .prepare(
       `UPDATE assets
-       SET status = 'archived', archived_at = CURRENT_TIMESTAMP, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+       SET status = 'archived',
+           visible_in_runtime_library = 0,
+           archived_at = CURRENT_TIMESTAMP,
+           updated_by = ?,
+           updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`
     )
     .bind(admin.id, existing.id)
@@ -1565,6 +1603,7 @@ async function handleAdminRestoreAsset(env: Env, request: Request, admin: UserRo
     .prepare(
       `UPDATE assets
        SET status = 'draft',
+           visible_in_runtime_library = 0,
            archived_at = NULL,
            deleted_at = NULL,
            updated_by = ?,
@@ -1602,8 +1641,8 @@ async function handleAdminDuplicateAsset(env: Env, request: Request, admin: User
   await env.DB
     .prepare(
       `INSERT INTO assets
-       (uuid, name, slug, category_id, status, version, sort_order, model_r2_key, model_url, thumbnail_r2_key, thumbnail_url, preview_r2_key, preview_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'draft', 0, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+       (uuid, name, slug, category_id, status, visible_in_runtime_library, version, sort_order, model_r2_key, model_url, thumbnail_r2_key, thumbnail_url, preview_r2_key, preview_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'draft', 0, 0, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     )
     .bind(
       uuid,
@@ -1706,7 +1745,12 @@ async function handleAdminAssetFile(
 async function handlePublishedAssets(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const sceneCategoryFilter = (url.searchParams.get('sceneCategory') || '').trim();
-  const clauses = ["a.status = 'published'", 'a.deleted_at IS NULL', 'c.is_archived = 0'];
+  const clauses = [
+    "a.status = 'published'",
+    'a.visible_in_runtime_library = 1',
+    'a.deleted_at IS NULL',
+    'c.is_archived = 0',
+  ];
   const binds: unknown[] = [];
   if (sceneCategoryFilter) {
     clauses.push('c.scene_category = ?');
@@ -1715,6 +1759,7 @@ async function handlePublishedAssets(request: Request, env: Env): Promise<Respon
   const rows = await env.DB
     .prepare(
       `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.status, a.version, a.sort_order,
+              a.visible_in_runtime_library,
               a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
               a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
               c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category
@@ -1733,7 +1778,7 @@ async function handlePublishedAssets(request: Request, env: Env): Promise<Respon
 async function handlePublishedAssetFile(request: Request, env: Env, assetUuid: string, kind: 'model' | 'thumbnail' | 'preview'): Promise<Response> {
   const row = await env.DB
     .prepare(
-      `SELECT uuid, status, deleted_at, model_r2_key, thumbnail_r2_key, preview_r2_key
+      `SELECT uuid, status, visible_in_runtime_library, deleted_at, model_r2_key, thumbnail_r2_key, preview_r2_key
        FROM assets
        WHERE uuid = ?
        LIMIT 1`
@@ -1742,12 +1787,15 @@ async function handlePublishedAssetFile(request: Request, env: Env, assetUuid: s
     .first<{
       uuid: string;
       status: string;
+      visible_in_runtime_library: number;
       deleted_at: string | null;
       model_r2_key: string;
       thumbnail_r2_key: string | null;
       preview_r2_key: string | null;
     }>();
-  if (!row || row.deleted_at || row.status !== 'published') return toJson({ error: 'Asset not found' }, 404);
+  if (!row || row.deleted_at || row.status !== 'published' || Number(row.visible_in_runtime_library) !== 1) {
+    return toJson({ error: 'Asset not found' }, 404);
+  }
   const key = kind === 'model' ? row.model_r2_key : (kind === 'thumbnail' ? row.thumbnail_r2_key : row.preview_r2_key);
   if (!key) return toJson({ error: 'File not found' }, 404);
   const object = await env.ASSETS_BUCKET.get(key);
@@ -1853,7 +1901,7 @@ export default {
 
       const adminAssetFileMatch = path.match(/^\/admin\/assets\/([^/]+)\/(model|thumbnail|preview)$/);
       const categoryIdMatch = path.match(/^\/admin\/asset-categories\/(\d+)$/);
-      const assetActionMatch = path.match(/^\/admin\/assets\/([^/]+)\/(publish|archive|restore|duplicate|thumbnail)$/);
+      const assetActionMatch = path.match(/^\/admin\/assets\/([^/]+)\/(publish|archive|restore|duplicate|thumbnail|set-runtime-visibility)$/);
       const assetIdMatch = path.match(/^\/admin\/assets\/([^/]+)$/);
       if (
         adminAssetFileMatch
@@ -1937,6 +1985,10 @@ export default {
           }
           if (action === 'thumbnail' && request.method === 'POST') {
             response = await handleAdminUploadThumbnail(env, request, admin, assetUuid);
+            return withCors(request, response, env);
+          }
+          if (action === 'set-runtime-visibility' && request.method === 'POST') {
+            response = await handleAdminSetAssetRuntimeVisibility(env, request, admin, assetUuid);
             return withCors(request, response, env);
           }
         }

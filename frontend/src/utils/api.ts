@@ -182,6 +182,13 @@ export async function publishLibraryAsset(id: string): Promise<LibraryAsset> {
   return res.data.asset as LibraryAsset;
 }
 
+export async function setLibraryAssetRuntimeVisibility(id: string, visibleInRuntimeLibrary: boolean): Promise<LibraryAsset> {
+  const res = await api.post(`/admin/assets/${encodeURIComponent(id)}/set-runtime-visibility`, {
+    visibleInRuntimeLibrary,
+  });
+  return res.data.asset as LibraryAsset;
+}
+
 export async function archiveLibraryAsset(id: string): Promise<LibraryAsset> {
   const res = await api.post(`/admin/assets/${encodeURIComponent(id)}/archive`);
   return res.data.asset as LibraryAsset;
