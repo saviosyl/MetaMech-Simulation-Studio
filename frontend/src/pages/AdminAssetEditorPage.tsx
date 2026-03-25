@@ -58,6 +58,7 @@ type ResizeDrag = {
 
 type MeasureMode = 'two-point' | 'chain';
 type CameraIntent = 'none' | 'fit' | 'frameSelected' | 'reset';
+type InteractionTool = 'nodes' | 'measurement';
 
 type MeasurementPoint = {
   id: string;
@@ -243,8 +244,8 @@ const ModelPreview: React.FC<{
   pivotOffsetMm: [number, number, number];
   cameraIntent: CameraIntent;
   onCameraIntentHandled: () => void;
+  activeTool: InteractionTool;
   measurementMode: MeasureMode;
-  measurementActive: boolean;
   onModelBoundsComputed: (bounds: RawBounds | null) => void;
   measurementPoints: MeasurementPoint[];
   onMeasurementPointsChange: (points: MeasurementPoint[]) => void;
@@ -267,8 +268,8 @@ const ModelPreview: React.FC<{
   pivotOffsetMm,
   cameraIntent,
   onCameraIntentHandled,
+  activeTool,
   measurementMode,
-  measurementActive,
   onModelBoundsComputed,
   measurementPoints,
   onMeasurementPointsChange,
@@ -502,7 +503,7 @@ const ModelPreview: React.FC<{
           onClick={(event) => {
             const point = getPlaneIntersection(event);
             if (!point) return;
-            if (measurementActive) {
+            if (activeTool === 'measurement') {
               const measurementPoint: MeasurementPoint = {
                 id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
                 positionMm: [mToMm(point.x), mToMm(point.y), mToMm(point.z)],
@@ -539,22 +540,28 @@ const ModelPreview: React.FC<{
           points={measurementPoints.map((p) => [mmToM(p.positionMm[0]), mmToM(p.positionMm[1]), mmToM(p.positionMm[2])])}
           color="#f59e0b"
           lineWidth={2}
+          depthTest={false}
         />
       )}
-      {measurementPoints.map((p) => (
+      {measurementPoints.map((p, index) => (
         <mesh
           key={p.id}
           position={[mmToM(p.positionMm[0]), mmToM(p.positionMm[1]), mmToM(p.positionMm[2])]}
         >
           <sphereGeometry args={[0.03, 12, 12]} />
-          <meshStandardMaterial color="#f59e0b" emissive="#a16207" emissiveIntensity={0.55} />
+          <meshStandardMaterial
+            color={index === 0 ? '#22c55e' : index === (measurementPoints.length - 1) ? '#ef4444' : '#f59e0b'}
+            emissive={index === 0 ? '#14532d' : index === (measurementPoints.length - 1) ? '#7f1d1d' : '#a16207'}
+            emissiveIntensity={0.65}
+            depthTest={false}
+          />
         </mesh>
       ))}
       {nodes.map((node, index) => {
         const p = node.position || [0, 0, 0];
         const selected = selectedNodeIndex === index;
         const nodePosition: [number, number, number] = [mmToM(Number(p[0]) || 0), mmToM(Number(p[1]) || 0), mmToM(Number(p[2]) || 0)];
-        if (selected) {
+        if (selected && activeTool === 'nodes') {
           return (
             <TransformControls
               key={`${node.id || 'node'}-${index}`}
@@ -650,6 +657,7 @@ const AdminAssetEditorPage: React.FC = () => {
   const [pivotOffsetMm, setPivotOffsetMm] = useState<[number, number, number]>([0, 0, 0]);
   const [measureMode, setMeasureMode] = useState<MeasureMode>('two-point');
   const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
+  const [activeTool, setActiveTool] = useState<InteractionTool>('nodes');
   const [knownDimensionMmInput, setKnownDimensionMmInput] = useState<string>('');
   const [cameraIntent, setCameraIntent] = useState<CameraIntent>('none');
   const [fitTargetPath, setFitTargetPath] = useState<string>('');
@@ -750,6 +758,7 @@ const AdminAssetEditorPage: React.FC = () => {
       setPivotOffsetMm([0, 0, 0]);
     }
     setMeasurementPoints([]);
+    setActiveTool('nodes');
     setKnownDimensionMmInput('');
     setCameraIntent('none');
     setFitTargetPath('');
@@ -786,6 +795,7 @@ const AdminAssetEditorPage: React.FC = () => {
   }
 
   function addNode(): void {
+    setActiveTool('nodes');
     const id = `NODE_${nodes.length + 1}`;
     const next: AssetDefinitionNode = {
       id,
@@ -941,10 +951,21 @@ const AdminAssetEditorPage: React.FC = () => {
     setError('');
     setMessage('');
     try {
-      const updated = await publishLibraryAsset(asset.id);
-      setAssets((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
-      hydrateFromAsset(updated);
-      setMessage('Asset published');
+      // Persist current editor metadata first so publish/runtime uses the exact normalized transform.
+      const saved = await updateLibraryAsset(asset.id, {
+        name: name.trim() || asset.name,
+        description: description.trim(),
+        tags: tagsText.split(',').map((v) => v.trim()).filter(Boolean),
+        categoryId: selectedCategoryId || asset.categoryId,
+        metadata,
+      });
+      const published = await publishLibraryAsset(saved.id);
+      setAssets((prev) => prev.map((row) => {
+        if (row.id === saved.id) return published;
+        return row;
+      }));
+      hydrateFromAsset(published);
+      setMessage('Metadata saved and asset published');
       await refreshRuntimePublishedAssets().catch(() => undefined);
     } catch (e) {
       setError(errorMessage(e, 'Failed to publish asset'));
@@ -1122,8 +1143,8 @@ const AdminAssetEditorPage: React.FC = () => {
               pivotOffsetMm={pivotOffsetMm}
               cameraIntent={cameraIntent}
               onCameraIntentHandled={() => setCameraIntent('none')}
+              activeTool={activeTool}
               measurementMode={measureMode}
-              measurementActive={Boolean(asset?.modelUrl)}
               onModelBoundsComputed={setNativeBounds}
               measurementPoints={measurementPoints}
               onMeasurementPointsChange={setMeasurementPoints}
@@ -1264,11 +1285,14 @@ const AdminAssetEditorPage: React.FC = () => {
                   </button>
                 </div>
                 <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Measurements</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>
+                    Measurements {activeTool === 'measurement' ? '(active tool)' : ''}
+                  </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
                       type="button"
                       onClick={() => {
+                        setActiveTool('measurement');
                         setMeasureMode('two-point');
                         setMeasurementPoints([]);
                       }}
@@ -1280,6 +1304,7 @@ const AdminAssetEditorPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        setActiveTool('measurement');
                         setMeasureMode('chain');
                         setMeasurementPoints([]);
                       }}
@@ -1289,6 +1314,13 @@ const AdminAssetEditorPage: React.FC = () => {
                     </button>
                     <button type="button" onClick={() => setMeasurementPoints([])} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}>
                       Clear
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTool('nodes')}
+                      style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: activeTool === 'nodes' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
+                    >
+                      Node Tool
                     </button>
                   </div>
                   {measureMode === 'two-point' ? (
@@ -1339,12 +1371,12 @@ const AdminAssetEditorPage: React.FC = () => {
                 <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)' }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Visual Placement</div>
                   <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4 }}>
-                    Click in viewport to place selected node. Drag selected node to reposition. Placement snaps to 50mm increments for guided alignment.
+                    Active tool: <strong>{activeTool === 'nodes' ? 'Node placement/edit' : 'Measurement'}</strong>. Click in viewport to place selected node only when Node Tool is active.
                   </div>
                 </div>
                 <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
                   {nodes.map((node, index) => (
-                    <button key={`${node.id || 'node'}-${index}`} type="button" onClick={() => setSelectedNodeIndex(index)} style={{ textAlign: 'left', border: `1px solid ${selectedNodeIndex === index ? 'color-mix(in oklab, var(--mm-accent-primary) 40%, transparent)' : 'var(--mm-border-subtle)'}`, borderRadius: 8, padding: 8, background: selectedNodeIndex === index ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)' }}>
+                    <button key={`${node.id || 'node'}-${index}`} type="button" onClick={() => { setActiveTool('nodes'); setSelectedNodeIndex(index); }} style={{ textAlign: 'left', border: `1px solid ${selectedNodeIndex === index ? 'color-mix(in oklab, var(--mm-accent-primary) 40%, transparent)' : 'var(--mm-border-subtle)'}`, borderRadius: 8, padding: 8, background: selectedNodeIndex === index ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)' }}>
                       <div style={{ fontSize: 12, fontWeight: 700 }}>{node.id || `Node ${index + 1}`}</div>
                       <div style={{ fontSize: 10, color: 'var(--mm-text-tertiary)' }}>type: {node.type || 'unknown'}</div>
                     </button>

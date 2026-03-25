@@ -5,6 +5,8 @@ import { AssetDef, ConnectionPortDef, getAssetManifest, setRuntimeExternalAssets
 import { ModuleDefinition, setRuntimeExternalModules } from './moduleLibrary';
 import { useEditorStore } from '../store/editorStore';
 
+type SourceUnit = 'mm' | 'cm' | 'm' | 'unknown';
+
 function toSceneCategory(input: string | null | undefined): SceneCategory {
   const raw = String(input || '').trim().toLowerCase();
   const valid: SceneCategory[] = ['process', 'modular', 'environment', 'actors', 'robots', 'pallets', 'fmcg', 'medical'];
@@ -40,11 +42,26 @@ function extractPorts(metadata: AssetMetadata): ConnectionPortDef[] {
   return ports;
 }
 
+function sourceUnitFactorToMeters(sourceUnit: SourceUnit): number {
+  if (sourceUnit === 'mm') return 0.001;
+  if (sourceUnit === 'cm') return 0.01;
+  if (sourceUnit === 'm') return 1;
+  return 1;
+}
+
 function inferDefaultScale(metadata: AssetMetadata): [number, number, number] | undefined {
+  const sourceUnitRaw = metadata?.sourceUnit as unknown;
+  const sourceUnit: SourceUnit = sourceUnitRaw === 'mm' || sourceUnitRaw === 'cm' || sourceUnitRaw === 'm' || sourceUnitRaw === 'unknown'
+    ? sourceUnitRaw
+    : 'unknown';
+  const sourceUnitScale = sourceUnitFactorToMeters(sourceUnit);
   const scaleCorrectionRaw = metadata?.scaleCorrection as unknown;
-  if (Number.isFinite(Number(scaleCorrectionRaw))) {
-    const s = Number(scaleCorrectionRaw);
-    if (s > 0) return [s, s, s];
+  const parsedCorrection = Number(scaleCorrectionRaw);
+  const hasScaleCorrection = Number.isFinite(parsedCorrection) && parsedCorrection > 0;
+  if (hasScaleCorrection || sourceUnit !== 'unknown') {
+    const correction = hasScaleCorrection ? parsedCorrection : 1;
+    const worldScale = sourceUnitScale * correction;
+    if (worldScale > 0) return [worldScale, worldScale, worldScale];
   }
   const declared = metadata?.defaultScale as unknown;
   if (Array.isArray(declared) && declared.length >= 3) {
