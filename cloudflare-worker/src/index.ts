@@ -1281,11 +1281,11 @@ async function handleAdminUpdateCategory(
 
 async function handleAdminDeleteCategory(env: Env, categoryId: number): Promise<Response> {
   const inUse = await env.DB
-    .prepare('SELECT COUNT(*) AS count FROM assets WHERE category_id = ? AND deleted_at IS NULL')
+    .prepare('SELECT COUNT(*) AS count FROM assets WHERE category_id = ?')
     .bind(categoryId)
     .first<{ count: number }>();
   if (Number(inUse?.count || 0) > 0) {
-    return toJson({ error: 'Cannot delete a category with active assets' }, 400);
+    return toJson({ error: 'Cannot delete category while it still contains assets. Move/delete those assets first.' }, 400);
   }
   await env.DB.prepare('DELETE FROM asset_categories WHERE id = ?').bind(categoryId).run();
   return toJson({ success: true });
