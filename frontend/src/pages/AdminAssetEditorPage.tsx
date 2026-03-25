@@ -59,6 +59,8 @@ type ResizeDrag = {
 type MeasureMode = 'two-point' | 'chain';
 type CameraIntent = 'none' | 'fit' | 'frameSelected' | 'reset';
 type InteractionTool = 'nodes' | 'measurement';
+type PathMode = 'none' | 'straight-node' | 'polyline';
+type PathPoint = { id: string; positionMm: [number, number, number] };
 
 type MeasurementPoint = {
   id: string;
@@ -245,6 +247,7 @@ const ModelPreview: React.FC<{
   cameraIntent: CameraIntent;
   onCameraIntentHandled: () => void;
   activeTool: InteractionTool;
+  pathMode: PathMode;
   measurementMode: MeasureMode;
   onModelBoundsComputed: (bounds: RawBounds | null) => void;
   measurementPoints: MeasurementPoint[];
@@ -261,6 +264,10 @@ const ModelPreview: React.FC<{
   movingParts: AssetMovingPart[];
   previewPartIndex: number;
   previewT: number;
+  pathPoints: PathPoint[];
+  selectedPathPointIndex: number;
+  onPathPointsChange: (points: PathPoint[]) => void;
+  onSelectPathPoint: (index: number) => void;
 }> = ({
   modelUrl,
   sourceUnit,
@@ -269,6 +276,7 @@ const ModelPreview: React.FC<{
   cameraIntent,
   onCameraIntentHandled,
   activeTool,
+  pathMode,
   measurementMode,
   onModelBoundsComputed,
   measurementPoints,
@@ -285,6 +293,10 @@ const ModelPreview: React.FC<{
   movingParts,
   previewPartIndex,
   previewT,
+  pathPoints,
+  selectedPathPointIndex,
+  onPathPointsChange,
+  onSelectPathPoint,
 }) => {
   const [loadedRoot, setLoadedRoot] = useState<THREE.Object3D | null>(null);
   const [loadError, setLoadError] = useState<string>('');
@@ -521,6 +533,15 @@ const ModelPreview: React.FC<{
               }
               return;
             }
+            if (activeTool === 'nodes' && pathMode === 'polyline') {
+              const nextPoint: PathPoint = {
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                positionMm: snapPosition(point),
+              };
+              onPathPointsChange([...pathPoints, nextPoint]);
+              onSelectPathPoint(pathPoints.length);
+              return;
+            }
             onPlaceNodeAtMm(snapPosition(point));
           }}
           onPointerMissed={() => {
@@ -600,6 +621,72 @@ const ModelPreview: React.FC<{
           </mesh>
         );
       })}
+      {(pathPoints.length >= 2 || (pathMode === 'straight-node' && nodes.length >= 2)) && (
+        <Line
+          points={
+            pathMode === 'straight-node'
+              ? ((): [number, number, number][] => {
+                const infeed = nodes.find((n) => String(n.type || '').toLowerCase().includes('infeed')) || nodes[0];
+                const outfeed = nodes.find((n) => String(n.type || '').toLowerCase().includes('outfeed')) || nodes[nodes.length - 1];
+                if (!infeed?.position || !outfeed?.position) return [];
+                return [
+                  [mmToM(Number(infeed.position[0]) || 0), mmToM(Number(infeed.position[1]) || 0), mmToM(Number(infeed.position[2]) || 0)],
+                  [mmToM(Number(outfeed.position[0]) || 0), mmToM(Number(outfeed.position[1]) || 0), mmToM(Number(outfeed.position[2]) || 0)],
+                ];
+              })()
+              : pathPoints.map((p) => [mmToM(p.positionMm[0]), mmToM(p.positionMm[1]), mmToM(p.positionMm[2])])
+          }
+          color="#38bdf8"
+          lineWidth={2.6}
+          depthTest={false}
+        />
+      )}
+      {pathMode === 'polyline' && pathPoints.map((point, index) => {
+        const pointPosition: [number, number, number] = [
+          mmToM(point.positionMm[0]),
+          mmToM(point.positionMm[1]),
+          mmToM(point.positionMm[2]),
+        ];
+        if (selectedPathPointIndex === index && activeTool === 'nodes') {
+          return (
+            <TransformControls
+              key={point.id}
+              mode="translate"
+              size={0.6}
+              onObjectChange={(event) => {
+                const target = (event?.target as { object?: THREE.Object3D } | undefined);
+                if (!target?.object) return;
+                const snapped = snapPosition(target.object.position.clone());
+                onPathPointsChange(pathPoints.map((p, i) => (i === index ? { ...p, positionMm: snapped } : p)));
+              }}
+            >
+              <mesh
+                position={pointPosition}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelectPathPoint(index);
+                }}
+              >
+                <sphereGeometry args={[0.065, 14, 12]} />
+                <meshStandardMaterial color="#38bdf8" emissive="#0c4a6e" emissiveIntensity={0.55} />
+              </mesh>
+            </TransformControls>
+          );
+        }
+        return (
+          <mesh
+            key={point.id}
+            position={pointPosition}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectPathPoint(index);
+            }}
+          >
+            <sphereGeometry args={[0.05, 14, 12]} />
+            <meshStandardMaterial color={selectedPathPointIndex === index ? '#0ea5e9' : '#7dd3fc'} />
+          </mesh>
+        );
+      })}
       <Environment preset="city" />
       <CameraBridge onCamera={(camera: THREE.Camera | undefined) => { if (camera) cameraRef.current = camera; }} />
       <OrbitControls
@@ -658,6 +745,9 @@ const AdminAssetEditorPage: React.FC = () => {
   const [measureMode, setMeasureMode] = useState<MeasureMode>('two-point');
   const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
   const [activeTool, setActiveTool] = useState<InteractionTool>('nodes');
+  const [pathMode, setPathMode] = useState<PathMode>('none');
+  const [pathPoints, setPathPoints] = useState<PathPoint[]>([]);
+  const [selectedPathPointIndex, setSelectedPathPointIndex] = useState<number>(-1);
   const [knownDimensionMmInput, setKnownDimensionMmInput] = useState<string>('');
   const [cameraIntent, setCameraIntent] = useState<CameraIntent>('none');
   const [fitTargetPath, setFitTargetPath] = useState<string>('');
@@ -698,8 +788,16 @@ const AdminAssetEditorPage: React.FC = () => {
       ...(nativeBounds ? { nativeBounds: toMetadataNativeBounds(nativeBounds) } : {}),
       ...(normalizedBoundsMm ? { normalizedBoundsMm } : {}),
       ...(pivotOffsetMm ? { pivotOffset: pivotOffsetMm } : {}),
+      ...(pathMode !== 'none'
+        ? {
+          transportPath: {
+            mode: pathMode,
+            points: pathPoints.map((p) => p.positionMm),
+          },
+        }
+        : {}),
     };
-  }, [asset, nodes, movableParts, sourceUnit, scaleCorrection, nativeBounds, normalizedBoundsMm, pivotOffsetMm]);
+  }, [asset, nodes, movableParts, sourceUnit, scaleCorrection, nativeBounds, normalizedBoundsMm, pivotOffsetMm, pathMode, pathPoints]);
 
   const twoPointDistanceMm = useMemo(() => {
     if (measurementPoints.length < 2) return null;
@@ -759,6 +857,25 @@ const AdminAssetEditorPage: React.FC = () => {
     }
     setMeasurementPoints([]);
     setActiveTool('nodes');
+    const existingPath = m.transportPath;
+    const existingMode = (existingPath?.mode === 'straight-node' || existingPath?.mode === 'polyline')
+      ? existingPath.mode
+      : (existingPath?.mode === 'node-link' ? 'straight-node' : 'none');
+    setPathMode(existingMode);
+    const existingPoints = Array.isArray(existingPath?.points)
+      ? existingPath.points
+        .map((raw, index) => {
+          if (!Array.isArray(raw) || raw.length < 3) return null;
+          const x = Number(raw[0]);
+          const y = Number(raw[1]);
+          const z = Number(raw[2]);
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+          return { id: `path-${index}-${Date.now()}`, positionMm: [x, y, z] as [number, number, number] };
+        })
+        .filter((p): p is PathPoint => Boolean(p))
+      : [];
+    setPathPoints(existingPoints);
+    setSelectedPathPointIndex(existingPoints.length > 0 ? 0 : -1);
     setKnownDimensionMmInput('');
     setCameraIntent('none');
     setFitTargetPath('');
@@ -1144,6 +1261,7 @@ const AdminAssetEditorPage: React.FC = () => {
               cameraIntent={cameraIntent}
               onCameraIntentHandled={() => setCameraIntent('none')}
               activeTool={activeTool}
+              pathMode={pathMode}
               measurementMode={measureMode}
               onModelBoundsComputed={setNativeBounds}
               measurementPoints={measurementPoints}
@@ -1160,6 +1278,10 @@ const AdminAssetEditorPage: React.FC = () => {
               movingParts={movableParts}
               previewPartIndex={previewPartIndex}
               previewT={previewT}
+              pathPoints={pathPoints}
+              selectedPathPointIndex={selectedPathPointIndex}
+              onPathPointsChange={setPathPoints}
+              onSelectPathPoint={setSelectedPathPointIndex}
             />
           </div>
           <div style={{ borderTop: '1px solid var(--mm-border-subtle)', padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', position: 'sticky', bottom: 0, background: 'var(--mm-bg-panel)', zIndex: 4, boxShadow: '0 -8px 18px rgba(2, 6, 23, 0.22)' }}>
@@ -1358,6 +1480,102 @@ const AdminAssetEditorPage: React.FC = () => {
                     </button>
                   </div>
                 </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8, display: 'grid', gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>
+                  Product Flow Path
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPathMode('straight-node');
+                      setActiveTool('nodes');
+                    }}
+                    style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: pathMode === 'straight-node' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
+                  >
+                      Infeed -&gt; Outfeed
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPathMode('polyline');
+                      setActiveTool('nodes');
+                    }}
+                    style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: pathMode === 'polyline' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
+                  >
+                    Multi-point Path
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPathMode('none');
+                      setPathPoints([]);
+                      setSelectedPathPointIndex(-1);
+                    }}
+                    style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: pathMode === 'none' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
+                  >
+                    Disable Path
+                  </button>
+                </div>
+                {pathMode === 'straight-node' && (
+                  <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                    Uses infeed/outfeed node positions as a straight transport path.
+                  </div>
+                )}
+                {pathMode === 'polyline' && (
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                      Click viewport to add points. Select a point to drag with gizmo.
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => setPathPoints([])}
+                        style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}
+                      >
+                        Clear Points
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedPathPointIndex < 0) return;
+                          setPathPoints((prev) => prev.filter((_, i) => i !== selectedPathPointIndex));
+                          setSelectedPathPointIndex(-1);
+                        }}
+                        disabled={selectedPathPointIndex < 0}
+                        style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}
+                      >
+                        Remove Selected Point
+                      </button>
+                    </div>
+                    <div style={{ maxHeight: 120, overflowY: 'auto', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, background: 'var(--mm-bg-surface)' }}>
+                      {pathPoints.length === 0 ? (
+                        <div style={{ padding: 8, fontSize: 11, color: 'var(--mm-text-tertiary)' }}>No path points yet.</div>
+                      ) : (
+                        pathPoints.map((point, index) => (
+                          <button
+                            key={point.id}
+                            type="button"
+                            onClick={() => setSelectedPathPointIndex(index)}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              borderBottom: '1px solid var(--mm-border-subtle)',
+                              background: selectedPathPointIndex === index ? 'var(--mm-accent-primary-muted)' : 'transparent',
+                              padding: '6px 8px',
+                              fontSize: 11,
+                            }}
+                          >
+                            P{index + 1}: [{point.positionMm[0].toFixed(1)}, {point.positionMm[1].toFixed(1)}, {point.positionMm[2].toFixed(1)}] mm
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8 }}>

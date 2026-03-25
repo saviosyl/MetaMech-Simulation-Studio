@@ -87,6 +87,12 @@ export interface AssetMovingPart {
 export interface AssetMetadata {
   nodes?: AssetDefinitionNode[];
   movableParts?: AssetMovingPart[];
+  transportPath?: {
+    mode: 'node-link' | 'straight-node' | 'polyline';
+    sourceNodeId?: string;
+    targetNodeId?: string;
+    points: [number, number, number][];
+  };
   parameters?: Record<string, number | string | boolean>;
   sourceUnit?: 'mm' | 'cm' | 'm' | 'unknown';
   scaleCorrection?: number;

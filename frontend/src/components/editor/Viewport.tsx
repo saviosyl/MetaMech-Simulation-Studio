@@ -375,7 +375,7 @@ const SceneContent: React.FC<{
       }
     : {
         // Match editor preview grid style while staying subtle in runtime.
-        cell: '#6b7280',
+        cell: '#5f6776',
         section: '#334155',
       };
 
