@@ -88,6 +88,21 @@ export interface AssetMetadata {
   nodes?: AssetDefinitionNode[];
   movableParts?: AssetMovingPart[];
   parameters?: Record<string, number | string | boolean>;
+  sourceUnit?: 'mm' | 'cm' | 'm' | 'unknown';
+  scaleCorrection?: number;
+  nativeBounds?: {
+    width: number;
+    depth: number;
+    height: number;
+    min: [number, number, number];
+    max: [number, number, number];
+  };
+  normalizedBoundsMm?: {
+    width: number;
+    depth: number;
+    height: number;
+  };
+  pivotOffset?: [number, number, number];
   [key: string]: unknown;
 }
 

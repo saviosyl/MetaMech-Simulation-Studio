@@ -41,6 +41,11 @@ function extractPorts(metadata: AssetMetadata): ConnectionPortDef[] {
 }
 
 function inferDefaultScale(metadata: AssetMetadata): [number, number, number] | undefined {
+  const scaleCorrectionRaw = metadata?.scaleCorrection as unknown;
+  if (Number.isFinite(Number(scaleCorrectionRaw))) {
+    const s = Number(scaleCorrectionRaw);
+    if (s > 0) return [s, s, s];
+  }
   const declared = metadata?.defaultScale as unknown;
   if (Array.isArray(declared) && declared.length >= 3) {
     const sx = Number(declared[0]);
@@ -53,9 +58,21 @@ function inferDefaultScale(metadata: AssetMetadata): [number, number, number] | 
   return undefined;
 }
 
+function inferDefaultPositionOffset(metadata: AssetMetadata): [number, number, number] | undefined {
+  const pivotOffset = metadata?.pivotOffset as unknown;
+  if (!Array.isArray(pivotOffset) || pivotOffset.length < 3) return undefined;
+  const x = Number(pivotOffset[0]);
+  const y = Number(pivotOffset[1]);
+  const z = Number(pivotOffset[2]);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return undefined;
+  // metadata stores pivot offset in mm; runtime scene coordinates are meters
+  return [x / 1000, y / 1000, z / 1000];
+}
+
 function toStaticAssetDef(asset: LibraryAsset): AssetDef {
   const ports = extractPorts(asset.metadata || {});
   const scale = inferDefaultScale(asset.metadata || {});
+  const defaultPositionOffset = inferDefaultPositionOffset(asset.metadata || {});
   return {
     id: asset.id,
     assetType: 'static',
@@ -65,6 +82,7 @@ function toStaticAssetDef(asset: LibraryAsset): AssetDef {
     glbUrl: asset.modelUrl,
     thumbnailUrl: asset.thumbnailUrl || '',
     defaultScale: scale,
+    defaultPositionOffset,
     ...(ports.length > 0 ? { connectionPorts: ports } : {}),
   };
 }

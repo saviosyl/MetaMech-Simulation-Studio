@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Save, Shield, Trash2, Upload, User } from 'lucide-react';
-import { Canvas } from '@react-three/fiber';
-import { Environment, Grid, OrbitControls, TransformControls } from '@react-three/drei';
+import { ArrowLeft, Crosshair, Maximize, Plus, Ruler, Save, Shield, Trash2, Upload, User } from 'lucide-react';
+import { Canvas, useThree } from '@react-three/fiber';
+import { Environment, Grid, Line, OrbitControls, TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { useAuth } from '../contexts/AuthContext';
@@ -26,14 +26,6 @@ type ModelHierarchyItem = {
   childCount: number;
 };
 
-type ObjectTreeNode = {
-  id: string;
-  name: string;
-  path: string;
-  isMesh: boolean;
-  children: ObjectTreeNode[];
-};
-
 const LEFT_PANEL_MIN = 240;
 const LEFT_PANEL_MAX = 460;
 const RIGHT_PANEL_MIN = 300;
@@ -41,12 +33,36 @@ const RIGHT_PANEL_MAX = 560;
 const VIEWPORT_MIN = 520;
 const PANEL_WIDTHS_STORAGE_KEY = 'metamech.adminAssetEditor.panelWidths';
 
+type SourceUnit = 'mm' | 'cm' | 'm' | 'unknown';
+
+type RawBounds = {
+  x: number;
+  y: number;
+  z: number;
+  min: [number, number, number];
+  max: [number, number, number];
+};
+
+type BoundsMm = {
+  width: number;
+  depth: number;
+  height: number;
+};
+
 type ResizeDrag = {
   side: 'left' | 'right';
   startX: number;
   startLeft: number;
   startRight: number;
 } | null;
+
+type MeasureMode = 'two-point' | 'chain';
+type CameraIntent = 'none' | 'fit' | 'frameSelected' | 'reset';
+
+type MeasurementPoint = {
+  id: string;
+  positionMm: [number, number, number];
+};
 
 function errorMessage(error: unknown, fallback: string): string {
   const e = error as { response?: { data?: { error?: string } }; message?: string };
@@ -69,6 +85,105 @@ function mmToM(value: number): number {
 function mToMm(value: number): number {
   return value * 1000;
 }
+
+function sourceUnitFactorToMeters(sourceUnit: SourceUnit): number {
+  if (sourceUnit === 'mm') return 0.001;
+  if (sourceUnit === 'cm') return 0.01;
+  if (sourceUnit === 'm') return 1;
+  return 1;
+}
+
+function sourceUnitFactorToMm(sourceUnit: SourceUnit): number {
+  if (sourceUnit === 'mm') return 1;
+  if (sourceUnit === 'cm') return 10;
+  if (sourceUnit === 'm') return 1000;
+  return 1000;
+}
+
+function computeBoundsMm(raw: RawBounds, sourceUnit: SourceUnit, scaleCorrection: number): BoundsMm {
+  const factor = sourceUnitFactorToMm(sourceUnit) * Math.max(0.000001, scaleCorrection || 1);
+  return {
+    width: raw.x * factor,
+    depth: raw.z * factor,
+    height: raw.y * factor,
+  };
+}
+
+function toMetadataNativeBounds(raw: RawBounds): NonNullable<AssetMetadata['nativeBounds']> {
+  return {
+    width: raw.x,
+    depth: raw.z,
+    height: raw.y,
+    min: raw.min,
+    max: raw.max,
+  };
+}
+
+function fromMetadataNativeBounds(input: AssetMetadata['nativeBounds'] | undefined): RawBounds | null {
+  if (!input) return null;
+  const width = Number(input.width);
+  const height = Number(input.height);
+  const depth = Number(input.depth);
+  const min = input.min;
+  const max = input.max;
+  if (
+    !Number.isFinite(width)
+    || !Number.isFinite(height)
+    || !Number.isFinite(depth)
+    || !Array.isArray(min)
+    || !Array.isArray(max)
+    || min.length < 3
+    || max.length < 3
+  ) {
+    return null;
+  }
+  return {
+    x: width,
+    y: height,
+    z: depth,
+    min: [Number(min[0]) || 0, Number(min[1]) || 0, Number(min[2]) || 0],
+    max: [Number(max[0]) || 0, Number(max[1]) || 0, Number(max[2]) || 0],
+  };
+}
+
+function distanceMm(a: [number, number, number], b: [number, number, number]): number {
+  const dx = a[0] - b[0];
+  const dy = a[1] - b[1];
+  const dz = a[2] - b[2];
+  return Math.sqrt((dx * dx) + (dy * dy) + (dz * dz));
+}
+
+function fitCameraToBox(camera: THREE.Camera, controls: OrbitControlsLike | null, box: THREE.Box3): void {
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  const maxDim = Math.max(size.x, size.y, size.z, 0.001);
+  const perspective = camera as THREE.PerspectiveCamera;
+  const fovRad = THREE.MathUtils.degToRad(perspective.fov || 45);
+  const distance = (maxDim / (2 * Math.tan(fovRad / 2))) * 1.35;
+  perspective.position.set(center.x + distance, center.y + (distance * 0.7), center.z + distance);
+  perspective.near = Math.max(0.01, distance / 1000);
+  perspective.far = Math.max(1000, distance * 1000);
+  perspective.updateProjectionMatrix();
+  if (controls) {
+    controls.target.copy(center);
+    controls.update();
+  }
+}
+
+type OrbitControlsLike = {
+  target: THREE.Vector3;
+  update: () => void;
+};
+
+const CameraBridge: React.FC<{ onCamera: (camera: THREE.Camera) => void }> = ({ onCamera }) => {
+  const { camera } = useThree();
+  useEffect(() => {
+    onCamera(camera);
+  }, [camera, onCamera]);
+  return null;
+};
 
 function displayObjectName(node: THREE.Object3D): string {
   const rawName = (node.name || '').trim();
@@ -100,7 +215,8 @@ function findObjectByHierarchyPath(root: THREE.Object3D, path: string): THREE.Ob
 function applyMotionPreview(
   targetRoot: THREE.Object3D,
   part: AssetMovingPart | null,
-  previewT: number
+  previewT: number,
+  worldScale: number
 ): void {
   if (!part) return;
   const v = part.min + (part.max - part.min) * previewT;
@@ -108,7 +224,7 @@ function applyMotionPreview(
     || targetRoot.getObjectByName(part.objectName)
     || targetRoot;
   if (part.motionType === 'translate') {
-    const delta = mmToM(v - part.default);
+    const delta = mmToM(v - part.default) / Math.max(worldScale, 0.000001);
     if (part.axis === 'x') candidate.position.x += delta;
     if (part.axis === 'y') candidate.position.y += delta;
     if (part.axis === 'z') candidate.position.z += delta;
@@ -120,33 +236,19 @@ function applyMotionPreview(
   }
 }
 
-function buildObjectTree(items: ModelHierarchyItem[]): ObjectTreeNode[] {
-  const roots: ObjectTreeNode[] = [];
-  const byPath = new Map<string, ObjectTreeNode>();
-  for (const item of items) {
-    const node: ObjectTreeNode = {
-      id: item.id,
-      name: item.name,
-      path: item.path,
-      isMesh: item.isMesh,
-      children: [],
-    };
-    byPath.set(item.path, node);
-    const splitIdx = item.path.lastIndexOf('/');
-    if (splitIdx <= 0) {
-      roots.push(node);
-      continue;
-    }
-    const parentPath = item.path.slice(0, splitIdx);
-    const parent = byPath.get(parentPath);
-    if (parent) parent.children.push(node);
-    else roots.push(node);
-  }
-  return roots;
-}
-
 const ModelPreview: React.FC<{
   modelUrl: string | null;
+  sourceUnit: SourceUnit;
+  scaleCorrection: number;
+  pivotOffsetMm: [number, number, number];
+  cameraIntent: CameraIntent;
+  onCameraIntentHandled: () => void;
+  measurementMode: MeasureMode;
+  measurementActive: boolean;
+  onModelBoundsComputed: (bounds: RawBounds | null) => void;
+  measurementPoints: MeasurementPoint[];
+  onMeasurementPointsChange: (points: MeasurementPoint[]) => void;
+  frameTargetPath: string;
   nodes: AssetDefinitionNode[];
   selectedNodeIndex: number;
   onSelectNode: (index: number) => void;
@@ -160,6 +262,17 @@ const ModelPreview: React.FC<{
   previewT: number;
 }> = ({
   modelUrl,
+  sourceUnit,
+  scaleCorrection,
+  pivotOffsetMm,
+  cameraIntent,
+  onCameraIntentHandled,
+  measurementMode,
+  measurementActive,
+  onModelBoundsComputed,
+  measurementPoints,
+  onMeasurementPointsChange,
+  frameTargetPath,
   nodes,
   selectedNodeIndex,
   onSelectNode,
@@ -174,7 +287,8 @@ const ModelPreview: React.FC<{
 }) => {
   const [loadedRoot, setLoadedRoot] = useState<THREE.Object3D | null>(null);
   const [loadError, setLoadError] = useState<string>('');
-  const previewGroupRef = useRef<THREE.Group | null>(null);
+  const controlsRef = useRef<OrbitControlsLike | null>(null);
+  const cameraRef = useRef<THREE.Camera | null>(null);
   const modelBoundsRef = useRef<THREE.Box3 | null>(null);
 
   useEffect(() => {
@@ -245,6 +359,28 @@ const ModelPreview: React.FC<{
     };
   }, [modelUrl, setHierarchyItems]);
 
+  useEffect(() => {
+    if (!loadedRoot) {
+      onModelBoundsComputed(null);
+      return;
+    }
+    const box = new THREE.Box3().setFromObject(loadedRoot);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    onModelBoundsComputed({
+      x: size.x,
+      y: size.y,
+      z: size.z,
+      min: [box.min.x, box.min.y, box.min.z],
+      max: [box.max.x, box.max.y, box.max.z],
+    });
+  }, [loadedRoot, onModelBoundsComputed]);
+
+  const worldScale = useMemo(
+    () => Math.max(0.000001, sourceUnitFactorToMeters(sourceUnit) * (Number.isFinite(scaleCorrection) ? scaleCorrection : 1)),
+    [sourceUnit, scaleCorrection]
+  );
+
   const previewRoot = useMemo(() => {
     if (!loadedRoot) return null;
     const clone = loadedRoot.clone(true);
@@ -254,12 +390,9 @@ const ModelPreview: React.FC<{
     box.getSize(size);
     box.getCenter(center);
     clone.position.set(-center.x, -box.min.y, -center.z);
-    const maxDim = Math.max(size.x, size.y, size.z);
-    if (maxDim > 0) {
-      const s = 2.4 / maxDim;
-      clone.scale.setScalar(s);
-      clone.position.multiplyScalar(s);
-    }
+    clone.scale.setScalar(worldScale);
+    clone.position.multiplyScalar(worldScale);
+    clone.position.add(new THREE.Vector3(mmToM(pivotOffsetMm[0]), mmToM(pivotOffsetMm[1]), mmToM(pivotOffsetMm[2])));
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
@@ -277,10 +410,48 @@ const ModelPreview: React.FC<{
       }
     });
     const part = movingParts[previewPartIndex] || null;
-    applyMotionPreview(clone, part, previewT);
+    applyMotionPreview(clone, part, previewT, worldScale);
     modelBoundsRef.current = new THREE.Box3().setFromObject(clone);
     return clone;
-  }, [loadedRoot, movingParts, previewPartIndex, previewT, highlightedObjectNames]);
+  }, [loadedRoot, movingParts, previewPartIndex, previewT, highlightedObjectNames, worldScale, pivotOffsetMm]);
+
+  useEffect(() => {
+    if (cameraIntent === 'none') return;
+    const camera = cameraRef.current;
+    if (!camera) return;
+    const controls = controlsRef.current;
+    if (cameraIntent === 'reset') {
+      const perspective = camera as THREE.PerspectiveCamera;
+      perspective.position.set(2.5, 2, 2.5);
+      perspective.near = 0.01;
+      perspective.far = 2000;
+      perspective.updateProjectionMatrix();
+      if (controls) {
+        controls.target.set(0, 0, 0);
+        controls.update();
+      }
+      onCameraIntentHandled();
+      return;
+    }
+    const bounds = modelBoundsRef.current;
+    if (!bounds) {
+      onCameraIntentHandled();
+      return;
+    }
+    if (cameraIntent === 'frameSelected' && previewRoot && frameTargetPath) {
+      const target = findObjectByHierarchyPath(previewRoot, frameTargetPath);
+      if (target) {
+        const targetBox = new THREE.Box3().setFromObject(target);
+        fitCameraToBox(camera, controls, targetBox);
+      } else {
+        fitCameraToBox(camera, controls, bounds);
+      }
+      onCameraIntentHandled();
+      return;
+    }
+    fitCameraToBox(camera, controls, bounds);
+    onCameraIntentHandled();
+  }, [cameraIntent, onCameraIntentHandled, previewRoot, frameTargetPath]);
 
   function getPlaneIntersection(event: THREE.Event): THREE.Vector3 | null {
     const e = event as THREE.Event & { point?: THREE.Vector3 };
@@ -324,7 +495,6 @@ const ModelPreview: React.FC<{
       <Grid args={[10, 10]} cellColor="#6b7280" sectionColor="#334155" fadeDistance={18} fadeStrength={1.2} />
       {previewRoot ? (
         <group
-          ref={previewGroupRef}
           onPointerDown={(event) => {
             const hoveredName = (event.object as THREE.Object3D | undefined)?.name;
             if (hoveredName) setHighlightedObjectNames([hoveredName]);
@@ -332,6 +502,24 @@ const ModelPreview: React.FC<{
           onClick={(event) => {
             const point = getPlaneIntersection(event);
             if (!point) return;
+            if (measurementActive) {
+              const measurementPoint: MeasurementPoint = {
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                positionMm: [mToMm(point.x), mToMm(point.y), mToMm(point.z)],
+              };
+              if (measurementMode === 'two-point') {
+                if (measurementPoints.length === 0) {
+                  onMeasurementPointsChange([measurementPoint]);
+                } else if (measurementPoints.length === 1) {
+                  onMeasurementPointsChange([measurementPoints[0], measurementPoint]);
+                } else {
+                  onMeasurementPointsChange([measurementPoints[1], measurementPoint]);
+                }
+              } else {
+                onMeasurementPointsChange([...measurementPoints, measurementPoint]);
+              }
+              return;
+            }
             onPlaceNodeAtMm(snapPosition(point));
           }}
           onPointerMissed={() => {
@@ -346,6 +534,22 @@ const ModelPreview: React.FC<{
           <meshStandardMaterial color="#64748b" metalness={0.3} roughness={0.55} />
         </mesh>
       )}
+      {measurementPoints.length >= 2 && (
+        <Line
+          points={measurementPoints.map((p) => [mmToM(p.positionMm[0]), mmToM(p.positionMm[1]), mmToM(p.positionMm[2])])}
+          color="#f59e0b"
+          lineWidth={2}
+        />
+      )}
+      {measurementPoints.map((p) => (
+        <mesh
+          key={p.id}
+          position={[mmToM(p.positionMm[0]), mmToM(p.positionMm[1]), mmToM(p.positionMm[2])]}
+        >
+          <sphereGeometry args={[0.03, 12, 12]} />
+          <meshStandardMaterial color="#f59e0b" emissive="#a16207" emissiveIntensity={0.55} />
+        </mesh>
+      ))}
       {nodes.map((node, index) => {
         const p = node.position || [0, 0, 0];
         const selected = selectedNodeIndex === index;
@@ -357,8 +561,8 @@ const ModelPreview: React.FC<{
               mode="translate"
               size={0.7}
               onObjectChange={(event) => {
-                const target = event.target as { object?: THREE.Object3D };
-                if (!target.object) return;
+                const target = (event?.target as { object?: THREE.Object3D } | undefined);
+                if (!target?.object) return;
                 onMoveNodeToMm(index, snapPosition(target.object.position.clone()));
               }}
             >
@@ -390,7 +594,13 @@ const ModelPreview: React.FC<{
         );
       })}
       <Environment preset="city" />
-      <OrbitControls makeDefault />
+      <CameraBridge onCamera={(camera: THREE.Camera | undefined) => { if (camera) cameraRef.current = camera; }} />
+      <OrbitControls
+        makeDefault
+        ref={(value) => {
+          controlsRef.current = (value as OrbitControlsLike | null);
+        }}
+      />
       </Canvas>
       {loadError && (
         <div style={{ position: 'absolute', left: 12, right: 12, top: 12, border: '1px solid color-mix(in oklab, var(--mm-accent-danger) 35%, transparent)', borderRadius: 8, background: 'var(--mm-accent-danger-muted)', color: 'var(--mm-accent-danger)', fontSize: 12, padding: '8px 10px' }}>
@@ -434,6 +644,15 @@ const AdminAssetEditorPage: React.FC = () => {
   const [objectFilter, setObjectFilter] = useState('');
   const [selectedObjectPath, setSelectedObjectPath] = useState('');
   const [highlightedObjectNames, setHighlightedObjectNames] = useState<string[]>([]);
+  const [sourceUnit, setSourceUnit] = useState<SourceUnit>('unknown');
+  const [scaleCorrection, setScaleCorrection] = useState<number>(1);
+  const [nativeBounds, setNativeBounds] = useState<RawBounds | null>(null);
+  const [pivotOffsetMm, setPivotOffsetMm] = useState<[number, number, number]>([0, 0, 0]);
+  const [measureMode, setMeasureMode] = useState<MeasureMode>('two-point');
+  const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
+  const [knownDimensionMmInput, setKnownDimensionMmInput] = useState<string>('');
+  const [cameraIntent, setCameraIntent] = useState<CameraIntent>('none');
+  const [fitTargetPath, setFitTargetPath] = useState<string>('');
   const [leftPanelWidth, setLeftPanelWidth] = useState<number>(() => {
     if (typeof window === 'undefined') return 290;
     try {
@@ -456,13 +675,42 @@ const AdminAssetEditorPage: React.FC = () => {
   });
   const [resizeDrag, setResizeDrag] = useState<ResizeDrag>(null);
 
+  const normalizedBoundsMm = useMemo(() => {
+    if (!nativeBounds) return undefined;
+    return computeBoundsMm(nativeBounds, sourceUnit, scaleCorrection);
+  }, [nativeBounds, sourceUnit, scaleCorrection]);
+
   const metadata = useMemo<AssetMetadata>(() => {
     return {
       ...safeAssetMetadata(asset),
       nodes,
       movableParts,
+      sourceUnit,
+      scaleCorrection,
+      ...(nativeBounds ? { nativeBounds: toMetadataNativeBounds(nativeBounds) } : {}),
+      ...(normalizedBoundsMm ? { normalizedBoundsMm } : {}),
+      ...(pivotOffsetMm ? { pivotOffset: pivotOffsetMm } : {}),
     };
-  }, [asset, nodes, movableParts]);
+  }, [asset, nodes, movableParts, sourceUnit, scaleCorrection, nativeBounds, normalizedBoundsMm, pivotOffsetMm]);
+
+  const twoPointDistanceMm = useMemo(() => {
+    if (measurementPoints.length < 2) return null;
+    return distanceMm(measurementPoints[0].positionMm, measurementPoints[1].positionMm);
+  }, [measurementPoints]);
+
+  const chainSegments = useMemo(() => {
+    if (measurementPoints.length < 2) return [];
+    const segments: number[] = [];
+    for (let i = 1; i < measurementPoints.length; i += 1) {
+      segments.push(distanceMm(measurementPoints[i - 1].positionMm, measurementPoints[i].positionMm));
+    }
+    return segments;
+  }, [measurementPoints]);
+
+  const chainTotalMm = useMemo(
+    () => chainSegments.reduce((acc, value) => acc + value, 0),
+    [chainSegments]
+  );
 
   const validation = useMemo(() => {
     const problems: string[] = [];
@@ -487,6 +735,24 @@ const AdminAssetEditorPage: React.FC = () => {
     const m = safeAssetMetadata(next);
     setNodes(Array.isArray(m.nodes) ? (m.nodes as AssetDefinitionNode[]) : []);
     setMovableParts(Array.isArray(m.movableParts) ? (m.movableParts as AssetMovingPart[]) : []);
+    const nextSourceUnit = (m.sourceUnit === 'mm' || m.sourceUnit === 'cm' || m.sourceUnit === 'm' || m.sourceUnit === 'unknown')
+      ? m.sourceUnit
+      : 'unknown';
+    setSourceUnit(nextSourceUnit);
+    const nextScale = Number(m.scaleCorrection);
+    setScaleCorrection(Number.isFinite(nextScale) && nextScale > 0 ? nextScale : 1);
+    const nextNativeBounds = fromMetadataNativeBounds(m.nativeBounds);
+    setNativeBounds(nextNativeBounds);
+    const pivot = m.pivotOffset;
+    if (Array.isArray(pivot) && pivot.length >= 3) {
+      setPivotOffsetMm([Number(pivot[0]) || 0, Number(pivot[1]) || 0, Number(pivot[2]) || 0]);
+    } else {
+      setPivotOffsetMm([0, 0, 0]);
+    }
+    setMeasurementPoints([]);
+    setKnownDimensionMmInput('');
+    setCameraIntent('none');
+    setFitTargetPath('');
     setSelectedNodeIndex(-1);
     setPreviewPartIndex(-1);
   }
@@ -851,6 +1117,17 @@ const AdminAssetEditorPage: React.FC = () => {
           <div style={{ minHeight: 0 }}>
             <ModelPreview
               modelUrl={asset?.modelUrl || null}
+              sourceUnit={sourceUnit}
+              scaleCorrection={scaleCorrection}
+              pivotOffsetMm={pivotOffsetMm}
+              cameraIntent={cameraIntent}
+              onCameraIntentHandled={() => setCameraIntent('none')}
+              measurementMode={measureMode}
+              measurementActive={Boolean(asset?.modelUrl)}
+              onModelBoundsComputed={setNativeBounds}
+              measurementPoints={measurementPoints}
+              onMeasurementPointsChange={setMeasurementPoints}
+              frameTargetPath={fitTargetPath}
               nodes={nodes}
               selectedNodeIndex={selectedNodeIndex}
               onSelectNode={setSelectedNodeIndex}
@@ -905,6 +1182,150 @@ const AdminAssetEditorPage: React.FC = () => {
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
                 <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Tags (comma separated)</label>
                 <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8, display: 'grid', gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>
+                  Model Normalization
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Source Unit</label>
+                    <select value={sourceUnit} onChange={(e) => setSourceUnit(e.target.value as SourceUnit)}>
+                      <option value="unknown">unknown</option>
+                      <option value="mm">mm</option>
+                      <option value="cm">cm</option>
+                      <option value="m">m</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Scale Correction</label>
+                    <input
+                      type="number"
+                      step={0.0001}
+                      min={0.000001}
+                      value={scaleCorrection}
+                      onChange={(e) => setScaleCorrection(Math.max(0.000001, Number(e.target.value) || 1))}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gap: 4, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                  <div>
+                    Raw Bounds: {nativeBounds ? `W ${nativeBounds.x.toFixed(4)}, D ${nativeBounds.z.toFixed(4)}, H ${nativeBounds.y.toFixed(4)}` : 'not available'}
+                  </div>
+                  <div>
+                    Normalized (mm): {normalizedBoundsMm ? `W ${normalizedBoundsMm.width.toFixed(1)}, D ${normalizedBoundsMm.depth.toFixed(1)}, H ${normalizedBoundsMm.height.toFixed(1)}` : 'not available'}
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Pivot X (mm)</label>
+                    <input
+                      type="number"
+                      value={pivotOffsetMm[0]}
+                      onChange={(e) => setPivotOffsetMm([Number(e.target.value) || 0, pivotOffsetMm[1], pivotOffsetMm[2]])}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Pivot Y (mm)</label>
+                    <input
+                      type="number"
+                      value={pivotOffsetMm[1]}
+                      onChange={(e) => setPivotOffsetMm([pivotOffsetMm[0], Number(e.target.value) || 0, pivotOffsetMm[2]])}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Pivot Z (mm)</label>
+                    <input
+                      type="number"
+                      value={pivotOffsetMm[2]}
+                      onChange={(e) => setPivotOffsetMm([pivotOffsetMm[0], pivotOffsetMm[1], Number(e.target.value) || 0])}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button type="button" onClick={() => setCameraIntent('fit')} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Maximize size={12} />
+                    Fit to Model
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFitTargetPath(selectedObjectPath || '');
+                      setCameraIntent('frameSelected');
+                    }}
+                    style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <Crosshair size={12} />
+                    Frame Selected
+                  </button>
+                  <button type="button" onClick={() => setCameraIntent('reset')} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11 }}>
+                    Reset Camera
+                  </button>
+                </div>
+                <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Measurements</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMeasureMode('two-point');
+                        setMeasurementPoints([]);
+                      }}
+                      style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: measureMode === 'two-point' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
+                    >
+                      <Ruler size={12} style={{ marginRight: 4 }} />
+                      Point-to-point
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMeasureMode('chain');
+                        setMeasurementPoints([]);
+                      }}
+                      style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: measureMode === 'chain' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
+                    >
+                      Chained
+                    </button>
+                    <button type="button" onClick={() => setMeasurementPoints([])} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}>
+                      Clear
+                    </button>
+                  </div>
+                  {measureMode === 'two-point' ? (
+                    <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                      Distance: {twoPointDistanceMm != null ? `${twoPointDistanceMm.toFixed(2)} mm` : 'pick two points in viewport'}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                      Segments: {chainSegments.length > 0 ? chainSegments.map((s, i) => `#${i + 1} ${s.toFixed(1)}mm`).join(' | ') : 'pick polyline points'}
+                      {chainSegments.length > 0 ? ` • Total: ${chainTotalMm.toFixed(2)} mm` : ''}
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, alignItems: 'end' }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Set Known Dimension (mm)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={knownDimensionMmInput}
+                        onChange={(e) => setKnownDimensionMmInput(e.target.value)}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const known = Number(knownDimensionMmInput);
+                        if (!Number.isFinite(known) || known <= 0 || twoPointDistanceMm == null || twoPointDistanceMm <= 0) return;
+                        setScaleCorrection((prev) => Math.max(0.000001, prev * (known / twoPointDistanceMm)));
+                      }}
+                      disabled={twoPointDistanceMm == null || twoPointDistanceMm <= 0 || !(Number(knownDimensionMmInput) > 0)}
+                      style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 10px', background: 'var(--mm-bg-panel)', fontSize: 11 }}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8 }}>

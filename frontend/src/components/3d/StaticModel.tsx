@@ -9,13 +9,18 @@ interface StaticModelProps {
   onClick: () => void;
 }
 
-const GLBModel: React.FC<{ url: string; defaultScale?: [number, number, number] }> = ({ url, defaultScale }) => {
+const GLBModel: React.FC<{
+  url: string;
+  defaultScale?: [number, number, number];
+  defaultPositionOffset?: [number, number, number];
+}> = ({ url, defaultScale, defaultPositionOffset }) => {
   const { scene } = useGLTF(url);
   const cloned = React.useMemo(() => {
     const c = scene.clone(true);
     if (defaultScale) c.scale.set(...defaultScale);
+    if (defaultPositionOffset) c.position.set(...defaultPositionOffset);
     return c;
-  }, [scene, defaultScale]);
+  }, [scene, defaultScale, defaultPositionOffset]);
 
   return <primitive object={cloned} />;
 };
@@ -35,7 +40,11 @@ const StaticModel: React.FC<StaticModelProps> = ({ assetDef, isSelected, onClick
       onPointerOut={() => { document.body.style.cursor = 'auto'; }}
     >
       <Suspense fallback={<FallbackBox />}>
-        <GLBModel url={assetDef.glbUrl} defaultScale={assetDef.defaultScale} />
+        <GLBModel
+          url={assetDef.glbUrl}
+          defaultScale={assetDef.defaultScale}
+          defaultPositionOffset={assetDef.defaultPositionOffset}
+        />
       </Suspense>
       {isSelected && (
         <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>

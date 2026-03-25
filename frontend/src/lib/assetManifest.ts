@@ -13,6 +13,7 @@ export interface StaticAssetDef {
   glbUrl: string;
   thumbnailUrl: string;
   defaultScale?: [number, number, number];
+  defaultPositionOffset?: [number, number, number];
   connectionPorts?: ConnectionPortDef[];
 }
 
