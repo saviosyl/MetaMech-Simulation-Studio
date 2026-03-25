@@ -97,6 +97,7 @@ export interface LibraryAsset {
   name: string;
   slug: string;
   status: AssetStatus;
+  lifecycleState?: 'draft' | 'internal' | 'live' | 'archived' | 'deleted';
   visibleInRuntimeLibrary?: boolean;
   version: number;
   sortOrder: number;

@@ -119,6 +119,7 @@ export interface ListAssetsOptions {
   q?: string;
   categoryId?: number;
   status?: AssetStatus;
+  lifecycleState?: 'draft' | 'internal' | 'live' | 'archived' | 'deleted';
   tag?: string;
   includeDeleted?: boolean;
 }
@@ -128,6 +129,7 @@ export async function listLibraryAssets(options: ListAssetsOptions = {}): Promis
   if (options.q) params.set('q', options.q);
   if (options.categoryId) params.set('categoryId', String(options.categoryId));
   if (options.status) params.set('status', options.status);
+  if (options.lifecycleState) params.set('lifecycleState', options.lifecycleState);
   if (options.tag) params.set('tag', options.tag);
   if (options.includeDeleted) params.set('includeDeleted', 'true');
   const res = await api.get('/admin/assets', { params });

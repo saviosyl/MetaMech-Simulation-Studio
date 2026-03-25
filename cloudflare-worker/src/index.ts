@@ -38,6 +38,7 @@ type AssetRow = {
   slug: string;
   category_id: number;
   status: 'draft' | 'published' | 'archived';
+  lifecycle_state: AssetLifecycleState | null;
   visible_in_runtime_library: number;
   version: number;
   sort_order: number;
@@ -59,6 +60,10 @@ type AssetRow = {
   category_slug?: string;
   category_scene_category?: string;
 };
+
+type AssetLifecycleState = 'draft' | 'internal' | 'live' | 'archived' | 'deleted';
+const ASSET_LIFECYCLE_STATES: AssetLifecycleState[] = ['draft', 'internal', 'live', 'archived', 'deleted'];
+const ASSET_LIFECYCLE_SET = new Set<AssetLifecycleState>(ASSET_LIFECYCLE_STATES);
 
 type SceneCategory =
   | 'process'
@@ -1068,6 +1073,44 @@ function normalizeMetadata(input: unknown): Record<string, unknown> {
   return {};
 }
 
+function asAssetLifecycleState(input: unknown): AssetLifecycleState | null {
+  const value = String(input || '').trim().toLowerCase() as AssetLifecycleState;
+  return ASSET_LIFECYCLE_SET.has(value) ? value : null;
+}
+
+function deriveLifecycleState(row: Pick<AssetRow, 'lifecycle_state' | 'status' | 'visible_in_runtime_library' | 'deleted_at'>): AssetLifecycleState {
+  const explicit = asAssetLifecycleState(row.lifecycle_state);
+  if (explicit) return explicit;
+  if (row.deleted_at) return 'deleted';
+  if (row.status === 'archived') return 'archived';
+  if (row.status === 'published') return Number(row.visible_in_runtime_library) === 1 ? 'live' : 'internal';
+  return 'draft';
+}
+
+function statusFromLifecycle(lifecycleState: AssetLifecycleState): AssetRow['status'] {
+  if (lifecycleState === 'live' || lifecycleState === 'internal') return 'published';
+  if (lifecycleState === 'archived' || lifecycleState === 'deleted') return 'archived';
+  return 'draft';
+}
+
+function isRuntimeLiveLifecycle(lifecycleState: AssetLifecycleState): boolean {
+  return lifecycleState === 'live';
+}
+
+function validLifecycleTransition(fromState: AssetLifecycleState, toState: AssetLifecycleState): boolean {
+  if (fromState === toState) return true;
+  if (fromState === 'draft') return ['internal', 'live', 'archived', 'deleted'].includes(toState);
+  if (fromState === 'internal') return ['draft', 'live', 'archived', 'deleted'].includes(toState);
+  if (fromState === 'live') return ['internal', 'archived', 'deleted'].includes(toState);
+  if (fromState === 'archived') return ['draft', 'internal', 'live', 'deleted'].includes(toState);
+  if (fromState === 'deleted') return ['draft'].includes(toState);
+  return false;
+}
+
+function lifecycleSqlExpr(alias: string): string {
+  return `COALESCE(${alias}.lifecycle_state, CASE WHEN ${alias}.deleted_at IS NOT NULL THEN 'deleted' WHEN ${alias}.status = 'archived' THEN 'archived' WHEN ${alias}.status = 'published' AND ${alias}.visible_in_runtime_library = 1 THEN 'live' WHEN ${alias}.status = 'published' THEN 'internal' ELSE 'draft' END)`;
+}
+
 async function requireAdminUser(request: Request, env: Env): Promise<UserRow | null> {
   const user = await readAuthedUser(request, env);
   if (!user) return null;
@@ -1136,14 +1179,16 @@ function serializeAsset(row: AssetRow, request: Request): Record<string, unknown
   const adminPreviewUrl = row.preview_r2_key
     ? `${base}/admin/assets/${encodeURIComponent(row.uuid)}/preview`
     : null;
-  const usePublished = row.status === 'published' && !row.deleted_at && Number(row.visible_in_runtime_library) === 1;
+  const lifecycleState = deriveLifecycleState(row);
+  const usePublished = !row.deleted_at && isRuntimeLiveLifecycle(lifecycleState);
   return {
     id: row.uuid,
     dbId: row.id,
     name: row.name,
     slug: row.slug,
     status: row.status,
-    visibleInRuntimeLibrary: Number(row.visible_in_runtime_library) === 1,
+    lifecycleState,
+    visibleInRuntimeLibrary: isRuntimeLiveLifecycle(lifecycleState),
     version: row.version,
     sortOrder: row.sort_order,
     categoryId: row.category_id,
@@ -1418,8 +1463,8 @@ async function handleAdminUploadAsset(request: Request, env: Env, admin: UserRow
   await env.DB
     .prepare(
       `INSERT INTO assets
-       (uuid, name, slug, category_id, status, version, sort_order, model_r2_key, model_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'draft', 0, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+       (uuid, name, slug, category_id, status, lifecycle_state, version, sort_order, model_r2_key, model_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'draft', 'draft', 0, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     )
     .bind(
       uuid,
@@ -1499,6 +1544,10 @@ async function handleAdminUpdateAsset(
 async function handleAdminPublishAsset(env: Env, request: Request, admin: UserRow, assetUuid: string): Promise<Response> {
   const existing = await readAssetByUuid(env, assetUuid);
   if (!existing || existing.deleted_at) return toJson({ error: 'Asset not found' }, 404);
+  const fromState = deriveLifecycleState(existing);
+  if (!validLifecycleTransition(fromState, 'internal')) {
+    return toJson({ error: `Invalid lifecycle transition: ${fromState} -> internal` }, 400);
+  }
   const metadata = safeJsonParse<Record<string, unknown>>(existing.metadata, {});
   const validationError = validateMetadataForPublish(metadata);
   if (validationError) return toJson({ error: validationError }, 400);
@@ -1508,6 +1557,7 @@ async function handleAdminPublishAsset(env: Env, request: Request, admin: UserRo
     .prepare(
       `UPDATE assets
        SET status = 'published',
+           lifecycle_state = 'internal',
            visible_in_runtime_library = 0,
            version = ?,
            published_at = CURRENT_TIMESTAMP,
@@ -1556,22 +1606,28 @@ async function handleAdminSetAssetRuntimeVisibility(
 ): Promise<Response> {
   const existing = await readAssetByUuid(env, assetUuid);
   if (!existing || existing.deleted_at) return toJson({ error: 'Asset not found' }, 404);
-  if (existing.status !== 'published') {
-    return toJson({ error: 'Only published assets can be marked visible in runtime library' }, 400);
+  const currentLifecycle = deriveLifecycleState(existing);
+  if (existing.status !== 'published' || !['internal', 'live'].includes(currentLifecycle)) {
+    return toJson({ error: 'Only internal/live assets can be shown in runtime library' }, 400);
   }
   const body = await readJson<{ visibleInRuntimeLibrary?: boolean }>(request);
   if (typeof body?.visibleInRuntimeLibrary !== 'boolean') {
     return toJson({ error: 'visibleInRuntimeLibrary boolean is required' }, 400);
   }
+  const nextLifecycle: AssetLifecycleState = body.visibleInRuntimeLibrary ? 'live' : 'internal';
+  if (!validLifecycleTransition(currentLifecycle, nextLifecycle)) {
+    return toJson({ error: `Invalid lifecycle transition: ${currentLifecycle} -> ${nextLifecycle}` }, 400);
+  }
   await env.DB
     .prepare(
       `UPDATE assets
-       SET visible_in_runtime_library = ?,
+       SET lifecycle_state = ?,
+           visible_in_runtime_library = ?,
            updated_by = ?,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`
     )
-    .bind(body.visibleInRuntimeLibrary ? 1 : 0, admin.id, existing.id)
+    .bind(nextLifecycle, body.visibleInRuntimeLibrary ? 1 : 0, admin.id, existing.id)
     .run();
   const row = await readAssetByUuid(env, assetUuid);
   return toJson({ asset: row ? serializeAsset(row, request) : null });
@@ -1580,10 +1636,15 @@ async function handleAdminSetAssetRuntimeVisibility(
 async function handleAdminArchiveAsset(env: Env, request: Request, admin: UserRow, assetUuid: string): Promise<Response> {
   const existing = await readAssetByUuid(env, assetUuid);
   if (!existing || existing.deleted_at) return toJson({ error: 'Asset not found' }, 404);
+  const fromState = deriveLifecycleState(existing);
+  if (!validLifecycleTransition(fromState, 'archived')) {
+    return toJson({ error: `Invalid lifecycle transition: ${fromState} -> archived` }, 400);
+  }
   await env.DB
     .prepare(
       `UPDATE assets
        SET status = 'archived',
+           lifecycle_state = 'archived',
            visible_in_runtime_library = 0,
            archived_at = CURRENT_TIMESTAMP,
            updated_by = ?,
@@ -1599,10 +1660,15 @@ async function handleAdminArchiveAsset(env: Env, request: Request, admin: UserRo
 async function handleAdminRestoreAsset(env: Env, request: Request, admin: UserRow, assetUuid: string): Promise<Response> {
   const existing = await readAssetByUuid(env, assetUuid);
   if (!existing) return toJson({ error: 'Asset not found' }, 404);
+  const fromState = deriveLifecycleState(existing);
+  if (!validLifecycleTransition(fromState, 'draft')) {
+    return toJson({ error: `Invalid lifecycle transition: ${fromState} -> draft` }, 400);
+  }
   await env.DB
     .prepare(
       `UPDATE assets
        SET status = 'draft',
+           lifecycle_state = 'draft',
            visible_in_runtime_library = 0,
            archived_at = NULL,
            deleted_at = NULL,
@@ -1641,8 +1707,8 @@ async function handleAdminDuplicateAsset(env: Env, request: Request, admin: User
   await env.DB
     .prepare(
       `INSERT INTO assets
-       (uuid, name, slug, category_id, status, visible_in_runtime_library, version, sort_order, model_r2_key, model_url, thumbnail_r2_key, thumbnail_url, preview_r2_key, preview_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'draft', 0, 0, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+       (uuid, name, slug, category_id, status, lifecycle_state, visible_in_runtime_library, version, sort_order, model_r2_key, model_url, thumbnail_r2_key, thumbnail_url, preview_r2_key, preview_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'draft', 'draft', 0, 0, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     )
     .bind(
       uuid,
@@ -1667,10 +1733,20 @@ async function handleAdminDuplicateAsset(env: Env, request: Request, admin: User
 async function handleAdminSoftDeleteAsset(env: Env, admin: UserRow, assetUuid: string): Promise<Response> {
   const existing = await readAssetByUuid(env, assetUuid);
   if (!existing || existing.deleted_at) return toJson({ error: 'Asset not found' }, 404);
+  const fromState = deriveLifecycleState(existing);
+  if (!validLifecycleTransition(fromState, 'deleted')) {
+    return toJson({ error: `Invalid lifecycle transition: ${fromState} -> deleted` }, 400);
+  }
   await env.DB
     .prepare(
       `UPDATE assets
-       SET deleted_at = CURRENT_TIMESTAMP, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+       SET status = 'archived',
+           lifecycle_state = 'deleted',
+           visible_in_runtime_library = 0,
+           deleted_at = CURRENT_TIMESTAMP,
+           archived_at = COALESCE(archived_at, CURRENT_TIMESTAMP),
+           updated_by = ?,
+           updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`
     )
     .bind(admin.id, existing.id)
@@ -1746,8 +1822,7 @@ async function handlePublishedAssets(request: Request, env: Env): Promise<Respon
   const url = new URL(request.url);
   const sceneCategoryFilter = (url.searchParams.get('sceneCategory') || '').trim();
   const clauses = [
-    "a.status = 'published'",
-    'a.visible_in_runtime_library = 1',
+    "COALESCE(a.lifecycle_state, CASE WHEN a.deleted_at IS NOT NULL THEN 'deleted' WHEN a.status = 'archived' THEN 'archived' WHEN a.status = 'published' AND a.visible_in_runtime_library = 1 THEN 'live' WHEN a.status = 'published' THEN 'internal' ELSE 'draft' END) = 'live'",
     'a.deleted_at IS NULL',
     'c.is_archived = 0',
   ];
@@ -1758,7 +1833,7 @@ async function handlePublishedAssets(request: Request, env: Env): Promise<Respon
   }
   const rows = await env.DB
     .prepare(
-      `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.status, a.version, a.sort_order,
+      `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.status, a.lifecycle_state, a.version, a.sort_order,
               a.visible_in_runtime_library,
               a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
               a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
@@ -1778,7 +1853,7 @@ async function handlePublishedAssets(request: Request, env: Env): Promise<Respon
 async function handlePublishedAssetFile(request: Request, env: Env, assetUuid: string, kind: 'model' | 'thumbnail' | 'preview'): Promise<Response> {
   const row = await env.DB
     .prepare(
-      `SELECT uuid, status, visible_in_runtime_library, deleted_at, model_r2_key, thumbnail_r2_key, preview_r2_key
+      `SELECT uuid, status, lifecycle_state, visible_in_runtime_library, deleted_at, model_r2_key, thumbnail_r2_key, preview_r2_key
        FROM assets
        WHERE uuid = ?
        LIMIT 1`
@@ -1787,13 +1862,22 @@ async function handlePublishedAssetFile(request: Request, env: Env, assetUuid: s
     .first<{
       uuid: string;
       status: string;
+      lifecycle_state: AssetLifecycleState | null;
       visible_in_runtime_library: number;
       deleted_at: string | null;
       model_r2_key: string;
       thumbnail_r2_key: string | null;
       preview_r2_key: string | null;
     }>();
-  if (!row || row.deleted_at || row.status !== 'published' || Number(row.visible_in_runtime_library) !== 1) {
+  const lifecycleState = row
+    ? deriveLifecycleState({
+      lifecycle_state: row.lifecycle_state,
+      status: row.status as AssetRow['status'],
+      visible_in_runtime_library: row.visible_in_runtime_library,
+      deleted_at: row.deleted_at,
+    })
+    : null;
+  if (!row || row.deleted_at || lifecycleState !== 'live') {
     return toJson({ error: 'Asset not found' }, 404);
   }
   const key = kind === 'model' ? row.model_r2_key : (kind === 'thumbnail' ? row.thumbnail_r2_key : row.preview_r2_key);
@@ -1901,7 +1985,7 @@ export default {
 
       const adminAssetFileMatch = path.match(/^\/admin\/assets\/([^/]+)\/(model|thumbnail|preview)$/);
       const categoryIdMatch = path.match(/^\/admin\/asset-categories\/(\d+)$/);
-      const assetActionMatch = path.match(/^\/admin\/assets\/([^/]+)\/(publish|archive|restore|duplicate|thumbnail|set-runtime-visibility)$/);
+      const assetActionMatch = path.match(/^\/admin\/assets\/([^/]+)\/(publish|archive|restore|duplicate|thumbnail|set-runtime-visibility|set-lifecycle-state)$/);
       const assetIdMatch = path.match(/^\/admin\/assets\/([^/]+)$/);
       if (
         adminAssetFileMatch
@@ -1989,6 +2073,10 @@ export default {
           }
           if (action === 'set-runtime-visibility' && request.method === 'POST') {
             response = await handleAdminSetAssetRuntimeVisibility(env, request, admin, assetUuid);
+            return withCors(request, response, env);
+          }
+          if (action === 'set-lifecycle-state' && request.method === 'POST') {
+            response = await handleAdminSetAssetLifecycleState(env, request, admin, assetUuid);
             return withCors(request, response, env);
           }
         }
