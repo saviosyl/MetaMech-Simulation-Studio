@@ -910,6 +910,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
       : getDefaultParameters(type);
+    const staticMetadata = (!isParametric && matchingAsset?.assetType === 'static')
+      ? ((matchingAsset as AssetDef & { metadata?: Record<string, any> }).metadata || {})
+      : {};
+    const withTransportPath = staticMetadata.transportPath && typeof staticMetadata.transportPath === 'object'
+      ? { transportPath: staticMetadata.transportPath }
+      : {};
+    const withAssetNodes = Array.isArray(staticMetadata.nodes) ? { assetNodes: staticMetadata.nodes } : {};
 
     // Auto-generate unique sensor tag
     if (type === 'sensor' && !defaultParams.sensorTag) {
@@ -935,7 +942,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       position: [position[0], 0, position[2]], // Force Y=0 (on ground)
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
-      parameters: defaultParams,
+      parameters: { ...defaultParams, ...withTransportPath, ...withAssetNodes },
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
       assetId: matchingAsset?.id,
       assetDefType: matchingAsset?.assetType,
@@ -1588,3 +1595,4 @@ function getDefaultParameters(type: string): Record<string, any> {
   
   return defaults[type] || {};
 }
+

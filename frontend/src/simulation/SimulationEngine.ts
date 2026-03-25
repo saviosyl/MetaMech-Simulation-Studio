@@ -18,6 +18,13 @@ import { StopperRunState, createStopperState, evaluateStopper, editorParamsToSto
 import { PusherRunState, createPusherState, evaluatePusher, editorParamsToPusherConfig } from './PusherLogic';
 import { RuleEngineState, createRuleEngineState, evaluateRules, RuleContext, ActionCommand, Rule } from './RuleEngine';
 
+type CustomTransportPath = {
+  mode?: 'node-link' | 'straight-node' | 'polyline';
+  sourceNodeId?: string;
+  targetNodeId?: string;
+  points?: [number, number, number][];
+};
+
 const COLOR_MAP: Record<string, string> = {
   brown: '#8B4513',
   red: '#ef4444',
@@ -44,6 +51,123 @@ const CONVEYOR_TYPES = [
   'mm85-idler-end',
   'mm85-guide-rail',
 ];
+
+function hasCustomTransportPath(node: ProcessNode): boolean {
+  const tp = (node.parameters as { transportPath?: CustomTransportPath } | undefined)?.transportPath;
+  if (!tp) return false;
+  if (tp.mode === 'polyline') {
+    return Array.isArray(tp.points) && tp.points.length >= 2;
+  }
+  if (tp.mode === 'straight-node' || tp.mode === 'node-link') {
+    return true;
+  }
+  return false;
+}
+
+function asVec3OrNull(input: unknown): [number, number, number] | null {
+  if (!Array.isArray(input) || input.length < 3) return null;
+  const x = Number(input[0]);
+  const y = Number(input[1]);
+  const z = Number(input[2]);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+  return [x, y, z];
+}
+
+function segmentLength(a: [number, number, number], b: [number, number, number]): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const dz = b[2] - a[2];
+  return Math.sqrt((dx * dx) + (dy * dy) + (dz * dz));
+}
+
+function lerpPoint(a: [number, number, number], b: [number, number, number], t: number): [number, number, number] {
+  return [
+    a[0] + ((b[0] - a[0]) * t),
+    a[1] + ((b[1] - a[1]) * t),
+    a[2] + ((b[2] - a[2]) * t),
+  ];
+}
+
+function buildWorldPathPoints(node: ProcessNode): [number, number, number][] {
+  const tp = (node.parameters as { transportPath?: CustomTransportPath } | undefined)?.transportPath;
+  if (!tp) return [];
+  if (tp.mode === 'polyline') {
+    const points = Array.isArray(tp.points) ? tp.points : [];
+    const world = points
+      .map((p) => asVec3OrNull(p))
+      .filter((p): p is [number, number, number] => Boolean(p))
+      .map((local) => [
+        node.position[0] + local[0],
+        node.position[1] + local[1],
+        node.position[2] + local[2],
+      ] as [number, number, number]);
+    return world;
+  }
+
+  // straight-node / node-link: derive from saved node definitions when possible.
+  const nodeDefs = ((node.parameters as { assetNodes?: unknown }).assetNodes || []) as unknown[];
+  const resolvedNodeDefs = Array.isArray(nodeDefs) ? nodeDefs : [];
+  const nodeIn = resolvedNodeDefs.find((n) => String((n as { type?: unknown }).type || '').toLowerCase().includes('infeed')) as
+    | { position?: [number, number, number] }
+    | undefined;
+  const nodeOut = resolvedNodeDefs.find((n) => String((n as { type?: unknown }).type || '').toLowerCase().includes('outfeed')) as
+    | { position?: [number, number, number] }
+    | undefined;
+  const inLocal = asVec3OrNull(nodeIn?.position);
+  const outLocal = asVec3OrNull(nodeOut?.position);
+  if (inLocal && outLocal) {
+    return [
+      [node.position[0] + inLocal[0], node.position[1] + inLocal[1], node.position[2] + inLocal[2]],
+      [node.position[0] + outLocal[0], node.position[1] + outLocal[1], node.position[2] + outLocal[2]],
+    ];
+  }
+  return [];
+}
+
+function samplePolyline(points: [number, number, number][], t: number): {
+  position: [number, number, number];
+  tangent: [number, number, number];
+  length: number;
+} | null {
+  if (points.length < 2) return null;
+  const lengths: number[] = [];
+  let total = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    const len = segmentLength(points[i - 1], points[i]);
+    lengths.push(len);
+    total += len;
+  }
+  if (total <= 0.000001) {
+    return {
+      position: points[0],
+      tangent: [1, 0, 0],
+      length: 0.000001,
+    };
+  }
+  const target = Math.max(0, Math.min(1, t)) * total;
+  let acc = 0;
+  for (let i = 0; i < lengths.length; i += 1) {
+    const segLen = lengths[i];
+    const nextAcc = acc + segLen;
+    if (target <= nextAcc || i === lengths.length - 1) {
+      const localT = segLen > 0 ? (target - acc) / segLen : 0;
+      const a = points[i];
+      const b = points[i + 1];
+      const position = lerpPoint(a, b, localT);
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const dz = b[2] - a[2];
+      const mag = Math.sqrt((dx * dx) + (dy * dy) + (dz * dz)) || 1;
+      return {
+        position,
+        tangent: [dx / mag, dy / mag, dz / mag],
+        length: total,
+      };
+    }
+    acc = nextAcc;
+  }
+  return null;
+}
 const MAX_FLOW_EVENTS = 200; // cap event log size
 
 export class SimulationEngine {
@@ -258,6 +382,11 @@ export class SimulationEngine {
         case 'pusher': this.tickPusher(node, stats, elapsed); break;
         case 'vertical-lifter': this.tickLift(node, stats, elapsed); break;
         default: {
+          // Runtime-published static assets can carry authored transport paths.
+          if (hasCustomTransportPath(node)) {
+            this.tickConveyor(node, stats, elapsed);
+            break;
+          }
           // Unknown node type: pass products through to output
           const defArrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
           const defOut = this.getOutEdges(node.id);
@@ -439,9 +568,16 @@ export class SimulationEngine {
   // ─── Conveyor: products ride the belt via transport path ──────
   private tickConveyor(node: ProcessNode, stats: NodeStats, dt: number) {
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
-    const path = createTransportPath(node.type, node.parameters);
+    const customPoints = buildWorldPathPoints(node);
+    const customPathAtStart = samplePolyline(customPoints, 0);
+    const customPathAtMid = samplePolyline(customPoints, 0.5);
+    const customPathAtEnd = samplePolyline(customPoints, 1);
+    const hasCustomPath = Boolean(customPathAtStart && customPathAtMid && customPathAtEnd);
+    const path = hasCustomPath ? null : createTransportPath(node.type, node.parameters);
     const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
-    const pathLen = path ? path.length : ((node.parameters.length || 3000) / 1000);
+    const pathLen = hasCustomPath
+      ? (customPathAtStart?.length || ((node.parameters.length || 3000) / 1000))
+      : (path ? path.length : ((node.parameters.length || 3000) / 1000));
     const MIN_GAP_M = 0.001; // ~1mm gap — products touch each other when accumulated
 
     // Accept new arrivals at path start
@@ -572,7 +708,13 @@ export class SimulationEngine {
 
       // Convert 1D path position to 3D world position
       const t = product.pathPosition;
-      if (path) {
+      if (hasCustomPath) {
+        const sampled = samplePolyline(customPoints, t);
+        if (sampled) {
+          product.currentPosition = sampled.position;
+          product.currentRotationY = Math.atan2(sampled.tangent[0], sampled.tangent[2]);
+        }
+      } else if (path) {
         product.currentPosition = path.getWorldPosition(t, node.position, node.rotation, node.scale);
         const tangent = path.getWorldTangent(t, node.rotation);
         product.currentRotationY = Math.atan2(tangent[0], tangent[2]);
@@ -1434,8 +1576,12 @@ export class SimulationEngine {
       const t = Math.min(naturalT, targetT);
 
       // Position using transport path
-      const accPath = createTransportPath(node.type, node.parameters);
-      if (accPath) {
+      const customPoints = buildWorldPathPoints(node);
+      const sampled = samplePolyline(customPoints, t);
+      const accPath = sampled ? null : createTransportPath(node.type, node.parameters);
+      if (sampled) {
+        product.currentPosition = sampled.position;
+      } else if (accPath) {
         product.currentPosition = accPath.getWorldPosition(t, node.position, node.rotation, node.scale);
       } else if (inputPort && outputPort) {
         const inWorld = getPortWorldPosition(inputPort.localPosition, node);

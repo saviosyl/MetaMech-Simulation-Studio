@@ -124,9 +124,10 @@ function inferDefaultPositionOffset(
 }
 
 function toStaticAssetDef(asset: LibraryAsset): AssetDef {
-  const ports = extractPorts(asset.metadata || {});
-  const scale = inferDefaultScale(asset.metadata || {});
-  const defaultPositionOffset = inferDefaultPositionOffset(asset.metadata || {}, scale);
+  const metadata = asset.metadata || {};
+  const ports = extractPorts(metadata);
+  const scale = inferDefaultScale(metadata);
+  const defaultPositionOffset = inferDefaultPositionOffset(metadata, scale);
   return {
     id: asset.id,
     assetType: 'static',
@@ -135,6 +136,7 @@ function toStaticAssetDef(asset: LibraryAsset): AssetDef {
     description: asset.description || 'Published library asset',
     glbUrl: asset.modelUrl,
     thumbnailUrl: asset.thumbnailUrl || '',
+    metadata,
     defaultScale: scale,
     defaultPositionOffset,
     ...(ports.length > 0 ? { connectionPorts: ports } : {}),

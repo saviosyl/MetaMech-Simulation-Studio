@@ -1,3 +1,5 @@
+import type { AssetMetadata } from '../types';
+
 export interface ConnectionPortDef {
   id: string;
   type: 'input' | 'output';
@@ -14,6 +16,7 @@ export interface StaticAssetDef {
   thumbnailUrl: string;
   defaultScale?: [number, number, number];
   defaultPositionOffset?: [number, number, number];
+  metadata?: AssetMetadata;
   connectionPorts?: ConnectionPortDef[];
 }
 
