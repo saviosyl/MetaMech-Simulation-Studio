@@ -374,8 +374,8 @@ const SceneContent: React.FC<{
         section: '#8fa0b5',
       }
     : {
-        // Keep the grid subtle but clearer, closer to the admin editor style.
-        cell: '#627289',
+        // Match editor preview grid style while staying subtle in runtime.
+        cell: '#6b7280',
         section: '#334155',
       };
 
@@ -445,13 +445,13 @@ const SceneContent: React.FC<{
           position={[0, 0, 0]}
           args={[sceneSettings.grid.size, sceneSettings.grid.divisions]}
           cellSize={minorCellSize}
-          cellThickness={0.42}
+          cellThickness={0.36}
           cellColor={gridPalette.cell}
           sectionSize={majorSectionSize}
-          sectionThickness={1.15}
+          sectionThickness={0.95}
           sectionColor={gridPalette.section}
-          fadeDistance={72}
-          fadeStrength={1.22}
+          fadeDistance={120}
+          fadeStrength={0.85}
           infiniteGrid
         />
       )}

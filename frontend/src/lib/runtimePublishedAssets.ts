@@ -75,7 +75,27 @@ function inferDefaultScale(metadata: AssetMetadata): [number, number, number] | 
   return undefined;
 }
 
-function inferDefaultPositionOffset(metadata: AssetMetadata): [number, number, number] | undefined {
+function inferGroundAlignmentOffset(metadata: AssetMetadata, worldScale: number): [number, number, number] | undefined {
+  const bounds = metadata?.nativeBounds as unknown;
+  if (!bounds || typeof bounds !== 'object') return undefined;
+  const min = (bounds as { min?: unknown }).min;
+  const max = (bounds as { max?: unknown }).max;
+  if (!Array.isArray(min) || min.length < 3 || !Array.isArray(max) || max.length < 3) return undefined;
+  const minX = Number(min[0]);
+  const minY = Number(min[1]);
+  const minZ = Number(min[2]);
+  const maxX = Number(max[0]);
+  const maxZ = Number(max[2]);
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(minZ) || !Number.isFinite(maxX) || !Number.isFinite(maxZ)) {
+    return undefined;
+  }
+  const centerX = (minX + maxX) / 2;
+  const centerZ = (minZ + maxZ) / 2;
+  // Match editor preview normalization: center X/Z and lift base to y=0.
+  return [-centerX * worldScale, -minY * worldScale, -centerZ * worldScale];
+}
+
+function inferPivotOffset(metadata: AssetMetadata): [number, number, number] | undefined {
   const pivotOffset = metadata?.pivotOffset as unknown;
   if (!Array.isArray(pivotOffset) || pivotOffset.length < 3) return undefined;
   const x = Number(pivotOffset[0]);
@@ -86,10 +106,27 @@ function inferDefaultPositionOffset(metadata: AssetMetadata): [number, number, n
   return [x / 1000, y / 1000, z / 1000];
 }
 
+function inferDefaultPositionOffset(
+  metadata: AssetMetadata,
+  defaultScale: [number, number, number] | undefined
+): [number, number, number] | undefined {
+  const worldScale = defaultScale && Number.isFinite(defaultScale[0]) && defaultScale[0] > 0
+    ? defaultScale[0]
+    : 1;
+  const groundAlignment = inferGroundAlignmentOffset(metadata, worldScale);
+  const pivotOffset = inferPivotOffset(metadata);
+  if (!groundAlignment && !pivotOffset) return undefined;
+  return [
+    (groundAlignment?.[0] || 0) + (pivotOffset?.[0] || 0),
+    (groundAlignment?.[1] || 0) + (pivotOffset?.[1] || 0),
+    (groundAlignment?.[2] || 0) + (pivotOffset?.[2] || 0),
+  ];
+}
+
 function toStaticAssetDef(asset: LibraryAsset): AssetDef {
   const ports = extractPorts(asset.metadata || {});
   const scale = inferDefaultScale(asset.metadata || {});
-  const defaultPositionOffset = inferDefaultPositionOffset(asset.metadata || {});
+  const defaultPositionOffset = inferDefaultPositionOffset(asset.metadata || {}, scale);
   return {
     id: asset.id,
     assetType: 'static',
