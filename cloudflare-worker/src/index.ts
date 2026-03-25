@@ -1099,10 +1099,10 @@ function isRuntimeLiveLifecycle(lifecycleState: AssetLifecycleState): boolean {
 
 function validLifecycleTransition(fromState: AssetLifecycleState, toState: AssetLifecycleState): boolean {
   if (fromState === toState) return true;
-  if (fromState === 'draft') return ['internal', 'live', 'archived', 'deleted'].includes(toState);
+  if (fromState === 'draft') return ['internal', 'archived', 'deleted'].includes(toState);
   if (fromState === 'internal') return ['draft', 'live', 'archived', 'deleted'].includes(toState);
   if (fromState === 'live') return ['internal', 'archived', 'deleted'].includes(toState);
-  if (fromState === 'archived') return ['draft', 'internal', 'live', 'deleted'].includes(toState);
+  if (fromState === 'archived') return ['draft', 'internal', 'deleted'].includes(toState);
   if (fromState === 'deleted') return ['draft'].includes(toState);
   return false;
 }
@@ -1617,6 +1617,11 @@ async function handleAdminSetAssetRuntimeVisibility(
   const nextLifecycle: AssetLifecycleState = body.visibleInRuntimeLibrary ? 'live' : 'internal';
   if (!validLifecycleTransition(currentLifecycle, nextLifecycle)) {
     return toJson({ error: `Invalid lifecycle transition: ${currentLifecycle} -> ${nextLifecycle}` }, 400);
+  }
+  if (nextLifecycle === 'live') {
+    const metadata = safeJsonParse<Record<string, unknown>>(existing.metadata, {});
+    const validationError = validateMetadataForPublish(metadata);
+    if (validationError) return toJson({ error: validationError }, 400);
   }
   await env.DB
     .prepare(
