@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Save, Shield, Trash2, Upload, User } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
-import { Environment, Grid, OrbitControls } from '@react-three/drei';
+import { Environment, Grid, OrbitControls, TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { useAuth } from '../contexts/AuthContext';
@@ -86,12 +86,6 @@ const ModelPreview: React.FC<{
   const [loadedRoot, setLoadedRoot] = useState<THREE.Object3D | null>(null);
   const [loadError, setLoadError] = useState<string>('');
   const previewGroupRef = useRef<THREE.Group | null>(null);
-  const dragStateRef = useRef<{ index: number; offset: THREE.Vector3 } | null>(null);
-  const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
-  const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
-  const dragPlaneRef = useRef<THREE.Plane>(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
-  const pointerDownRef = useRef(false);
-  const clickMovedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -190,18 +184,7 @@ const ModelPreview: React.FC<{
     if (e.point && Number.isFinite(e.point.x) && Number.isFinite(e.point.y) && Number.isFinite(e.point.z)) {
       return e.point.clone();
     }
-    const pe = event.nativeEvent as PointerEvent | undefined;
-    if (!pe || !previewGroupRef.current) return null;
-    const canvas = pe.target as HTMLCanvasElement;
-    if (!canvas || typeof canvas.getBoundingClientRect !== 'function') return null;
-    const rect = canvas.getBoundingClientRect();
-    mouseRef.current.x = ((pe.clientX - rect.left) / rect.width) * 2 - 1;
-    mouseRef.current.y = -((pe.clientY - rect.top) / rect.height) * 2 + 1;
-    const camera = (event as unknown as { camera?: THREE.Camera }).camera;
-    if (!camera) return null;
-    raycasterRef.current.setFromCamera(mouseRef.current, camera);
-    const hit = new THREE.Vector3();
-    return raycasterRef.current.ray.intersectPlane(dragPlaneRef.current, hit) ? hit : null;
+    return null;
   }
 
   function snapPosition(positionM: THREE.Vector3): [number, number, number] {
@@ -222,45 +205,15 @@ const ModelPreview: React.FC<{
         <group
           ref={previewGroupRef}
           onPointerDown={(event) => {
-            pointerDownRef.current = true;
-            clickMovedRef.current = false;
-            const point = getPlaneIntersection(event);
-            if (!point) return;
             const hoveredName = (event.object as THREE.Object3D | undefined)?.name;
             if (hoveredName) setHighlightedObjectNames([hoveredName]);
-            if (selectedNodeIndex >= 0 && nodes[selectedNodeIndex]) {
-              const node = nodes[selectedNodeIndex];
-              const nodePos = new THREE.Vector3(mmToM(node.position[0]), mmToM(node.position[1]), mmToM(node.position[2]));
-              const dist = point.distanceTo(nodePos);
-              if (dist < 0.13) {
-                dragStateRef.current = { index: selectedNodeIndex, offset: nodePos.clone().sub(point) };
-                event.stopPropagation();
-              }
-            }
           }}
-          onPointerMove={(event) => {
-            if (!pointerDownRef.current) return;
-            clickMovedRef.current = true;
-            const drag = dragStateRef.current;
-            if (!drag) return;
-            const point = getPlaneIntersection(event);
-            if (!point) return;
-            const moved = point.clone().add(drag.offset);
-            onMoveNodeToMm(drag.index, snapPosition(moved));
-          }}
-          onPointerUp={(event) => {
-            pointerDownRef.current = false;
-            const drag = dragStateRef.current;
-            dragStateRef.current = null;
-            if (drag) return;
-            if (clickMovedRef.current) return;
+          onClick={(event) => {
             const point = getPlaneIntersection(event);
             if (!point) return;
             onPlaceNodeAtMm(snapPosition(point));
           }}
           onPointerMissed={() => {
-            pointerDownRef.current = false;
-            dragStateRef.current = null;
             setHighlightedObjectNames([]);
           }}
         >
@@ -275,17 +228,43 @@ const ModelPreview: React.FC<{
       {nodes.map((node, index) => {
         const p = node.position || [0, 0, 0];
         const selected = selectedNodeIndex === index;
+        const nodePosition: [number, number, number] = [mmToM(Number(p[0]) || 0), mmToM(Number(p[1]) || 0), mmToM(Number(p[2]) || 0)];
+        if (selected) {
+          return (
+            <TransformControls
+              key={`${node.id || 'node'}-${index}`}
+              mode="translate"
+              size={0.7}
+              onObjectChange={(event) => {
+                const target = event.target as { object?: THREE.Object3D };
+                if (!target.object) return;
+                onMoveNodeToMm(index, snapPosition(target.object.position.clone()));
+              }}
+            >
+              <mesh
+                position={nodePosition}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelectNode(index);
+                }}
+              >
+                <sphereGeometry args={[0.07, 14, 12]} />
+                <meshStandardMaterial color="#f59e0b" />
+              </mesh>
+            </TransformControls>
+          );
+        }
         return (
           <mesh
             key={`${node.id || 'node'}-${index}`}
-            position={[mmToM(Number(p[0]) || 0), mmToM(Number(p[1]) || 0), mmToM(Number(p[2]) || 0)]}
+            position={nodePosition}
             onClick={(event) => {
               event.stopPropagation();
               onSelectNode(index);
             }}
           >
-            <sphereGeometry args={[selected ? 0.07 : 0.05, 14, 12]} />
-            <meshStandardMaterial color={selected ? '#f59e0b' : (String(node.type || '').toLowerCase().includes('in') ? '#34d399' : '#22d3ee')} />
+            <sphereGeometry args={[0.05, 14, 12]} />
+            <meshStandardMaterial color={String(node.type || '').toLowerCase().includes('in') ? '#34d399' : '#22d3ee'} />
           </mesh>
         );
       })}
@@ -668,10 +647,11 @@ const AdminAssetEditorPage: React.FC = () => {
           </div>
         </section>
 
-        <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: 10, overflowY: 'auto' }}>
-          {!asset && <div style={{ fontSize: 12, color: 'var(--mm-text-tertiary)' }}>Select an asset to edit authoring metadata.</div>}
-          {asset && (
-            <div style={{ display: 'grid', gap: 10 }}>
+        <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 2 }}>
+            {!asset && <div style={{ fontSize: 12, color: 'var(--mm-text-tertiary)' }}>Select an asset to edit authoring metadata.</div>}
+            {asset && (
+              <div style={{ display: 'grid', gap: 10 }}>
               <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>Asset Info</div>
               <div style={{ display: 'grid', gap: 6 }}>
                 <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Name</label>
@@ -875,8 +855,9 @@ const AdminAssetEditorPage: React.FC = () => {
                   </ul>
                 )}
               </div>
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </section>
       </main>
     </div>
