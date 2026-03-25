@@ -34,9 +34,27 @@ type ObjectTreeNode = {
   children: ObjectTreeNode[];
 };
 
+const LEFT_PANEL_MIN = 240;
+const LEFT_PANEL_MAX = 460;
+const RIGHT_PANEL_MIN = 300;
+const RIGHT_PANEL_MAX = 560;
+const VIEWPORT_MIN = 520;
+const PANEL_WIDTHS_STORAGE_KEY = 'metamech.adminAssetEditor.panelWidths';
+
+type ResizeDrag = {
+  side: 'left' | 'right';
+  startX: number;
+  startLeft: number;
+  startRight: number;
+} | null;
+
 function errorMessage(error: unknown, fallback: string): string {
   const e = error as { response?: { data?: { error?: string } }; message?: string };
   return e?.response?.data?.error || e?.message || fallback;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
 function safeAssetMetadata(asset: LibraryAsset | null): AssetMetadata {
@@ -392,6 +410,7 @@ const AdminAssetEditorPage: React.FC = () => {
   const navigate = useNavigate();
   const { assetId } = useParams<{ assetId?: string }>();
   const { user, logout } = useAuth();
+  const mainRef = useRef<HTMLElement | null>(null);
   const modelFileRef = useRef<HTMLInputElement | null>(null);
   const thumbFileRef = useRef<HTMLInputElement | null>(null);
 
@@ -415,6 +434,27 @@ const AdminAssetEditorPage: React.FC = () => {
   const [objectFilter, setObjectFilter] = useState('');
   const [selectedObjectPath, setSelectedObjectPath] = useState('');
   const [highlightedObjectNames, setHighlightedObjectNames] = useState<string[]>([]);
+  const [leftPanelWidth, setLeftPanelWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 290;
+    try {
+      const raw = window.sessionStorage.getItem(PANEL_WIDTHS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) as { left?: number } : {};
+      return clamp(Number(parsed.left || 290), LEFT_PANEL_MIN, LEFT_PANEL_MAX);
+    } catch {
+      return 290;
+    }
+  });
+  const [rightPanelWidth, setRightPanelWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 350;
+    try {
+      const raw = window.sessionStorage.getItem(PANEL_WIDTHS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) as { right?: number } : {};
+      return clamp(Number(parsed.right || 350), RIGHT_PANEL_MIN, RIGHT_PANEL_MAX);
+    } catch {
+      return 350;
+    }
+  });
+  const [resizeDrag, setResizeDrag] = useState<ResizeDrag>(null);
 
   const metadata = useMemo<AssetMetadata>(() => {
     return {
@@ -531,6 +571,64 @@ const AdminAssetEditorPage: React.FC = () => {
     () => hierarchyItems.find((item) => item.path === selectedObjectPath) || null,
     [hierarchyItems, selectedObjectPath]
   );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.sessionStorage.setItem(
+        PANEL_WIDTHS_STORAGE_KEY,
+        JSON.stringify({ left: leftPanelWidth, right: rightPanelWidth })
+      );
+    } catch {
+      // Non-blocking: layout still works if session storage is unavailable.
+    }
+  }, [leftPanelWidth, rightPanelWidth]);
+
+  useEffect(() => {
+    if (!resizeDrag) return;
+    const onMouseMove = (event: MouseEvent) => {
+      const host = mainRef.current;
+      if (!host) return;
+      const availableWidth = host.clientWidth - 20;
+      const gutterTotal = 20;
+      const columnsWidth = availableWidth - gutterTotal;
+      if (columnsWidth <= 0) return;
+      if (resizeDrag.side === 'left') {
+        const nextRaw = resizeDrag.startLeft + (event.clientX - resizeDrag.startX);
+        const maxByViewport = columnsWidth - resizeDrag.startRight - VIEWPORT_MIN;
+        const boundedMax = Math.min(LEFT_PANEL_MAX, maxByViewport);
+        setLeftPanelWidth(clamp(Math.round(nextRaw), LEFT_PANEL_MIN, Math.max(LEFT_PANEL_MIN, boundedMax)));
+      } else {
+        const nextRaw = resizeDrag.startRight - (event.clientX - resizeDrag.startX);
+        const maxByViewport = columnsWidth - resizeDrag.startLeft - VIEWPORT_MIN;
+        const boundedMax = Math.min(RIGHT_PANEL_MAX, maxByViewport);
+        setRightPanelWidth(clamp(Math.round(nextRaw), RIGHT_PANEL_MIN, Math.max(RIGHT_PANEL_MIN, boundedMax)));
+      }
+    };
+    const onMouseUp = () => setResizeDrag(null);
+    const prevCursor = document.body.style.cursor;
+    const prevUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevUserSelect;
+    };
+  }, [resizeDrag]);
+
+  function beginResize(event: React.MouseEvent<HTMLDivElement>, side: 'left' | 'right'): void {
+    event.preventDefault();
+    setResizeDrag({
+      side,
+      startX: event.clientX,
+      startLeft: leftPanelWidth,
+      startRight: rightPanelWidth,
+    });
+  }
 
   function addMovingPart(): void {
     setMovableParts((prev) => [
@@ -657,8 +755,19 @@ const AdminAssetEditorPage: React.FC = () => {
         </div>
       </header>
 
-      <main style={{ flex: 1, padding: 10, display: 'grid', gridTemplateColumns: '290px 1fr 350px', gap: 10, minHeight: 0, overflow: 'hidden' }}>
-        <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <main
+        ref={mainRef}
+        style={{
+          flex: 1,
+          padding: 10,
+          display: 'grid',
+          gridTemplateColumns: `${leftPanelWidth}px minmax(${VIEWPORT_MIN}px, 1fr) ${rightPanelWidth}px`,
+          gap: 10,
+          minHeight: 0,
+          overflow: 'hidden',
+        }}
+      >
+        <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative' }}>
           <div style={{ display: 'grid', gap: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>Assets</div>
@@ -707,6 +816,35 @@ const AdminAssetEditorPage: React.FC = () => {
               );
             })}
           </div>
+          <div
+            role="separator"
+            aria-label="Resize assets panel"
+            aria-orientation="vertical"
+            onMouseDown={(event) => beginResize(event, 'left')}
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: -6,
+              bottom: 0,
+              width: 12,
+              cursor: 'col-resize',
+              zIndex: 6,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: 2,
+                height: '45%',
+                borderRadius: 999,
+                background: resizeDrag?.side === 'left'
+                  ? 'var(--mm-accent-primary)'
+                  : 'color-mix(in oklab, var(--mm-text-disabled) 50%, transparent)',
+              }}
+            />
+          </div>
         </section>
 
         <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, overflow: 'hidden', display: 'grid', gridTemplateRows: '1fr auto', minHeight: 0 }}>
@@ -754,7 +892,7 @@ const AdminAssetEditorPage: React.FC = () => {
           </div>
         </section>
 
-        <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: 8, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+        <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: 8, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
           <div style={{ flex: 1, minHeight: 0, overflowY: 'scroll', overscrollBehavior: 'contain', scrollbarGutter: 'stable', paddingRight: 8, paddingBottom: 8 }}>
             {!asset && <div style={{ fontSize: 12, color: 'var(--mm-text-tertiary)' }}>Select an asset to edit authoring metadata.</div>}
             {asset && (
@@ -984,6 +1122,35 @@ const AdminAssetEditorPage: React.FC = () => {
               </div>
               </div>
             )}
+          </div>
+          <div
+            role="separator"
+            aria-label="Resize properties panel"
+            aria-orientation="vertical"
+            onMouseDown={(event) => beginResize(event, 'right')}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: -6,
+              bottom: 0,
+              width: 12,
+              cursor: 'col-resize',
+              zIndex: 6,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: 2,
+                height: '45%',
+                borderRadius: 999,
+                background: resizeDrag?.side === 'right'
+                  ? 'var(--mm-accent-primary)'
+                  : 'color-mix(in oklab, var(--mm-text-disabled) 50%, transparent)',
+              }}
+            />
           </div>
         </section>
       </main>
