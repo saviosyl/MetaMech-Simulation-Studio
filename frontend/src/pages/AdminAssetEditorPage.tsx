@@ -52,6 +52,33 @@ function mToMm(value: number): number {
   return value * 1000;
 }
 
+function displayObjectName(node: THREE.Object3D): string {
+  const rawName = (node.name || '').trim();
+  if (rawName) return rawName;
+  return node.type ? `(unnamed ${node.type})` : '(unnamed)';
+}
+
+function findObjectByHierarchyPath(root: THREE.Object3D, path: string): THREE.Object3D | null {
+  const parts = String(path || '')
+    .split('/')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return null;
+
+  let current: THREE.Object3D = root;
+  let partIndex = 0;
+  const rootDisplay = displayObjectName(root);
+  if (parts[0] === rootDisplay) partIndex = 1;
+
+  for (; partIndex < parts.length; partIndex += 1) {
+    const segment = parts[partIndex];
+    const next = current.children.find((child) => displayObjectName(child) === segment);
+    if (!next) return null;
+    current = next;
+  }
+  return current;
+}
+
 function applyMotionPreview(
   targetRoot: THREE.Object3D,
   part: AssetMovingPart | null,
@@ -59,7 +86,9 @@ function applyMotionPreview(
 ): void {
   if (!part) return;
   const v = part.min + (part.max - part.min) * previewT;
-  const candidate = targetRoot.getObjectByName(part.objectName) || targetRoot;
+  const candidate = findObjectByHierarchyPath(targetRoot, part.objectName)
+    || targetRoot.getObjectByName(part.objectName)
+    || targetRoot;
   if (part.motionType === 'translate') {
     const delta = mmToM(v - part.default);
     if (part.axis === 'x') candidate.position.x += delta;
@@ -158,9 +187,7 @@ const ModelPreview: React.FC<{
             setLoadedRoot(gltf.scene);
             const hierarchy: ModelHierarchyItem[] = [];
             function walk(node: THREE.Object3D, parentPath: string, depth: number): void {
-              const rawName = (node.name || '').trim();
-              const fallbackName = node.type ? `(unnamed ${node.type})` : '(unnamed)';
-              const displayName = rawName || fallbackName;
+              const displayName = displayObjectName(node);
               const path = parentPath ? `${parentPath}/${displayName}` : displayName;
               hierarchy.push({
                 id: `${path}#${hierarchy.length}`,
@@ -500,6 +527,10 @@ const AdminAssetEditorPage: React.FC = () => {
     if (!q) return hierarchyItems;
     return hierarchyItems.filter((item) => item.path.toLowerCase().includes(q) || item.name.toLowerCase().includes(q));
   }, [objectFilter, hierarchyItems]);
+  const selectedHierarchyItem = useMemo(
+    () => hierarchyItems.find((item) => item.path === selectedObjectPath) || null,
+    [hierarchyItems, selectedObjectPath]
+  );
 
   function addMovingPart(): void {
     setMovableParts((prev) => [
@@ -600,7 +631,7 @@ const AdminAssetEditorPage: React.FC = () => {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--mm-bg-app)', color: 'var(--mm-text-primary)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', background: 'var(--mm-bg-app)', color: 'var(--mm-text-primary)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <header style={{ background: 'var(--mm-bg-panel)', borderBottom: '1px solid var(--mm-border)', padding: '10px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Link to={simulationUrls.productHome} style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -626,7 +657,7 @@ const AdminAssetEditorPage: React.FC = () => {
         </div>
       </header>
 
-      <main style={{ flex: 1, padding: 10, display: 'grid', gridTemplateColumns: '290px 1fr 350px', gap: 10, minHeight: 0 }}>
+      <main style={{ flex: 1, padding: 10, display: 'grid', gridTemplateColumns: '290px 1fr 350px', gap: 10, minHeight: 0, overflow: 'hidden' }}>
         <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div style={{ display: 'grid', gap: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -652,7 +683,7 @@ const AdminAssetEditorPage: React.FC = () => {
             </div>
           </div>
           {loading && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--mm-text-tertiary)' }}>Loading assets…</div>}
-          <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gap: 6, marginTop: 8 }}>
+          <div style={{ flex: 1, overflowY: 'scroll', overscrollBehavior: 'contain', scrollbarGutter: 'stable', display: 'grid', gap: 6, marginTop: 8, paddingRight: 6 }}>
             {assets.map((row) => {
               const selected = asset?.id === row.id;
               return (
@@ -695,7 +726,7 @@ const AdminAssetEditorPage: React.FC = () => {
               previewT={previewT}
             />
           </div>
-          <div style={{ borderTop: '1px solid var(--mm-border-subtle)', padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', position: 'sticky', bottom: 0, background: 'var(--mm-bg-panel)', zIndex: 2 }}>
+          <div style={{ borderTop: '1px solid var(--mm-border-subtle)', padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', position: 'sticky', bottom: 0, background: 'var(--mm-bg-panel)', zIndex: 4, boxShadow: '0 -8px 18px rgba(2, 6, 23, 0.22)' }}>
             <button type="button" onClick={saveAsset} disabled={!asset || saving} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '8px 10px', background: 'var(--mm-bg-surface)', color: 'var(--mm-text-primary)', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <Save size={13} />
               Save Metadata
@@ -724,7 +755,7 @@ const AdminAssetEditorPage: React.FC = () => {
         </section>
 
         <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: 8, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', scrollbarGutter: 'stable both-edges', paddingRight: 10, paddingBottom: 8 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'scroll', overscrollBehavior: 'contain', scrollbarGutter: 'stable', paddingRight: 8, paddingBottom: 8 }}>
             {!asset && <div style={{ fontSize: 12, color: 'var(--mm-text-tertiary)' }}>Select an asset to edit authoring metadata.</div>}
             {asset && (
               <div style={{ display: 'grid', gap: 10 }}>
@@ -825,9 +856,9 @@ const AdminAssetEditorPage: React.FC = () => {
                           key={item.id}
                           type="button"
                           onClick={() => {
-                            const nameToSelect = item.name.startsWith('(unnamed') ? '' : item.name;
-                            setSelectedObjectName(nameToSelect);
-                            if (nameToSelect) setHighlightedObjectNames([nameToSelect]);
+                            setSelectedObjectPath(item.path);
+                            const nameToHighlight = item.name.startsWith('(unnamed') ? '' : item.name;
+                            setHighlightedObjectNames(nameToHighlight ? [nameToHighlight] : []);
                           }}
                           style={{
                             width: '100%',
@@ -835,10 +866,12 @@ const AdminAssetEditorPage: React.FC = () => {
                             padding: '6px 8px',
                             border: 'none',
                             borderBottom: '1px solid var(--mm-border-subtle)',
+                            borderLeft: selectedObjectPath === item.path ? '3px solid var(--mm-accent-primary)' : '3px solid transparent',
                             paddingLeft: `${8 + (item.depth * 12)}px`,
                             background: selectedObjectPath === item.path ? 'var(--mm-accent-primary-muted)' : 'transparent',
-                            color: selectedObjectPath === item.path ? 'var(--mm-accent-primary)' : 'var(--mm-text-secondary)',
+                            color: selectedObjectPath === item.path ? 'var(--mm-text-primary)' : 'var(--mm-text-secondary)',
                             fontSize: 11,
+                            cursor: 'pointer',
                           }}
                         >
                           <span style={{ fontWeight: item.isMesh ? 600 : 500 }}>
@@ -850,9 +883,17 @@ const AdminAssetEditorPage: React.FC = () => {
                           <div style={{ marginTop: 2, color: 'var(--mm-text-disabled)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {item.path}
                           </div>
+                          {selectedObjectPath === item.path && (
+                            <div style={{ marginTop: 2, fontSize: 10, fontWeight: 700, color: 'var(--mm-accent-primary)' }}>
+                              Selected
+                            </div>
+                          )}
                         </button>
                       ))
                     )}
+                  </div>
+                  <div style={{ fontSize: 11, color: selectedHierarchyItem ? 'var(--mm-text-primary)' : 'var(--mm-text-tertiary)' }}>
+                    {selectedHierarchyItem ? `Selected object: ${selectedHierarchyItem.path}` : 'Selected object: none'}
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
