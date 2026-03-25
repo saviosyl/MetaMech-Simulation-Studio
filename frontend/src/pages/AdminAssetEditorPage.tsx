@@ -687,7 +687,7 @@ const AdminAssetEditorPage: React.FC = () => {
               onSelectNode={setSelectedNodeIndex}
               onPlaceNodeAtMm={placeSelectedNodeAt}
               onMoveNodeToMm={(index, positionMm) => updateNode(index, { position: positionMm })}
-              setObjectNames={setObjectNames}
+              setHierarchyItems={setHierarchyItems}
               highlightedObjectNames={highlightedObjectNames}
               setHighlightedObjectNames={setHighlightedObjectNames}
               movingParts={movableParts}
