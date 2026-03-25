@@ -17,6 +17,23 @@ import { AssetDefinitionNode, AssetMetadata, AssetMovingPart, LibraryAsset } fro
 import { simulationUrls } from '../content/simulationMarketingContent';
 import { refreshRuntimePublishedAssets } from '../lib/runtimePublishedAssets';
 
+type ModelHierarchyItem = {
+  id: string;
+  name: string;
+  path: string;
+  depth: number;
+  isMesh: boolean;
+  childCount: number;
+};
+
+type ObjectTreeNode = {
+  id: string;
+  name: string;
+  path: string;
+  isMesh: boolean;
+  children: ObjectTreeNode[];
+};
+
 function errorMessage(error: unknown, fallback: string): string {
   const e = error as { response?: { data?: { error?: string } }; message?: string };
   return e?.response?.data?.error || e?.message || fallback;
@@ -56,6 +73,31 @@ function applyMotionPreview(
   }
 }
 
+function buildObjectTree(items: ModelHierarchyItem[]): ObjectTreeNode[] {
+  const roots: ObjectTreeNode[] = [];
+  const byPath = new Map<string, ObjectTreeNode>();
+  for (const item of items) {
+    const node: ObjectTreeNode = {
+      id: item.id,
+      name: item.name,
+      path: item.path,
+      isMesh: item.isMesh,
+      children: [],
+    };
+    byPath.set(item.path, node);
+    const splitIdx = item.path.lastIndexOf('/');
+    if (splitIdx <= 0) {
+      roots.push(node);
+      continue;
+    }
+    const parentPath = item.path.slice(0, splitIdx);
+    const parent = byPath.get(parentPath);
+    if (parent) parent.children.push(node);
+    else roots.push(node);
+  }
+  return roots;
+}
+
 const ModelPreview: React.FC<{
   modelUrl: string | null;
   nodes: AssetDefinitionNode[];
@@ -63,7 +105,7 @@ const ModelPreview: React.FC<{
   onSelectNode: (index: number) => void;
   onPlaceNodeAtMm: (positionMm: [number, number, number]) => void;
   onMoveNodeToMm: (index: number, positionMm: [number, number, number]) => void;
-  setObjectNames: (names: string[]) => void;
+  setHierarchyItems: (items: ModelHierarchyItem[]) => void;
   highlightedObjectNames: string[];
   setHighlightedObjectNames: (names: string[]) => void;
   movingParts: AssetMovingPart[];
@@ -76,7 +118,7 @@ const ModelPreview: React.FC<{
   onSelectNode,
   onPlaceNodeAtMm,
   onMoveNodeToMm,
-  setObjectNames,
+  setHierarchyItems,
   highlightedObjectNames,
   setHighlightedObjectNames,
   movingParts,
@@ -86,12 +128,13 @@ const ModelPreview: React.FC<{
   const [loadedRoot, setLoadedRoot] = useState<THREE.Object3D | null>(null);
   const [loadError, setLoadError] = useState<string>('');
   const previewGroupRef = useRef<THREE.Group | null>(null);
+  const modelBoundsRef = useRef<THREE.Box3 | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     if (!modelUrl) {
       setLoadedRoot(null);
-      setObjectNames([]);
+      setHierarchyItems([]);
       setLoadError('');
       return () => {
         cancelled = true;
@@ -113,18 +156,32 @@ const ModelPreview: React.FC<{
           (gltf) => {
             if (cancelled) return;
             setLoadedRoot(gltf.scene);
-            const names: string[] = [];
-            gltf.scene.traverse((child) => {
-              const c = child as THREE.Object3D & { isMesh?: boolean };
-              if (c.isMesh && c.name) names.push(c.name);
-            });
-            setObjectNames(Array.from(new Set(names)).sort((a, b) => a.localeCompare(b)));
+            const hierarchy: ModelHierarchyItem[] = [];
+            function walk(node: THREE.Object3D, parentPath: string, depth: number): void {
+              const rawName = (node.name || '').trim();
+              const fallbackName = node.type ? `(unnamed ${node.type})` : '(unnamed)';
+              const displayName = rawName || fallbackName;
+              const path = parentPath ? `${parentPath}/${displayName}` : displayName;
+              hierarchy.push({
+                id: `${path}#${hierarchy.length}`,
+                name: displayName,
+                path,
+                depth,
+                isMesh: !!(node as THREE.Mesh).isMesh,
+                childCount: node.children.length,
+              });
+              for (const child of node.children) {
+                walk(child, path, depth + 1);
+              }
+            }
+            walk(gltf.scene, '', 0);
+            setHierarchyItems(hierarchy);
             setLoadError('');
           },
           (err) => {
             if (!cancelled) {
               setLoadedRoot(null);
-              setObjectNames([]);
+              setHierarchyItems([]);
               setLoadError(err?.message || 'Model could not be loaded');
             }
           }
@@ -133,7 +190,7 @@ const ModelPreview: React.FC<{
         if (!cancelled) {
           const e = err as { message?: string };
           setLoadedRoot(null);
-          setObjectNames([]);
+          setHierarchyItems([]);
           setLoadError(e?.message || 'Model could not be loaded');
         }
       }
@@ -141,7 +198,7 @@ const ModelPreview: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [modelUrl, setObjectNames]);
+  }, [modelUrl, setHierarchyItems]);
 
   const previewRoot = useMemo(() => {
     if (!loadedRoot) return null;
@@ -176,6 +233,7 @@ const ModelPreview: React.FC<{
     });
     const part = movingParts[previewPartIndex] || null;
     applyMotionPreview(clone, part, previewT);
+    modelBoundsRef.current = new THREE.Box3().setFromObject(clone);
     return clone;
   }, [loadedRoot, movingParts, previewPartIndex, previewT, highlightedObjectNames]);
 
@@ -189,9 +247,27 @@ const ModelPreview: React.FC<{
 
   function snapPosition(positionM: THREE.Vector3): [number, number, number] {
     const snapStepM = 0.05;
-    const sx = Math.round(positionM.x / snapStepM) * snapStepM;
-    const sy = Math.max(0, Math.round(positionM.y / snapStepM) * snapStepM);
-    const sz = Math.round(positionM.z / snapStepM) * snapStepM;
+    let sx = Math.round(positionM.x / snapStepM) * snapStepM;
+    let sy = Math.max(0, Math.round(positionM.y / snapStepM) * snapStepM);
+    let sz = Math.round(positionM.z / snapStepM) * snapStepM;
+    const bounds = modelBoundsRef.current;
+    const selected = nodes[selectedNodeIndex];
+    const type = String(selected?.type || '').toLowerCase();
+    if (bounds && (type.includes('infeed') || type.includes('outfeed'))) {
+      const spanX = bounds.max.x - bounds.min.x;
+      const spanZ = bounds.max.z - bounds.min.z;
+      const primaryAxis = spanX >= spanZ ? 'x' : 'z';
+      const preferMin = type.includes('infeed');
+      if (primaryAxis === 'x') {
+        sx = preferMin ? bounds.min.x : bounds.max.x;
+        sy = THREE.MathUtils.clamp(sy, bounds.min.y, bounds.max.y);
+        sz = THREE.MathUtils.clamp(sz, bounds.min.z, bounds.max.z);
+      } else {
+        sz = preferMin ? bounds.min.z : bounds.max.z;
+        sy = THREE.MathUtils.clamp(sy, bounds.min.y, bounds.max.y);
+        sx = THREE.MathUtils.clamp(sx, bounds.min.x, bounds.max.x);
+      }
+    }
     return [mToMm(sx), mToMm(sy), mToMm(sz)];
   }
 
