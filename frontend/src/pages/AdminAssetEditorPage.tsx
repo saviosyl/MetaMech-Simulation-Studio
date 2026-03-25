@@ -601,7 +601,7 @@ const AdminAssetEditorPage: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--mm-bg-app)', color: 'var(--mm-text-primary)', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ background: 'var(--mm-bg-panel)', borderBottom: '1px solid var(--mm-border)', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <header style={{ background: 'var(--mm-bg-panel)', borderBottom: '1px solid var(--mm-border)', padding: '10px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Link to={simulationUrls.productHome} style={{ textDecoration: 'none', color: 'inherit' }}>
             <img src="/simulation-studio-logo.png" alt="Simulation Studio" style={{ width: 198, height: 40, borderRadius: 8, objectFit: 'cover', objectPosition: 'center 45%' }} />
@@ -626,7 +626,7 @@ const AdminAssetEditorPage: React.FC = () => {
         </div>
       </header>
 
-      <main style={{ flex: 1, padding: 14, display: 'grid', gridTemplateColumns: '300px 1fr 360px', gap: 12, minHeight: 0 }}>
+      <main style={{ flex: 1, padding: 10, display: 'grid', gridTemplateColumns: '290px 1fr 350px', gap: 10, minHeight: 0 }}>
         <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div style={{ display: 'grid', gap: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -695,7 +695,7 @@ const AdminAssetEditorPage: React.FC = () => {
               previewT={previewT}
             />
           </div>
-          <div style={{ borderTop: '1px solid var(--mm-border-subtle)', padding: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ borderTop: '1px solid var(--mm-border-subtle)', padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', position: 'sticky', bottom: 0, background: 'var(--mm-bg-panel)', zIndex: 2 }}>
             <button type="button" onClick={saveAsset} disabled={!asset || saving} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '8px 10px', background: 'var(--mm-bg-surface)', color: 'var(--mm-text-primary)', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <Save size={13} />
               Save Metadata
@@ -723,8 +723,8 @@ const AdminAssetEditorPage: React.FC = () => {
           </div>
         </section>
 
-        <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'scroll', overscrollBehavior: 'contain', scrollbarGutter: 'stable', paddingRight: 8 }}>
+        <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: 8, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', scrollbarGutter: 'stable both-edges', paddingRight: 10, paddingBottom: 8 }}>
             {!asset && <div style={{ fontSize: 12, color: 'var(--mm-text-tertiary)' }}>Select an asset to edit authoring metadata.</div>}
             {asset && (
               <div style={{ display: 'grid', gap: 10 }}>
