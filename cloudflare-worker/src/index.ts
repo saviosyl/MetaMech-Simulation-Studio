@@ -1985,7 +1985,7 @@ export default {
 
       const adminAssetFileMatch = path.match(/^\/admin\/assets\/([^/]+)\/(model|thumbnail|preview)$/);
       const categoryIdMatch = path.match(/^\/admin\/asset-categories\/(\d+)$/);
-      const assetActionMatch = path.match(/^\/admin\/assets\/([^/]+)\/(publish|archive|restore|duplicate|thumbnail|set-runtime-visibility|set-lifecycle-state)$/);
+      const assetActionMatch = path.match(/^\/admin\/assets\/([^/]+)\/(publish|archive|restore|duplicate|thumbnail|set-runtime-visibility)$/);
       const assetIdMatch = path.match(/^\/admin\/assets\/([^/]+)$/);
       if (
         adminAssetFileMatch
@@ -2073,10 +2073,6 @@ export default {
           }
           if (action === 'set-runtime-visibility' && request.method === 'POST') {
             response = await handleAdminSetAssetRuntimeVisibility(env, request, admin, assetUuid);
-            return withCors(request, response, env);
-          }
-          if (action === 'set-lifecycle-state' && request.method === 'POST') {
-            response = await handleAdminSetAssetLifecycleState(env, request, admin, assetUuid);
             return withCors(request, response, env);
           }
         }
