@@ -384,9 +384,9 @@ const AdminAssetEditorPage: React.FC = () => {
   const [selectedNodeIndex, setSelectedNodeIndex] = useState<number>(-1);
   const [previewPartIndex, setPreviewPartIndex] = useState<number>(-1);
   const [previewT, setPreviewT] = useState<number>(0.5);
-  const [objectNames, setObjectNames] = useState<string[]>([]);
+  const [hierarchyItems, setHierarchyItems] = useState<ModelHierarchyItem[]>([]);
   const [objectFilter, setObjectFilter] = useState('');
-  const [selectedObjectName, setSelectedObjectName] = useState('');
+  const [selectedObjectPath, setSelectedObjectPath] = useState('');
   const [highlightedObjectNames, setHighlightedObjectNames] = useState<string[]>([]);
 
   const metadata = useMemo<AssetMetadata>(() => {
@@ -495,11 +495,11 @@ const AdminAssetEditorPage: React.FC = () => {
     updateNode(selectedNodeIndex, { position: positionMm });
   }
 
-  const filteredObjectNames = useMemo(() => {
+  const filteredHierarchyItems = useMemo(() => {
     const q = objectFilter.trim().toLowerCase();
-    if (!q) return objectNames;
-    return objectNames.filter((name) => name.toLowerCase().includes(q));
-  }, [objectFilter, objectNames]);
+    if (!q) return hierarchyItems;
+    return hierarchyItems.filter((item) => item.path.toLowerCase().includes(q) || item.name.toLowerCase().includes(q));
+  }, [objectFilter, hierarchyItems]);
 
   function addMovingPart(): void {
     setMovableParts((prev) => [
@@ -815,18 +815,19 @@ const AdminAssetEditorPage: React.FC = () => {
                     style={{ fontSize: 12 }}
                   />
                   <div style={{ maxHeight: 130, overflowY: 'auto', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, background: 'var(--mm-bg-panel)' }}>
-                    {filteredObjectNames.length === 0 ? (
+                    {filteredHierarchyItems.length === 0 ? (
                       <div style={{ padding: 8, fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
-                        {objectNames.length === 0 ? 'No named mesh objects found in current GLB.' : 'No objects match this filter.'}
+                        {hierarchyItems.length === 0 ? 'No scene hierarchy found in current GLB.' : 'No objects match this filter.'}
                       </div>
                     ) : (
-                      filteredObjectNames.map((name) => (
+                      filteredHierarchyItems.map((item) => (
                         <button
-                          key={name}
+                          key={item.id}
                           type="button"
                           onClick={() => {
-                            setSelectedObjectName(name);
-                            setHighlightedObjectNames([name]);
+                            const nameToSelect = item.name.startsWith('(unnamed') ? '' : item.name;
+                            setSelectedObjectName(nameToSelect);
+                            if (nameToSelect) setHighlightedObjectNames([nameToSelect]);
                           }}
                           style={{
                             width: '100%',
@@ -834,12 +835,21 @@ const AdminAssetEditorPage: React.FC = () => {
                             padding: '6px 8px',
                             border: 'none',
                             borderBottom: '1px solid var(--mm-border-subtle)',
-                            background: selectedObjectName === name ? 'var(--mm-accent-primary-muted)' : 'transparent',
-                            color: selectedObjectName === name ? 'var(--mm-accent-primary)' : 'var(--mm-text-secondary)',
+                            paddingLeft: `${8 + (item.depth * 12)}px`,
+                            background: selectedObjectPath === item.path ? 'var(--mm-accent-primary-muted)' : 'transparent',
+                            color: selectedObjectPath === item.path ? 'var(--mm-accent-primary)' : 'var(--mm-text-secondary)',
                             fontSize: 11,
                           }}
                         >
-                          {name}
+                          <span style={{ fontWeight: item.isMesh ? 600 : 500 }}>
+                            {item.name}
+                          </span>
+                          <span style={{ marginLeft: 6, color: 'var(--mm-text-disabled)', fontSize: 10 }}>
+                            {item.childCount > 0 ? `(${item.childCount})` : item.isMesh ? 'mesh' : 'group'}
+                          </span>
+                          <div style={{ marginTop: 2, color: 'var(--mm-text-disabled)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.path}
+                          </div>
                         </button>
                       ))
                     )}
@@ -848,11 +858,11 @@ const AdminAssetEditorPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        if (!selectedObjectName) return;
+                        if (!selectedObjectPath) return;
                         setMovableParts((prev) => [
                           ...prev,
                           {
-                            objectName: selectedObjectName,
+                            objectName: selectedObjectPath,
                             motionType: 'translate',
                             axis: 'x',
                             min: 0,
@@ -862,7 +872,7 @@ const AdminAssetEditorPage: React.FC = () => {
                           },
                         ]);
                       }}
-                      disabled={!selectedObjectName}
+                      disabled={!selectedObjectPath}
                       style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11 }}
                     >
                       Add Selected Object as Moving Part
