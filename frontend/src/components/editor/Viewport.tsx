@@ -370,12 +370,13 @@ const SceneContent: React.FC<{
   const majorSectionSize = minorCellSize * 4;
   const gridPalette = themeMode === 'light'
     ? {
-        cell: '#c7d2de',
-        section: '#9fb0c4',
+        cell: '#bcc8d6',
+        section: '#8fa0b5',
       }
     : {
-        cell: '#4f5f76',
-        section: '#758aa7',
+        // Keep the grid subtle but clearer, closer to the admin editor style.
+        cell: '#627289',
+        section: '#334155',
       };
 
   // Disable orbit rotation when a 3D object is selected AND a manipulation tool is active
@@ -444,13 +445,13 @@ const SceneContent: React.FC<{
           position={[0, 0, 0]}
           args={[sceneSettings.grid.size, sceneSettings.grid.divisions]}
           cellSize={minorCellSize}
-          cellThickness={0.34}
+          cellThickness={0.42}
           cellColor={gridPalette.cell}
           sectionSize={majorSectionSize}
-          sectionThickness={0.9}
+          sectionThickness={1.15}
           sectionColor={gridPalette.section}
-          fadeDistance={68}
-          fadeStrength={1.18}
+          fadeDistance={72}
+          fadeStrength={1.22}
           infiniteGrid
         />
       )}
