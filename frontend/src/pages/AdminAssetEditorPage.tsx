@@ -105,29 +105,45 @@ const ModelPreview: React.FC<{
     }
 
     const loader = new GLTFLoader();
-    loader.setCrossOrigin('use-credentials');
-    loader.load(
-      modelUrl,
-      (gltf) => {
-        if (cancelled) return;
-        setLoadedRoot(gltf.scene);
-        const names: string[] = [];
-        gltf.scene.traverse((child) => {
-          const c = child as THREE.Object3D & { isMesh?: boolean };
-          if (c.isMesh && c.name) names.push(c.name);
-        });
-        setObjectNames(Array.from(new Set(names)).sort((a, b) => a.localeCompare(b)));
-        setLoadError('');
-      },
-      undefined,
-      (err) => {
+    (async () => {
+      try {
+        // Use explicit credentialed fetch so admin-only model endpoints include auth cookies.
+        const response = await fetch(modelUrl, { credentials: 'include' });
+        if (!response.ok) {
+          throw new Error(`fetch for ${modelUrl} responded with ${response.status}`);
+        }
+        const modelBytes = await response.arrayBuffer();
+        loader.parse(
+          modelBytes,
+          modelUrl,
+          (gltf) => {
+            if (cancelled) return;
+            setLoadedRoot(gltf.scene);
+            const names: string[] = [];
+            gltf.scene.traverse((child) => {
+              const c = child as THREE.Object3D & { isMesh?: boolean };
+              if (c.isMesh && c.name) names.push(c.name);
+            });
+            setObjectNames(Array.from(new Set(names)).sort((a, b) => a.localeCompare(b)));
+            setLoadError('');
+          },
+          (err) => {
+            if (!cancelled) {
+              setLoadedRoot(null);
+              setObjectNames([]);
+              setLoadError(err?.message || 'Model could not be loaded');
+            }
+          }
+        );
+      } catch (err) {
         if (!cancelled) {
+          const e = err as { message?: string };
           setLoadedRoot(null);
           setObjectNames([]);
-          setLoadError(err?.message || 'Model could not be loaded');
+          setLoadError(e?.message || 'Model could not be loaded');
         }
       }
-    );
+    })();
     return () => {
       cancelled = true;
     };
