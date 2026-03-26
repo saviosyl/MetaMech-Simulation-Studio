@@ -156,6 +156,10 @@ function distanceMm(a: [number, number, number], b: [number, number, number]): n
   return Math.sqrt((dx * dx) + (dy * dy) + (dz * dz));
 }
 
+function magnitudeMm(v: [number, number, number]): number {
+  return Math.sqrt((v[0] * v[0]) + (v[1] * v[1]) + (v[2] * v[2]));
+}
+
 function fitCameraToBox(camera: THREE.Camera, controls: OrbitControlsLike | null, box: THREE.Box3): void {
   const size = new THREE.Vector3();
   const center = new THREE.Vector3();
@@ -778,6 +782,45 @@ const AdminAssetEditorPage: React.FC = () => {
     return computeBoundsMm(nativeBounds, sourceUnit, scaleCorrection);
   }, [nativeBounds, sourceUnit, scaleCorrection]);
 
+  const normalizationWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    if (!normalizedBoundsMm) return warnings;
+    const w = normalizedBoundsMm.width;
+    const d = normalizedBoundsMm.depth;
+    const h = normalizedBoundsMm.height;
+    const maxDim = Math.max(w, d, h);
+    const minDim = Math.min(w, d, h);
+
+    if (maxDim > 50000) {
+      warnings.push(`Very large asset (${maxDim.toFixed(0)} mm max dimension). Check Source Unit and Scale Correction.`);
+    }
+    if (maxDim < 20) {
+      warnings.push(`Very small asset (${maxDim.toFixed(1)} mm max dimension). Check Source Unit and Scale Correction.`);
+    }
+    if (minDim > 0 && (maxDim / minDim) > 400) {
+      warnings.push('Abnormal bounding-box ratio detected. Verify source export and model orientation.');
+    }
+    if (nativeBounds) {
+      const centerRaw: [number, number, number] = [
+        (nativeBounds.min[0] + nativeBounds.max[0]) / 2,
+        (nativeBounds.min[1] + nativeBounds.max[1]) / 2,
+        (nativeBounds.min[2] + nativeBounds.max[2]) / 2,
+      ];
+      const centerOffsetMm = magnitudeMm([
+        centerRaw[0] * sourceUnitFactorToMm(sourceUnit) * scaleCorrection,
+        centerRaw[1] * sourceUnitFactorToMm(sourceUnit) * scaleCorrection,
+        centerRaw[2] * sourceUnitFactorToMm(sourceUnit) * scaleCorrection,
+      ]);
+      if (centerOffsetMm > Math.max(5000, maxDim * 2)) {
+        warnings.push('Model origin appears far from mesh center. Consider fixing origin in Blender before export.');
+      }
+    }
+    if (Math.abs(pivotOffsetMm[1]) > Math.max(3000, maxDim * 0.75)) {
+      warnings.push('Large Pivot Y offset may cause model to appear too low/high in runtime.');
+    }
+    return warnings;
+  }, [normalizedBoundsMm, nativeBounds, sourceUnit, scaleCorrection, pivotOffsetMm]);
+
   const metadata = useMemo<AssetMetadata>(() => {
     return {
       ...safeAssetMetadata(asset),
@@ -830,8 +873,11 @@ const AdminAssetEditorPage: React.FC = () => {
       if (id && ids.has(id)) problems.push(`Duplicate node id: ${id}`);
       if (id) ids.add(id);
     }
+    for (const warning of normalizationWarnings) {
+      problems.push(`Normalization warning: ${warning}`);
+    }
     return problems;
-  }, [asset, selectedCategoryId, nodes]);
+  }, [asset, selectedCategoryId, nodes, normalizationWarnings]);
 
   function hydrateFromAsset(next: LibraryAsset | null): void {
     setAsset(next);
@@ -1359,7 +1405,24 @@ const AdminAssetEditorPage: React.FC = () => {
                   <div>
                     Normalized (mm): {normalizedBoundsMm ? `W ${normalizedBoundsMm.width.toFixed(1)}, D ${normalizedBoundsMm.depth.toFixed(1)}, H ${normalizedBoundsMm.height.toFixed(1)}` : 'not available'}
                   </div>
+                  <div>
+                    World Size (m): {normalizedBoundsMm
+                      ? `W ${(normalizedBoundsMm.width / 1000).toFixed(3)}, D ${(normalizedBoundsMm.depth / 1000).toFixed(3)}, H ${(normalizedBoundsMm.height / 1000).toFixed(3)}`
+                      : 'not available'}
+                  </div>
                 </div>
+                {normalizationWarnings.length > 0 && (
+                  <div style={{ border: '1px solid color-mix(in oklab, var(--mm-accent-warning, #f59e0b) 45%, transparent)', borderRadius: 8, background: 'color-mix(in oklab, var(--mm-accent-warning, #f59e0b) 10%, transparent)', padding: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)', marginBottom: 4 }}>
+                      Import Warnings
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                      {normalizationWarnings.map((warning) => (
+                        <li key={warning}>{warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
                   <div>
                     <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Pivot X (mm)</label>
