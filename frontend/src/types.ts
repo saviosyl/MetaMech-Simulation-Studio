@@ -112,6 +112,9 @@ export type BehaviorTemplateType =
 export interface AssetMetadata {
   nodes?: AssetDefinitionNode[];
   movableParts?: AssetMovingPart[];
+  objectAliases?: Record<string, string>;
+  objectRotationsDeg?: Record<string, [number, number, number]>;
+  assetRootRotationDeg?: [number, number, number];
   transportPath?: {
     mode: 'node-link' | 'straight-node' | 'polyline';
     sourceNodeId?: string;

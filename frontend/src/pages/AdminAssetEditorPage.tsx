@@ -73,6 +73,12 @@ type PathPoint = { id: string; positionMm: [number, number, number] };
 type NodeGizmoSnapMode = 'none' | 'grid' | 'ground';
 type TransformMode = 'translate' | 'rotate';
 type CollapsibleSectionKey = 'assets' | 'hierarchy' | 'nodes' | 'movingParts';
+type RotationTargetKind = 'assetRoot' | 'selectedObject' | 'selectedNode' | 'selectedPivot';
+type RotationTargetInfo = {
+  kind: RotationTargetKind;
+  label: string;
+  rotationDeg: [number, number, number];
+};
 
 type MeasurementPoint = {
   id: string;
@@ -101,6 +107,28 @@ function errorMessage(error: unknown, fallback: string): string {
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
+
+function degToRad(value: number): number {
+  return (value * Math.PI) / 180;
+}
+
+function radToDeg(value: number): number {
+  return (value * 180) / Math.PI;
+}
+
+function normalizeEulerDeg(input: unknown, fallback: [number, number, number] = [0, 0, 0]): [number, number, number] {
+  if (!Array.isArray(input) || input.length < 3) return fallback;
+  const x = Number(input[0]);
+  const y = Number(input[1]);
+  const z = Number(input[2]);
+  return [
+    Number.isFinite(x) ? x : fallback[0],
+    Number.isFinite(y) ? y : fallback[1],
+    Number.isFinite(z) ? z : fallback[2],
+  ];
+}
+
+const ASSET_ROOT_PATH = '__asset_root__';
 
 function safeAssetMetadata(asset: LibraryAsset | null): AssetMetadata {
   if (!asset) return {};
@@ -391,6 +419,17 @@ function findObjectByHierarchyPath(root: THREE.Object3D, path: string): THREE.Ob
   return current;
 }
 
+function hierarchyPathFromObject(root: THREE.Object3D, object: THREE.Object3D): string | null {
+  const segments: string[] = [];
+  let current: THREE.Object3D | null = object;
+  while (current) {
+    segments.unshift(displayObjectName(current));
+    if (current === root) return segments.join('/');
+    current = current.parent;
+  }
+  return null;
+}
+
 function applyMotionPreview(
   targetRoot: THREE.Object3D,
   part: AssetMovingPart | null,
@@ -420,6 +459,8 @@ const ModelPreview: React.FC<{
   sourceUnit: SourceUnit;
   scaleCorrection: number;
   pivotOffsetMm: [number, number, number];
+  assetRootRotationDeg: [number, number, number];
+  objectRotationDegByPath: Record<string, [number, number, number]>;
   cameraIntent: CameraIntent;
   onCameraIntentHandled: () => void;
   activeTool: InteractionTool;
@@ -432,8 +473,12 @@ const ModelPreview: React.FC<{
   nodes: AssetDefinitionNode[];
   selectedNodeIndex: number;
   onSelectNode: (index: number) => void;
+  selectedObjectPath: string;
+  onSelectObjectPath: (path: string) => void;
   onPlaceNodeAtMm: (positionMm: [number, number, number]) => void;
   onMoveNodeToMm: (index: number, positionMm: [number, number, number]) => void;
+  onRotateSelectedObjectDeg: (path: string, rotationDeg: [number, number, number]) => void;
+  onSetAssetRootRotationDeg: (rotationDeg: [number, number, number]) => void;
   setHierarchyItems: (items: ModelHierarchyItem[]) => void;
   highlightedObjectNames: string[];
   setHighlightedObjectNames: (names: string[]) => void;
@@ -445,6 +490,8 @@ const ModelPreview: React.FC<{
   onPathPointsChange: (points: PathPoint[]) => void;
   onSelectPathPoint: (index: number) => void;
   toolbarButtons: ToolbarButton[];
+  rotationTargetInfo: RotationTargetInfo | null;
+  rotationHintMessage: string;
   showWorldAxis: boolean;
   showLocalAxis: boolean;
   nodeSnapMode: NodeGizmoSnapMode;
@@ -454,6 +501,8 @@ const ModelPreview: React.FC<{
   sourceUnit,
   scaleCorrection,
   pivotOffsetMm,
+  assetRootRotationDeg,
+  objectRotationDegByPath,
   cameraIntent,
   onCameraIntentHandled,
   activeTool,
@@ -466,8 +515,12 @@ const ModelPreview: React.FC<{
   nodes,
   selectedNodeIndex,
   onSelectNode,
+  selectedObjectPath,
+  onSelectObjectPath,
   onPlaceNodeAtMm,
   onMoveNodeToMm,
+  onRotateSelectedObjectDeg,
+  onSetAssetRootRotationDeg,
   setHierarchyItems,
   highlightedObjectNames,
   setHighlightedObjectNames,
@@ -479,6 +532,8 @@ const ModelPreview: React.FC<{
   onPathPointsChange,
   onSelectPathPoint,
   toolbarButtons,
+  rotationTargetInfo,
+  rotationHintMessage,
   showWorldAxis,
   showLocalAxis,
   nodeSnapMode,
@@ -592,6 +647,21 @@ const ModelPreview: React.FC<{
     clone.scale.setScalar(worldScale);
     clone.position.multiplyScalar(worldScale);
     clone.position.add(new THREE.Vector3(mmToM(pivotOffsetMm[0]), mmToM(pivotOffsetMm[1]), mmToM(pivotOffsetMm[2])));
+    clone.rotation.set(
+      degToRad(assetRootRotationDeg[0]),
+      degToRad(assetRootRotationDeg[1]),
+      degToRad(assetRootRotationDeg[2])
+    );
+    for (const [path, rotationDeg] of Object.entries(objectRotationDegByPath)) {
+      if (!path || path === ASSET_ROOT_PATH) continue;
+      const target = findObjectByHierarchyPath(clone, path);
+      if (!target) continue;
+      target.rotation.set(
+        degToRad(rotationDeg[0] || 0),
+        degToRad(rotationDeg[1] || 0),
+        degToRad(rotationDeg[2] || 0)
+      );
+    }
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
@@ -612,7 +682,26 @@ const ModelPreview: React.FC<{
     applyMotionPreview(clone, part, previewT, worldScale);
     modelBoundsRef.current = new THREE.Box3().setFromObject(clone);
     return clone;
-  }, [loadedRoot, movingParts, previewPartIndex, previewT, highlightedObjectNames, worldScale, pivotOffsetMm]);
+  }, [
+    loadedRoot,
+    movingParts,
+    previewPartIndex,
+    previewT,
+    highlightedObjectNames,
+    worldScale,
+    pivotOffsetMm,
+    assetRootRotationDeg,
+    objectRotationDegByPath,
+  ]);
+
+  const rotateTargetObject = useMemo(() => {
+    if (!previewRoot || activeTool !== 'rotate') return null;
+    if (selectedNodeIndex >= 0 || selectedPathPointIndex >= 0) return null;
+    if (selectedObjectPath && selectedObjectPath !== ASSET_ROOT_PATH) {
+      return findObjectByHierarchyPath(previewRoot, selectedObjectPath);
+    }
+    return previewRoot;
+  }, [previewRoot, activeTool, selectedNodeIndex, selectedPathPointIndex, selectedObjectPath]);
 
   function parseNodeFocusIndex(path: string): number | null {
     if (!path.startsWith('__node__:')) return null;
@@ -808,8 +897,12 @@ const ModelPreview: React.FC<{
       {previewRoot ? (
         <group
           onPointerDown={(event) => {
-            const hoveredName = (event.object as THREE.Object3D | undefined)?.name;
+            const hoveredObject = event.object as THREE.Object3D | undefined;
+            if (!hoveredObject) return;
+            const hoveredName = displayObjectName(hoveredObject);
             if (hoveredName) setHighlightedObjectNames([hoveredName]);
+            const hoveredPath = hierarchyPathFromObject(previewRoot, hoveredObject);
+            if (hoveredPath) onSelectObjectPath(hoveredPath);
           }}
           onClick={(event) => {
             const point = getPlaneIntersection(event);
@@ -856,6 +949,27 @@ const ModelPreview: React.FC<{
           <boxGeometry args={[1.2, 0.8, 0.8]} />
           <meshStandardMaterial color="#64748b" metalness={0.3} roughness={0.55} />
         </mesh>
+      )}
+      {rotateTargetObject && (
+        <TransformControls
+          object={rotateTargetObject}
+          mode="rotate"
+          size={0.85}
+          onObjectChange={(event) => {
+            const targetObject = (event?.target as { object?: THREE.Object3D } | undefined)?.object;
+            if (!targetObject) return;
+            const nextDeg: [number, number, number] = [
+              radToDeg(targetObject.rotation.x),
+              radToDeg(targetObject.rotation.y),
+              radToDeg(targetObject.rotation.z),
+            ];
+            if (selectedObjectPath && selectedObjectPath !== ASSET_ROOT_PATH) {
+              onRotateSelectedObjectDeg(selectedObjectPath, nextDeg);
+              return;
+            }
+            onSetAssetRootRotationDeg(nextDeg);
+          }}
+        />
       )}
       {measurementPoints.length >= 2 && (
         <Line
@@ -1016,6 +1130,14 @@ const ModelPreview: React.FC<{
           Upload a GLB to preview and author nodes/moving parts.
         </div>
       )}
+      {activeTool === 'rotate' && (
+        <div style={{ position: 'absolute', left: 12, right: 12, bottom: 12, border: '1px solid color-mix(in oklab, var(--mm-accent-primary) 45%, transparent)', borderRadius: 8, background: 'var(--mm-accent-primary-muted)', color: 'var(--mm-text-primary)', fontSize: 11, padding: '7px 10px', display: 'grid', gap: 2 }}>
+          <div style={{ fontWeight: 700 }}>
+            Rotation target: {rotationTargetInfo?.label || 'Asset Root'}
+          </div>
+          <div>{rotationHintMessage}</div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1047,6 +1169,9 @@ const AdminAssetEditorPage: React.FC = () => {
   const [hierarchyItems, setHierarchyItems] = useState<ModelHierarchyItem[]>([]);
   const [objectFilter, setObjectFilter] = useState('');
   const [selectedObjectPath, setSelectedObjectPath] = useState('');
+  const [objectAliasesByPath, setObjectAliasesByPath] = useState<Record<string, string>>({});
+  const [assetRootRotationDeg, setAssetRootRotationDeg] = useState<[number, number, number]>([0, 0, 0]);
+  const [objectRotationDegByPath, setObjectRotationDegByPath] = useState<Record<string, [number, number, number]>>({});
   const [highlightedObjectNames, setHighlightedObjectNames] = useState<string[]>([]);
   const [objectVisibility, setObjectVisibility] = useState<Record<string, boolean>>({});
   const [showObjectPathSet, setShowObjectPathSet] = useState<Record<string, boolean>>({});
@@ -1161,10 +1286,16 @@ const AdminAssetEditorPage: React.FC = () => {
   }, [normalizedBoundsMm, nativeBounds, sourceUnit, scaleCorrection, pivotOffsetMm]);
 
   const metadata = useMemo<AssetMetadata>(() => {
+    const aliases = Object.fromEntries(
+      Object.entries(objectAliasesByPath).filter(([, value]) => String(value || '').trim().length > 0)
+    );
     return {
       ...safeAssetMetadata(asset),
       nodes,
       movableParts,
+      ...(Object.keys(aliases).length > 0 ? { objectAliases: aliases } : {}),
+      ...(Object.keys(objectRotationDegByPath).length > 0 ? { objectRotationsDeg: objectRotationDegByPath } : {}),
+      assetRootRotationDeg,
       behaviorTemplate,
       behaviorConfig,
       runtimeControls,
@@ -1182,7 +1313,24 @@ const AdminAssetEditorPage: React.FC = () => {
         }
         : {}),
     };
-  }, [asset, nodes, movableParts, behaviorTemplate, behaviorConfig, runtimeControls, sourceUnit, scaleCorrection, nativeBounds, normalizedBoundsMm, pivotOffsetMm, pathMode, pathPoints]);
+  }, [
+    asset,
+    nodes,
+    movableParts,
+    objectAliasesByPath,
+    objectRotationDegByPath,
+    assetRootRotationDeg,
+    behaviorTemplate,
+    behaviorConfig,
+    runtimeControls,
+    sourceUnit,
+    scaleCorrection,
+    nativeBounds,
+    normalizedBoundsMm,
+    pivotOffsetMm,
+    pathMode,
+    pathPoints,
+  ]);
 
   const twoPointDistanceMm = useMemo(() => {
     if (measurementPoints.length < 2) return null;
@@ -1260,6 +1408,21 @@ const AdminAssetEditorPage: React.FC = () => {
     } else {
       setPivotOffsetMm([0, 0, 0]);
     }
+    setObjectAliasesByPath(
+      m.objectAliases && typeof m.objectAliases === 'object' && !Array.isArray(m.objectAliases)
+        ? Object.fromEntries(
+          Object.entries(m.objectAliases).map(([path, alias]) => [path, String(alias || '')])
+        )
+        : {}
+    );
+    setAssetRootRotationDeg(normalizeEulerDeg(m.assetRootRotationDeg, [0, 0, 0]));
+    setObjectRotationDegByPath(
+      m.objectRotationsDeg && typeof m.objectRotationsDeg === 'object' && !Array.isArray(m.objectRotationsDeg)
+        ? Object.fromEntries(
+          Object.entries(m.objectRotationsDeg).map(([path, value]) => [path, normalizeEulerDeg(value, [0, 0, 0])])
+        )
+        : {}
+    );
     const templateRaw = String(m.behaviorTemplate || '').trim();
     const nextBehaviorTemplate: BehaviorTemplateType = (
       templateRaw === 'straight-conveyor'
@@ -1317,6 +1480,8 @@ const AdminAssetEditorPage: React.FC = () => {
     setFitTargetPath('');
     setSelectedNodeIndex(-1);
     setPreviewPartIndex(-1);
+    setSelectedObjectPath('');
+    setHighlightedObjectNames([]);
   }
 
   async function loadData() {
@@ -1413,6 +1578,84 @@ const AdminAssetEditorPage: React.FC = () => {
     () => hierarchyItems.find((item) => item.path === selectedObjectPath) || null,
     [hierarchyItems, selectedObjectPath]
   );
+  const selectedObjectRotationDeg = useMemo<[number, number, number]>(
+    () => normalizeEulerDeg(objectRotationDegByPath[selectedObjectPath], [0, 0, 0]),
+    [objectRotationDegByPath, selectedObjectPath]
+  );
+  const selectedNodeRotationDeg = useMemo<[number, number, number]>(
+    () => normalizeEulerDeg(nodes[selectedNodeIndex]?.rotation, [0, 0, 0]),
+    [nodes, selectedNodeIndex]
+  );
+  const rotationTargetInfo = useMemo<RotationTargetInfo | null>(() => {
+    if (selectedNodeIndex >= 0 && nodes[selectedNodeIndex]) {
+      return {
+        kind: 'selectedNode',
+        label: `Node: ${nodes[selectedNodeIndex]?.id || `Node ${selectedNodeIndex + 1}`}`,
+        rotationDeg: selectedNodeRotationDeg,
+      };
+    }
+    if (selectedPathPointIndex >= 0) {
+      return {
+        kind: 'selectedPivot',
+        label: `Pivot point ${selectedPathPointIndex + 1}`,
+        rotationDeg: [0, 0, 0],
+      };
+    }
+    if (selectedObjectPath && selectedObjectPath !== ASSET_ROOT_PATH) {
+      const objectLabel = objectAliasesByPath[selectedObjectPath] || selectedHierarchyItem?.name || selectedObjectPath;
+      return {
+        kind: 'selectedObject',
+        label: `Object: ${objectLabel}`,
+        rotationDeg: selectedObjectRotationDeg,
+      };
+    }
+    return {
+      kind: 'assetRoot',
+      label: 'Asset root',
+      rotationDeg: assetRootRotationDeg,
+    };
+  }, [
+    selectedNodeIndex,
+    nodes,
+    selectedNodeRotationDeg,
+    selectedPathPointIndex,
+    selectedObjectPath,
+    selectedHierarchyItem,
+    selectedObjectRotationDeg,
+    objectAliasesByPath,
+    assetRootRotationDeg,
+  ]);
+  const rotationHintMessage = useMemo(() => {
+    if (rotationTargetInfo?.kind === 'selectedNode') {
+      return 'Rotate mode: drag red/green/blue ring to rotate selected node (X/Y/Z).';
+    }
+    if (rotationTargetInfo?.kind === 'selectedObject') {
+      return 'Rotate mode: drag red/green/blue ring to rotate selected object (X/Y/Z).';
+    }
+    if (rotationTargetInfo?.kind === 'selectedPivot') {
+      return 'Pivot selected. Use Move/Pivot tools for point adjustments.';
+    }
+    return 'Rotate mode: drag red/green/blue ring to rotate the asset root (X/Y/Z).';
+  }, [rotationTargetInfo]);
+
+  function toggleLeftSection(section: LeftPanelSection): void {
+    setLeftSectionOpen((prev) => ({ ...prev, [section]: !prev[section] }));
+  }
+
+  function setSelectedObjectPathAndHighlight(path: string): void {
+    setSelectedObjectPath(path);
+    if (!path || path === ASSET_ROOT_PATH) {
+      setHighlightedObjectNames([]);
+      return;
+    }
+    const item = hierarchyItems.find((candidate) => candidate.path === path);
+    const objectName = item?.name || path.split('/').pop() || '';
+    if (!objectName || objectName.startsWith('(unnamed')) {
+      setHighlightedObjectNames([]);
+      return;
+    }
+    setHighlightedObjectNames([objectName]);
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1584,14 +1827,28 @@ const AdminAssetEditorPage: React.FC = () => {
   const toolbarButtons = useMemo<ToolbarButton[]>(() => ([
     { key: 'select', label: 'Select', activeWhen: 'select', onClick: () => setActiveTool('select') },
     { key: 'move', label: 'Move', activeWhen: 'move', onClick: () => setActiveTool('move') },
-    { key: 'rotate', label: 'Rotate', activeWhen: 'rotate', onClick: () => setActiveTool('rotate') },
+    {
+      key: 'rotate',
+      label: 'Rotate',
+      activeWhen: 'rotate',
+      onClick: () => {
+        setActiveTool('rotate');
+        if (
+          selectedNodeIndex < 0
+          && selectedPathPointIndex < 0
+          && !selectedObjectPath
+        ) {
+          setSelectedObjectPathAndHighlight(ASSET_ROOT_PATH);
+        }
+      },
+    },
     { key: 'undo', label: 'Undo', icon: <Undo2 size={12} />, onClick: () => {} },
     { key: 'redo', label: 'Redo', icon: <Redo2 size={12} />, onClick: () => {} },
     { key: 'copy', label: 'Copy', icon: <Copy size={12} />, onClick: () => {} },
     { key: 'frame', label: 'Frame', icon: <Maximize size={12} />, onClick: () => setCameraIntent('fit') },
     { key: 'node', label: 'Node', activeWhen: 'node', onClick: () => setActiveTool('node') },
     { key: 'pivot', label: 'Pivot', activeWhen: 'pivot', onClick: () => setActiveTool('pivot') },
-  ]), [setCameraIntent]);
+  ]), [setCameraIntent, selectedNodeIndex, selectedPathPointIndex, selectedObjectPath]);
 
   function loadTemplatePreset(kind: 'straight' | 'lift'): void {
     if (kind === 'straight') {
@@ -1755,11 +2012,7 @@ const AdminAssetEditorPage: React.FC = () => {
                       <button
                         key={`left-h-${item.id}`}
                         type="button"
-                        onClick={() => {
-                          setSelectedObjectPath(item.path);
-                          const nameToHighlight = item.name.startsWith('(unnamed') ? '' : item.name;
-                          setHighlightedObjectNames(nameToHighlight ? [nameToHighlight] : []);
-                        }}
+                        onClick={() => setSelectedObjectPathAndHighlight(item.path)}
                         style={{
                           width: '100%',
                           textAlign: 'left',
@@ -2525,11 +2778,7 @@ const AdminAssetEditorPage: React.FC = () => {
                         <button
                           key={item.id}
                           type="button"
-                          onClick={() => {
-                            setSelectedObjectPath(item.path);
-                            const nameToHighlight = item.name.startsWith('(unnamed') ? '' : item.name;
-                            setHighlightedObjectNames(nameToHighlight ? [nameToHighlight] : []);
-                          }}
+                        onClick={() => setSelectedObjectPathAndHighlight(item.path)}
                           style={{
                             width: '100%',
                             textAlign: 'left',
