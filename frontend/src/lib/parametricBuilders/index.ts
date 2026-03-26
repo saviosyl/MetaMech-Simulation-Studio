@@ -39,6 +39,23 @@ function beltConveyorBuilderWithGLB(params: Record<string, any>): BuilderResult 
   return buildBeltConveyor(params);
 }
 
+/**
+ * Admin parametric template builder (basic belt v1).
+ * Maps template params to the existing belt builder input.
+ */
+function adminBasicBeltTemplateBuilder(params: Record<string, any>): BuilderResult {
+  const lengthMm = Number(params.lengthMm);
+  const widthMm = Number(params.widthMm);
+  const topHeightMm = Number(params.topHeightMm);
+  return buildBeltConveyor({
+    ...params,
+    length: Number.isFinite(lengthMm) ? lengthMm : 3000,
+    width: Number.isFinite(widthMm) ? widthMm : 600,
+    height: Number.isFinite(topHeightMm) ? topHeightMm : 850,
+    sideGuides: true,
+  });
+}
+
 const registry: Record<string, BuilderFunction> = {
   beltConveyorBuilder: beltConveyorBuilderWithGLB,
   rollerConveyorBuilder: buildRollerConveyor,
@@ -72,6 +89,7 @@ const registry: Record<string, BuilderFunction> = {
   mm85GuideRailBuilder: buildMM85GuideRail,
   mm85SupportLegBuilder: buildMM85SupportLeg,
   mm85EndDriveSupportBuilder: buildMM85EndDriveSupport,
+  adminBasicBeltTemplateBuilder,
 };
 
 export function getBuilder(name: string): BuilderFunction | undefined {

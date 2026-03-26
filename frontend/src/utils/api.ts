@@ -1,6 +1,14 @@
 /// <reference types="vite/client" />
 import axios from 'axios';
-import { AssetCategory, AssetMetadata, AssetStatus, LibraryAsset, SceneCategory } from '../types';
+import {
+  AssetCategory,
+  AssetMetadata,
+  AssetStatus,
+  LibraryAsset,
+  ParametricParameterValues,
+  ParametricTemplateId,
+  SceneCategory,
+} from '../types';
 
 const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
 // Dev fallback stays localhost, but production must never default to localhost.
@@ -143,6 +151,9 @@ export interface UploadAssetPayload {
   description?: string;
   tags?: string[];
   metadata?: AssetMetadata;
+  assetType?: 'static' | 'parametric';
+  templateId?: ParametricTemplateId;
+  parameterValues?: ParametricParameterValues;
 }
 
 export async function uploadLibraryAsset(payload: UploadAssetPayload): Promise<LibraryAsset> {
@@ -153,6 +164,9 @@ export async function uploadLibraryAsset(payload: UploadAssetPayload): Promise<L
   if (payload.description) formData.append('description', payload.description);
   if (payload.tags && payload.tags.length > 0) formData.append('tags', payload.tags.join(','));
   if (payload.metadata) formData.append('metadata', JSON.stringify(payload.metadata));
+  if (payload.assetType) formData.append('assetType', payload.assetType);
+  if (payload.templateId) formData.append('templateId', payload.templateId);
+  if (payload.parameterValues) formData.append('parameterValues', JSON.stringify(payload.parameterValues));
 
   const res = await api.post('/admin/assets/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -169,6 +183,9 @@ export async function updateLibraryAsset(
     metadata: AssetMetadata;
     categoryId: number;
     sortOrder: number;
+    assetType: 'static' | 'parametric';
+    templateId: ParametricTemplateId;
+    parameterValues: ParametricParameterValues;
   }>
 ): Promise<LibraryAsset> {
   const res = await api.put(`/admin/assets/${encodeURIComponent(id)}`, payload);

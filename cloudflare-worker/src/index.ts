@@ -37,6 +37,9 @@ type AssetRow = {
   name: string;
   slug: string;
   category_id: number;
+  asset_type: 'static' | 'parametric';
+  template_id: string | null;
+  parameter_values: string;
   status: 'draft' | 'published' | 'archived';
   lifecycle_state: AssetLifecycleState | null;
   visible_in_runtime_library: number;
@@ -64,6 +67,9 @@ type AssetRow = {
 type AssetLifecycleState = 'draft' | 'internal' | 'live' | 'archived' | 'deleted';
 const ASSET_LIFECYCLE_STATES: AssetLifecycleState[] = ['draft', 'internal', 'live', 'archived', 'deleted'];
 const ASSET_LIFECYCLE_SET = new Set<AssetLifecycleState>(ASSET_LIFECYCLE_STATES);
+type AssetType = 'static' | 'parametric';
+const ASSET_TYPES: AssetType[] = ['static', 'parametric'];
+const ASSET_TYPE_SET = new Set<AssetType>(ASSET_TYPES);
 
 type SceneCategory =
   | 'process'
@@ -1073,6 +1079,130 @@ function normalizeMetadata(input: unknown): Record<string, unknown> {
   return {};
 }
 
+function asAssetType(input: unknown): AssetType {
+  const value = String(input || '').trim().toLowerCase() as AssetType;
+  return ASSET_TYPE_SET.has(value) ? value : 'static';
+}
+
+function normalizeParameterValues(input: unknown): Record<string, number | string | boolean> {
+  if (!input) return {};
+  const raw = typeof input === 'string'
+    ? safeJsonParse<Record<string, unknown>>(input, {})
+    : (typeof input === 'object' && !Array.isArray(input) ? (input as Record<string, unknown>) : {});
+  const out: Record<string, number | string | boolean> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (!key) continue;
+    if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+function normalizeTemplateId(input: unknown): string | null {
+  const value = String(input || '').trim();
+  if (!value) return null;
+  return value.slice(0, 120);
+}
+
+const BELT_TEMPLATE_ID = 'basic-belt-conveyor-v1';
+const BELT_TEMPLATE_PARAMETERS: Record<string, {
+  type: 'number';
+  label: string;
+  default: number;
+  min: number;
+  max: number;
+  step: number;
+  unit: 'mm';
+}> = {
+  lengthMm: { type: 'number', label: 'Length', default: 3000, min: 500, max: 15000, step: 50, unit: 'mm' },
+  widthMm: { type: 'number', label: 'Width', default: 600, min: 200, max: 2000, step: 10, unit: 'mm' },
+  topHeightMm: { type: 'number', label: 'Top Height', default: 850, min: 100, max: 5000, step: 10, unit: 'mm' },
+};
+
+function buildBeltTemplateMetadata(
+  params: Record<string, number | string | boolean>
+): Record<string, unknown> {
+  const lengthMmRaw = Number(params.lengthMm);
+  const widthMmRaw = Number(params.widthMm);
+  const topHeightMmRaw = Number(params.topHeightMm);
+  const lengthMm = Number.isFinite(lengthMmRaw) ? Math.max(500, Math.min(15000, lengthMmRaw)) : 3000;
+  const widthMm = Number.isFinite(widthMmRaw) ? Math.max(200, Math.min(2000, widthMmRaw)) : 600;
+  const topHeightMm = Number.isFinite(topHeightMmRaw) ? Math.max(100, Math.min(5000, topHeightMmRaw)) : 850;
+  const halfLength = lengthMm / 2;
+  const infeed: [number, number, number] = [-halfLength, topHeightMm, 0];
+  const outfeed: [number, number, number] = [halfLength, topHeightMm, 0];
+  const halfWidth = widthMm / 2;
+  return {
+    nodes: [
+      {
+        id: 'NODE_INFEED',
+        label: 'Infeed',
+        type: 'infeed',
+        position: infeed,
+        rotation: [0, 0, 0],
+        direction: [1, 0, 0],
+      },
+      {
+        id: 'NODE_OUTFEED',
+        label: 'Outfeed',
+        type: 'outfeed',
+        position: outfeed,
+        rotation: [0, 0, 0],
+        direction: [1, 0, 0],
+      },
+    ],
+    transportPath: {
+      mode: 'straight-node',
+      sourceNodeId: 'NODE_INFEED',
+      targetNodeId: 'NODE_OUTFEED',
+      points: [infeed, outfeed],
+    },
+    parameters: {
+      lengthMm,
+      widthMm,
+      topHeightMm,
+    },
+    templateId: BELT_TEMPLATE_ID,
+    parameterValues: {
+      lengthMm,
+      widthMm,
+      topHeightMm,
+    },
+    templateParameters: BELT_TEMPLATE_PARAMETERS,
+    nativeBounds: {
+      width: lengthMm / 1000,
+      depth: widthMm / 1000,
+      height: 0.14,
+      min: [-(halfLength / 1000), 0, -(halfWidth / 1000)],
+      max: [halfLength / 1000, 0.14, halfWidth / 1000],
+    },
+    normalizedBoundsMm: {
+      width: lengthMm,
+      depth: widthMm,
+      height: 140,
+    },
+    sourceUnit: 'mm',
+    scaleCorrection: 1,
+    isParametricTemplate: true,
+  };
+}
+
+function validateParametricTemplateInput(
+  templateId: string | null,
+  parameterValuesInput: unknown
+): { templateId: string; parameterValues: Record<string, number | string | boolean>; metadata: Record<string, unknown> } | { error: string } {
+  if (!templateId) return { error: 'templateId is required for parametric assets' };
+  if (templateId !== BELT_TEMPLATE_ID) return { error: `Unsupported templateId: ${templateId}` };
+  const parameterValues = normalizeParameterValues(parameterValuesInput);
+  const metadata = buildBeltTemplateMetadata(parameterValues);
+  return {
+    templateId,
+    parameterValues,
+    metadata,
+  };
+}
+
 function asAssetLifecycleState(input: unknown): AssetLifecycleState | null {
   const value = String(input || '').trim().toLowerCase() as AssetLifecycleState;
   return ASSET_LIFECYCLE_SET.has(value) ? value : null;
@@ -1168,6 +1298,7 @@ function serializeCategory(row: AssetCategoryRow): Record<string, unknown> {
 function serializeAsset(row: AssetRow, request: Request): Record<string, unknown> {
   const tags = safeJsonParse<string[]>(row.tags, []);
   const metadata = safeJsonParse<Record<string, unknown>>(row.metadata, {});
+  const parameterValues = normalizeParameterValues(row.parameter_values);
   const base = new URL(request.url).origin;
   const publishedModelUrl = assetObjectUrl(request, 'model', row.uuid, row.version);
   const publishedThumbnailUrl = row.thumbnail_r2_key ? assetObjectUrl(request, 'thumbnail', row.uuid, row.version) : null;
@@ -1186,6 +1317,9 @@ function serializeAsset(row: AssetRow, request: Request): Record<string, unknown
     dbId: row.id,
     name: row.name,
     slug: row.slug,
+    assetType: asAssetType(row.asset_type),
+    templateId: row.template_id,
+    parameterValues,
     status: row.status,
     lifecycleState,
     visibleInRuntimeLibrary: isRuntimeLiveLifecycle(lifecycleState),
@@ -1227,8 +1361,8 @@ async function readCategoryById(env: Env, categoryId: number): Promise<AssetCate
 async function readAssetByUuid(env: Env, assetUuid: string): Promise<AssetRow | null> {
   return env.DB
     .prepare(
-      `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.status, a.version, a.sort_order,
-              a.visible_in_runtime_library,
+      `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.asset_type, a.template_id, a.parameter_values,
+              a.status, a.lifecycle_state, a.version, a.sort_order, a.visible_in_runtime_library,
               a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
               a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
               c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category
@@ -1353,6 +1487,11 @@ async function handleAdminListAssets(request: Request, env: Env): Promise<Respon
   const url = new URL(request.url);
   const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
   const status = (url.searchParams.get('status') || '').trim();
+  const lifecycleStateRaw = (url.searchParams.get('lifecycleState') || '').trim();
+  const lifecycleState = lifecycleStateRaw ? asAssetLifecycleState(lifecycleStateRaw) : null;
+  if (lifecycleStateRaw && !lifecycleState) {
+    return toJson({ error: `Invalid lifecycleState: ${lifecycleStateRaw}` }, 400);
+  }
   const categoryId = Number(url.searchParams.get('categoryId') || 0);
   const tag = (url.searchParams.get('tag') || '').trim().toLowerCase();
   const q = (url.searchParams.get('q') || '').trim().toLowerCase();
@@ -1363,6 +1502,10 @@ async function handleAdminListAssets(request: Request, env: Env): Promise<Respon
   if (status) {
     clauses.push('a.status = ?');
     binds.push(status);
+  }
+  if (lifecycleState) {
+    clauses.push(`${lifecycleSqlExpr('a')} = ?`);
+    binds.push(lifecycleState);
   }
   if (categoryId > 0) {
     clauses.push('a.category_id = ?');
@@ -1379,8 +1522,8 @@ async function handleAdminListAssets(request: Request, env: Env): Promise<Respon
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
   const rows = await env.DB
     .prepare(
-      `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.status, a.version, a.sort_order,
-              a.visible_in_runtime_library,
+      `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.asset_type, a.template_id, a.parameter_values,
+              a.status, a.lifecycle_state, a.version, a.sort_order, a.visible_in_runtime_library,
               a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
               a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
               c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category
@@ -1463,8 +1606,8 @@ async function handleAdminUploadAsset(request: Request, env: Env, admin: UserRow
   await env.DB
     .prepare(
       `INSERT INTO assets
-       (uuid, name, slug, category_id, status, lifecycle_state, version, sort_order, model_r2_key, model_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'draft', 'draft', 0, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+       (uuid, name, slug, category_id, asset_type, template_id, parameter_values, status, lifecycle_state, version, sort_order, model_r2_key, model_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'static', NULL, '{}', 'draft', 'draft', 0, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     )
     .bind(
       uuid,
@@ -1501,6 +1644,9 @@ async function handleAdminUpdateAsset(
     metadata?: unknown;
     categoryId?: number;
     sortOrder?: number;
+    assetType?: unknown;
+    templateId?: unknown;
+    parameterValues?: unknown;
   }>(request);
   const nextName = String(body?.name ?? existing.name).trim();
   if (!nextName) return toJson({ error: 'Asset name is required' }, 400);
@@ -1514,20 +1660,48 @@ async function handleAdminUpdateAsset(
     ? Number(body?.sortOrder)
     : existing.sort_order;
   const tags = body?.tags === undefined ? safeJsonParse<string[]>(existing.tags, []) : normalizeTags(body.tags);
-  const metadata = body?.metadata === undefined
+  let metadata = body?.metadata === undefined
     ? safeJsonParse<Record<string, unknown>>(existing.metadata, {})
     : normalizeMetadata(body.metadata);
+  let nextAssetType = body?.assetType === undefined
+    ? asAssetType(existing.asset_type)
+    : asAssetType(body.assetType);
+  let nextTemplateId = body?.templateId === undefined
+    ? normalizeTemplateId(existing.template_id)
+    : normalizeTemplateId(body.templateId);
+  let nextParameterValues = body?.parameterValues === undefined
+    ? normalizeParameterValues(existing.parameter_values)
+    : normalizeParameterValues(body.parameterValues);
+
+  if (nextAssetType === 'parametric') {
+    const validation = validateParametricTemplateInput(nextTemplateId, nextParameterValues);
+    if ('error' in validation) {
+      return toJson({ error: validation.error }, 400);
+    }
+    nextTemplateId = validation.templateId;
+    nextParameterValues = validation.parameterValues;
+    metadata = {
+      ...metadata,
+      ...validation.metadata,
+    };
+  } else {
+    nextTemplateId = null;
+    nextParameterValues = {};
+  }
 
   await env.DB
     .prepare(
       `UPDATE assets
-       SET name = ?, slug = ?, category_id = ?, description = ?, tags = ?, metadata = ?, sort_order = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+       SET name = ?, slug = ?, category_id = ?, asset_type = ?, template_id = ?, parameter_values = ?, description = ?, tags = ?, metadata = ?, sort_order = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`
     )
     .bind(
       nextName,
       slug,
       nextCategoryId,
+      nextAssetType,
+      nextTemplateId,
+      JSON.stringify(nextParameterValues),
       nextDescription,
       JSON.stringify(tags),
       JSON.stringify(metadata),
@@ -1712,14 +1886,17 @@ async function handleAdminDuplicateAsset(env: Env, request: Request, admin: User
   await env.DB
     .prepare(
       `INSERT INTO assets
-       (uuid, name, slug, category_id, status, lifecycle_state, visible_in_runtime_library, version, sort_order, model_r2_key, model_url, thumbnail_r2_key, thumbnail_url, preview_r2_key, preview_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'draft', 'draft', 0, 0, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+       (uuid, name, slug, category_id, asset_type, template_id, parameter_values, status, lifecycle_state, visible_in_runtime_library, version, sort_order, model_r2_key, model_url, thumbnail_r2_key, thumbnail_url, preview_r2_key, preview_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', 'draft', 0, 0, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     )
     .bind(
       uuid,
       duplicateName,
       duplicateSlug,
       source.category_id,
+      source.asset_type,
+      source.template_id,
+      source.parameter_values,
       sortOrder,
       key,
       key,
@@ -1838,8 +2015,8 @@ async function handlePublishedAssets(request: Request, env: Env): Promise<Respon
   }
   const rows = await env.DB
     .prepare(
-      `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.status, a.lifecycle_state, a.version, a.sort_order,
-              a.visible_in_runtime_library,
+      `SELECT a.id, a.uuid, a.name, a.slug, a.category_id, a.asset_type, a.template_id, a.parameter_values,
+              a.status, a.lifecycle_state, a.version, a.sort_order, a.visible_in_runtime_library,
               a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
               a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
               c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category

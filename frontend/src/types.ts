@@ -84,6 +84,23 @@ export interface AssetMovingPart {
   speed: number;
 }
 
+export interface ParametricParameterValues {
+  [key: string]: number | string | boolean;
+}
+
+export type ParametricTemplateId = 'basic-belt-conveyor-v1';
+
+export interface ParametricTemplateParameterDef {
+  type: 'number' | 'string' | 'text' | 'select' | 'boolean' | 'color';
+  label: string;
+  default: number | string | boolean;
+  options?: string[];
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+}
+
 export interface AssetMetadata {
   nodes?: AssetDefinitionNode[];
   movableParts?: AssetMovingPart[];
@@ -109,6 +126,9 @@ export interface AssetMetadata {
     height: number;
   };
   pivotOffset?: [number, number, number];
+  templateId?: ParametricTemplateId;
+  parameterValues?: ParametricParameterValues;
+  templateParameters?: Record<string, ParametricTemplateParameterDef>;
   [key: string]: unknown;
 }
 
@@ -117,6 +137,9 @@ export interface LibraryAsset {
   dbId: number;
   name: string;
   slug: string;
+  assetType?: 'static' | 'parametric';
+  templateId?: ParametricTemplateId | null;
+  parameterValues?: ParametricParameterValues;
   status: AssetStatus;
   lifecycleState?: 'draft' | 'internal' | 'live' | 'archived' | 'deleted';
   visibleInRuntimeLibrary?: boolean;
