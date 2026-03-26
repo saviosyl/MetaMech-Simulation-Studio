@@ -101,6 +101,14 @@ export interface ParametricTemplateParameterDef {
   unit?: string;
 }
 
+export type BehaviorTemplateType =
+  | 'none'
+  | 'straight-conveyor'
+  | 'lift-conveyor'
+  | 'rotary-transfer'
+  | 'angle-transfer'
+  | 'robot-pick-place';
+
 export interface AssetMetadata {
   nodes?: AssetDefinitionNode[];
   movableParts?: AssetMovingPart[];
@@ -129,6 +137,17 @@ export interface AssetMetadata {
   templateId?: ParametricTemplateId;
   parameterValues?: ParametricParameterValues;
   templateParameters?: Record<string, ParametricTemplateParameterDef>;
+  behaviorTemplate?: BehaviorTemplateType;
+  behaviorConfig?: Record<string, unknown>;
+  runtimeControls?: {
+    showSpeedSlider?: boolean;
+    showTargetHeight?: boolean;
+    showAutoManual?: boolean;
+    showHomeCommand?: boolean;
+    showEnableToggle?: boolean;
+    showSensorState?: boolean;
+    showStopperState?: boolean;
+  };
   [key: string]: unknown;
 }
 

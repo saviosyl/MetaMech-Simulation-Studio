@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Crosshair, Maximize, Plus, Ruler, Save, Shield, Trash2, Upload, User } from 'lucide-react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { Environment, Grid, Line, OrbitControls, TransformControls } from '@react-three/drei';
+import { Environment, Grid, Html, Line, OrbitControls, TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,7 +13,7 @@ import {
   uploadAssetThumbnail,
   uploadLibraryAsset,
 } from '../utils/api';
-import { AssetDefinitionNode, AssetMetadata, AssetMovingPart, LibraryAsset } from '../types';
+import { AssetDefinitionNode, AssetMetadata, AssetMovingPart, BehaviorTemplateType, LibraryAsset } from '../types';
 import { simulationUrls } from '../content/simulationMarketingContent';
 import { refreshRuntimePublishedAssets } from '../lib/runtimePublishedAssets';
 
@@ -57,15 +57,21 @@ type ResizeDrag = {
 } | null;
 
 type MeasureMode = 'two-point' | 'chain';
-type CameraIntent = 'none' | 'fit' | 'frameSelected' | 'reset';
+type CameraIntent = 'none' | 'fit' | 'frameSelected' | 'focusNode' | 'reset';
 type InteractionTool = 'nodes' | 'measurement';
 type PathMode = 'none' | 'straight-node' | 'polyline';
 type PathPoint = { id: string; positionMm: [number, number, number] };
+type NodeGizmoSnapMode = 'none' | 'grid' | 'ground';
+type TransformMode = 'translate' | 'rotate';
 
 type MeasurementPoint = {
   id: string;
   positionMm: [number, number, number];
 };
+
+type BehaviorConfig = Record<string, number | string | boolean | (number | string)[]>;
+
+type RuntimeControlsConfig = NonNullable<AssetMetadata['runtimeControls']>;
 
 function errorMessage(error: unknown, fallback: string): string {
   const e = error as { response?: { data?: { error?: string } }; message?: string };
@@ -158,6 +164,152 @@ function distanceMm(a: [number, number, number], b: [number, number, number]): n
 
 function magnitudeMm(v: [number, number, number]): number {
   return Math.sqrt((v[0] * v[0]) + (v[1] * v[1]) + (v[2] * v[2]));
+}
+
+function nodeColorByType(nodeType: string | undefined): string {
+  const t = String(nodeType || '').toLowerCase();
+  if (t.includes('infeed') || t === 'product_in') return '#3b82f6'; // blue
+  if (t.includes('outfeed') || t === 'product_out') return '#22c55e'; // green
+  if (t.includes('stop') || t.includes('load')) return '#f59e0b'; // yellow
+  if (t.includes('pick')) return '#f97316'; // orange
+  if (t.includes('place')) return '#a855f7'; // purple
+  if (t.includes('transfer')) return '#06b6d4';
+  return '#22d3ee';
+}
+
+function defaultBehaviorConfig(template: BehaviorTemplateType): BehaviorConfig {
+  if (template === 'straight-conveyor') {
+    return {
+      speedMpm: 20,
+      direction: 'forward',
+      usablePathLengthMm: 1200,
+      conveyorTopHeightMm: 800,
+      accumulationEnabled: false,
+      stopMode: 'none',
+      sensorList: '',
+      stopperAssignment: '',
+    };
+  }
+  if (template === 'lift-conveyor') {
+    return {
+      lowerInfeedNodeId: 'NODE_INFEED_LOWER',
+      upperOutfeedNodeId: 'NODE_OUTFEED_UPPER',
+      liftTravelAxis: 'y',
+      lowerStopPositionMm: 800,
+      upperStopPositionMm: 2400,
+      targetHeightsMm: '800,2400',
+      liftSpeedUpMps: 0.35,
+      liftSpeedDownMps: 0.3,
+      conveyorSpeedMpm: 12,
+      dwellBeforeLiftSec: 0.5,
+      dwellAfterLiftSec: 0.5,
+      loadingZoneLengthMm: 350,
+      unloadZoneLengthMm: 350,
+      allowIntermediateLevels: false,
+      homePositionMm: 800,
+      cycleMode: 'auto-up-after-load',
+    };
+  }
+  if (template === 'rotary-transfer') {
+    return {
+      pickNodeId: 'NODE_PICK',
+      placeNodeIds: 'NODE_PLACE',
+      rotationCenterNodeId: 'NODE_CENTER',
+      rotationAngleDeg: 90,
+      rotationSpeedDegPerSec: 120,
+      dwellSec: 0.3,
+      indexingMode: 'single',
+      destinationMode: 'single',
+    };
+  }
+  if (template === 'angle-transfer' || template === 'robot-pick-place') {
+    return {
+      sourceNodeId: 'NODE_SOURCE',
+      destinationNodeIds: 'NODE_DEST',
+      transferAngleDeg: 45,
+      cycleTimeSec: 2.5,
+      pickDelaySec: 0.2,
+      placeDelaySec: 0.2,
+      motionProfileSpeed: 1,
+      gripperTiming: 'simple',
+    };
+  }
+  return {};
+}
+
+function defaultRuntimeControlsForTemplate(template: BehaviorTemplateType): RuntimeControlsConfig {
+  if (template === 'straight-conveyor') {
+    return {
+      showSpeedSlider: true,
+      showTargetHeight: false,
+      showAutoManual: false,
+      showHomeCommand: false,
+      showEnableToggle: true,
+      showSensorState: true,
+      showStopperState: true,
+    };
+  }
+  if (template === 'lift-conveyor') {
+    return {
+      showSpeedSlider: true,
+      showTargetHeight: true,
+      showAutoManual: true,
+      showHomeCommand: true,
+      showEnableToggle: true,
+      showSensorState: true,
+      showStopperState: true,
+    };
+  }
+  if (template === 'rotary-transfer' || template === 'angle-transfer' || template === 'robot-pick-place') {
+    return {
+      showSpeedSlider: true,
+      showTargetHeight: false,
+      showAutoManual: true,
+      showHomeCommand: true,
+      showEnableToggle: true,
+      showSensorState: false,
+      showStopperState: false,
+    };
+  }
+  return {
+    showSpeedSlider: false,
+    showTargetHeight: false,
+    showAutoManual: false,
+    showHomeCommand: false,
+    showEnableToggle: false,
+    showSensorState: false,
+    showStopperState: false,
+  };
+}
+
+function asFiniteNumber(value: unknown, fallback: number): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function hasNodeType(nodes: AssetDefinitionNode[], key: string): boolean {
+  return nodes.some((n) => String(n.type || '').toLowerCase().includes(key));
+}
+
+function toNumberOrUndefined(value: unknown): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeBehaviorConfig(input: unknown): BehaviorConfig {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const out: BehaviorConfig = {};
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (
+      typeof value === 'number'
+      || typeof value === 'string'
+      || typeof value === 'boolean'
+      || (Array.isArray(value) && value.every((item) => typeof item === 'number' || typeof item === 'string'))
+    ) {
+      out[key] = value as number | string | boolean | (number | string)[];
+    }
+  }
+  return out;
 }
 
 function fitCameraToBox(camera: THREE.Camera, controls: OrbitControlsLike | null, box: THREE.Box3): void {
@@ -272,6 +424,10 @@ const ModelPreview: React.FC<{
   selectedPathPointIndex: number;
   onPathPointsChange: (points: PathPoint[]) => void;
   onSelectPathPoint: (index: number) => void;
+  showWorldAxis: boolean;
+  showLocalAxis: boolean;
+  nodeSnapMode: NodeGizmoSnapMode;
+  nodeTransformMode: TransformMode;
 }> = ({
   modelUrl,
   sourceUnit,
@@ -301,6 +457,10 @@ const ModelPreview: React.FC<{
   selectedPathPointIndex,
   onPathPointsChange,
   onSelectPathPoint,
+  showWorldAxis,
+  showLocalAxis,
+  nodeSnapMode,
+  nodeTransformMode,
 }) => {
   const [loadedRoot, setLoadedRoot] = useState<THREE.Object3D | null>(null);
   const [loadError, setLoadError] = useState<string>('');
@@ -432,6 +592,13 @@ const ModelPreview: React.FC<{
     return clone;
   }, [loadedRoot, movingParts, previewPartIndex, previewT, highlightedObjectNames, worldScale, pivotOffsetMm]);
 
+  function parseNodeFocusIndex(path: string): number | null {
+    if (!path.startsWith('__node__:')) return null;
+    const index = Number(path.slice('__node__:'.length));
+    if (!Number.isInteger(index) || index < 0) return null;
+    return index;
+  }
+
   useEffect(() => {
     if (cameraIntent === 'none') return;
     const camera = cameraRef.current;
@@ -455,6 +622,30 @@ const ModelPreview: React.FC<{
       onCameraIntentHandled();
       return;
     }
+    if (cameraIntent === 'focusNode') {
+      const selectedNode = nodes[selectedNodeIndex];
+      if (selectedNode?.position) {
+        const center = new THREE.Vector3(
+          mmToM(Number(selectedNode.position[0]) || 0),
+          mmToM(Number(selectedNode.position[1]) || 0),
+          mmToM(Number(selectedNode.position[2]) || 0)
+        );
+        const perspective = camera as THREE.PerspectiveCamera;
+        const distance = 1.8;
+        perspective.position.set(center.x + distance, center.y + (distance * 0.5), center.z + distance);
+        perspective.near = 0.01;
+        perspective.far = 2000;
+        perspective.updateProjectionMatrix();
+        if (controls) {
+          controls.target.copy(center);
+          controls.update();
+        }
+      } else if (bounds) {
+        fitCameraToBox(camera, controls, bounds);
+      }
+      onCameraIntentHandled();
+      return;
+    }
     if (cameraIntent === 'frameSelected' && previewRoot && frameTargetPath) {
       const target = findObjectByHierarchyPath(previewRoot, frameTargetPath);
       if (target) {
@@ -466,9 +657,29 @@ const ModelPreview: React.FC<{
       onCameraIntentHandled();
       return;
     }
+    if (cameraIntent === 'focusNode') {
+      const focusedNodeIndex = parseNodeFocusIndex(frameTargetPath);
+      const focusedNode = focusedNodeIndex != null ? nodes[focusedNodeIndex] : null;
+      const p = focusedNode?.position;
+      if (p) {
+        const center = new THREE.Vector3(mmToM(Number(p[0]) || 0), mmToM(Number(p[1]) || 0), mmToM(Number(p[2]) || 0));
+        const perspective = camera as THREE.PerspectiveCamera;
+        const distance = 1.2;
+        perspective.position.set(center.x + distance, center.y + (distance * 0.6), center.z + distance);
+        perspective.near = 0.01;
+        perspective.far = 2000;
+        perspective.updateProjectionMatrix();
+        if (controls) {
+          controls.target.copy(center);
+          controls.update();
+        }
+      }
+      onCameraIntentHandled();
+      return;
+    }
     fitCameraToBox(camera, controls, bounds);
     onCameraIntentHandled();
-  }, [cameraIntent, onCameraIntentHandled, previewRoot, frameTargetPath]);
+  }, [cameraIntent, onCameraIntentHandled, previewRoot, frameTargetPath, nodes, selectedNodeIndex]);
 
   function getPlaneIntersection(event: THREE.Event): THREE.Vector3 | null {
     const e = event as THREE.Event & { point?: THREE.Vector3 };
@@ -480,9 +691,11 @@ const ModelPreview: React.FC<{
 
   function snapPosition(positionM: THREE.Vector3): [number, number, number] {
     const snapStepM = 0.05;
-    let sx = Math.round(positionM.x / snapStepM) * snapStepM;
-    let sy = Math.max(0, Math.round(positionM.y / snapStepM) * snapStepM);
-    let sz = Math.round(positionM.z / snapStepM) * snapStepM;
+    const shouldSnapGrid = nodeSnapMode === 'grid' || nodeSnapMode === 'ground';
+    let sx = shouldSnapGrid ? Math.round(positionM.x / snapStepM) * snapStepM : positionM.x;
+    let sy = shouldSnapGrid ? Math.round(positionM.y / snapStepM) * snapStepM : positionM.y;
+    let sz = shouldSnapGrid ? Math.round(positionM.z / snapStepM) * snapStepM : positionM.z;
+    if (nodeSnapMode === 'ground') sy = 0;
     const bounds = modelBoundsRef.current;
     const selected = nodes[selectedNodeIndex];
     const type = String(selected?.type || '').toLowerCase();
@@ -510,6 +723,8 @@ const ModelPreview: React.FC<{
       <ambientLight intensity={0.65} />
       <directionalLight castShadow position={[3, 5, 2]} intensity={1.1} />
       <Grid args={[10, 10]} cellColor="#6b7280" sectionColor="#334155" fadeDistance={18} fadeStrength={1.2} />
+      {showWorldAxis && <axesHelper args={[1.2]} />}
+      {showLocalAxis && previewRoot && <primitive object={new THREE.AxesHelper(0.8)} position={previewRoot.position.clone()} />}
       {previewRoot ? (
         <group
           onPointerDown={(event) => {
@@ -586,11 +801,12 @@ const ModelPreview: React.FC<{
         const p = node.position || [0, 0, 0];
         const selected = selectedNodeIndex === index;
         const nodePosition: [number, number, number] = [mmToM(Number(p[0]) || 0), mmToM(Number(p[1]) || 0), mmToM(Number(p[2]) || 0)];
+        const nodeColor = nodeColorByType(node.type);
         if (selected && activeTool === 'nodes') {
           return (
             <TransformControls
               key={`${node.id || 'node'}-${index}`}
-              mode="translate"
+              mode={nodeTransformMode}
               size={0.7}
               onObjectChange={(event) => {
                 const target = (event?.target as { object?: THREE.Object3D } | undefined);
@@ -606,7 +822,11 @@ const ModelPreview: React.FC<{
                 }}
               >
                 <sphereGeometry args={[0.07, 14, 12]} />
-                <meshStandardMaterial color="#f59e0b" />
+                <meshStandardMaterial color={nodeColor} emissive={selected ? nodeColor : '#000000'} emissiveIntensity={selected ? 0.4 : 0} />
+                {showLocalAxis && <axesHelper args={[0.24]} />}
+                <Html position={[0.1, 0.1, 0]} style={{ pointerEvents: 'none', fontSize: 10, fontWeight: 700, color: '#e2e8f0', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
+                  {node.id || `Node ${index + 1}`}
+                </Html>
               </mesh>
             </TransformControls>
           );
@@ -621,7 +841,11 @@ const ModelPreview: React.FC<{
             }}
           >
             <sphereGeometry args={[0.05, 14, 12]} />
-            <meshStandardMaterial color={String(node.type || '').toLowerCase().includes('in') ? '#34d399' : '#22d3ee'} />
+            <meshStandardMaterial color={nodeColor} />
+            {showLocalAxis && <axesHelper args={[0.22]} />}
+            <Html position={[0.08, 0.08, 0]} style={{ pointerEvents: 'none', fontSize: 10, fontWeight: 700, color: '#e2e8f0', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
+              {node.id || `Node ${index + 1}`}
+            </Html>
           </mesh>
         );
       })}
@@ -752,6 +976,30 @@ const AdminAssetEditorPage: React.FC = () => {
   const [pathMode, setPathMode] = useState<PathMode>('none');
   const [pathPoints, setPathPoints] = useState<PathPoint[]>([]);
   const [selectedPathPointIndex, setSelectedPathPointIndex] = useState<number>(-1);
+  const [behaviorTemplate, setBehaviorTemplate] = useState<BehaviorTemplateType>('none');
+  const [behaviorConfig, setBehaviorConfig] = useState<Record<string, unknown>>({});
+  const [runtimeControls, setRuntimeControls] = useState<NonNullable<AssetMetadata['runtimeControls']>>({
+    showSpeedSlider: false,
+    showTargetHeight: false,
+    showAutoManual: false,
+    showHomeCommand: false,
+    showEnableToggle: false,
+    showSensorState: false,
+    showStopperState: false,
+  });
+  const [showWorldAxis, setShowWorldAxis] = useState(true);
+  const [showLocalAxis, setShowLocalAxis] = useState(true);
+  const [nodeSnapMode, setNodeSnapMode] = useState<NodeGizmoSnapMode>('grid');
+  const [nodeTransformMode, setNodeTransformMode] = useState<TransformMode>('translate');
+
+  function setBehaviorField(key: string, value: number | string | boolean): void {
+    setBehaviorConfig((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function setRuntimeControl(key: keyof RuntimeControlsConfig, value: boolean): void {
+    setRuntimeControls((prev) => ({ ...prev, [key]: value }));
+  }
+
   const [knownDimensionMmInput, setKnownDimensionMmInput] = useState<string>('');
   const [cameraIntent, setCameraIntent] = useState<CameraIntent>('none');
   const [fitTargetPath, setFitTargetPath] = useState<string>('');
@@ -826,6 +1074,9 @@ const AdminAssetEditorPage: React.FC = () => {
       ...safeAssetMetadata(asset),
       nodes,
       movableParts,
+      behaviorTemplate,
+      behaviorConfig,
+      runtimeControls,
       sourceUnit,
       scaleCorrection,
       ...(nativeBounds ? { nativeBounds: toMetadataNativeBounds(nativeBounds) } : {}),
@@ -840,7 +1091,7 @@ const AdminAssetEditorPage: React.FC = () => {
         }
         : {}),
     };
-  }, [asset, nodes, movableParts, sourceUnit, scaleCorrection, nativeBounds, normalizedBoundsMm, pivotOffsetMm, pathMode, pathPoints]);
+  }, [asset, nodes, movableParts, behaviorTemplate, behaviorConfig, runtimeControls, sourceUnit, scaleCorrection, nativeBounds, normalizedBoundsMm, pivotOffsetMm, pathMode, pathPoints]);
 
   const twoPointDistanceMm = useMemo(() => {
     if (measurementPoints.length < 2) return null;
@@ -876,8 +1127,25 @@ const AdminAssetEditorPage: React.FC = () => {
     for (const warning of normalizationWarnings) {
       problems.push(`Normalization warning: ${warning}`);
     }
+    const hasInfeed = nodes.some((n) => String(n.type || '').toLowerCase().includes('infeed'));
+    const hasOutfeed = nodes.some((n) => String(n.type || '').toLowerCase().includes('outfeed'));
+    if (behaviorTemplate === 'straight-conveyor') {
+      if (!hasInfeed) problems.push('Straight Conveyor template requires an infeed node');
+      if (!hasOutfeed) problems.push('Straight Conveyor template requires an outfeed node');
+      const pathLen = Number(behaviorConfig.usablePathLengthMm || 0);
+      if (!(pathLen > 0)) problems.push('Straight Conveyor template requires usable path length');
+    }
+    if (behaviorTemplate === 'lift-conveyor') {
+      if (!hasInfeed) problems.push('Lift Conveyor template requires a lower infeed node');
+      if (!hasOutfeed) problems.push('Lift Conveyor template requires an upper outfeed node');
+      const lowerStop = Number(behaviorConfig.lowerStopPositionMm || 0);
+      const upperStop = Number(behaviorConfig.upperStopPositionMm || 0);
+      if (!(upperStop > lowerStop)) problems.push('Lift Conveyor requires upper stop > lower stop');
+      const axis = String(behaviorConfig.travelAxis || 'z').toLowerCase();
+      if (!['x', 'y', 'z'].includes(axis)) problems.push('Lift Conveyor requires travel axis x/y/z');
+    }
     return problems;
-  }, [asset, selectedCategoryId, nodes, normalizationWarnings]);
+  }, [asset, selectedCategoryId, nodes, normalizationWarnings, behaviorTemplate, behaviorConfig]);
 
   function hydrateFromAsset(next: LibraryAsset | null): void {
     setAsset(next);
@@ -901,6 +1169,37 @@ const AdminAssetEditorPage: React.FC = () => {
     } else {
       setPivotOffsetMm([0, 0, 0]);
     }
+    const templateRaw = String(m.behaviorTemplate || '').trim();
+    const nextBehaviorTemplate: BehaviorTemplateType = (
+      templateRaw === 'straight-conveyor'
+      || templateRaw === 'lift-conveyor'
+      || templateRaw === 'rotary-transfer'
+      || templateRaw === 'angle-transfer'
+      || templateRaw === 'robot-pick-place'
+      || templateRaw === 'none'
+    ) ? (templateRaw as BehaviorTemplateType) : 'none';
+    setBehaviorTemplate(nextBehaviorTemplate);
+    const hasBehaviorConfig =
+      m.behaviorConfig && typeof m.behaviorConfig === 'object' && !Array.isArray(m.behaviorConfig);
+    setBehaviorConfig(
+      hasBehaviorConfig
+        ? { ...(m.behaviorConfig as Record<string, unknown>) }
+        : defaultBehaviorConfig(nextBehaviorTemplate)
+    );
+    const hasRuntimeControls = m.runtimeControls && typeof m.runtimeControls === 'object';
+    setRuntimeControls(
+      hasRuntimeControls
+        ? {
+          showSpeedSlider: !!m.runtimeControls?.showSpeedSlider,
+          showTargetHeight: !!m.runtimeControls?.showTargetHeight,
+          showAutoManual: !!m.runtimeControls?.showAutoManual,
+          showHomeCommand: !!m.runtimeControls?.showHomeCommand,
+          showEnableToggle: !!m.runtimeControls?.showEnableToggle,
+          showSensorState: !!m.runtimeControls?.showSensorState,
+          showStopperState: !!m.runtimeControls?.showStopperState,
+        }
+        : defaultRuntimeControlsForTemplate(nextBehaviorTemplate)
+    );
     setMeasurementPoints([]);
     setActiveTool('nodes');
     const existingPath = m.transportPath;
@@ -998,7 +1297,20 @@ const AdminAssetEditorPage: React.FC = () => {
       setSelectedNodeIndex(nodes.length);
       return;
     }
-    updateNode(selectedNodeIndex, { position: positionMm });
+    updateNode(selectedNodeIndex, { position: applyNodeSnap(positionMm) });
+  }
+
+  function placeSelectedNodeOnGround(): void {
+    if (selectedNodeIndex < 0 || !nodes[selectedNodeIndex]) return;
+    const current = nodes[selectedNodeIndex];
+    const pos = current.position || [0, 0, 0];
+    updateNode(selectedNodeIndex, { position: [Number(pos[0]) || 0, 0, Number(pos[2]) || 0] });
+  }
+
+  function focusSelectedNode(): void {
+    if (selectedNodeIndex < 0 || !nodes[selectedNodeIndex]?.id) return;
+    setFitTargetPath(`__node__:${selectedNodeIndex}`);
+    setCameraIntent('focusNode');
   }
 
   const filteredHierarchyItems = useMemo(() => {
@@ -1178,6 +1490,41 @@ const AdminAssetEditorPage: React.FC = () => {
     }
   }
 
+  function loadTemplatePreset(kind: 'straight' | 'lift'): void {
+    if (kind === 'straight') {
+      const infeed = nodes.find((n) => String(n.type || '').toLowerCase().includes('infeed')) || nodes[0];
+      const outfeed = nodes.find((n) => String(n.type || '').toLowerCase().includes('outfeed')) || nodes[nodes.length - 1];
+      setBehaviorTemplate('straight-conveyor');
+      setBehaviorConfig({
+        ...defaultBehaviorConfig('straight-conveyor'),
+        ...(infeed?.id ? { infeedNodeId: infeed.id } : {}),
+        ...(outfeed?.id ? { outfeedNodeId: outfeed.id } : {}),
+        speedMpm: Number(behaviorConfig.speedMpm || 20) || 20,
+      });
+      setRuntimeControls(defaultRuntimeControlsForTemplate('straight-conveyor'));
+      setPathMode('straight-node');
+      setActiveTool('nodes');
+      return;
+    }
+    const infeed = nodes.find((n) => String(n.type || '').toLowerCase().includes('infeed')) || nodes[0];
+    const outfeed = nodes.find((n) => String(n.type || '').toLowerCase().includes('outfeed')) || nodes[nodes.length - 1];
+    const lower = Number(infeed?.position?.[1] || 800);
+    const upper = Number(outfeed?.position?.[1] || Math.max(lower + 1200, 2400));
+    setBehaviorTemplate('lift-conveyor');
+    setBehaviorConfig({
+      ...defaultBehaviorConfig('lift-conveyor'),
+      ...(infeed?.id ? { lowerInfeedNodeId: infeed.id } : {}),
+      ...(outfeed?.id ? { upperOutfeedNodeId: outfeed.id } : {}),
+      lowerStopPositionMm: lower,
+      upperStopPositionMm: Math.max(upper, lower + 50),
+      homePositionMm: lower,
+      targetHeightsMm: `${Math.round(lower)},${Math.round(Math.max(upper, lower + 50))}`,
+    });
+    setRuntimeControls(defaultRuntimeControlsForTemplate('lift-conveyor'));
+    setPathMode('straight-node');
+    setActiveTool('nodes');
+  }
+
   return (
     <div style={{ height: '100vh', background: 'var(--mm-bg-app)', color: 'var(--mm-text-primary)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <header style={{ background: 'var(--mm-bg-panel)', borderBottom: '1px solid var(--mm-border)', padding: '10px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
@@ -1328,6 +1675,10 @@ const AdminAssetEditorPage: React.FC = () => {
               selectedPathPointIndex={selectedPathPointIndex}
               onPathPointsChange={setPathPoints}
               onSelectPathPoint={setSelectedPathPointIndex}
+              nodeSnapMode={nodeSnapMode}
+              nodeTransformMode={nodeTransformMode}
+              showWorldAxis={showWorldAxis}
+              showLocalAxis={showLocalAxis}
             />
           </div>
           <div style={{ borderTop: '1px solid var(--mm-border-subtle)', padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', position: 'sticky', bottom: 0, background: 'var(--mm-bg-panel)', zIndex: 4, boxShadow: '0 -8px 18px rgba(2, 6, 23, 0.22)' }}>
@@ -1641,6 +1992,202 @@ const AdminAssetEditorPage: React.FC = () => {
                 )}
               </div>
 
+              <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8, display: 'grid', gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>
+                  Behavior Template
+                </div>
+                <select
+                  value={behaviorTemplate}
+                  onChange={(e) => {
+                    const nextTemplate = e.target.value as BehaviorTemplateType;
+                    setBehaviorTemplate(nextTemplate);
+                    setBehaviorConfig(defaultBehaviorConfig(nextTemplate));
+                    setRuntimeControls(defaultRuntimeControlsForTemplate(nextTemplate));
+                  }}
+                >
+                  <option value="none">None / Static</option>
+                  <option value="straight-conveyor">Straight Conveyor</option>
+                  <option value="lift-conveyor">Lift Conveyor</option>
+                  <option value="rotary-transfer">Rotary Transfer</option>
+                  <option value="angle-transfer">Angle Transfer</option>
+                  <option value="robot-pick-place">Robot Pick &amp; Place</option>
+                </select>
+
+                {behaviorTemplate === 'straight-conveyor' && (
+                  <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Straight Conveyor Properties</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Speed (m/min)</label>
+                        <input type="number" value={Number(behaviorConfig.speedMpm || 20)} onChange={(e) => setBehaviorField('speedMpm', Number(e.target.value) || 0)} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Direction</label>
+                        <select value={String(behaviorConfig.direction || 'forward')} onChange={(e) => setBehaviorField('direction', e.target.value)}>
+                          <option value="forward">forward</option>
+                          <option value="reverse">reverse</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Usable Path Length (mm)</label>
+                        <input type="number" value={Number(behaviorConfig.usablePathLengthMm || 0)} onChange={(e) => setBehaviorField('usablePathLengthMm', Number(e.target.value) || 0)} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Conveyor Top Height (mm)</label>
+                        <input type="number" value={Number(behaviorConfig.conveyorTopHeightMm || 0)} onChange={(e) => setBehaviorField('conveyorTopHeightMm', Number(e.target.value) || 0)} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                        <input type="checkbox" checked={Boolean(behaviorConfig.accumulationEnabled)} onChange={(e) => setBehaviorField('accumulationEnabled', e.target.checked)} />
+                        Accumulation
+                      </label>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Stop Mode</label>
+                        <select value={String(behaviorConfig.stopMode || 'none')} onChange={(e) => setBehaviorField('stopMode', e.target.value)}>
+                          <option value="none">none</option>
+                          <option value="sensor">sensor</option>
+                          <option value="stopper">stopper</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {behaviorTemplate === 'lift-conveyor' && (
+                  <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Lift Conveyor Properties</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Travel Axis</label>
+                        <select value={String(behaviorConfig.liftTravelAxis || 'y')} onChange={(e) => setBehaviorField('liftTravelAxis', e.target.value)}>
+                          <option value="x">x</option>
+                          <option value="y">y</option>
+                          <option value="z">z</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lower Stop (mm)</label>
+                        <input type="number" value={Number(behaviorConfig.lowerStopPositionMm || 0)} onChange={(e) => setBehaviorField('lowerStopPositionMm', Number(e.target.value) || 0)} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Upper Stop (mm)</label>
+                        <input type="number" value={Number(behaviorConfig.upperStopPositionMm || 0)} onChange={(e) => setBehaviorField('upperStopPositionMm', Number(e.target.value) || 0)} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lift Speed Up (m/s)</label>
+                        <input type="number" step={0.01} value={Number(behaviorConfig.liftSpeedUpMps || 0)} onChange={(e) => setBehaviorField('liftSpeedUpMps', Number(e.target.value) || 0)} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lift Speed Down (m/s)</label>
+                        <input type="number" step={0.01} value={Number(behaviorConfig.liftSpeedDownMps || 0)} onChange={(e) => setBehaviorField('liftSpeedDownMps', Number(e.target.value) || 0)} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Conveyor Speed (m/min)</label>
+                        <input type="number" value={Number(behaviorConfig.conveyorSpeedMpm || 0)} onChange={(e) => setBehaviorField('conveyorSpeedMpm', Number(e.target.value) || 0)} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Cycle Mode</label>
+                        <select value={String(behaviorConfig.cycleMode || 'auto-up-after-load')} onChange={(e) => setBehaviorField('cycleMode', e.target.value)}>
+                          <option value="auto-up-after-load">auto up after load</option>
+                          <option value="wait-downstream-ready">wait for downstream ready</option>
+                          <option value="manual-trigger">manual trigger</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              {(behaviorTemplate === 'rotary-transfer' || behaviorTemplate === 'angle-transfer' || behaviorTemplate === 'robot-pick-place') && (
+                <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>
+                    {behaviorTemplate === 'rotary-transfer' ? 'Rotary Transfer Properties' : behaviorTemplate === 'angle-transfer' ? 'Angle Transfer Properties' : 'Robot Pick & Place Properties'}
+                  </div>
+                  {behaviorTemplate === 'rotary-transfer' ? (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Pick Node ID</label>
+                          <input value={String(behaviorConfig.pickNodeId || '')} onChange={(e) => setBehaviorField('pickNodeId', e.target.value)} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Place Node IDs (comma)</label>
+                          <input value={String(behaviorConfig.placeNodeIds || '')} onChange={(e) => setBehaviorField('placeNodeIds', e.target.value)} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Rotation Angle (deg)</label>
+                          <input type="number" value={Number(behaviorConfig.rotationAngleDeg || 0)} onChange={(e) => setBehaviorField('rotationAngleDeg', Number(e.target.value) || 0)} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Rotation Speed (deg/s)</label>
+                          <input type="number" value={Number(behaviorConfig.rotationSpeedDegPerSec || 0)} onChange={(e) => setBehaviorField('rotationSpeedDegPerSec', Number(e.target.value) || 0)} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Dwell (s)</label>
+                          <input type="number" step={0.01} value={Number(behaviorConfig.dwellSec || 0)} onChange={(e) => setBehaviorField('dwellSec', Number(e.target.value) || 0)} />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Source Node ID</label>
+                          <input value={String(behaviorConfig.sourceNodeId || '')} onChange={(e) => setBehaviorField('sourceNodeId', e.target.value)} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Destination Node IDs (comma)</label>
+                          <input value={String(behaviorConfig.destinationNodeIds || '')} onChange={(e) => setBehaviorField('destinationNodeIds', e.target.value)} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Transfer Angle (deg)</label>
+                          <input type="number" value={Number(behaviorConfig.transferAngleDeg || 0)} onChange={(e) => setBehaviorField('transferAngleDeg', Number(e.target.value) || 0)} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Cycle Time (s)</label>
+                          <input type="number" step={0.01} value={Number(behaviorConfig.cycleTimeSec || 0)} onChange={(e) => setBehaviorField('cycleTimeSec', Number(e.target.value) || 0)} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Motion Speed</label>
+                          <input type="number" step={0.01} value={Number(behaviorConfig.motionProfileSpeed || 0)} onChange={(e) => setBehaviorField('motionProfileSpeed', Number(e.target.value) || 0)} />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+                <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Runtime Controls</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                    {([
+                      ['showSpeedSlider', 'Speed slider'],
+                      ['showTargetHeight', 'Target height selector'],
+                      ['showAutoManual', 'Auto/manual mode'],
+                      ['showHomeCommand', 'Home command'],
+                      ['showEnableToggle', 'Enable/disable'],
+                      ['showSensorState', 'Sensor state visibility'],
+                      ['showStopperState', 'Stopper state visibility'],
+                    ] as [keyof RuntimeControlsConfig, string][]).map(([key, label]) => (
+                      <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                        <input type="checkbox" checked={Boolean(runtimeControls[key])} onChange={(e) => setRuntimeControl(key, e.target.checked)} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>Nodes</div>
@@ -1649,10 +2196,48 @@ const AdminAssetEditorPage: React.FC = () => {
                     Add Node
                   </button>
                 </div>
-                <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)' }}>
+                  <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Visual Placement</div>
                   <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4 }}>
                     Active tool: <strong>{activeTool === 'nodes' ? 'Node placement/edit' : 'Measurement'}</strong>. Click in viewport to place selected node only when Node Tool is active.
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                      <input type="checkbox" checked={showWorldAxis} onChange={(e) => setShowWorldAxis(e.target.checked)} />
+                      Show World Axis
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                      <input type="checkbox" checked={showLocalAxis} onChange={(e) => setShowLocalAxis(e.target.checked)} />
+                      Show Local Axis
+                    </label>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Node Transform</label>
+                      <select value={nodeTransformMode} onChange={(e) => setNodeTransformMode(e.target.value as TransformMode)}>
+                        <option value="translate">Move</option>
+                        <option value="rotate">Rotate</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Node Snap</label>
+                      <select value={nodeSnapMode} onChange={(e) => setNodeSnapMode(e.target.value as NodeGizmoSnapMode)}>
+                        <option value="none">None</option>
+                        <option value="grid">Grid</option>
+                        <option value="ground">Ground (Y=0)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button type="button" onClick={placeSelectedNodeOnGround} disabled={selectedNodeIndex < 0} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}>
+                      Place Selected on Ground
+                    </button>
+                    <button type="button" onClick={focusSelectedNode} disabled={selectedNodeIndex < 0} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}>
+                      Focus Selected Node
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                    Node colors: Infeed = Blue, Outfeed = Green, Stop/Load = Yellow, Pick = Orange, Place = Purple.
                   </div>
                 </div>
                 <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>

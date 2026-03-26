@@ -917,6 +917,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ? { transportPath: staticMetadata.transportPath }
       : {};
     const withAssetNodes = Array.isArray(staticMetadata.nodes) ? { assetNodes: staticMetadata.nodes } : {};
+    const withBehaviorTemplate = typeof staticMetadata.behaviorTemplate === 'string'
+      ? { behaviorTemplate: staticMetadata.behaviorTemplate }
+      : {};
+    const withBehaviorConfig = staticMetadata.behaviorConfig && typeof staticMetadata.behaviorConfig === 'object'
+      ? { behaviorConfig: staticMetadata.behaviorConfig }
+      : {};
+    const withRuntimeControls = staticMetadata.runtimeControls && typeof staticMetadata.runtimeControls === 'object'
+      ? { runtimeControls: staticMetadata.runtimeControls }
+      : {};
 
     // Auto-generate unique sensor tag
     if (type === 'sensor' && !defaultParams.sensorTag) {
@@ -942,7 +951,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       position: [position[0], 0, position[2]], // Force Y=0 (on ground)
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
-      parameters: { ...defaultParams, ...withTransportPath, ...withAssetNodes },
+      parameters: {
+        ...defaultParams,
+        ...withTransportPath,
+        ...withAssetNodes,
+        ...withBehaviorTemplate,
+        ...withBehaviorConfig,
+        ...withRuntimeControls,
+      },
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
       assetId: matchingAsset?.id,
       assetDefType: matchingAsset?.assetType,
