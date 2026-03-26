@@ -142,6 +142,7 @@ import PathRenderer from '../3d/PathRenderer';
 import CameraPathPlayer from '../3d/CameraPathPlayer';
 import ViewportToolbar from '../editor/ViewportToolbar';
 import { VIDEO_CAPTURE_PRESETS, VideoQualityPreset } from '../../lib/videoExportPresets';
+import PortDirectionDebug from '../3d/PortDirectionDebug';
 
 // Wrapper that attaches TransformControls to the selected object
 const DraggableObject: React.FC<{
@@ -353,6 +354,7 @@ const SceneContent: React.FC<{
     measureActive,
     addMeasurePoint,
     overlaysHidden,
+    directionDebugVisible,
     themeMode,
     activeTool,
     isExportRendering,
@@ -620,6 +622,7 @@ const SceneContent: React.FC<{
 
       {/* Connection Lines between connected objects (hidden in clean view) */}
       {!overlaysHidden && <ConnectionLines />}
+      {!overlaysHidden && directionDebugVisible && <PortDirectionDebug />}
 
       {/* Custom Imported Models */}
       <CustomModelRenderer orbitRef={orbitRef} />

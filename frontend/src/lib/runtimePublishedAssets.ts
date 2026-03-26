@@ -32,11 +32,25 @@ function extractPorts(metadata: AssetMetadata): ConnectionPortDef[] {
     const y = Number(p[1]);
     const z = Number(p[2]);
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+    const d = node?.direction;
+    let direction: [number, number, number] | undefined;
+    if (Array.isArray(d) && d.length >= 3) {
+      const dx = Number(d[0]);
+      const dy = Number(d[1]);
+      const dz = Number(d[2]);
+      if (Number.isFinite(dx) && Number.isFinite(dy) && Number.isFinite(dz)) {
+        const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len > 0.000001) {
+          direction = [dx / len, dy / len, dz / len];
+        }
+      }
+    }
     // metadata positions are in mm in authoring UI; runtime expects meters
     ports.push({
       id: String(node.id || `${portType}-${ports.length + 1}`),
       type: portType,
       localPosition: [x / 1000, y / 1000, z / 1000],
+      ...(direction ? { direction } : {}),
     });
   }
   return ports;

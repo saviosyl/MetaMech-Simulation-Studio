@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useEditorStore, getConnectionPorts, ProcessNode, EnvironmentAsset, ConnectionPort } from '../../store/editorStore';
-import { getPortWorldPosition, alignNodeToPort, solveMateTransform, localDirToWorld } from '../../lib/nodeTransform';
+import { getPortWorldPosition, getPortWorldDirection, alignNodeToPort, solveMateTransform } from '../../lib/nodeTransform';
 import { findNearestConveyorSnap, isAccessoryType, isConveyorType, applyAccessorySnap } from '../../lib/accessorySnap';
 
 const SNAP_THRESHOLD = 0.5;
@@ -107,7 +107,7 @@ function nodeCategory(id: string, processNodesList: ProcessNode[], _environmentA
 }
 
 const SnapSystem: React.FC = () => {
-  const { processNodes, environmentAssets, edges, selectedObjectId, isDragging, mateMode, activeTool, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
+  const { processNodes, environmentAssets, edges, selectedObjectId, isDragging, mateMode, activeTool, directionDebugVisible, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
   const wasDragging = useRef(false);
 
   // Merged list of all nodes that can have ports (process + environment)
@@ -169,7 +169,7 @@ const SnapSystem: React.FC = () => {
               const dist = usePlanarDist ? planarDist : dist3d;
               if (dist < bestDist) {
                 bestDist = dist;
-                const opWorldDir = localDirToWorld(op.direction, other.rotation);
+                const opWorldDir = getPortWorldDirection(op.direction, other as any);
                 bestMatch = { myPort: mp, targetNode: other, targetPort: op, targetWorldPos: opWorld, targetWorldDir: opWorldDir };
               }
             }
@@ -240,12 +240,21 @@ const SnapSystem: React.FC = () => {
   }, [isDragging]);
 
   // Show ports for all nodes when something is selected, being dragged, or mate mode
-  const showPorts = selectedObjectId !== null || isDragging || mateMode.active;
+  const showPorts = selectedObjectId !== null || isDragging || mateMode.active || directionDebugVisible;
 
   const portVisuals = useMemo(() => {
     if (!showPorts) return [];
 
-    const visuals: { position: [number, number, number]; type: 'input' | 'output'; nodeId: string; portId: string; connected: boolean; category: 'process' | 'environment' }[] = [];
+    const visuals: {
+      position: [number, number, number];
+      worldDirection: [number, number, number];
+      localDirection: [number, number, number];
+      type: 'input' | 'output';
+      nodeId: string;
+      portId: string;
+      connected: boolean;
+      category: 'process' | 'environment';
+    }[] = [];
 
     // Process nodes
     processNodes.forEach((node: ProcessNode) => {
@@ -256,7 +265,16 @@ const SnapSystem: React.FC = () => {
           (e.from === node.id && e.fromPort === port.id) ||
           (e.to === node.id && e.toPort === port.id)
         );
-        visuals.push({ position: worldPos, type: port.type, nodeId: node.id, portId: port.id, connected, category: 'process' });
+        visuals.push({
+          position: worldPos,
+          worldDirection: getPortWorldDirection(port.direction, node as any),
+          localDirection: port.direction,
+          type: port.type,
+          nodeId: node.id,
+          portId: port.id,
+          connected,
+          category: 'process',
+        });
       });
     });
 
@@ -265,7 +283,16 @@ const SnapSystem: React.FC = () => {
       const ports = getConnectionPorts(asset.type, asset.parameters, (asset as any).assetId);
       ports.forEach((port: ConnectionPort) => {
         const worldPos = getPortWorldPosition(port.localPosition, asset as any);
-        visuals.push({ position: worldPos, type: port.type, nodeId: asset.id, portId: port.id, connected: false, category: 'environment' });
+        visuals.push({
+          position: worldPos,
+          worldDirection: getPortWorldDirection(port.direction, asset as any),
+          localDirection: port.direction,
+          type: port.type,
+          nodeId: asset.id,
+          portId: port.id,
+          connected: false,
+          category: 'environment',
+        });
       });
     });
 
@@ -343,10 +370,7 @@ const SnapSystem: React.FC = () => {
               updateObject(firstAsProcess.id, 'process', { parameters: { ...firstAsProcess.parameters, ...fixedParams } });
             }
           }
-          const firstWorldDir = localDirToWorld(
-            firstPort.direction,
-            firstNode.rotation,
-          );
+          const firstWorldDir = getPortWorldDirection(firstPort.direction, firstNode as any);
           const mate = solveMateTransform(
             selectedPort.worldPosition,
             firstWorldDir,
@@ -427,6 +451,30 @@ const SnapSystem: React.FC = () => {
                   side={THREE.DoubleSide}
                 />
               </mesh>
+            )}
+            {directionDebugVisible && (
+              <>
+                <arrowHelper
+                  args={[
+                    new THREE.Vector3(...pv.worldDirection),
+                    new THREE.Vector3(0, 0, 0),
+                    0.24,
+                    pv.type === 'input' ? '#3b82f6' : '#22c55e',
+                    0.08,
+                    0.045,
+                  ]}
+                />
+                <arrowHelper
+                  args={[
+                    new THREE.Vector3(...pv.localDirection),
+                    new THREE.Vector3(0, 0, 0),
+                    0.16,
+                    '#f59e0b',
+                    0.055,
+                    0.03,
+                  ]}
+                />
+              </>
             )}
           </group>
         );
@@ -512,7 +560,7 @@ export function checkSnap(
               );
               adjustedDp = updatedPorts.find(p => p.id === dp.id) || dp;
             }
-            const opWorldDir = localDirToWorld(op.direction, otherNode.rotation);
+            const opWorldDir = getPortWorldDirection(op.direction, otherNode as any);
             const mate = solveMateTransform(
               opWorld,
               opWorldDir,

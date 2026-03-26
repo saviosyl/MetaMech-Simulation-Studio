@@ -570,7 +570,14 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
  * - Changing parameters triggers React re-render → ports auto-recompute
  * - Serialization stores only (position, rotation, parameters) — ports derive from params
  */
-export function getWorldConnectionPorts(node: ProcessNode | EnvironmentAsset | Actor): { id: string; type: 'input' | 'output'; localPosition: [number, number, number]; worldPosition: [number, number, number] }[] {
+export function getWorldConnectionPorts(node: ProcessNode | EnvironmentAsset | Actor): {
+  id: string;
+  type: 'input' | 'output';
+  localPosition: [number, number, number];
+  worldPosition: [number, number, number];
+  localDirection?: [number, number, number];
+  worldDirection?: [number, number, number];
+}[] {
   return computeWorldPorts(
     { ...node, type: (node as ProcessNode).type },
     (type, params, assetId) => getConnectionPorts(type, params, assetId),
@@ -698,6 +705,8 @@ interface EditorState {
   toggleVisibility: (id: string) => void;
   overlaysHidden: boolean;
   setOverlaysHidden: (hidden: boolean) => void;
+  directionDebugVisible: boolean;
+  setDirectionDebugVisible: (visible: boolean) => void;
   pathsVisible: boolean;
   setPathsVisible: (visible: boolean) => void;
   
@@ -836,6 +845,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   focusRequest: 0,
   hiddenIds: new Set(),
   overlaysHidden: false,
+  directionDebugVisible: false,
   pathsVisible: true,
   
   isPlaying: false,
@@ -1196,6 +1206,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   setOverlaysHidden: (hidden) => set({ overlaysHidden: hidden }),
+  setDirectionDebugVisible: (visible) => set({ directionDebugVisible: visible }),
   setPathsVisible: (visible) => set({ pathsVisible: visible }),
   
   setSceneSettings: (settings) => {

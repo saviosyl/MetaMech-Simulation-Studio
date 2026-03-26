@@ -4,7 +4,7 @@ import ImportModelDialog from './ImportModelDialog';
 import CameraViewToolbar from './CameraViewToolbar';
 import {
   MousePointer, Move, RotateCcw, Maximize2, Link2, Magnet, Ruler,
-  Grid3X3, Eye, EyeOff, Route, Trash2, Copy, Download, Package,
+  Grid3X3, Eye, EyeOff, Route, Navigation, Trash2, Copy, Download, Package,
 } from 'lucide-react';
 
 type ToolType = 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure';
@@ -39,6 +39,8 @@ const ViewportToolbar: React.FC = () => {
   const pasteClipboard = useEditorStore(s => s.pasteClipboard);
   const overlaysHidden = useEditorStore(s => s.overlaysHidden);
   const setOverlaysHidden = useEditorStore(s => s.setOverlaysHidden);
+  const directionDebugVisible = useEditorStore(s => s.directionDebugVisible);
+  const setDirectionDebugVisible = useEditorStore(s => s.setDirectionDebugVisible);
   const pathsVisible = useEditorStore(s => s.pathsVisible);
   const setPathsVisible = useEditorStore(s => s.setPathsVisible);
   const requestFocus = useEditorStore(s => s.requestFocus);
@@ -199,6 +201,13 @@ const ViewportToolbar: React.FC = () => {
           style={btnStyle(pathsVisible)}
         >
           <Route size={16} />
+        </button>
+        <button
+          title={directionDebugVisible ? 'Hide node/port direction arrows' : 'Show node/port direction arrows'}
+          onClick={() => setDirectionDebugVisible(!directionDebugVisible)}
+          style={btnStyle(directionDebugVisible)}
+        >
+          <Navigation size={16} />
         </button>
       </div>
 

@@ -4,6 +4,8 @@ export interface ConnectionPortDef {
   id: string;
   type: 'input' | 'output';
   localPosition: [number, number, number];
+  /** Optional local-space outward direction vector for this port. */
+  direction?: [number, number, number];
 }
 
 export interface StaticAssetDef {
