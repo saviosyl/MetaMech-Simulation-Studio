@@ -2123,6 +2123,8 @@ const AdminAssetEditorPage: React.FC = () => {
               sourceUnit={sourceUnit}
               scaleCorrection={scaleCorrection}
               pivotOffsetMm={pivotOffsetMm}
+              assetRootRotationDeg={assetRootRotationDeg}
+              objectRotationDegByPath={objectRotationDegByPath}
               cameraIntent={cameraIntent}
               onCameraIntentHandled={() => setCameraIntent('none')}
               activeTool={activeTool}
@@ -2135,8 +2137,15 @@ const AdminAssetEditorPage: React.FC = () => {
               nodes={nodes}
               selectedNodeIndex={selectedNodeIndex}
               onSelectNode={setSelectedNodeIndex}
+              selectedObjectPath={selectedObjectPath}
+              onSelectObjectPath={setSelectedObjectPathAndHighlight}
               onPlaceNodeAtMm={placeSelectedNodeAt}
               onMoveNodeToMm={(index, positionMm) => updateNode(index, { position: positionMm })}
+              onRotateSelectedObjectDeg={(path, rotationDeg) => {
+                if (!path || path === ASSET_ROOT_PATH) return;
+                setObjectRotationDegByPath((prev) => ({ ...prev, [path]: normalizeEulerDeg(rotationDeg, [0, 0, 0]) }));
+              }}
+              onSetAssetRootRotationDeg={(rotationDeg) => setAssetRootRotationDeg(normalizeEulerDeg(rotationDeg, [0, 0, 0]))}
               setHierarchyItems={setHierarchyItems}
               highlightedObjectNames={highlightedObjectNames}
               setHighlightedObjectNames={setHighlightedObjectNames}
@@ -2148,6 +2157,8 @@ const AdminAssetEditorPage: React.FC = () => {
               onPathPointsChange={setPathPoints}
               onSelectPathPoint={setSelectedPathPointIndex}
               toolbarButtons={toolbarButtons}
+              rotationTargetInfo={rotationTargetInfo}
+              rotationHintMessage={rotationHintMessage}
               nodeSnapMode={nodeSnapMode}
               nodeTransformMode={nodeTransformMode}
               showWorldAxis={showWorldAxis}
