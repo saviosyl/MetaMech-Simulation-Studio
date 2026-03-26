@@ -1635,7 +1635,7 @@ const AdminAssetEditorPage: React.FC = () => {
     if (rotationTargetInfo?.kind === 'selectedPivot') {
       return 'Pivot selected. Use Move/Pivot tools for point adjustments.';
     }
-    return 'Rotate mode: drag red/green/blue ring to rotate the asset root (X/Y/Z).';
+    return 'Rotate mode: Asset Root';
   }, [rotationTargetInfo]);
 
   function toggleLeftSection(section: LeftPanelSection): void {
