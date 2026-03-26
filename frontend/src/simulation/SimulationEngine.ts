@@ -88,6 +88,10 @@ function lerpPoint(a: [number, number, number], b: [number, number, number], t: 
   ];
 }
 
+function mmVecToMeters(input: [number, number, number]): [number, number, number] {
+  return [input[0] / 1000, input[1] / 1000, input[2] / 1000];
+}
+
 function buildWorldPathPoints(node: ProcessNode): [number, number, number][] {
   const tp = (node.parameters as { transportPath?: CustomTransportPath } | undefined)?.transportPath;
   if (!tp) return [];
@@ -96,11 +100,15 @@ function buildWorldPathPoints(node: ProcessNode): [number, number, number][] {
     const world = points
       .map((p) => asVec3OrNull(p))
       .filter((p): p is [number, number, number] => Boolean(p))
-      .map((local) => [
-        node.position[0] + local[0],
-        node.position[1] + local[1],
-        node.position[2] + local[2],
-      ] as [number, number, number]);
+      // Editor metadata stores authored path coordinates in mm; runtime uses meters.
+      .map((localMm) => {
+        const local = mmVecToMeters(localMm);
+        return [
+          node.position[0] + local[0],
+          node.position[1] + local[1],
+          node.position[2] + local[2],
+        ] as [number, number, number];
+      });
     return world;
   }
 
@@ -113,9 +121,11 @@ function buildWorldPathPoints(node: ProcessNode): [number, number, number][] {
   const nodeOut = resolvedNodeDefs.find((n) => String((n as { type?: unknown }).type || '').toLowerCase().includes('outfeed')) as
     | { position?: [number, number, number] }
     | undefined;
-  const inLocal = asVec3OrNull(nodeIn?.position);
-  const outLocal = asVec3OrNull(nodeOut?.position);
-  if (inLocal && outLocal) {
+  const inLocalMm = asVec3OrNull(nodeIn?.position);
+  const outLocalMm = asVec3OrNull(nodeOut?.position);
+  if (inLocalMm && outLocalMm) {
+    const inLocal = mmVecToMeters(inLocalMm);
+    const outLocal = mmVecToMeters(outLocalMm);
     return [
       [node.position[0] + inLocal[0], node.position[1] + inLocal[1], node.position[2] + inLocal[2]],
       [node.position[0] + outLocal[0], node.position[1] + outLocal[1], node.position[2] + outLocal[2]],
