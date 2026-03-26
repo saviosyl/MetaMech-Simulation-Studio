@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronRight, Crosshair, Maximize, Plus, Ruler, Save, Shield, Trash2, Upload, User } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Copy, Crosshair, Maximize, Plus, Redo2, Ruler, Save, Shield, Trash2, Undo2, Upload, User } from 'lucide-react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Environment, Grid, Html, Line, OrbitControls, TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -67,7 +67,7 @@ type LeftPanelSection = 'assets' | 'hierarchy' | 'nodes' | 'moving';
 
 type MeasureMode = 'two-point' | 'chain';
 type CameraIntent = 'none' | 'fit' | 'frameSelected' | 'focusNode' | 'reset';
-type InteractionTool = 'nodes' | 'measurement';
+type InteractionTool = 'select' | 'move' | 'rotate' | 'node' | 'pivot' | 'measurement';
 type PathMode = 'none' | 'straight-node' | 'polyline';
 type PathPoint = { id: string; positionMm: [number, number, number] };
 type NodeGizmoSnapMode = 'none' | 'grid' | 'ground';
@@ -84,6 +84,14 @@ type LeftSectionKey = 'assets' | 'hierarchy' | 'nodes' | 'movingParts';
 type BehaviorConfig = Record<string, number | string | boolean | (number | string)[]>;
 
 type RuntimeControlsConfig = NonNullable<AssetMetadata['runtimeControls']>;
+type ToolbarButton = {
+  key: string;
+  label: string;
+  icon?: React.ReactNode;
+  activeWhen?: InteractionTool;
+  onClick: () => void;
+  disabled?: boolean;
+};
 
 function errorMessage(error: unknown, fallback: string): string {
   const e = error as { response?: { data?: { error?: string } }; message?: string };
@@ -436,6 +444,7 @@ const ModelPreview: React.FC<{
   selectedPathPointIndex: number;
   onPathPointsChange: (points: PathPoint[]) => void;
   onSelectPathPoint: (index: number) => void;
+  toolbarButtons: ToolbarButton[];
   showWorldAxis: boolean;
   showLocalAxis: boolean;
   nodeSnapMode: NodeGizmoSnapMode;
@@ -469,6 +478,7 @@ const ModelPreview: React.FC<{
   selectedPathPointIndex,
   onPathPointsChange,
   onSelectPathPoint,
+  toolbarButtons,
   showWorldAxis,
   showLocalAxis,
   nodeSnapMode,
@@ -731,6 +741,51 @@ const ModelPreview: React.FC<{
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 10,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 8,
+          display: 'flex',
+          gap: 6,
+          padding: '6px 8px',
+          borderRadius: 10,
+          border: '1px solid var(--mm-border-subtle)',
+          background: 'color-mix(in oklab, var(--mm-bg-panel) 85%, transparent)',
+          backdropFilter: 'blur(8px)',
+          boxShadow: 'var(--mm-shadow-sm)',
+        }}
+      >
+        {toolbarButtons.map((button) => (
+          <button
+            key={button.key}
+            type="button"
+            onClick={button.onClick}
+            disabled={button.disabled}
+            style={{
+              border: '1px solid var(--mm-border)',
+              borderRadius: 8,
+              padding: '5px 8px',
+              fontSize: 11,
+              background: button.activeWhen && button.activeWhen === activeTool
+                ? 'var(--mm-accent-primary-muted)'
+                : 'var(--mm-bg-surface)',
+              color: button.activeWhen && button.activeWhen === activeTool
+                ? 'var(--mm-accent-primary)'
+                : 'var(--mm-text-secondary)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              opacity: button.disabled ? 0.55 : 1,
+            }}
+          >
+            {button.icon}
+            {button.label}
+          </button>
+        ))}
+      </div>
       <Canvas shadows camera={{ position: [2.5, 2, 2.5], fov: 45 }}>
       <ambientLight intensity={0.65} />
       <directionalLight castShadow position={[3, 5, 2]} intensity={1.1} />
@@ -777,7 +832,7 @@ const ModelPreview: React.FC<{
               }
               return;
             }
-            if (activeTool === 'nodes' && pathMode === 'polyline') {
+            if (activeTool === 'node' && pathMode === 'polyline') {
               const nextPoint: PathPoint = {
                 id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
                 positionMm: snapPosition(point),
@@ -786,7 +841,9 @@ const ModelPreview: React.FC<{
               onSelectPathPoint(pathPoints.length);
               return;
             }
-            onPlaceNodeAtMm(snapPosition(point));
+            if (activeTool === 'node') {
+              onPlaceNodeAtMm(snapPosition(point));
+            }
           }}
           onPointerMissed={() => {
             setHighlightedObjectNames([]);
@@ -827,11 +884,11 @@ const ModelPreview: React.FC<{
         const selected = selectedNodeIndex === index;
         const nodePosition: [number, number, number] = [mmToM(Number(p[0]) || 0), mmToM(Number(p[1]) || 0), mmToM(Number(p[2]) || 0)];
         const nodeColor = nodeColorByType(node.type);
-        if (selected && activeTool === 'nodes') {
+        if (selected && (activeTool === 'move' || activeTool === 'rotate' || activeTool === 'pivot')) {
           return (
             <TransformControls
               key={`${node.id || 'node'}-${index}`}
-              mode={nodeTransformMode}
+              mode={activeTool === 'rotate' ? 'rotate' : nodeTransformMode}
               size={0.7}
               onObjectChange={(event) => {
                 const target = (event?.target as { object?: THREE.Object3D } | undefined);
@@ -900,7 +957,7 @@ const ModelPreview: React.FC<{
           mmToM(point.positionMm[1]),
           mmToM(point.positionMm[2]),
         ];
-        if (selectedPathPointIndex === index && activeTool === 'nodes') {
+        if (selectedPathPointIndex === index && (activeTool === 'move' || activeTool === 'pivot')) {
           return (
             <TransformControls
               key={point.id}
@@ -1006,7 +1063,7 @@ const AdminAssetEditorPage: React.FC = () => {
   const [pivotOffsetMm, setPivotOffsetMm] = useState<[number, number, number]>([0, 0, 0]);
   const [measureMode, setMeasureMode] = useState<MeasureMode>('two-point');
   const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
-  const [activeTool, setActiveTool] = useState<InteractionTool>('nodes');
+  const [activeTool, setActiveTool] = useState<InteractionTool>('select');
   const [pathMode, setPathMode] = useState<PathMode>('none');
   const [pathPoints, setPathPoints] = useState<PathPoint[]>([]);
   const [selectedPathPointIndex, setSelectedPathPointIndex] = useState<number>(-1);
@@ -1235,7 +1292,7 @@ const AdminAssetEditorPage: React.FC = () => {
         : defaultRuntimeControlsForTemplate(nextBehaviorTemplate)
     );
     setMeasurementPoints([]);
-    setActiveTool('nodes');
+    setActiveTool('node');
     const existingPath = m.transportPath;
     const existingMode = (existingPath?.mode === 'straight-node' || existingPath?.mode === 'polyline')
       ? existingPath.mode
@@ -1291,7 +1348,7 @@ const AdminAssetEditorPage: React.FC = () => {
   }
 
   function addNode(): void {
-    setActiveTool('nodes');
+    setActiveTool('node');
     const id = `NODE_${nodes.length + 1}`;
     const next: AssetDefinitionNode = {
       id,
@@ -1524,6 +1581,18 @@ const AdminAssetEditorPage: React.FC = () => {
     }
   }
 
+  const toolbarButtons = useMemo<ToolbarButton[]>(() => ([
+    { key: 'select', label: 'Select', activeWhen: 'select', onClick: () => setActiveTool('select') },
+    { key: 'move', label: 'Move', activeWhen: 'move', onClick: () => setActiveTool('move') },
+    { key: 'rotate', label: 'Rotate', activeWhen: 'rotate', onClick: () => setActiveTool('rotate') },
+    { key: 'undo', label: 'Undo', icon: <Undo2 size={12} />, onClick: () => {} },
+    { key: 'redo', label: 'Redo', icon: <Redo2 size={12} />, onClick: () => {} },
+    { key: 'copy', label: 'Copy', icon: <Copy size={12} />, onClick: () => {} },
+    { key: 'frame', label: 'Frame', icon: <Maximize size={12} />, onClick: () => setCameraIntent('fit') },
+    { key: 'node', label: 'Node', activeWhen: 'node', onClick: () => setActiveTool('node') },
+    { key: 'pivot', label: 'Pivot', activeWhen: 'pivot', onClick: () => setActiveTool('pivot') },
+  ]), [setCameraIntent]);
+
   function loadTemplatePreset(kind: 'straight' | 'lift'): void {
     if (kind === 'straight') {
       const infeed = nodes.find((n) => String(n.type || '').toLowerCase().includes('infeed')) || nodes[0];
@@ -1537,7 +1606,7 @@ const AdminAssetEditorPage: React.FC = () => {
       });
       setRuntimeControls(defaultRuntimeControlsForTemplate('straight-conveyor'));
       setPathMode('straight-node');
-      setActiveTool('nodes');
+      setActiveTool('node');
       return;
     }
     const infeed = nodes.find((n) => String(n.type || '').toLowerCase().includes('infeed')) || nodes[0];
@@ -1556,7 +1625,7 @@ const AdminAssetEditorPage: React.FC = () => {
     });
     setRuntimeControls(defaultRuntimeControlsForTemplate('lift-conveyor'));
     setPathMode('straight-node');
-    setActiveTool('nodes');
+    setActiveTool('node');
   }
 
   return (
@@ -1728,7 +1797,7 @@ const AdminAssetEditorPage: React.FC = () => {
                   <button
                     key={`left-node-${node.id || index}`}
                     type="button"
-                    onClick={() => { setActiveTool('nodes'); setSelectedNodeIndex(index); }}
+                    onClick={() => { setActiveTool('node'); setSelectedNodeIndex(index); }}
                     style={{ textAlign: 'left', border: `1px solid ${selectedNodeIndex === index ? 'color-mix(in oklab, var(--mm-accent-primary) 40%, transparent)' : 'var(--mm-border-subtle)'}`, borderRadius: 8, padding: 6, background: selectedNodeIndex === index ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)' }}
                   >
                     <div style={{ fontSize: 11, fontWeight: 700 }}>{node.id || `Node ${index + 1}`}</div>
@@ -1825,6 +1894,7 @@ const AdminAssetEditorPage: React.FC = () => {
               selectedPathPointIndex={selectedPathPointIndex}
               onPathPointsChange={setPathPoints}
               onSelectPathPoint={setSelectedPathPointIndex}
+              toolbarButtons={toolbarButtons}
               nodeSnapMode={nodeSnapMode}
               nodeTransformMode={nodeTransformMode}
               showWorldAxis={showWorldAxis}
@@ -2001,13 +2071,6 @@ const AdminAssetEditorPage: React.FC = () => {
                     <button type="button" onClick={() => setMeasurementPoints([])} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}>
                       Clear
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTool('nodes')}
-                      style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: activeTool === 'nodes' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
-                    >
-                      Node Tool
-                    </button>
                   </div>
                   {measureMode === 'two-point' ? (
                     <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)' }}>
@@ -2055,7 +2118,7 @@ const AdminAssetEditorPage: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setPathMode('straight-node');
-                      setActiveTool('nodes');
+                      setActiveTool('node');
                     }}
                     style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: pathMode === 'straight-node' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
                   >
@@ -2065,7 +2128,7 @@ const AdminAssetEditorPage: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setPathMode('polyline');
-                      setActiveTool('nodes');
+                      setActiveTool('node');
                     }}
                     style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: pathMode === 'polyline' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
                   >
@@ -2349,7 +2412,7 @@ const AdminAssetEditorPage: React.FC = () => {
                   <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Visual Placement</div>
                   <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4 }}>
-                    Active tool: <strong>{activeTool === 'nodes' ? 'Node placement/edit' : 'Measurement'}</strong>. Click in viewport to place selected node only when Node Tool is active.
+                    Active tool: <strong>{activeTool === 'node' ? 'Node placement/edit' : activeTool === 'measurement' ? 'Measurement' : activeTool === 'move' ? 'Move' : activeTool === 'rotate' ? 'Rotate' : activeTool === 'pivot' ? 'Pivot' : 'Select'}</strong>.
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
@@ -2392,7 +2455,7 @@ const AdminAssetEditorPage: React.FC = () => {
                 </div>
                 <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
                   {nodes.map((node, index) => (
-                    <button key={`${node.id || 'node'}-${index}`} type="button" onClick={() => { setActiveTool('nodes'); setSelectedNodeIndex(index); }} style={{ textAlign: 'left', border: `1px solid ${selectedNodeIndex === index ? 'color-mix(in oklab, var(--mm-accent-primary) 40%, transparent)' : 'var(--mm-border-subtle)'}`, borderRadius: 8, padding: 8, background: selectedNodeIndex === index ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)' }}>
+                    <button key={`${node.id || 'node'}-${index}`} type="button" onClick={() => { setActiveTool('node'); setSelectedNodeIndex(index); }} style={{ textAlign: 'left', border: `1px solid ${selectedNodeIndex === index ? 'color-mix(in oklab, var(--mm-accent-primary) 40%, transparent)' : 'var(--mm-border-subtle)'}`, borderRadius: 8, padding: 8, background: selectedNodeIndex === index ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)' }}>
                       <div style={{ fontSize: 12, fontWeight: 700 }}>{node.id || `Node ${index + 1}`}</div>
                       <div style={{ fontSize: 10, color: 'var(--mm-text-tertiary)' }}>type: {node.type || 'unknown'}</div>
                     </button>
