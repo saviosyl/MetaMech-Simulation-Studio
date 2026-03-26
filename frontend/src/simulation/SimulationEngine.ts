@@ -11,6 +11,7 @@ import { Product, NodeStats, FlowState, FlowEvent } from './Product';
 import { ProcessNode, ProcessEdge, getConnectionPorts } from '../store/editorStore';
 import { getPortWorldPosition } from '../lib/nodeTransform';
 import { createTransportPath } from '../lib/transportPath';
+import { localToWorld } from '../lib/nodeTransform';
 import { createRobotState, tickRobot, RobotState, RobotConfig } from './RobotMotionController';
 import { createPalletState, getNextSlotPosition, fillSlot, paramsToPalletDef, PalletState } from './PalletizingController';
 import { SensorState, createSensorState, evaluateSensor, editorParamsToSensorConfig, SensorEvent } from './SensorLogic';
@@ -103,11 +104,12 @@ function buildWorldPathPoints(node: ProcessNode): [number, number, number][] {
       // Editor metadata stores authored path coordinates in mm; runtime uses meters.
       .map((localMm) => {
         const local = mmVecToMeters(localMm);
-        return [
-          node.position[0] + local[0],
-          node.position[1] + local[1],
-          node.position[2] + local[2],
-        ] as [number, number, number];
+        return localToWorld(
+          local,
+          node.position as [number, number, number],
+          node.rotation as [number, number, number],
+          node.scale as [number, number, number]
+        );
       });
     return world;
   }
@@ -127,8 +129,18 @@ function buildWorldPathPoints(node: ProcessNode): [number, number, number][] {
     const inLocal = mmVecToMeters(inLocalMm);
     const outLocal = mmVecToMeters(outLocalMm);
     return [
-      [node.position[0] + inLocal[0], node.position[1] + inLocal[1], node.position[2] + inLocal[2]],
-      [node.position[0] + outLocal[0], node.position[1] + outLocal[1], node.position[2] + outLocal[2]],
+      localToWorld(
+        inLocal,
+        node.position as [number, number, number],
+        node.rotation as [number, number, number],
+        node.scale as [number, number, number]
+      ),
+      localToWorld(
+        outLocal,
+        node.position as [number, number, number],
+        node.rotation as [number, number, number],
+        node.scale as [number, number, number]
+      ),
     ];
   }
   return [];

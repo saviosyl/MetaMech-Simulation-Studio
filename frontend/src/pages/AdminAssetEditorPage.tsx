@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Crosshair, Maximize, Plus, Ruler, Save, Shield, Trash2, Upload, User } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Crosshair, Maximize, Plus, Ruler, Save, Shield, Trash2, Upload, User } from 'lucide-react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Environment, Grid, Html, Line, OrbitControls, TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -27,12 +27,18 @@ type ModelHierarchyItem = {
   childCount: number;
 };
 
+type LeftPanelSectionKey = 'assets' | 'hierarchy' | 'nodes' | 'movingParts';
+
 const LEFT_PANEL_MIN = 240;
 const LEFT_PANEL_MAX = 460;
 const RIGHT_PANEL_MIN = 300;
 const RIGHT_PANEL_MAX = 560;
 const VIEWPORT_MIN = 520;
 const PANEL_WIDTHS_STORAGE_KEY = 'metamech.adminAssetEditor.panelWidths';
+const ASSET_ROTATION_SECTION = 'assetRotation';
+const HIERARCHY_SECTION = 'hierarchy';
+const NODES_SECTION = 'nodes';
+const MOVING_PARTS_SECTION = 'movingParts';
 
 type SourceUnit = 'mm' | 'cm' | 'm' | 'unknown';
 
@@ -57,6 +63,8 @@ type ResizeDrag = {
   startRight: number;
 } | null;
 
+type LeftPanelSection = 'assets' | 'hierarchy' | 'nodes' | 'moving';
+
 type MeasureMode = 'two-point' | 'chain';
 type CameraIntent = 'none' | 'fit' | 'frameSelected' | 'focusNode' | 'reset';
 type InteractionTool = 'nodes' | 'measurement';
@@ -64,11 +72,14 @@ type PathMode = 'none' | 'straight-node' | 'polyline';
 type PathPoint = { id: string; positionMm: [number, number, number] };
 type NodeGizmoSnapMode = 'none' | 'grid' | 'ground';
 type TransformMode = 'translate' | 'rotate';
+type CollapsibleSectionKey = 'assets' | 'hierarchy' | 'nodes' | 'movingParts';
 
 type MeasurementPoint = {
   id: string;
   positionMm: [number, number, number];
 };
+
+type LeftSectionKey = 'assets' | 'hierarchy' | 'nodes' | 'movingParts';
 
 type BehaviorConfig = Record<string, number | string | boolean | (number | string)[]>;
 
@@ -724,7 +735,20 @@ const ModelPreview: React.FC<{
       <ambientLight intensity={0.65} />
       <directionalLight castShadow position={[3, 5, 2]} intensity={1.1} />
       <Grid args={[10, 10]} cellColor="#6b7280" sectionColor="#334155" fadeDistance={18} fadeStrength={1.2} />
-      {showWorldAxis && <axesHelper args={[1.2]} />}
+      {showWorldAxis && (
+        <>
+          <axesHelper args={[1.2]} />
+          <Html position={[1.28, 0, 0]} style={{ pointerEvents: 'none', fontSize: 11, fontWeight: 800, color: '#ef4444', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
+            X
+          </Html>
+          <Html position={[0, 1.28, 0]} style={{ pointerEvents: 'none', fontSize: 11, fontWeight: 800, color: '#22c55e', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
+            Y
+          </Html>
+          <Html position={[0, 0, 1.28]} style={{ pointerEvents: 'none', fontSize: 11, fontWeight: 800, color: '#3b82f6', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
+            Z
+          </Html>
+        </>
+      )}
       {showLocalAxis && previewRoot && <primitive object={new THREE.AxesHelper(0.8)} position={previewRoot.position.clone()} />}
       {previewRoot ? (
         <group
@@ -967,6 +991,15 @@ const AdminAssetEditorPage: React.FC = () => {
   const [objectFilter, setObjectFilter] = useState('');
   const [selectedObjectPath, setSelectedObjectPath] = useState('');
   const [highlightedObjectNames, setHighlightedObjectNames] = useState<string[]>([]);
+  const [objectVisibility, setObjectVisibility] = useState<Record<string, boolean>>({});
+  const [showObjectPathSet, setShowObjectPathSet] = useState<Record<string, boolean>>({});
+  const [leftSectionOpen, setLeftSectionOpen] = useState<Record<LeftPanelSection, boolean>>({
+    assets: true,
+    hierarchy: true,
+    nodes: true,
+    moving: true,
+  });
+  const [orientationEulerDeg, setOrientationEulerDeg] = useState<[number, number, number]>([0, 0, 0]);
   const [sourceUnit, setSourceUnit] = useState<SourceUnit>('unknown');
   const [scaleCorrection, setScaleCorrection] = useState<number>(1);
   const [nativeBounds, setNativeBounds] = useState<RawBounds | null>(null);
@@ -1566,53 +1599,169 @@ const AdminAssetEditorPage: React.FC = () => {
         }}
       >
         <section style={{ background: 'var(--mm-bg-panel)', border: '1px solid var(--mm-border)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative' }}>
-          <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ display: 'grid', gap: 6 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>Assets</div>
-              <button type="button" onClick={() => modelFileRef.current?.click()} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <Upload size={12} />
-                Upload GLB
-              </button>
-              <input
-                ref={modelFileRef}
-                type="file"
-                accept=".glb,model/gltf-binary"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void uploadModel(file);
-                  e.target.value = '';
-                }}
-              />
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>Authoring Navigator</div>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
-              Upload target category: {selectedCategoryId ?? 'none'}
-            </div>
-          </div>
-          {loading && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--mm-text-tertiary)' }}>Loading assets…</div>}
-          <div style={{ flex: 1, overflowY: 'scroll', overscrollBehavior: 'contain', scrollbarGutter: 'stable', display: 'grid', gap: 6, marginTop: 8, paddingRight: 6 }}>
-            {assets.map((row) => {
-              const selected = asset?.id === row.id;
-              return (
-                <button
-                  key={row.id}
-                  type="button"
-                  onClick={() => selectAsset(row)}
-                  style={{
-                    textAlign: 'left',
-                    border: `1px solid ${selected ? 'color-mix(in oklab, var(--mm-accent-primary) 40%, transparent)' : 'var(--mm-border-subtle)'}`,
-                    borderRadius: 8,
-                    padding: 8,
-                    background: selected ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)',
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>{row.name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--mm-text-tertiary)', marginTop: 2 }}>
-                    {row.status} • v{row.version}
+
+            <button
+              type="button"
+              onClick={() => toggleLeftSection('assets')}
+              style={{ textAlign: 'left', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11, fontWeight: 700 }}
+            >
+              {leftSectionOpen.assets ? '▼' : '▶'} Assets
+            </button>
+            {leftSectionOpen.assets && (
+              <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                    Upload target category: {selectedCategoryId ?? 'none'}
                   </div>
-                </button>
-              );
-            })}
+                  <button type="button" onClick={() => modelFileRef.current?.click()} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Upload size={12} />
+                    Upload GLB
+                  </button>
+                  <input
+                    ref={modelFileRef}
+                    type="file"
+                    accept=".glb,model/gltf-binary"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void uploadModel(file);
+                      e.target.value = '';
+                    }}
+                  />
+                </div>
+                {loading && <div style={{ fontSize: 12, color: 'var(--mm-text-tertiary)' }}>Loading assets…</div>}
+                <div style={{ maxHeight: 170, overflowY: 'auto', display: 'grid', gap: 6, paddingRight: 4 }}>
+                  {assets.map((row) => {
+                    const selected = asset?.id === row.id;
+                    return (
+                      <button
+                        key={row.id}
+                        type="button"
+                        onClick={() => selectAsset(row)}
+                        style={{
+                          textAlign: 'left',
+                          border: `1px solid ${selected ? 'color-mix(in oklab, var(--mm-accent-primary) 40%, transparent)' : 'var(--mm-border-subtle)'}`,
+                          borderRadius: 8,
+                          padding: 8,
+                          background: selected ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)',
+                        }}
+                      >
+                        <div style={{ fontSize: 12, fontWeight: 700 }}>{row.name}</div>
+                        <div style={{ fontSize: 10, color: 'var(--mm-text-tertiary)', marginTop: 2 }}>
+                          {row.status} • v{row.version}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => toggleLeftSection('hierarchy')}
+              style={{ textAlign: 'left', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11, fontWeight: 700 }}
+            >
+              {leftSectionOpen.hierarchy ? '▼' : '▶'} Model Object Hierarchy
+            </button>
+            {leftSectionOpen.hierarchy && (
+              <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
+                <input
+                  value={objectFilter}
+                  onChange={(e) => setObjectFilter(e.target.value)}
+                  placeholder="Filter object names"
+                  style={{ fontSize: 12 }}
+                />
+                <div style={{ maxHeight: 210, overflowY: 'auto', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, background: 'var(--mm-bg-panel)' }}>
+                  {filteredHierarchyItems.length === 0 ? (
+                    <div style={{ padding: 8, fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                      {hierarchyItems.length === 0 ? 'No scene hierarchy found in current GLB.' : 'No objects match this filter.'}
+                    </div>
+                  ) : (
+                    filteredHierarchyItems.map((item) => (
+                      <button
+                        key={`left-h-${item.id}`}
+                        type="button"
+                        onClick={() => {
+                          setSelectedObjectPath(item.path);
+                          const nameToHighlight = item.name.startsWith('(unnamed') ? '' : item.name;
+                          setHighlightedObjectNames(nameToHighlight ? [nameToHighlight] : []);
+                        }}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '6px 8px',
+                          border: 'none',
+                          borderBottom: '1px solid var(--mm-border-subtle)',
+                          borderLeft: selectedObjectPath === item.path ? '3px solid var(--mm-accent-primary)' : '3px solid transparent',
+                          paddingLeft: `${8 + (item.depth * 12)}px`,
+                          background: selectedObjectPath === item.path ? 'var(--mm-accent-primary-muted)' : 'transparent',
+                          color: selectedObjectPath === item.path ? 'var(--mm-text-primary)' : 'var(--mm-text-secondary)',
+                          fontSize: 11,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {item.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => toggleLeftSection('nodes')}
+              style={{ textAlign: 'left', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11, fontWeight: 700 }}
+            >
+              {leftSectionOpen.nodes ? '▼' : '▶'} Nodes
+            </button>
+            {leftSectionOpen.nodes && (
+              <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
+                {nodes.length === 0 ? (
+                  <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>No nodes yet.</div>
+                ) : nodes.map((node, index) => (
+                  <button
+                    key={`left-node-${node.id || index}`}
+                    type="button"
+                    onClick={() => { setActiveTool('nodes'); setSelectedNodeIndex(index); }}
+                    style={{ textAlign: 'left', border: `1px solid ${selectedNodeIndex === index ? 'color-mix(in oklab, var(--mm-accent-primary) 40%, transparent)' : 'var(--mm-border-subtle)'}`, borderRadius: 8, padding: 6, background: selectedNodeIndex === index ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)' }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 700 }}>{node.id || `Node ${index + 1}`}</div>
+                    <div style={{ fontSize: 10, color: 'var(--mm-text-tertiary)' }}>{node.type || 'unknown'}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => toggleLeftSection('moving')}
+              style={{ textAlign: 'left', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11, fontWeight: 700 }}
+            >
+              {leftSectionOpen.moving ? '▼' : '▶'} Moving Parts
+            </button>
+            {leftSectionOpen.moving && (
+              <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6, maxHeight: 150, overflowY: 'auto' }}>
+                {movableParts.length === 0 ? (
+                  <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>No moving parts yet.</div>
+                ) : movableParts.map((part, index) => (
+                  <button
+                    key={`left-move-${part.objectName}-${index}`}
+                    type="button"
+                    onClick={() => setPreviewPartIndex(index)}
+                    style={{ textAlign: 'left', border: `1px solid ${previewPartIndex === index ? 'color-mix(in oklab, var(--mm-accent-primary) 40%, transparent)' : 'var(--mm-border-subtle)'}`, borderRadius: 8, padding: 6, background: previewPartIndex === index ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)' }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 700 }}>{part.objectName}</div>
+                    <div style={{ fontSize: 10, color: 'var(--mm-text-tertiary)' }}>{part.motionType} • {part.axis}</div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div
             role="separator"
