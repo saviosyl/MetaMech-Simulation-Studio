@@ -1,6 +1,12 @@
-# MetaMech Accepted 3D Asset Pipeline (SOLIDWORKS -> Blender -> GLB)
+# MetaMech Accepted 3D Asset Pipeline (SOLIDWORKS 2024 -> GLB -> MetaMech)
 
-This document defines the **accepted, practical pipeline** for bringing CAD models into MetaMech Simulation Studio using Blender as the cleanup/export stage.
+This document defines the **accepted, practical pipeline** for bringing CAD models into MetaMech Simulation Studio.
+
+Primary workflow (SolidWorks 2024+):
+- **SOLIDWORKS 2024 -> GLB -> MetaMech**
+
+Fallback workflow (when direct GLB export is unavailable or needs repair):
+- **SOLIDWORKS -> Blender -> GLB -> MetaMech**
 
 ## 1) What MetaMech expects today
 
@@ -42,7 +48,24 @@ This document defines the **accepted, practical pipeline** for bringing CAD mode
 
 ---
 
-## 2) Recommended file path: SOLIDWORKS -> Blender -> GLB
+## 2) Recommended file path: SOLIDWORKS 2024 -> GLB
+
+If your SOLIDWORKS version supports direct GLB export, use it as the default route.
+
+1. Export `.glb` directly from SOLIDWORKS.
+2. Upload GLB into MetaMech Admin Asset Editor.
+3. Set Source Unit / Scale Correction if needed.
+4. Author nodes, moving parts, path, and behavior metadata.
+5. Save and publish.
+
+### Draco-compressed GLB support
+- MetaMech now supports both:
+  - standard GLB
+  - Draco-compressed GLB (via configured DRACO decoder)
+
+---
+
+## 3) Optional fallback: SOLIDWORKS -> Blender -> GLB
 
 ## Step A — Export from SOLIDWORKS
 
@@ -123,7 +146,7 @@ Before export to GLB:
 
 ---
 
-## 3) Practical acceptance targets for imported assets
+## 4) Practical acceptance targets for imported assets
 
 - Model appears near grid and is easy to frame with Fit to Model.
 - Normalized dimensions match expected machine size in mm.
@@ -133,7 +156,7 @@ Before export to GLB:
 
 ---
 
-## 4) Common failure symptoms and likely cause
+## 5) Common failure symptoms and likely cause
 
 - **Too large/small in app:** wrong `Source Unit` and/or bad Blender scale apply.
 - **Model below/above grid:** origin/geometry vertical offset issues; review grounding and pivot.
@@ -142,10 +165,10 @@ Before export to GLB:
 
 ---
 
-## 5) Current limitations
+## 6) Current limitations
 
 - MetaMech does not import SOLIDWORKS native CAD directly in browser runtime.
-- Non-GLB source formats need conversion before runtime use.
+- Non-GLB source formats still need conversion before runtime use.
 - Advanced automatic CAD-to-simulation semantic extraction is not part of this workflow.
 
 This pipeline is intentionally practical and reliable for beginner-to-intermediate users.

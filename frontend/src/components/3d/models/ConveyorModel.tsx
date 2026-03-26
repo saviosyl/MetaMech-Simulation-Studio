@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
-import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { useDracoGLTF } from '../../../lib/gltfLoaders';
 
 interface ConveyorModelProps {
   length?: number;
@@ -9,7 +9,7 @@ interface ConveyorModelProps {
 }
 
 const GLBConveyor: React.FC<{ isSelected: boolean }> = ({ isSelected }) => {
-  const { scene } = useGLTF('/models/conveyor.glb');
+  const { scene } = useDracoGLTF('/models/conveyor.glb');
   const cloned = scene.clone();
   
   cloned.traverse((child) => {
@@ -95,6 +95,6 @@ const ConveyorModel: React.FC<ConveyorModelProps> = (props) => {
 };
 
 // Preload
-useGLTF.preload('/models/conveyor.glb');
+useDracoGLTF.preload('/models/conveyor.glb');
 
 export default ConveyorModel;

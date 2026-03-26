@@ -16,6 +16,7 @@ import {
 import { AssetDefinitionNode, AssetMetadata, AssetMovingPart, BehaviorTemplateType, LibraryAsset } from '../types';
 import { simulationUrls } from '../content/simulationMarketingContent';
 import { refreshRuntimePublishedAssets } from '../lib/runtimePublishedAssets';
+import { configureGLTFLoader, toFriendlyGlbLoadError } from '../lib/gltfLoaders';
 
 type ModelHierarchyItem = {
   id: string;
@@ -480,6 +481,7 @@ const ModelPreview: React.FC<{
     }
 
     const loader = new GLTFLoader();
+    configureGLTFLoader(loader);
     (async () => {
       try {
         // Use explicit credentialed fetch so admin-only model endpoints include auth cookies.
@@ -518,16 +520,15 @@ const ModelPreview: React.FC<{
             if (!cancelled) {
               setLoadedRoot(null);
               setHierarchyItems([]);
-              setLoadError(err?.message || 'Model could not be loaded');
+              setLoadError(toFriendlyGlbLoadError(err));
             }
           }
         );
       } catch (err) {
         if (!cancelled) {
-          const e = err as { message?: string };
           setLoadedRoot(null);
           setHierarchyItems([]);
-          setLoadError(e?.message || 'Model could not be loaded');
+          setLoadError(toFriendlyGlbLoadError(err));
         }
       }
     })();

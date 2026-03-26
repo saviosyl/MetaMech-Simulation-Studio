@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { BuilderResult, ConnectionPort } from './beltConveyorBuilder';
+import { createConfiguredGLTFLoader } from '../gltfLoaders';
 
 const GLB_URL = '/models/belt_conveyor_.glb';
 
@@ -13,7 +13,7 @@ function loadModel(): Promise<void> {
   if (cachedModel) return Promise.resolve();
   if (loadingPromise) return loadingPromise;
 
-  const loader = new GLTFLoader();
+  const loader = createConfiguredGLTFLoader();
   loadingPromise = new Promise<void>((resolve, reject) => {
     loader.load(
       GLB_URL,

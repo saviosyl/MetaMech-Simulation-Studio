@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
 import { StaticAssetDef } from '../../lib/assetManifest';
+import { useDracoGLTF } from '../../lib/gltfLoaders';
 
 interface StaticModelProps {
   assetDef: StaticAssetDef;
@@ -14,7 +15,7 @@ const GLBModel: React.FC<{
   defaultScale?: [number, number, number];
   defaultPositionOffset?: [number, number, number];
 }> = ({ url, defaultScale, defaultPositionOffset }) => {
-  const { scene } = useGLTF(url);
+  const { scene } = useDracoGLTF(url);
   const cloned = React.useMemo(() => {
     const c = scene.clone(true);
     if (defaultScale) c.scale.set(...defaultScale);

@@ -1,9 +1,10 @@
 import React, { useRef, Suspense, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useGLTF, useAnimations } from '@react-three/drei';
+import { useAnimations } from '@react-three/drei';
 import { Actor, useEditorStore } from '../../store/editorStore';
 import { actorPathAnimator } from '../../simulation/ActorPathAnimator';
+import { useDracoGLTF } from '../../lib/gltfLoaders';
 
 interface ActorComponentProps {
   actor: Actor;
@@ -20,7 +21,7 @@ const AnimatedGLBModel: React.FC<{
   /** Extra Y rotation baked into the model to face +Z (forward) */
   modelRotationY?: number;
 }> = ({ url, targetSize, isSelected, playAnimation, modelRotationY = 0 }) => {
-  const { scene, animations } = useGLTF(url);
+  const { scene, animations } = useDracoGLTF(url);
   const groupRef = useRef<THREE.Group>(null!);
 
   const cloned = useMemo(() => {
@@ -95,7 +96,7 @@ const StaticGLBModel: React.FC<{
   isSelected: boolean;
   modelRotationY?: number;
 }> = ({ url, targetSize, isSelected, modelRotationY = 0 }) => {
-  const { scene } = useGLTF(url);
+  const { scene } = useDracoGLTF(url);
 
   const cloned = useMemo(() => {
     const clone = scene.clone(true);
