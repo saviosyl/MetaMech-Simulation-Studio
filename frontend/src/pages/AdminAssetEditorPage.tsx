@@ -382,6 +382,7 @@ function fitCameraToBox(camera: THREE.Camera, controls: OrbitControlsLike | null
 type OrbitControlsLike = {
   target: THREE.Vector3;
   update: () => void;
+  enabled?: boolean;
 };
 
 const CameraBridge: React.FC<{ onCamera: (camera: THREE.Camera) => void }> = ({ onCamera }) => {
@@ -1498,7 +1499,8 @@ const AdminAssetEditorPage: React.FC = () => {
         .filter((p): p is PathPoint => Boolean(p))
       : [];
     setPathPoints(existingPoints);
-    setSelectedPathPointIndex(existingPoints.length > 0 ? 0 : -1);
+    // Avoid hidden pre-selection that can block rotate-root gizmo visibility.
+    setSelectedPathPointIndex(-1);
     setKnownDimensionMmInput('');
     setCameraIntent('none');
     setFitTargetPath('');
@@ -1857,10 +1859,12 @@ const AdminAssetEditorPage: React.FC = () => {
       activeWhen: 'rotate',
       onClick: () => {
         setActiveTool('rotate');
+        // Keep rotate-root flow predictable: clear latent node/path selections.
+        setSelectedNodeIndex(-1);
+        setSelectedPathPointIndex(-1);
         if (
-          selectedNodeIndex < 0
-          && selectedPathPointIndex < 0
-          && !selectedObjectPath
+          !selectedObjectPath
+          || selectedObjectPath === ASSET_ROOT_PATH
         ) {
           setSelectedObjectPathAndHighlight(ASSET_ROOT_PATH);
         }
@@ -1872,7 +1876,7 @@ const AdminAssetEditorPage: React.FC = () => {
     { key: 'frame', label: 'Frame', icon: <Maximize size={12} />, onClick: () => setCameraIntent('fit') },
     { key: 'node', label: 'Node', activeWhen: 'node', onClick: () => setActiveTool('node') },
     { key: 'pivot', label: 'Pivot', activeWhen: 'pivot', onClick: () => setActiveTool('pivot') },
-  ]), [setCameraIntent, selectedNodeIndex, selectedPathPointIndex, selectedObjectPath]);
+  ]), [setCameraIntent, selectedObjectPath]);
 
   function loadTemplatePreset(kind: 'straight' | 'lift'): void {
     if (kind === 'straight') {
