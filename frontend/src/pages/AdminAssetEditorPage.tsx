@@ -79,6 +79,7 @@ type RotationTargetInfo = {
   label: string;
   rotationDeg: [number, number, number];
 };
+type RotationSnapStep = 'off' | 45 | 15;
 
 type MeasurementPoint = {
   id: string;
@@ -497,6 +498,7 @@ const ModelPreview: React.FC<{
   showLocalAxis: boolean;
   nodeSnapMode: NodeGizmoSnapMode;
   nodeTransformMode: TransformMode;
+  rotationSnapStep: RotationSnapStep;
 }> = ({
   modelUrl,
   sourceUnit,
@@ -539,6 +541,7 @@ const ModelPreview: React.FC<{
   showLocalAxis,
   nodeSnapMode,
   nodeTransformMode,
+  rotationSnapStep,
 }) => {
   const [loadedRoot, setLoadedRoot] = useState<THREE.Object3D | null>(null);
   const [loadError, setLoadError] = useState<string>('');
@@ -964,6 +967,7 @@ const ModelPreview: React.FC<{
           object={rootGroupRef.current}
           mode="rotate"
           size={0.85}
+          rotationSnap={rotationSnapStep === 'off' ? null : degToRad(rotationSnapStep)}
           onObjectChange={() => {
             const group = rootGroupRef.current;
             if (!group) return;
@@ -980,6 +984,7 @@ const ModelPreview: React.FC<{
           object={rotateTargetObject}
           mode="rotate"
           size={0.85}
+          rotationSnap={rotationSnapStep === 'off' ? null : degToRad(rotationSnapStep)}
           onObjectChange={(event) => {
             const targetObject = (event?.target as { object?: THREE.Object3D } | undefined)?.object;
             if (!targetObject) return;
@@ -1217,6 +1222,8 @@ const AdminAssetEditorPage: React.FC = () => {
   const [pathMode, setPathMode] = useState<PathMode>('none');
   const [pathPoints, setPathPoints] = useState<PathPoint[]>([]);
   const [selectedPathPointIndex, setSelectedPathPointIndex] = useState<number>(-1);
+  const [rotateSnapEnabled, setRotateSnapEnabled] = useState(true);
+  const [rotateSnapDeg, setRotateSnapDeg] = useState<45 | 15>(45);
   const [behaviorTemplate, setBehaviorTemplate] = useState<BehaviorTemplateType>('none');
   const [behaviorConfig, setBehaviorConfig] = useState<Record<string, unknown>>({});
   const [runtimeControls, setRuntimeControls] = useState<NonNullable<AssetMetadata['runtimeControls']>>({
@@ -1232,6 +1239,7 @@ const AdminAssetEditorPage: React.FC = () => {
   const [showLocalAxis, setShowLocalAxis] = useState(true);
   const [nodeSnapMode, setNodeSnapMode] = useState<NodeGizmoSnapMode>('grid');
   const [nodeTransformMode, setNodeTransformMode] = useState<TransformMode>('translate');
+  const [rotationSnapStep, setRotationSnapStep] = useState<RotationSnapStep>(45);
 
   function setBehaviorField(key: string, value: number | string | boolean): void {
     setBehaviorConfig((prev) => ({ ...prev, [key]: value }));
@@ -2187,6 +2195,7 @@ const AdminAssetEditorPage: React.FC = () => {
               toolbarButtons={toolbarButtons}
               rotationTargetInfo={rotationTargetInfo}
               rotationHintMessage={rotationHintMessage}
+              rotationSnapStep={rotationSnapStep}
               nodeSnapMode={nodeSnapMode}
               nodeTransformMode={nodeTransformMode}
               showWorldAxis={showWorldAxis}
@@ -2331,6 +2340,54 @@ const AdminAssetEditorPage: React.FC = () => {
                   <button type="button" onClick={() => setCameraIntent('reset')} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11 }}>
                     Reset Camera
                   </button>
+                </div>
+                <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>
+                    Asset Root Rotation (deg)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
+                    {[0, 1, 2].map((axis) => (
+                      <input
+                        key={`asset-root-rot-${axis}`}
+                        type="number"
+                        step={0.1}
+                        value={Number(assetRootRotationDeg[axis] || 0).toFixed(1)}
+                        onChange={(e) => {
+                          const next = [...assetRootRotationDeg] as [number, number, number];
+                          next[axis] = Number(e.target.value) || 0;
+                          setAssetRootRotationDeg(normalizeEulerDeg(next, [0, 0, 0]));
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Rotation Snap</label>
+                    <select
+                      value={rotationSnapStep === 'off' ? 'off' : String(rotationSnapStep)}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (raw === 'off') {
+                          setRotationSnapStep('off');
+                        } else if (raw === '15') {
+                          setRotationSnapStep(15);
+                        } else {
+                          setRotationSnapStep(45);
+                        }
+                      }}
+                      style={{ width: 100 }}
+                    >
+                      <option value="45">45°</option>
+                      <option value="15">15°</option>
+                      <option value="off">Off</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setAssetRootRotationDeg([0, 0, 0])}
+                      style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}
+                    >
+                      Reset Rotation
+                    </button>
+                  </div>
                 </div>
                 <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>
