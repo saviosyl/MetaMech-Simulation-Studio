@@ -2403,6 +2403,11 @@ const AdminAssetEditorPage: React.FC = () => {
             {!asset && <div style={{ fontSize: 12, color: 'var(--mm-text-tertiary)' }}>Select an asset to edit authoring metadata.</div>}
             {asset && (
               <div style={{ display: 'grid', gap: 10 }}>
+                <details open style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 10, background: 'var(--mm-bg-surface)' }}>
+                  <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '8px 10px', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--mm-text-secondary)' }}>
+                    Asset Basics
+                  </summary>
+                  <div style={{ padding: 8, display: 'grid', gap: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>Asset Info</div>
               <div style={{ display: 'grid', gap: 6 }}>
                 <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Name</label>
@@ -2413,6 +2418,11 @@ const AdminAssetEditorPage: React.FC = () => {
                 <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
               </div>
 
+                    <details style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, background: 'var(--mm-bg-panel)' }}>
+                      <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)' }}>
+                        Model Normalization (Advanced)
+                      </summary>
+                      <div style={{ padding: 8, display: 'grid', gap: 8 }}>
               <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8, display: 'grid', gap: 8 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>
                   Model Normalization
@@ -2626,6 +2636,16 @@ const AdminAssetEditorPage: React.FC = () => {
                 </div>
               </div>
 
+                      </div>
+                    </details>
+                  </div>
+                </details>
+
+                <details open style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 10, background: 'var(--mm-bg-surface)' }}>
+                  <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '8px 10px', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--mm-text-secondary)' }}>
+                    Behavior Setup
+                  </summary>
+                  <div style={{ padding: 8, display: 'grid', gap: 8 }}>
               <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8, display: 'grid', gap: 8 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>
                   Product Flow Path
@@ -2949,36 +2969,17 @@ const AdminAssetEditorPage: React.FC = () => {
                 </div>
               )}
 
-                <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Runtime Controls</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
-                    {(
-                      behaviorTemplate === 'lift-conveyor'
-                        ? ([
-                            ['showTargetHeight', 'Target height selector'],
-                            ['showSpeedSlider', 'Lift speed / conveyor speed'],
-                            ['showAutoManual', 'Auto/manual mode'],
-                            ['showHomeCommand', 'Home command'],
-                          ] as [keyof RuntimeControlsConfig, string][])
-                        : ([
-                            ['showSpeedSlider', 'Speed slider'],
-                            ['showTargetHeight', 'Target height selector'],
-                            ['showAutoManual', 'Auto/manual mode'],
-                            ['showHomeCommand', 'Home command'],
-                            ['showEnableToggle', 'Enable/disable'],
-                            ['showSensorState', 'Sensor state visibility'],
-                            ['showStopperState', 'Stopper state visibility'],
-                          ] as [keyof RuntimeControlsConfig, string][])
-                    ).map(([key, label]) => (
-                      <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
-                        <input type="checkbox" checked={Boolean(runtimeControls[key])} onChange={(e) => setRuntimeControl(key, e.target.checked)} />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
+
               </div>
 
+                  </div>
+                </details>
+
+                <details open style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 10, background: 'var(--mm-bg-surface)' }}>
+                  <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '8px 10px', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--mm-text-secondary)' }}>
+                    Nodes
+                  </summary>
+                  <div style={{ padding: 8, display: 'grid', gap: 8 }}>
               <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>Nodes</div>
@@ -3123,6 +3124,14 @@ const AdminAssetEditorPage: React.FC = () => {
                 )}
               </div>
 
+                  </div>
+                </details>
+
+                <details style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 10, background: 'var(--mm-bg-surface)' }}>
+                  <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '8px 10px', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--mm-text-secondary)' }}>
+                    Moving Parts
+                  </summary>
+                  <div style={{ padding: 8, display: 'grid', gap: 8 }}>
               <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>Moving Parts</div>
@@ -3283,6 +3292,49 @@ const AdminAssetEditorPage: React.FC = () => {
                 )}
               </div>
 
+                  </div>
+                </details>
+
+                <details style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 10, background: 'var(--mm-bg-surface)' }}>
+                  <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '8px 10px', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--mm-text-secondary)' }}>
+                    Runtime Controls
+                  </summary>
+                  <div style={{ padding: 8, display: 'grid', gap: 8 }}>
+                <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Runtime Controls</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                    {(
+                      behaviorTemplate === 'lift-conveyor'
+                        ? ([
+                            ['showTargetHeight', 'Target height selector'],
+                            ['showSpeedSlider', 'Lift speed / conveyor speed'],
+                            ['showAutoManual', 'Auto/manual mode'],
+                            ['showHomeCommand', 'Home command'],
+                          ] as [keyof RuntimeControlsConfig, string][])
+                        : ([
+                            ['showSpeedSlider', 'Speed slider'],
+                            ['showTargetHeight', 'Target height selector'],
+                            ['showAutoManual', 'Auto/manual mode'],
+                            ['showHomeCommand', 'Home command'],
+                            ['showEnableToggle', 'Enable/disable'],
+                            ['showSensorState', 'Sensor state visibility'],
+                            ['showStopperState', 'Stopper state visibility'],
+                          ] as [keyof RuntimeControlsConfig, string][])
+                    ).map(([key, label]) => (
+                      <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                        <input type="checkbox" checked={Boolean(runtimeControls[key])} onChange={(e) => setRuntimeControl(key, e.target.checked)} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>                  </div>
+                </details>
+
+                <details style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 10, background: 'var(--mm-bg-surface)' }}>
+                  <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '8px 10px', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--mm-text-secondary)' }}>
+                    Preview & Validation
+                  </summary>
+                  <div style={{ padding: 8, display: 'grid', gap: 8 }}>
               <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8, display: 'grid', gap: 6 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>Motion Preview</div>
                 <select value={previewPartIndex} onChange={(e) => setPreviewPartIndex(Number(e.target.value))}>
@@ -3308,6 +3360,8 @@ const AdminAssetEditorPage: React.FC = () => {
                   </ul>
                 )}
               </div>
+                  </div>
+                </details>
               </div>
             )}
           </div>
