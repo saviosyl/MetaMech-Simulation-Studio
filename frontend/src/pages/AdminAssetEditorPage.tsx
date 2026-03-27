@@ -2646,101 +2646,103 @@ const AdminAssetEditorPage: React.FC = () => {
                     Behavior Setup
                   </summary>
                   <div style={{ padding: 8, display: 'grid', gap: 8 }}>
-              <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8, display: 'grid', gap: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>
-                  Product Flow Path
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPathMode('straight-node');
-                      setActiveTool('node');
-                    }}
-                    style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: pathMode === 'straight-node' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
-                  >
+              {(behaviorTemplate === 'straight-conveyor' || behaviorTemplate === 'lift-conveyor') && (
+                <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8, display: 'grid', gap: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>
+                    Product Flow Path
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPathMode('straight-node');
+                        setActiveTool('node');
+                      }}
+                      style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: pathMode === 'straight-node' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
+                    >
                       Infeed -&gt; Outfeed
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPathMode('polyline');
-                      setActiveTool('node');
-                    }}
-                    style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: pathMode === 'polyline' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
-                  >
-                    Multi-point Path
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPathMode('none');
-                      setPathPoints([]);
-                      setSelectedPathPointIndex(-1);
-                    }}
-                    style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: pathMode === 'none' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
-                  >
-                    Disable Path
-                  </button>
-                </div>
-                {pathMode === 'straight-node' && (
-                  <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)' }}>
-                    Uses infeed/outfeed node positions as a straight transport path.
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPathMode('polyline');
+                        setActiveTool('node');
+                      }}
+                      style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: pathMode === 'polyline' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
+                    >
+                      Multi-point Path
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPathMode('none');
+                        setPathPoints([]);
+                        setSelectedPathPointIndex(-1);
+                      }}
+                      style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: pathMode === 'none' ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)', fontSize: 11 }}
+                    >
+                      Disable Path
+                    </button>
                   </div>
-                )}
-                {pathMode === 'polyline' && (
-                  <div style={{ display: 'grid', gap: 6 }}>
+                  {pathMode === 'straight-node' && (
                     <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)' }}>
-                      Click viewport to add points. Select a point to drag with gizmo.
+                      Uses infeed/outfeed node positions as a straight transport path.
                     </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button
-                        type="button"
-                        onClick={() => setPathPoints([])}
-                        style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}
-                      >
-                        Clear Points
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (selectedPathPointIndex < 0) return;
-                          setPathPoints((prev) => prev.filter((_, i) => i !== selectedPathPointIndex));
-                          setSelectedPathPointIndex(-1);
-                        }}
-                        disabled={selectedPathPointIndex < 0}
-                        style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}
-                      >
-                        Remove Selected Point
-                      </button>
+                  )}
+                  {pathMode === 'polyline' && (
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                        Click viewport to add points; drag selected point with gizmo.
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => setPathPoints([])}
+                          style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}
+                        >
+                          Clear Points
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedPathPointIndex < 0) return;
+                            setPathPoints((prev) => prev.filter((_, i) => i !== selectedPathPointIndex));
+                            setSelectedPathPointIndex(-1);
+                          }}
+                          disabled={selectedPathPointIndex < 0}
+                          style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}
+                        >
+                          Remove Selected Point
+                        </button>
+                      </div>
+                      <div style={{ maxHeight: 96, overflowY: 'auto', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, background: 'var(--mm-bg-surface)' }}>
+                        {pathPoints.length === 0 ? (
+                          <div style={{ padding: 8, fontSize: 11, color: 'var(--mm-text-tertiary)' }}>No path points yet.</div>
+                        ) : (
+                          pathPoints.map((point, index) => (
+                            <button
+                              key={point.id}
+                              type="button"
+                              onClick={() => setSelectedPathPointIndex(index)}
+                              style={{
+                                width: '100%',
+                                textAlign: 'left',
+                                border: 'none',
+                                borderBottom: '1px solid var(--mm-border-subtle)',
+                                background: selectedPathPointIndex === index ? 'var(--mm-accent-primary-muted)' : 'transparent',
+                                padding: '6px 8px',
+                                fontSize: 11,
+                              }}
+                            >
+                              P{index + 1}: [{point.positionMm[0].toFixed(1)}, {point.positionMm[1].toFixed(1)}, {point.positionMm[2].toFixed(1)}] mm
+                            </button>
+                          ))
+                        )}
+                      </div>
                     </div>
-                    <div style={{ maxHeight: 120, overflowY: 'auto', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, background: 'var(--mm-bg-surface)' }}>
-                      {pathPoints.length === 0 ? (
-                        <div style={{ padding: 8, fontSize: 11, color: 'var(--mm-text-tertiary)' }}>No path points yet.</div>
-                      ) : (
-                        pathPoints.map((point, index) => (
-                          <button
-                            key={point.id}
-                            type="button"
-                            onClick={() => setSelectedPathPointIndex(index)}
-                            style={{
-                              width: '100%',
-                              textAlign: 'left',
-                              border: 'none',
-                              borderBottom: '1px solid var(--mm-border-subtle)',
-                              background: selectedPathPointIndex === index ? 'var(--mm-accent-primary-muted)' : 'transparent',
-                              padding: '6px 8px',
-                              fontSize: 11,
-                            }}
-                          >
-                            P{index + 1}: [{point.positionMm[0].toFixed(1)}, {point.positionMm[1].toFixed(1)}, {point.positionMm[2].toFixed(1)}] mm
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8, display: 'grid', gap: 8 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>
