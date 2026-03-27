@@ -172,18 +172,18 @@ function getBoundPortWorldPosition(
     return getPortWorldPosition(localPort, node);
   }
   const nodeBindings = (node.parameters.nodeBindings || {}) as LiftV1NodeBindingMap;
-  const nodeDefs = ((node.parameters as { assetNodes?: unknown }).assetNodes || []) as unknown[];
-  const idByPosition = new Map<string, string>();
-  for (const rawNode of nodeDefs) {
-    if (!rawNode || typeof rawNode !== 'object') continue;
-    const nodeId = String((rawNode as { id?: unknown }).id || '').trim();
-    const pos = asVec3OrNull((rawNode as { position?: unknown }).position);
-    if (!nodeId || !pos) continue;
-    const key = `${(pos[0] / 1000).toFixed(6)}|${(pos[1] / 1000).toFixed(6)}|${(pos[2] / 1000).toFixed(6)}`;
-    idByPosition.set(key, nodeId);
-  }
-  const localKey = `${localPort[0].toFixed(6)}|${localPort[1].toFixed(6)}|${localPort[2].toFixed(6)}`;
-  const nodeId = idByPosition.get(localKey);
+  const portDefs = getConnectionPorts(node.type, node.parameters, node.assetId);
+  const matchedPort = portDefs.find((port) => {
+    const px = Number(port.localPosition[0] || 0);
+    const py = Number(port.localPosition[1] || 0);
+    const pz = Number(port.localPosition[2] || 0);
+    return (
+      Math.abs(px - localPort[0]) < 0.000001
+      && Math.abs(py - localPort[1]) < 0.000001
+      && Math.abs(pz - localPort[2]) < 0.000001
+    );
+  });
+  const nodeId = matchedPort?.id ? String(matchedPort.id) : '';
   const binding = nodeId ? nodeBindings[nodeId] : undefined;
   const base = getPortWorldPosition(localPort, node);
   if (binding?.frame === 'movingPart' && String(binding.movingPartId || '') === String(behavior.movingPartId || '')) {
@@ -1398,8 +1398,8 @@ export class SimulationEngine {
       node.position[2],
     ];
 
-    const pickPortWorld = pickPort ? getPortWorldPosition(pickPort.localPosition, node) : pickFallback;
-    const placePortWorld = placePort ? getPortWorldPosition(placePort.localPosition, node) : placeFallback;
+    const pickPortWorld = pickPort ? getBoundPortWorldPosition(pickPort.localPosition, node) : pickFallback;
+    const placePortWorld = placePort ? getBoundPortWorldPosition(placePort.localPosition, node) : placeFallback;
 
     // Use true connected node endpoints as source of truth where possible.
     // This removes generic side-offset behavior and forces node-to-node transfer.
@@ -1411,7 +1411,7 @@ export class SimulationEngine {
         const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters);
         const fromPort = fromPorts.find(p => p.id === edge.fromPort) || fromPorts.find(p => p.type === 'output');
         if (fromPort) {
-          pickPosition = getPortWorldPosition(fromPort.localPosition, fromNode);
+          pickPosition = getBoundPortWorldPosition(fromPort.localPosition, fromNode);
         }
       }
     }
@@ -1426,7 +1426,7 @@ export class SimulationEngine {
         const toPorts = getConnectionPorts(toNode.type, toNode.parameters);
         const toPort = toPorts.find(p => p.id === edge.toPort) || toPorts.find(p => p.type === 'input');
         if (toPort) {
-          placePosition = getPortWorldPosition(toPort.localPosition, toNode);
+          placePosition = getBoundPortWorldPosition(toPort.localPosition, toNode);
         }
       }
     }
