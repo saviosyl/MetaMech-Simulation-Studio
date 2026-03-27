@@ -544,6 +544,7 @@ const ModelPreview: React.FC<{
   const controlsRef = useRef<OrbitControlsLike | null>(null);
   const cameraRef = useRef<THREE.Camera | null>(null);
   const modelBoundsRef = useRef<THREE.Box3 | null>(null);
+  const rootGroupRef = useRef<THREE.Group | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -647,11 +648,6 @@ const ModelPreview: React.FC<{
     clone.scale.setScalar(worldScale);
     clone.position.multiplyScalar(worldScale);
     clone.position.add(new THREE.Vector3(mmToM(pivotOffsetMm[0]), mmToM(pivotOffsetMm[1]), mmToM(pivotOffsetMm[2])));
-    clone.rotation.set(
-      degToRad(assetRootRotationDeg[0]),
-      degToRad(assetRootRotationDeg[1]),
-      degToRad(assetRootRotationDeg[2])
-    );
     for (const [path, rotationDeg] of Object.entries(objectRotationDegByPath)) {
       if (!path || path === ASSET_ROOT_PATH) continue;
       const target = findObjectByHierarchyPath(clone, path);
@@ -690,18 +686,19 @@ const ModelPreview: React.FC<{
     highlightedObjectNames,
     worldScale,
     pivotOffsetMm,
-    assetRootRotationDeg,
     objectRotationDegByPath,
   ]);
 
   const rotateTargetObject = useMemo(() => {
     if (!previewRoot || activeTool !== 'rotate') return null;
     if (selectedNodeIndex >= 0 || selectedPathPointIndex >= 0) return null;
-    if (selectedObjectPath && selectedObjectPath !== ASSET_ROOT_PATH) {
-      return findObjectByHierarchyPath(previewRoot, selectedObjectPath);
-    }
-    return previewRoot;
+    if (!selectedObjectPath || selectedObjectPath === ASSET_ROOT_PATH) return null;
+    return findObjectByHierarchyPath(previewRoot, selectedObjectPath);
   }, [previewRoot, activeTool, selectedNodeIndex, selectedPathPointIndex, selectedObjectPath]);
+  const rotateAssetRootActive = activeTool === 'rotate'
+    && selectedNodeIndex < 0
+    && selectedPathPointIndex < 0
+    && (!selectedObjectPath || selectedObjectPath === ASSET_ROOT_PATH);
 
   function parseNodeFocusIndex(path: string): number | null {
     if (!path.startsWith('__node__:')) return null;
@@ -896,7 +893,18 @@ const ModelPreview: React.FC<{
       {showLocalAxis && previewRoot && <primitive object={new THREE.AxesHelper(0.8)} position={previewRoot.position.clone()} />}
       {previewRoot ? (
         <group
+          ref={rootGroupRef}
+          rotation={[
+            degToRad(assetRootRotationDeg[0]),
+            degToRad(assetRootRotationDeg[1]),
+            degToRad(assetRootRotationDeg[2]),
+          ]}
           onPointerDown={(event) => {
+            if (rotateAssetRootActive) {
+              onSelectObjectPath(ASSET_ROOT_PATH);
+              setHighlightedObjectNames([]);
+              return;
+            }
             const hoveredObject = event.object as THREE.Object3D | undefined;
             if (!hoveredObject) return;
             const hoveredName = displayObjectName(hoveredObject);
@@ -949,6 +957,22 @@ const ModelPreview: React.FC<{
           <boxGeometry args={[1.2, 0.8, 0.8]} />
           <meshStandardMaterial color="#64748b" metalness={0.3} roughness={0.55} />
         </mesh>
+      )}
+      {rotateAssetRootActive && rootGroupRef.current && (
+        <TransformControls
+          object={rootGroupRef.current}
+          mode="rotate"
+          size={0.85}
+          onObjectChange={() => {
+            const group = rootGroupRef.current;
+            if (!group) return;
+            onSetAssetRootRotationDeg([
+              radToDeg(group.rotation.x),
+              radToDeg(group.rotation.y),
+              radToDeg(group.rotation.z),
+            ]);
+          }}
+        />
       )}
       {rotateTargetObject && (
         <TransformControls
