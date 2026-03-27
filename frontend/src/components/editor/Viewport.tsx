@@ -764,7 +764,8 @@ const Viewport: React.FC = () => {
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    const hasModulePayload = !!event.dataTransfer.getData('application/json');
+    const dragTypes = Array.from(event.dataTransfer.types || []);
+    const hasModulePayload = dragTypes.includes('application/json');
     event.dataTransfer.dropEffect = hasModulePayload ? 'copy' : 'none';
   }, []);
 
