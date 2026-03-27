@@ -3288,10 +3288,30 @@ const AdminAssetEditorPage: React.FC = () => {
                         )}
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 6 }}>
-                        <input type="number" value={part.min} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, min: Number(e.target.value) || 0 } : p)))} placeholder="min" />
-                        <input type="number" value={part.max} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, max: Number(e.target.value) || 0 } : p)))} placeholder="max" />
-                        <input type="number" value={part.default} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, default: Number(e.target.value) || 0 } : p)))} placeholder="default" />
-                        <input type="number" value={part.speed} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, speed: Number(e.target.value) || 0 } : p)))} placeholder="speed" />
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                            {part.motionType === 'lift' ? 'Min Height (mm)' : 'Offset X (mm)'}
+                          </label>
+                          <input type="number" value={part.min} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, min: Number(e.target.value) || 0 } : p)))} placeholder="min" />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                            {part.motionType === 'lift' ? 'Max Height (mm)' : 'Offset Y (mm)'}
+                          </label>
+                          <input type="number" value={part.max} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, max: Number(e.target.value) || 0 } : p)))} placeholder="max" />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                            {part.motionType === 'lift' ? 'Default Height (mm)' : 'Offset Z (mm)'}
+                          </label>
+                          <input type="number" value={part.default} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, default: Number(e.target.value) || 0 } : p)))} placeholder="default" />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                            {part.motionType === 'lift' ? 'Lift Speed (mm/s)' : 'Travel Speed'}
+                          </label>
+                          <input type="number" value={part.speed} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, speed: Number(e.target.value) || 0 } : p)))} placeholder="speed" />
+                        </div>
                       </div>
                       <input type="number" value={Number(part.dwellMs || 0)} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, dwellMs: Number(e.target.value) || 0 } : p)))} placeholder="dwell (ms)" />
                       <button type="button" onClick={() => setMovableParts((prev) => prev.filter((_, i) => i !== index))} style={{ border: '1px solid color-mix(in oklab, var(--mm-accent-danger) 45%, transparent)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-accent-danger-muted)', color: 'var(--mm-accent-danger)', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
