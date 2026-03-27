@@ -70,7 +70,7 @@ type CameraIntent = 'none' | 'fit' | 'frameSelected' | 'focusNode' | 'reset';
 type InteractionTool = 'select' | 'move' | 'rotate' | 'node' | 'pivot' | 'measurement';
 type PathMode = 'none' | 'straight-node' | 'polyline';
 type PathPoint = { id: string; positionMm: [number, number, number] };
-type NodeGizmoSnapMode = 'none' | 'grid' | 'ground';
+type NodeGizmoSnapMode = 'off' | 'surface' | 'center' | 'edge';
 type TransformMode = 'translate' | 'rotate';
 type CollapsibleSectionKey = 'assets' | 'hierarchy' | 'nodes' | 'movingParts';
 type RotationTargetKind = 'assetRoot' | 'selectedObject' | 'selectedNode' | 'selectedPivot';
@@ -802,12 +802,9 @@ const ModelPreview: React.FC<{
   }
 
   function snapPosition(positionM: THREE.Vector3): [number, number, number] {
-    const snapStepM = 0.05;
-    const shouldSnapGrid = nodeSnapMode === 'grid' || nodeSnapMode === 'ground';
-    let sx = shouldSnapGrid ? Math.round(positionM.x / snapStepM) * snapStepM : positionM.x;
-    let sy = shouldSnapGrid ? Math.round(positionM.y / snapStepM) * snapStepM : positionM.y;
-    let sz = shouldSnapGrid ? Math.round(positionM.z / snapStepM) * snapStepM : positionM.z;
-    if (nodeSnapMode === 'ground') sy = 0;
+    let sx = positionM.x;
+    let sy = positionM.y;
+    let sz = positionM.z;
     const bounds = modelBoundsRef.current;
     const selected = nodes[selectedNodeIndex];
     const type = String(selected?.type || '').toLowerCase();
@@ -827,6 +824,60 @@ const ModelPreview: React.FC<{
       }
     }
     return [mToMm(sx), mToMm(sy), mToMm(sz)];
+  }
+
+  function getClickedMeshBounds(event: THREE.Event): THREE.Box3 | null {
+    if (!previewRoot) return null;
+    const e = event as THREE.Event & { object?: THREE.Object3D };
+    let current = e.object || null;
+    while (current && current !== previewRoot) {
+      if ((current as THREE.Mesh).isMesh) {
+        return new THREE.Box3().setFromObject(current);
+      }
+      current = current.parent;
+    }
+    return null;
+  }
+
+  function getSnappedNodePlacementFromClick(event: THREE.Event): [number, number, number] | null {
+    const point = getPlaneIntersection(event);
+    if (!point) return null;
+    if (nodeSnapMode === 'off') {
+      return snapPosition(point);
+    }
+    if (nodeSnapMode === 'surface') {
+      return [mToMm(point.x), mToMm(point.y), mToMm(point.z)];
+    }
+    const targetBounds = getClickedMeshBounds(event) || modelBoundsRef.current;
+    if (!targetBounds) {
+      return [mToMm(point.x), mToMm(point.y), mToMm(point.z)];
+    }
+    const center = targetBounds.getCenter(new THREE.Vector3());
+    const size = targetBounds.getSize(new THREE.Vector3());
+    const primaryAxis = size.x >= size.z ? 'x' : 'z';
+    const snapped = point.clone();
+    if (nodeSnapMode === 'center') {
+      // Conveyor-like placement: keep along travel axis, snap to centerline on top surface.
+      if (primaryAxis === 'x') {
+        snapped.x = THREE.MathUtils.clamp(snapped.x, targetBounds.min.x, targetBounds.max.x);
+        snapped.z = center.z;
+      } else {
+        snapped.z = THREE.MathUtils.clamp(snapped.z, targetBounds.min.z, targetBounds.max.z);
+        snapped.x = center.x;
+      }
+      snapped.y = targetBounds.max.y;
+      return [mToMm(snapped.x), mToMm(snapped.y), mToMm(snapped.z)];
+    }
+    // Edge mode: place on nearest side edge on top surface, following clicked side.
+    if (primaryAxis === 'x') {
+      snapped.x = THREE.MathUtils.clamp(snapped.x, targetBounds.min.x, targetBounds.max.x);
+      snapped.z = snapped.z >= center.z ? targetBounds.max.z : targetBounds.min.z;
+    } else {
+      snapped.z = THREE.MathUtils.clamp(snapped.z, targetBounds.min.z, targetBounds.max.z);
+      snapped.x = snapped.x >= center.x ? targetBounds.max.x : targetBounds.min.x;
+    }
+    snapped.y = targetBounds.max.y;
+    return [mToMm(snapped.x), mToMm(snapped.y), mToMm(snapped.z)];
   }
 
   return (
@@ -947,7 +998,9 @@ const ModelPreview: React.FC<{
               return;
             }
             if (activeTool === 'node') {
-              onPlaceNodeAtMm(snapPosition(point));
+              const snapped = getSnappedNodePlacementFromClick(event);
+              if (!snapped) return;
+              onPlaceNodeAtMm(snapped);
             }
           }}
           onPointerMissed={() => {
@@ -1237,7 +1290,7 @@ const AdminAssetEditorPage: React.FC = () => {
   });
   const [showWorldAxis, setShowWorldAxis] = useState(true);
   const [showLocalAxis, setShowLocalAxis] = useState(true);
-  const [nodeSnapMode, setNodeSnapMode] = useState<NodeGizmoSnapMode>('grid');
+  const [nodeSnapMode, setNodeSnapMode] = useState<NodeGizmoSnapMode>('surface');
   const [nodeTransformMode, setNodeTransformMode] = useState<TransformMode>('translate');
   const [rotationSnapStep, setRotationSnapStep] = useState<RotationSnapStep>(45);
 
@@ -2784,9 +2837,10 @@ const AdminAssetEditorPage: React.FC = () => {
                     <div>
                       <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Node Snap</label>
                       <select value={nodeSnapMode} onChange={(e) => setNodeSnapMode(e.target.value as NodeGizmoSnapMode)}>
-                        <option value="none">None</option>
-                        <option value="grid">Grid</option>
-                        <option value="ground">Ground (Y=0)</option>
+                        <option value="off">Off</option>
+                        <option value="surface">Surface</option>
+                        <option value="center">Center</option>
+                        <option value="edge">Edge</option>
                       </select>
                     </div>
                   </div>
