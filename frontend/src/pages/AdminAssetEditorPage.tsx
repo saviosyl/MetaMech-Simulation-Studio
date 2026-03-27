@@ -977,19 +977,27 @@ const ModelPreview: React.FC<{
       <Grid args={[10, 10]} cellColor="#6b7280" sectionColor="#334155" fadeDistance={18} fadeStrength={1.2} />
       {showWorldAxis && (
         <>
-          <axesHelper args={[1.2]} />
+          <group rotation={[-Math.PI / 2, 0, 0]}>
+            <axesHelper args={[1.2]} />
+          </group>
           <Html position={[1.28, 0, 0]} style={{ pointerEvents: 'none', fontSize: 11, fontWeight: 800, color: '#ef4444', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
             X
           </Html>
-          <Html position={[0, 1.28, 0]} style={{ pointerEvents: 'none', fontSize: 11, fontWeight: 800, color: '#22c55e', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
+          <Html position={[0, 0, -1.28]} style={{ pointerEvents: 'none', fontSize: 11, fontWeight: 800, color: '#22c55e', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
             Y
           </Html>
-          <Html position={[0, 0, 1.28]} style={{ pointerEvents: 'none', fontSize: 11, fontWeight: 800, color: '#3b82f6', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
+          <Html position={[0, 1.28, 0]} style={{ pointerEvents: 'none', fontSize: 11, fontWeight: 800, color: '#3b82f6', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
             Z
           </Html>
         </>
       )}
-      {showLocalAxis && previewRoot && <primitive object={new THREE.AxesHelper(0.8)} position={previewRoot.position.clone()} />}
+      {showLocalAxis && previewRoot && (
+        <primitive
+          object={new THREE.AxesHelper(0.8)}
+          position={previewRoot.position.clone()}
+          rotation={[-Math.PI / 2, 0, 0]}
+        />
+      )}
       {previewRoot ? (
         <group
           ref={rootGroupRef}
@@ -1146,7 +1154,7 @@ const ModelPreview: React.FC<{
               >
                 <sphereGeometry args={[0.07, 14, 12]} />
                 <meshStandardMaterial color={nodeColor} emissive={selected ? nodeColor : '#000000'} emissiveIntensity={selected ? 0.4 : 0} />
-                {showLocalAxis && <axesHelper args={[0.24]} />}
+                {showLocalAxis && <axesHelper args={[0.24]} rotation={[-Math.PI / 2, 0, 0]} />}
                 <Html position={[0.1, 0.1, 0]} style={{ pointerEvents: 'none', fontSize: 10, fontWeight: 700, color: '#e2e8f0', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
                   {node.id || `Node ${index + 1}`}
                 </Html>
@@ -1165,7 +1173,7 @@ const ModelPreview: React.FC<{
           >
             <sphereGeometry args={[0.05, 14, 12]} />
             <meshStandardMaterial color={nodeColor} />
-            {showLocalAxis && <axesHelper args={[0.22]} />}
+            {showLocalAxis && <axesHelper args={[0.22]} rotation={[-Math.PI / 2, 0, 0]} />}
             <Html position={[0.08, 0.08, 0]} style={{ pointerEvents: 'none', fontSize: 10, fontWeight: 700, color: '#e2e8f0', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>
               {node.id || `Node ${index + 1}`}
             </Html>

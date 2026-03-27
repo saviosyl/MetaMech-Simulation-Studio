@@ -144,6 +144,18 @@ import ViewportToolbar from '../editor/ViewportToolbar';
 import { VIDEO_CAPTURE_PRESETS, VideoQualityPreset } from '../../lib/videoExportPresets';
 import PortDirectionDebug from '../3d/PortDirectionDebug';
 
+const AXIS_X_COLOR = '#ef4444';
+const AXIS_Y_COLOR = '#22c55e';
+const AXIS_Z_COLOR = '#3b82f6';
+
+const ZUpAxisHelper: React.FC<{ size: number }> = ({ size }) => (
+  <group>
+    <arrowHelper args={[new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), size, AXIS_X_COLOR]} />
+    <arrowHelper args={[new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), size, AXIS_Y_COLOR]} />
+    <arrowHelper args={[new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), size, AXIS_Z_COLOR]} />
+  </group>
+);
+
 // Wrapper that attaches TransformControls to the selected object
 const DraggableObject: React.FC<{
   children: React.ReactNode;
@@ -458,10 +470,8 @@ const SceneContent: React.FC<{
         />
       )}
 
-      {/* Axes Helper */}
-      {sceneSettings.axes.visible && (
-        <axesHelper args={[sceneSettings.axes.size]} />
-      )}
+      {/* Axes helper (app convention): X red, Y green, Z blue with Z shown as vertical. */}
+      {sceneSettings.axes.visible && <ZUpAxisHelper size={sceneSettings.axes.size} />}
 
       {/* Contact Shadows — premium ground contact effect */}
       {!isMobileSafari && (!isNavigating || isExportRendering) && (
@@ -796,7 +806,7 @@ const Viewport: React.FC = () => {
         {/* 3D orientation gizmo */}
         <GizmoHelper alignment="bottom-right" margin={[78, 88]}>
           <GizmoViewport
-            axisColors={['#ef4444', '#22c55e', '#3b82f6']}
+            axisColors={[AXIS_X_COLOR, AXIS_Y_COLOR, AXIS_Z_COLOR]}
             labelColor="#f8fafc"
           />
         </GizmoHelper>
