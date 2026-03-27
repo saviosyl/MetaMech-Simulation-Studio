@@ -75,13 +75,17 @@ export interface AssetDefinitionNode {
 }
 
 export interface AssetMovingPart {
+  id?: string;
+  name?: string;
   objectName: string;
-  motionType: 'translate' | 'rotate';
+  motionType: 'none' | 'translate' | 'rotate' | 'lift';
   axis: 'x' | 'y' | 'z';
   min: number;
   max: number;
   default: number;
   speed: number;
+  dwellMs?: number;
+  parentPartId?: string;
 }
 
 export interface ParametricParameterValues {
@@ -112,6 +116,10 @@ export type BehaviorTemplateType =
 export interface AssetMetadata {
   nodes?: AssetDefinitionNode[];
   movableParts?: AssetMovingPart[];
+  nodeBindings?: Record<string, {
+    frame: 'assetRoot' | 'movingPart';
+    movingPartId?: string;
+  }>;
   objectAliases?: Record<string, string>;
   objectRotationsDeg?: Record<string, [number, number, number]>;
   assetRootRotationDeg?: [number, number, number];

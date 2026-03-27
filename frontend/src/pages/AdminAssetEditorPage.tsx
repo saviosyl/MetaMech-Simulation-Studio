@@ -80,10 +80,25 @@ type RotationTargetInfo = {
   rotationDeg: [number, number, number];
 };
 type RotationSnapStep = 'off' | 45 | 15;
+type LiftNodeBindingMap = Record<string, 'assetRoot' | 'movingPart'>;
 
 type MeasurementPoint = {
   id: string;
   positionMm: [number, number, number];
+};
+
+type LiftV1BehaviorConfig = {
+  movingPartId?: string;
+  liftAxis?: 'z';
+  liftMinMm?: number;
+  liftMaxMm?: number;
+  liftDefaultMm?: number;
+  lowerInfeedNodeId?: string;
+  upperOutfeedNodeId?: string;
+  liftSpeedMmPerSec?: number;
+  conveyorSpeedMpm?: number;
+  controlMode?: 'auto' | 'manual';
+  homeTargetMm?: number;
 };
 
 type LeftSectionKey = 'assets' | 'hierarchy' | 'nodes' | 'movingParts';
@@ -241,22 +256,17 @@ function defaultBehaviorConfig(template: BehaviorTemplateType): BehaviorConfig {
   }
   if (template === 'lift-conveyor') {
     return {
-      lowerInfeedNodeId: 'NODE_INFEED_LOWER',
-      upperOutfeedNodeId: 'NODE_OUTFEED_UPPER',
-      liftTravelAxis: 'y',
-      lowerStopPositionMm: 800,
-      upperStopPositionMm: 2400,
-      targetHeightsMm: '800,2400',
-      liftSpeedUpMps: 0.35,
-      liftSpeedDownMps: 0.3,
+      movingPartId: '',
+      liftAxis: 'z',
+      liftMinMm: 0,
+      liftMaxMm: 2500,
+      liftDefaultMm: 800,
+      lowerInfeedNodeId: '',
+      upperOutfeedNodeId: '',
+      liftSpeedMmPerSec: 350,
       conveyorSpeedMpm: 12,
-      dwellBeforeLiftSec: 0.5,
-      dwellAfterLiftSec: 0.5,
-      loadingZoneLengthMm: 350,
-      unloadZoneLengthMm: 350,
-      allowIntermediateLevels: false,
-      homePositionMm: 800,
-      cycleMode: 'auto-up-after-load',
+      controlMode: 'auto',
+      homeTargetMm: 0,
     };
   }
   if (template === 'rotary-transfer') {
@@ -304,9 +314,9 @@ function defaultRuntimeControlsForTemplate(template: BehaviorTemplateType): Runt
       showTargetHeight: true,
       showAutoManual: true,
       showHomeCommand: true,
-      showEnableToggle: true,
-      showSensorState: true,
-      showStopperState: true,
+      showEnableToggle: false,
+      showSensorState: false,
+      showStopperState: false,
     };
   }
   if (template === 'rotary-transfer' || template === 'angle-transfer' || template === 'robot-pick-place') {
@@ -359,6 +369,40 @@ function normalizeBehaviorConfig(input: unknown): BehaviorConfig {
     }
   }
   return out;
+}
+
+function normalizeLiftNodeBindings(input: unknown): LiftNodeBindingMap {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const out: LiftNodeBindingMap = {};
+  for (const [nodeId, rawBinding] of Object.entries(input as Record<string, unknown>)) {
+    const normalized = rawBinding === 'movingPart' ? 'movingPart' : 'assetRoot';
+    out[String(nodeId)] = normalized;
+  }
+  return out;
+}
+
+function toLiftV1BehaviorConfig(input: unknown): LiftV1BehaviorConfig {
+  const source = normalizeBehaviorConfig(input);
+  const movingPartId = String(source.movingPartId || '').trim();
+  const lowerInfeedNodeId = String(source.lowerInfeedNodeId || '').trim();
+  const upperOutfeedNodeId = String(source.upperOutfeedNodeId || '').trim();
+  const toFinite = (value: unknown, fallback: number): number => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  return {
+    movingPartId,
+    liftAxis: 'z',
+    liftMinMm: toFinite(source.liftMinMm, 0),
+    liftMaxMm: toFinite(source.liftMaxMm, 2500),
+    liftDefaultMm: toFinite(source.liftDefaultMm, 800),
+    lowerInfeedNodeId,
+    upperOutfeedNodeId,
+    liftSpeedMmPerSec: toFinite(source.liftSpeedMmPerSec, 350),
+    conveyorSpeedMpm: toFinite(source.conveyorSpeedMpm, 12),
+    controlMode: String(source.controlMode || 'auto') === 'manual' ? 'manual' : 'auto',
+    homeTargetMm: toFinite(source.homeTargetMm, 0),
+  };
 }
 
 function fitCameraToBox(camera: THREE.Camera, controls: OrbitControlsLike | null, box: THREE.Box3): void {
@@ -1293,6 +1337,7 @@ const AdminAssetEditorPage: React.FC = () => {
   const [nodeSnapMode, setNodeSnapMode] = useState<NodeGizmoSnapMode>('surface');
   const [nodeTransformMode, setNodeTransformMode] = useState<TransformMode>('translate');
   const [rotationSnapStep, setRotationSnapStep] = useState<RotationSnapStep>(45);
+  const [liftNodeBindings, setLiftNodeBindings] = useState<LiftNodeBindingMap>({});
 
   function setBehaviorField(key: string, value: number | string | boolean): void {
     setBehaviorConfig((prev) => ({ ...prev, [key]: value }));
@@ -1379,6 +1424,16 @@ const AdminAssetEditorPage: React.FC = () => {
       ...safeAssetMetadata(asset),
       nodes,
       movableParts,
+      ...(Object.keys(liftNodeBindings).length > 0
+        ? {
+          nodeBindings: Object.fromEntries(
+            Object.entries(liftNodeBindings).map(([nodeId, frame]) => [
+              nodeId,
+              { frame, ...(frame === 'movingPart' ? { movingPartId: String(toLiftV1BehaviorConfig(behaviorConfig).movingPartId || '') } : {}) },
+            ])
+          ),
+        }
+        : {}),
       ...(Object.keys(aliases).length > 0 ? { objectAliases: aliases } : {}),
       ...(Object.keys(objectRotationDegByPath).length > 0 ? { objectRotationsDeg: objectRotationDegByPath } : {}),
       assetRootRotationDeg,
@@ -1403,6 +1458,7 @@ const AdminAssetEditorPage: React.FC = () => {
     asset,
     nodes,
     movableParts,
+    liftNodeBindings,
     objectAliasesByPath,
     objectRotationDegByPath,
     assetRootRotationDeg,
@@ -1461,16 +1517,50 @@ const AdminAssetEditorPage: React.FC = () => {
       if (!(pathLen > 0)) problems.push('Straight Conveyor template requires usable path length');
     }
     if (behaviorTemplate === 'lift-conveyor') {
-      if (!hasInfeed) problems.push('Lift Conveyor template requires a lower infeed node');
-      if (!hasOutfeed) problems.push('Lift Conveyor template requires an upper outfeed node');
-      const lowerStop = Number(behaviorConfig.lowerStopPositionMm || 0);
-      const upperStop = Number(behaviorConfig.upperStopPositionMm || 0);
-      if (!(upperStop > lowerStop)) problems.push('Lift Conveyor requires upper stop > lower stop');
-      const axis = String(behaviorConfig.travelAxis || 'z').toLowerCase();
-      if (!['x', 'y', 'z'].includes(axis)) problems.push('Lift Conveyor requires travel axis x/y/z');
+      const lift = toLiftV1BehaviorConfig(behaviorConfig);
+      const infeedId = lift.lowerInfeedNodeId || '';
+      const outfeedId = lift.upperOutfeedNodeId || '';
+      const movingPartId = lift.movingPartId || '';
+      if (!hasInfeed) problems.push('Lift V1 requires at least one infeed node in the asset');
+      if (!hasOutfeed) problems.push('Lift V1 requires at least one outfeed node in the asset');
+      if (!movingPartId) problems.push('Lift V1 requires selecting one moving part');
+      const selectedPart = movableParts.find((part) => String(part.id || '') === movingPartId);
+      if (!selectedPart) problems.push('Lift V1 moving part id does not match an existing moving part');
+      if (selectedPart && selectedPart.motionType !== 'lift') problems.push('Lift V1 moving part must use motion type "lift"');
+      if (selectedPart && selectedPart.axis !== 'z') problems.push('Lift V1 moving part axis must be z');
+      if (!infeedId) problems.push('Lift V1 requires selecting lower infeed node');
+      if (!outfeedId) problems.push('Lift V1 requires selecting upper outfeed node');
+      const lowerInfeedNode = nodes.find((n) => String(n.id || '') === infeedId);
+      const upperOutfeedNode = nodes.find((n) => String(n.id || '') === outfeedId);
+      if (!lowerInfeedNode) problems.push('Lift V1 lower infeed node id is missing or invalid');
+      if (!upperOutfeedNode) problems.push('Lift V1 upper outfeed node id is missing or invalid');
+      if (lowerInfeedNode && !String(lowerInfeedNode.type || '').toLowerCase().includes('infeed')) {
+        problems.push('Lift V1 lower node must be type infeed');
+      }
+      if (upperOutfeedNode && !String(upperOutfeedNode.type || '').toLowerCase().includes('outfeed')) {
+        problems.push('Lift V1 upper node must be type outfeed');
+      }
+      const liftMin = Number(lift.liftMinMm || 0);
+      const liftMax = Number(lift.liftMaxMm || 0);
+      const liftDefault = Number(lift.liftDefaultMm || 0);
+      if (!(liftMax > liftMin)) problems.push('Lift V1 requires max > min');
+      if (liftDefault < liftMin || liftDefault > liftMax) problems.push('Lift V1 default must be within min/max');
+      const speed = Number(lift.liftSpeedMmPerSec || 0);
+      if (!(speed > 0)) problems.push('Lift V1 requires lift speed > 0');
+      const conveyorSpeed = Number(lift.conveyorSpeedMpm || 0);
+      if (!(conveyorSpeed >= 0)) problems.push('Lift V1 requires conveyor speed >= 0');
+      const requiredControls: (keyof RuntimeControlsConfig)[] = [
+        'showTargetHeight',
+        'showSpeedSlider',
+        'showAutoManual',
+        'showHomeCommand',
+      ];
+      for (const key of requiredControls) {
+        if (!runtimeControls[key]) problems.push(`Lift V1 requires runtime control "${key}" enabled`);
+      }
     }
     return problems;
-  }, [asset, selectedCategoryId, nodes, normalizationWarnings, behaviorTemplate, behaviorConfig]);
+  }, [asset, selectedCategoryId, nodes, normalizationWarnings, behaviorTemplate, behaviorConfig, movableParts, runtimeControls]);
 
   function hydrateFromAsset(next: LibraryAsset | null): void {
     setAsset(next);
@@ -1526,6 +1616,7 @@ const AdminAssetEditorPage: React.FC = () => {
         ? { ...(m.behaviorConfig as Record<string, unknown>) }
         : defaultBehaviorConfig(nextBehaviorTemplate)
     );
+    setLiftNodeBindings(normalizeLiftNodeBindings(m.nodeBindings));
     const hasRuntimeControls = m.runtimeControls && typeof m.runtimeControls === 'object';
     setRuntimeControls(
       hasRuntimeControls
@@ -1808,13 +1899,16 @@ const AdminAssetEditorPage: React.FC = () => {
     setMovableParts((prev) => [
       ...prev,
       {
+        id: `part-${prev.length + 1}`,
+        name: `Part ${prev.length + 1}`,
         objectName: `Part_${prev.length + 1}`,
-        motionType: 'translate',
-        axis: 'x',
+        motionType: 'lift',
+        axis: 'z',
         min: 0,
-        max: 100,
+        max: 2500,
         default: 0,
-        speed: 10,
+        speed: 350,
+        dwellMs: 0,
       },
     ]);
   }
@@ -1959,19 +2053,29 @@ const AdminAssetEditorPage: React.FC = () => {
     }
     const infeed = nodes.find((n) => String(n.type || '').toLowerCase().includes('infeed')) || nodes[0];
     const outfeed = nodes.find((n) => String(n.type || '').toLowerCase().includes('outfeed')) || nodes[nodes.length - 1];
-    const lower = Number(infeed?.position?.[1] || 800);
-    const upper = Number(outfeed?.position?.[1] || Math.max(lower + 1200, 2400));
+    const lower = Number(infeed?.position?.[2] || 0);
+    const upper = Math.max(Number(outfeed?.position?.[2] || 2500), lower + 100);
+    const part = movableParts[0];
+    const movingPartId = String(part?.id || '');
     setBehaviorTemplate('lift-conveyor');
     setBehaviorConfig({
       ...defaultBehaviorConfig('lift-conveyor'),
+      movingPartId,
       ...(infeed?.id ? { lowerInfeedNodeId: infeed.id } : {}),
       ...(outfeed?.id ? { upperOutfeedNodeId: outfeed.id } : {}),
-      lowerStopPositionMm: lower,
-      upperStopPositionMm: Math.max(upper, lower + 50),
-      homePositionMm: lower,
-      targetHeightsMm: `${Math.round(lower)},${Math.round(Math.max(upper, lower + 50))}`,
+      liftAxis: 'z',
+      liftMinMm: lower,
+      liftMaxMm: upper,
+      liftDefaultMm: lower,
+      homeTargetMm: lower,
     });
     setRuntimeControls(defaultRuntimeControlsForTemplate('lift-conveyor'));
+    if (infeed?.id || outfeed?.id) {
+      const nextBindings: LiftNodeBindingMap = {};
+      if (infeed?.id) nextBindings[infeed.id] = 'movingPart';
+      if (outfeed?.id) nextBindings[outfeed.id] = 'movingPart';
+      setLiftNodeBindings(nextBindings);
+    }
     setPathMode('straight-node');
     setActiveTool('node');
   }
@@ -2675,47 +2779,83 @@ const AdminAssetEditorPage: React.FC = () => {
 
                 {behaviorTemplate === 'lift-conveyor' && (
                   <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Lift Conveyor Properties</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Lift Application (V1)</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
                       <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Travel Axis</label>
-                        <select value={String(behaviorConfig.liftTravelAxis || 'y')} onChange={(e) => setBehaviorField('liftTravelAxis', e.target.value)}>
-                          <option value="x">x</option>
-                          <option value="y">y</option>
-                          <option value="z">z</option>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Moving Part</label>
+                        <select value={String(toLiftV1BehaviorConfig(behaviorConfig).movingPartId || '')} onChange={(e) => setBehaviorField('movingPartId', e.target.value)}>
+                          <option value="">select moving part</option>
+                          {movableParts.map((part, idx) => (
+                            <option key={String(part.id || `part-${idx}`)} value={String(part.id || '')}>
+                              {part.name || part.objectName || `Part ${idx + 1}`}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lower Stop (mm)</label>
-                        <input type="number" value={Number(behaviorConfig.lowerStopPositionMm || 0)} onChange={(e) => setBehaviorField('lowerStopPositionMm', Number(e.target.value) || 0)} />
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lift Axis</label>
+                        <input value="z" disabled />
                       </div>
                       <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Upper Stop (mm)</label>
-                        <input type="number" value={Number(behaviorConfig.upperStopPositionMm || 0)} onChange={(e) => setBehaviorField('upperStopPositionMm', Number(e.target.value) || 0)} />
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Control Mode</label>
+                        <select value={String(toLiftV1BehaviorConfig(behaviorConfig).controlMode || 'auto')} onChange={(e) => setBehaviorField('controlMode', e.target.value === 'manual' ? 'manual' : 'auto')}>
+                          <option value="auto">auto</option>
+                          <option value="manual">manual</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Min (mm)</label>
+                        <input type="number" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftMinMm || 0)} onChange={(e) => setBehaviorField('liftMinMm', Number(e.target.value) || 0)} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Max (mm)</label>
+                        <input type="number" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftMaxMm || 2500)} onChange={(e) => setBehaviorField('liftMaxMm', Number(e.target.value) || 0)} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Default (mm)</label>
+                        <input type="number" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftDefaultMm || 0)} onChange={(e) => setBehaviorField('liftDefaultMm', Number(e.target.value) || 0)} />
                       </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
                       <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lift Speed Up (m/s)</label>
-                        <input type="number" step={0.01} value={Number(behaviorConfig.liftSpeedUpMps || 0)} onChange={(e) => setBehaviorField('liftSpeedUpMps', Number(e.target.value) || 0)} />
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lift Speed (mm/s)</label>
+                        <input type="number" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftSpeedMmPerSec || 0)} onChange={(e) => setBehaviorField('liftSpeedMmPerSec', Number(e.target.value) || 0)} />
                       </div>
-                      <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lift Speed Down (m/s)</label>
-                        <input type="number" step={0.01} value={Number(behaviorConfig.liftSpeedDownMps || 0)} onChange={(e) => setBehaviorField('liftSpeedDownMps', Number(e.target.value) || 0)} />
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
                       <div>
                         <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Conveyor Speed (m/min)</label>
-                        <input type="number" value={Number(behaviorConfig.conveyorSpeedMpm || 0)} onChange={(e) => setBehaviorField('conveyorSpeedMpm', Number(e.target.value) || 0)} />
+                        <input type="number" value={Number(toLiftV1BehaviorConfig(behaviorConfig).conveyorSpeedMpm || 0)} onChange={(e) => setBehaviorField('conveyorSpeedMpm', Number(e.target.value) || 0)} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lower Infeed Node</label>
+                        <select
+                          value={String(toLiftV1BehaviorConfig(behaviorConfig).lowerInfeedNodeId || '')}
+                          onChange={(e) => setBehaviorField('lowerInfeedNodeId', e.target.value)}
+                        >
+                          <option value="">select infeed</option>
+                          {nodes.filter((n) => String(n.type || '').toLowerCase().includes('infeed')).map((n, idx) => (
+                            <option key={`lift-in-${n.id || idx}`} value={String(n.id || '')}>{n.id || `Node ${idx + 1}`}</option>
+                          ))}
+                        </select>
                       </div>
                       <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Cycle Mode</label>
-                        <select value={String(behaviorConfig.cycleMode || 'auto-up-after-load')} onChange={(e) => setBehaviorField('cycleMode', e.target.value)}>
-                          <option value="auto-up-after-load">auto up after load</option>
-                          <option value="wait-downstream-ready">wait for downstream ready</option>
-                          <option value="manual-trigger">manual trigger</option>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Upper Outfeed Node</label>
+                        <select
+                          value={String(toLiftV1BehaviorConfig(behaviorConfig).upperOutfeedNodeId || '')}
+                          onChange={(e) => setBehaviorField('upperOutfeedNodeId', e.target.value)}
+                        >
+                          <option value="">select outfeed</option>
+                          {nodes.filter((n) => String(n.type || '').toLowerCase().includes('outfeed')).map((n, idx) => (
+                            <option key={`lift-out-${n.id || idx}`} value={String(n.id || '')}>{n.id || `Node ${idx + 1}`}</option>
+                          ))}
                         </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Home Target (mm)</label>
+                        <input type="number" value={Number(toLiftV1BehaviorConfig(behaviorConfig).homeTargetMm || 0)} onChange={(e) => setBehaviorField('homeTargetMm', Number(e.target.value) || 0)} />
                       </div>
                     </div>
                   </div>
@@ -2787,15 +2927,24 @@ const AdminAssetEditorPage: React.FC = () => {
                 <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Runtime Controls</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
-                    {([
-                      ['showSpeedSlider', 'Speed slider'],
-                      ['showTargetHeight', 'Target height selector'],
-                      ['showAutoManual', 'Auto/manual mode'],
-                      ['showHomeCommand', 'Home command'],
-                      ['showEnableToggle', 'Enable/disable'],
-                      ['showSensorState', 'Sensor state visibility'],
-                      ['showStopperState', 'Stopper state visibility'],
-                    ] as [keyof RuntimeControlsConfig, string][]).map(([key, label]) => (
+                    {(
+                      behaviorTemplate === 'lift-conveyor'
+                        ? ([
+                            ['showTargetHeight', 'Target height selector'],
+                            ['showSpeedSlider', 'Lift speed / conveyor speed'],
+                            ['showAutoManual', 'Auto/manual mode'],
+                            ['showHomeCommand', 'Home command'],
+                          ] as [keyof RuntimeControlsConfig, string][])
+                        : ([
+                            ['showSpeedSlider', 'Speed slider'],
+                            ['showTargetHeight', 'Target height selector'],
+                            ['showAutoManual', 'Auto/manual mode'],
+                            ['showHomeCommand', 'Home command'],
+                            ['showEnableToggle', 'Enable/disable'],
+                            ['showSensorState', 'Sensor state visibility'],
+                            ['showStopperState', 'Stopper state visibility'],
+                          ] as [keyof RuntimeControlsConfig, string][])
+                    ).map(([key, label]) => (
                       <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
                         <input type="checkbox" checked={Boolean(runtimeControls[key])} onChange={(e) => setRuntimeControl(key, e.target.checked)} />
                         {label}
@@ -2974,13 +3123,16 @@ const AdminAssetEditorPage: React.FC = () => {
                         setMovableParts((prev) => [
                           ...prev,
                           {
+                            id: `part-${prev.length + 1}`,
+                            name: `Part ${prev.length + 1}`,
                             objectName: selectedObjectPath,
-                            motionType: 'translate',
-                            axis: 'x',
+                            motionType: 'lift',
+                            axis: 'z',
                             min: 0,
-                            max: 100,
+                            max: 2500,
                             default: 0,
-                            speed: 10,
+                            speed: 350,
+                            dwellMs: 0,
                           },
                         ]);
                       }}
@@ -3001,11 +3153,15 @@ const AdminAssetEditorPage: React.FC = () => {
                 <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
                   {movableParts.map((part, index) => (
                     <div key={`${part.objectName}-${index}`} style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
+                      <input value={String(part.id || '')} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, id: e.target.value } : p)))} placeholder="part id" />
+                      <input value={String(part.name || '')} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, name: e.target.value } : p)))} placeholder="part name" />
                       <input value={part.objectName} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, objectName: e.target.value } : p)))} placeholder="Object name" />
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
-                        <select value={part.motionType} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, motionType: e.target.value as 'translate' | 'rotate' } : p)))}>
+                        <select value={part.motionType} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, motionType: e.target.value as AssetMovingPart['motionType'] } : p)))}>
+                          <option value="none">none</option>
                           <option value="translate">translate</option>
                           <option value="rotate">rotate</option>
+                          <option value="lift">lift</option>
                         </select>
                         <select value={part.axis} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, axis: e.target.value as 'x' | 'y' | 'z' } : p)))}>
                           <option value="x">x</option>
@@ -3019,6 +3175,7 @@ const AdminAssetEditorPage: React.FC = () => {
                         <input type="number" value={part.default} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, default: Number(e.target.value) || 0 } : p)))} placeholder="default" />
                         <input type="number" value={part.speed} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, speed: Number(e.target.value) || 0 } : p)))} placeholder="speed" />
                       </div>
+                      <input type="number" value={Number(part.dwellMs || 0)} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, dwellMs: Number(e.target.value) || 0 } : p)))} placeholder="dwell (ms)" />
                       <button type="button" onClick={() => setMovableParts((prev) => prev.filter((_, i) => i !== index))} style={{ border: '1px solid color-mix(in oklab, var(--mm-accent-danger) 45%, transparent)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-accent-danger-muted)', color: 'var(--mm-accent-danger)', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
                         <Trash2 size={12} />
                         Remove Part
@@ -3026,6 +3183,23 @@ const AdminAssetEditorPage: React.FC = () => {
                     </div>
                   ))}
                 </div>
+                {behaviorTemplate === 'lift-conveyor' && nodes.length > 0 && (
+                  <div style={{ display: 'grid', gap: 8, marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Node Binding (Lift V1)</div>
+                    {nodes.map((node, index) => (
+                      <label key={`lift-bind-${node.id || index}`} style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, color: 'var(--mm-text-secondary)' }}>{node.id || `Node ${index + 1}`}</span>
+                        <select
+                          value={liftNodeBindings[String(node.id || '')] || 'assetRoot'}
+                          onChange={(e) => setLiftNodeBindings((prev) => ({ ...prev, [String(node.id || '')]: e.target.value === 'movingPart' ? 'movingPart' : 'assetRoot' }))}
+                        >
+                          <option value="assetRoot">assetRoot</option>
+                          <option value="movingPart">movingPart</option>
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8, display: 'grid', gap: 6 }}>
