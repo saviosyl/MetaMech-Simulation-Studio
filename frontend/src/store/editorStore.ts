@@ -8,6 +8,22 @@ import { FrameAssemblyExportContract } from '../lib/frameDesigner/model';
 import { toFrameAssemblyParameters } from '../lib/frameDesigner/sceneInterop';
 import { VideoQualityPreset } from '../lib/videoExportPresets';
 
+function toRuntimeDefaultRotationFromMetadata(
+  metadata: Record<string, unknown> | null | undefined
+): [number, number, number] {
+  const raw = metadata?.assetRootRotationDeg;
+  if (!Array.isArray(raw) || raw.length < 3) return [0, 0, 0];
+  const xDeg = Number(raw[0]);
+  const yDeg = Number(raw[1]);
+  const zDeg = Number(raw[2]);
+  if (!Number.isFinite(xDeg) || !Number.isFinite(yDeg) || !Number.isFinite(zDeg)) return [0, 0, 0];
+  return [
+    (xDeg * Math.PI) / 180,
+    (yDeg * Math.PI) / 180,
+    (zDeg * Math.PI) / 180,
+  ];
+}
+
 // Types
 export interface ProcessNode {
   id: string;
@@ -923,6 +939,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const staticMetadata = (!isParametric && matchingAsset?.assetType === 'static')
       ? ((matchingAsset as AssetDef & { metadata?: Record<string, any> }).metadata || {})
       : {};
+    const defaultRotation = toRuntimeDefaultRotationFromMetadata(staticMetadata);
     const withTransportPath = staticMetadata.transportPath && typeof staticMetadata.transportPath === 'object'
       ? { transportPath: staticMetadata.transportPath }
       : {};
@@ -959,7 +976,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       id: uuidv4(),
       type,
       position: [position[0], 0, position[2]], // Force Y=0 (on ground)
-      rotation: [0, 0, 0],
+      rotation: defaultRotation,
       scale: [1, 1, 1],
       parameters: {
         ...defaultParams,
@@ -988,12 +1005,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
       : getDefaultParameters(type);
+    const staticMetadata = (!isParametric && matchingAsset?.assetType === 'static')
+      ? ((matchingAsset as AssetDef & { metadata?: Record<string, any> }).metadata || {})
+      : {};
+    const defaultRotation = toRuntimeDefaultRotationFromMetadata(staticMetadata);
 
     const newAsset: EnvironmentAsset = {
       id: uuidv4(),
       type,
       position: [position[0], 0, position[2]], // Force Y=0
-      rotation: [0, 0, 0],
+      rotation: defaultRotation,
       scale: [1, 1, 1],
       parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
@@ -1046,12 +1067,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
       : getDefaultParameters(type);
+    const staticMetadata = (!isParametric && matchingAsset?.assetType === 'static')
+      ? ((matchingAsset as AssetDef & { metadata?: Record<string, any> }).metadata || {})
+      : {};
+    const defaultRotation = toRuntimeDefaultRotationFromMetadata(staticMetadata);
 
     const newActor: Actor = {
       id: uuidv4(),
       type,
       position: [position[0], 0, position[2]],
-      rotation: [0, 0, 0],
+      rotation: defaultRotation,
       scale: [1, 1, 1],
       parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,

@@ -18,6 +18,7 @@ export interface StaticAssetDef {
   thumbnailUrl: string;
   defaultScale?: [number, number, number];
   defaultPositionOffset?: [number, number, number];
+  defaultRotation?: [number, number, number];
   metadata?: AssetMetadata;
   connectionPorts?: ConnectionPortDef[];
 }

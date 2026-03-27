@@ -137,11 +137,26 @@ function inferDefaultPositionOffset(
   ];
 }
 
+function inferDefaultRotation(metadata: AssetMetadata): [number, number, number] | undefined {
+  const raw = metadata?.assetRootRotationDeg as unknown;
+  if (!Array.isArray(raw) || raw.length < 3) return undefined;
+  const xDeg = Number(raw[0]);
+  const yDeg = Number(raw[1]);
+  const zDeg = Number(raw[2]);
+  if (!Number.isFinite(xDeg) || !Number.isFinite(yDeg) || !Number.isFinite(zDeg)) return undefined;
+  return [
+    (xDeg * Math.PI) / 180,
+    (yDeg * Math.PI) / 180,
+    (zDeg * Math.PI) / 180,
+  ];
+}
+
 function toStaticAssetDef(asset: LibraryAsset): AssetDef {
   const metadata = asset.metadata || {};
   const ports = extractPorts(metadata);
   const scale = inferDefaultScale(metadata);
   const defaultPositionOffset = inferDefaultPositionOffset(metadata, scale);
+  const defaultRotation = inferDefaultRotation(metadata);
   return {
     id: asset.id,
     assetType: 'static',
@@ -153,6 +168,7 @@ function toStaticAssetDef(asset: LibraryAsset): AssetDef {
     metadata,
     defaultScale: scale,
     defaultPositionOffset,
+    defaultRotation,
     ...(ports.length > 0 ? { connectionPorts: ports } : {}),
   };
 }
