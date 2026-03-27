@@ -26,6 +26,19 @@ type CustomTransportPath = {
   points?: [number, number, number][];
 };
 
+type LiftV1NodeBindingMap = Record<string, { frame?: 'assetRoot' | 'movingPart'; movingPartId?: string }>;
+type LiftV1BehaviorConfig = {
+  movingPartId?: string;
+  liftAxis?: 'z';
+  liftMinMm?: number;
+  liftMaxMm?: number;
+  liftDefaultMm?: number;
+  homeTargetMm?: number;
+  liftSpeedMmPerSec?: number;
+  conveyorSpeedMpm?: number;
+  controlMode?: 'auto' | 'manual';
+};
+
 const COLOR_MAP: Record<string, string> = {
   brown: '#8B4513',
   red: '#ef4444',
@@ -91,6 +104,93 @@ function lerpPoint(a: [number, number, number], b: [number, number, number], t: 
 
 function mmVecToMeters(input: [number, number, number]): [number, number, number] {
   return [input[0] / 1000, input[1] / 1000, input[2] / 1000];
+}
+
+function asLiftV1BehaviorConfig(input: unknown): LiftV1BehaviorConfig | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const raw = input as Record<string, unknown>;
+  const movingPartId = String(raw.movingPartId || '').trim();
+  const liftAxis = String(raw.liftAxis || '').trim().toLowerCase();
+  if (!movingPartId || liftAxis !== 'z') return null;
+  const toFinite = (value: unknown, fallback: number): number => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const liftMinMm = toFinite(raw.liftMinMm, 0);
+  const liftMaxMm = toFinite(raw.liftMaxMm, 0);
+  const liftDefaultMm = toFinite(raw.liftDefaultMm, liftMinMm);
+  const homeTargetMm = toFinite(raw.homeTargetMm, liftDefaultMm);
+  const liftSpeedMmPerSec = Math.max(0, toFinite(raw.liftSpeedMmPerSec, 0));
+  const conveyorSpeedMpm = Math.max(0, toFinite(raw.conveyorSpeedMpm, 0));
+  const controlMode = String(raw.controlMode || 'auto').toLowerCase() === 'manual' ? 'manual' : 'auto';
+  if (!(liftMaxMm > liftMinMm)) return null;
+  return {
+    movingPartId,
+    liftAxis: 'z',
+    liftMinMm,
+    liftMaxMm,
+    liftDefaultMm,
+    homeTargetMm,
+    liftSpeedMmPerSec,
+    conveyorSpeedMpm,
+    controlMode,
+  };
+}
+
+function resolveLiftCurrentTargetMm(
+  behavior: LiftV1BehaviorConfig,
+  node: ProcessNode
+): number {
+  const min = Number(behavior.liftMinMm || 0);
+  const max = Number(behavior.liftMaxMm || 0);
+  const fallback = Number.isFinite(behavior.liftDefaultMm) ? Number(behavior.liftDefaultMm) : min;
+    const requested = Number(node.parameters.liftTargetMm ?? node.parameters.targetHeightMm);
+  const target = Number.isFinite(requested) ? requested : fallback;
+  return Math.min(max, Math.max(min, target));
+}
+
+function getLiftAppliedOffsetMeters(node: ProcessNode): number {
+  const template = String(node.parameters.behaviorTemplate || '').trim();
+  if (template !== 'lift-conveyor') return 0;
+  const behavior = asLiftV1BehaviorConfig(node.parameters.behaviorConfig);
+  if (!behavior) return 0;
+  const min = Number(behavior.liftMinMm || 0);
+  const target = resolveLiftCurrentTargetMm(behavior, node);
+  return (target - min) / 1000;
+}
+
+function getBoundPortWorldPosition(
+  localPort: [number, number, number],
+  node: ProcessNode
+): [number, number, number] {
+  const template = String(node.parameters.behaviorTemplate || '').trim();
+  if (template !== 'lift-conveyor') {
+    return getPortWorldPosition(localPort, node);
+  }
+  const behavior = asLiftV1BehaviorConfig(node.parameters.behaviorConfig);
+  if (!behavior) {
+    return getPortWorldPosition(localPort, node);
+  }
+  const nodeBindings = (node.parameters.nodeBindings || {}) as LiftV1NodeBindingMap;
+  const nodeDefs = ((node.parameters as { assetNodes?: unknown }).assetNodes || []) as unknown[];
+  const idByPosition = new Map<string, string>();
+  for (const rawNode of nodeDefs) {
+    if (!rawNode || typeof rawNode !== 'object') continue;
+    const nodeId = String((rawNode as { id?: unknown }).id || '').trim();
+    const pos = asVec3OrNull((rawNode as { position?: unknown }).position);
+    if (!nodeId || !pos) continue;
+    const key = `${(pos[0] / 1000).toFixed(6)}|${(pos[1] / 1000).toFixed(6)}|${(pos[2] / 1000).toFixed(6)}`;
+    idByPosition.set(key, nodeId);
+  }
+  const localKey = `${localPort[0].toFixed(6)}|${localPort[1].toFixed(6)}|${localPort[2].toFixed(6)}`;
+  const nodeId = idByPosition.get(localKey);
+  const binding = nodeId ? nodeBindings[nodeId] : undefined;
+  const base = getPortWorldPosition(localPort, node);
+  if (binding?.frame === 'movingPart' && String(binding.movingPartId || '') === String(behavior.movingPartId || '')) {
+    const zOffsetM = getLiftAppliedOffsetMeters(node);
+    return [base[0], base[1], base[2] + zOffsetM];
+  }
+  return base;
 }
 
 function buildWorldPathPoints(node: ProcessNode): [number, number, number][] {
@@ -433,6 +533,8 @@ export class SimulationEngine {
       stats.queueLength = stats.queue.length;
     }
 
+    this.applyLiftV1Motion(elapsed);
+
     this.tickMovingProducts(elapsed);
 
     // ─── Rule Engine: evaluate trigger→action rules ────────────
@@ -440,6 +542,56 @@ export class SimulationEngine {
 
     // Cleanup completed products that left the system
     this.products = this.products.filter(p => p.state !== 'completed' || (this.simTime - (p.completedAt || 0)) < 2);
+  }
+
+  private applyLiftV1Motion(dt: number): void {
+    if (dt <= 0) return;
+    for (const node of this.nodes) {
+      if (String(node.parameters.behaviorTemplate || '') !== 'lift-conveyor') continue;
+      const behavior = asLiftV1BehaviorConfig(node.parameters.behaviorConfig);
+      if (!behavior) continue;
+      const movingPartId = String(behavior.movingPartId || '').trim();
+      if (!movingPartId) continue;
+      const parts = Array.isArray((node.parameters as { movableParts?: unknown }).movableParts)
+        ? ((node.parameters as { movableParts?: unknown }).movableParts as unknown[])
+        : [];
+      const index = parts.findIndex((part) => {
+        if (!part || typeof part !== 'object') return false;
+        return String((part as { id?: unknown }).id || '').trim() === movingPartId;
+      });
+      if (index < 0) continue;
+      const currentPart = parts[index] as Record<string, unknown>;
+      const min = Number(behavior.liftMinMm || 0);
+      const max = Number(behavior.liftMaxMm || 0);
+      const current = Number(currentPart.default);
+      const currentMm = Number.isFinite(current) ? current : Number(behavior.liftDefaultMm || min);
+      const targetMm = resolveLiftCurrentTargetMm(behavior, node);
+      const speedMmPerSec = Math.max(0, Number(node.parameters.liftSpeedMmPerSec ?? behavior.liftSpeedMmPerSec ?? 0));
+      const maxStep = speedMmPerSec * dt;
+      const delta = targetMm - currentMm;
+      let nextMm = currentMm;
+      if (Math.abs(delta) <= maxStep || maxStep <= 0.000001) {
+        nextMm = targetMm;
+      } else {
+        nextMm = currentMm + Math.sign(delta) * maxStep;
+      }
+      const clamped = Math.min(max, Math.max(min, nextMm));
+      const nextPart = {
+        ...currentPart,
+        motionType: 'lift',
+        axis: 'z',
+        min,
+        max,
+        default: clamped,
+        speed: Number(node.parameters.liftSpeedMmPerSec ?? behavior.liftSpeedMmPerSec ?? currentPart.speed ?? 0),
+      };
+      const nextParts = [...parts];
+      nextParts[index] = nextPart;
+      node.parameters.movableParts = nextParts;
+      node.parameters.currentLiftHeightMm = clamped;
+      node.parameters.conveyorSpeedMpm = Number(node.parameters.conveyorSpeedMpm ?? behavior.conveyorSpeedMpm ?? 0);
+      node.parameters.controlMode = String(node.parameters.controlMode || behavior.controlMode || 'auto');
+    }
   }
 
   // ─── Rule Engine tick ────────────────────────────────────────
@@ -745,8 +897,8 @@ export class SimulationEngine {
         const inputPort = ports.find(p => p.type === 'input');
         const outputPort = ports.find(p => p.type === 'output');
         if (inputPort && outputPort) {
-          const inWorld = getPortWorldPosition(inputPort.localPosition, node);
-          const outWorld = getPortWorldPosition(outputPort.localPosition, node);
+          const inWorld = getBoundPortWorldPosition(inputPort.localPosition, node);
+          const outWorld = getBoundPortWorldPosition(outputPort.localPosition, node);
           product.currentPosition = [
             inWorld[0] + (outWorld[0] - inWorld[0]) * t,
             inWorld[1] + (outWorld[1] - inWorld[1]) * t,
@@ -791,8 +943,8 @@ export class SimulationEngine {
     const ports = getConnectionPorts(node.type, node.parameters);
     const inPort = ports.find(p => p.type === 'input');
     const outPort = ports.find(p => p.type === 'output');
-    const infeedPos = inPort ? getPortWorldPosition(inPort.localPosition, node) : [node.position[0], node.position[1] + 0.85, node.position[2]] as [number,number,number];
-    const outfeedPos = outPort ? getPortWorldPosition(outPort.localPosition, node) : [node.position[0], node.position[1] + 0.85, node.position[2]] as [number,number,number];
+    const infeedPos = inPort ? getBoundPortWorldPosition(inPort.localPosition, node) : [node.position[0], node.position[1] + 0.85, node.position[2]] as [number,number,number];
+    const outfeedPos = outPort ? getBoundPortWorldPosition(outPort.localPosition, node) : [node.position[0], node.position[1] + 0.85, node.position[2]] as [number,number,number];
 
     // ─ Release finished product ─
     if (stats.processing && stats.processEndTime !== null && this.simTime >= stats.processEndTime) {
@@ -973,8 +1125,8 @@ export class SimulationEngine {
         || toPorts.find(p => p.type === 'input');
       if (!fp || !tp) continue;
 
-      const start = getPortWorldPosition(fp.localPosition, fromNode);
-      const end = getPortWorldPosition(tp.localPosition, toNode);
+      const start = getBoundPortWorldPosition(fp.localPosition, fromNode);
+      const end = getBoundPortWorldPosition(tp.localPosition, toNode);
 
       const dx = end[0] - start[0];
       const dy = end[1] - start[1];

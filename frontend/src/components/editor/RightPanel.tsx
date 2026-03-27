@@ -97,6 +97,47 @@ const RightPanel: React.FC = () => {
     const d = getAssetById((selectedObject as any).assetId);
     return d?.assetType === 'parametric' ? d as ParametricAssetDef : null;
   }, [selectedObject]);
+  const selectedStaticMetadata = React.useMemo(() => {
+    if (!selectedObject || !(selectedObject as any).assetId) return null;
+    const d = getAssetById((selectedObject as any).assetId);
+    if (!d || d.assetType !== 'static') return null;
+    const staticDef = d as { metadata?: Record<string, unknown> };
+    return staticDef.metadata && typeof staticDef.metadata === 'object' ? staticDef.metadata : null;
+  }, [selectedObject]);
+  const liftRuntimeUi = React.useMemo(() => {
+    if (!selectedObject || selectedObjectType !== 'process' || !selectedStaticMetadata) return null;
+    const behaviorTemplate = String(selectedStaticMetadata.behaviorTemplate || '');
+    if (behaviorTemplate !== 'lift-conveyor') return null;
+    const runtimeControls = (selectedStaticMetadata.runtimeControls && typeof selectedStaticMetadata.runtimeControls === 'object')
+      ? selectedStaticMetadata.runtimeControls as Record<string, unknown>
+      : {};
+    const behaviorConfig = (selectedStaticMetadata.behaviorConfig && typeof selectedStaticMetadata.behaviorConfig === 'object')
+      ? selectedStaticMetadata.behaviorConfig as Record<string, unknown>
+      : {};
+    const movingParts = Array.isArray(selectedStaticMetadata.movableParts)
+      ? selectedStaticMetadata.movableParts as Array<Record<string, unknown>>
+      : [];
+    const movingPartId = String(behaviorConfig.movingPartId || '').trim();
+    const selectedPart = movingParts.find((part) => String(part.id || '') === movingPartId) || movingParts[0] || null;
+    const toFinite = (value: unknown, fallback: number): number => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const minMm = toFinite(behaviorConfig.liftMinMm, toFinite(selectedPart?.min, 0));
+    const maxMm = toFinite(behaviorConfig.liftMaxMm, Math.max(minMm + 1, toFinite(selectedPart?.max, 2500)));
+    const defaultMm = toFinite(behaviorConfig.liftDefaultMm, toFinite(selectedPart?.default, minMm));
+    return {
+      controls: {
+        showTargetHeight: Boolean(runtimeControls.showTargetHeight),
+        showSpeedSlider: Boolean(runtimeControls.showSpeedSlider),
+        showAutoManual: Boolean(runtimeControls.showAutoManual),
+        showHomeCommand: Boolean(runtimeControls.showHomeCommand),
+      },
+      minMm,
+      maxMm: Math.max(maxMm, minMm + 1),
+      defaultMm: Math.min(Math.max(defaultMm, minMm), Math.max(maxMm, minMm + 1)),
+    };
+  }, [selectedObject, selectedObjectType, selectedStaticMetadata]);
 
   const handleParam = (k: string, v: any) => {
     if (!selectedObject || !selectedObjectType) return;
@@ -530,6 +571,96 @@ const RightPanel: React.FC = () => {
                   {g.adv.length > 0 && <Section title="Advanced" icon={Settings} defaultOpen={false}>{g.adv.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                 </>);
               })()}
+
+              {liftRuntimeUi && (
+                <Section title="Lift Runtime" icon={Radio} defaultOpen={true} badge="LIFT V1">
+                  {liftRuntimeUi.controls.showTargetHeight && (
+                    <div style={fieldGap}>
+                      <label style={labelStyle}>Target Height (mm)</label>
+                      <input
+                        type="number"
+                        min={liftRuntimeUi.minMm}
+                        max={liftRuntimeUi.maxMm}
+                        step={10}
+                        value={Number(selectedObject.parameters.targetHeightMm ?? liftRuntimeUi.defaultMm)}
+                        onChange={(e) => handleParam('targetHeightMm', Number(e.target.value) || liftRuntimeUi.defaultMm)}
+                        style={inputStyle}
+                      />
+                    </div>
+                  )}
+                  {liftRuntimeUi.controls.showSpeedSlider && (
+                    <>
+                      <div style={fieldGap}>
+                        <label style={labelStyle}>Lift Speed (mm/s)</label>
+                        <input
+                          type="number"
+                          min={1}
+                          step={10}
+                          value={Number(selectedObject.parameters.liftSpeedMmPerSec ?? 350)}
+                          onChange={(e) => handleParam('liftSpeedMmPerSec', Math.max(1, Number(e.target.value) || 350))}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div style={fieldGap}>
+                        <label style={labelStyle}>Conveyor Speed (m/min)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={Number(selectedObject.parameters.conveyorSpeedMpm ?? 12)}
+                          onChange={(e) => handleParam('conveyorSpeedMpm', Math.max(0, Number(e.target.value) || 12))}
+                          style={inputStyle}
+                        />
+                      </div>
+                    </>
+                  )}
+                  {liftRuntimeUi.controls.showAutoManual && (
+                    <div style={fieldGap}>
+                      <label style={labelStyle}>Mode</label>
+                      <select
+                        value={String(selectedObject.parameters.controlMode ?? 'auto')}
+                        onChange={(e) => handleParam('controlMode', e.target.value === 'manual' ? 'manual' : 'auto')}
+                        style={inputStyle}
+                      >
+                        <option value="auto" style={{ background: 'var(--mm-bg-panel)' }}>Auto</option>
+                        <option value="manual" style={{ background: 'var(--mm-bg-panel)' }}>Manual</option>
+                      </select>
+                    </div>
+                  )}
+                  {liftRuntimeUi.controls.showHomeCommand && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rawBehavior = selectedStaticMetadata?.behaviorConfig;
+                        const behaviorObj = rawBehavior && typeof rawBehavior === 'object'
+                          ? rawBehavior as Record<string, unknown>
+                          : {};
+                        const metadataHome = Number(behaviorObj.homeTargetMm);
+                        const paramHome = Number(selectedObject.parameters.homeTargetMm);
+                        const resolvedHome = Number.isFinite(paramHome)
+                          ? paramHome
+                          : (Number.isFinite(metadataHome) ? metadataHome : liftRuntimeUi.minMm);
+                        handleParam('targetHeightMm', Math.min(liftRuntimeUi.maxMm, Math.max(liftRuntimeUi.minMm, resolvedHome)));
+                        handleParam('liftTargetMm', Math.min(liftRuntimeUi.maxMm, Math.max(liftRuntimeUi.minMm, resolvedHome)));
+                        handleParam('goHomeNow', Date.now());
+                      }}
+                      style={{
+                        width: '100%',
+                        border: '1px solid var(--mm-border)',
+                        borderRadius: 8,
+                        padding: '8px 10px',
+                        background: 'var(--mm-bg-surface)',
+                        color: 'var(--mm-text-primary)',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Home
+                    </button>
+                  )}
+                </Section>
+              )}
             </div>
           ) : (
             <div style={{ padding: 12 }}>

@@ -24,6 +24,33 @@ function toRuntimeDefaultRotationFromMetadata(
   ];
 }
 
+function toLiftRuntimeDefaultsFromMetadata(
+  metadata: Record<string, unknown> | null | undefined
+): Record<string, unknown> {
+  const behaviorTemplate = String(metadata?.behaviorTemplate || '');
+  if (behaviorTemplate !== 'lift-conveyor') return {};
+  const rawConfig = (metadata?.behaviorConfig && typeof metadata.behaviorConfig === 'object')
+    ? (metadata.behaviorConfig as Record<string, unknown>)
+    : {};
+  const toFinite = (value: unknown, fallback: number): number => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const min = toFinite(rawConfig.liftMinMm, 0);
+  const max = toFinite(rawConfig.liftMaxMm, Math.max(min + 100, 2500));
+  const clampedMax = max > min ? max : min + 100;
+  const defaultMm = Math.max(min, Math.min(clampedMax, toFinite(rawConfig.liftDefaultMm, min)));
+  const homeTargetMm = Math.max(min, Math.min(clampedMax, toFinite(rawConfig.homeTargetMm, defaultMm)));
+  return {
+    targetHeightMm: defaultMm,
+    currentLiftHeightMm: defaultMm,
+    liftSpeedMmPerSec: Math.max(1, toFinite(rawConfig.liftSpeedMmPerSec, 350)),
+    conveyorSpeedMpm: Math.max(0, toFinite(rawConfig.conveyorSpeedMpm, 12)),
+    controlMode: String(rawConfig.controlMode || 'auto') === 'manual' ? 'manual' : 'auto',
+    homeTargetMm,
+  };
+}
+
 // Types
 export interface ProcessNode {
   id: string;
@@ -944,6 +971,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ? { transportPath: staticMetadata.transportPath }
       : {};
     const withAssetNodes = Array.isArray(staticMetadata.nodes) ? { assetNodes: staticMetadata.nodes } : {};
+    const withMovableParts = Array.isArray(staticMetadata.movableParts) ? { movableParts: staticMetadata.movableParts } : {};
+    const withNodeBindings = staticMetadata.nodeBindings && typeof staticMetadata.nodeBindings === 'object'
+      ? { nodeBindings: staticMetadata.nodeBindings }
+      : {};
+    const withLiftRuntimeDefaults = toLiftRuntimeDefaultsFromMetadata(staticMetadata);
     const withBehaviorTemplate = typeof staticMetadata.behaviorTemplate === 'string'
       ? { behaviorTemplate: staticMetadata.behaviorTemplate }
       : {};
@@ -982,9 +1014,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ...defaultParams,
         ...withTransportPath,
         ...withAssetNodes,
+        ...withMovableParts,
+        ...withNodeBindings,
         ...withBehaviorTemplate,
         ...withBehaviorConfig,
         ...withRuntimeControls,
+        ...withLiftRuntimeDefaults,
       },
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
       assetId: matchingAsset?.id,
