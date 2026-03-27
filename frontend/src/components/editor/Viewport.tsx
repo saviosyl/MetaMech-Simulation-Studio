@@ -147,6 +147,7 @@ import PortDirectionDebug from '../3d/PortDirectionDebug';
 const AXIS_X_COLOR = '#ef4444';
 const AXIS_Y_COLOR = '#22c55e';
 const AXIS_Z_COLOR = '#3b82f6';
+const INTERNAL_MODULE_TEXT_PREFIX = 'metamech:module:';
 
 const ZUpAxisHelper: React.FC<{ size: number }> = ({ size }) => (
   <group>
@@ -699,62 +700,76 @@ const Viewport: React.FC = () => {
 
   const exportPreset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
   const dynamicDprMax = isExportRendering ? Math.max(2, Math.min(3, exportPreset.targetDpr)) : 2;
+  const parseModuleDropPayload = useCallback((event: React.DragEvent): { moduleId: string; category: string } | null => {
+    const jsonPayload = event.dataTransfer.getData('application/json');
+    if (jsonPayload) {
+      try {
+        const parsed = JSON.parse(jsonPayload);
+        if (
+          parsed
+          && parsed.type === 'module'
+          && typeof parsed.moduleId === 'string'
+          && typeof parsed.category === 'string'
+        ) {
+          return { moduleId: parsed.moduleId, category: parsed.category };
+        }
+      } catch {
+        // fall through to text payload parser
+      }
+    }
+
+    const textPayload = event.dataTransfer.getData('text/plain');
+    if (!textPayload || !textPayload.startsWith(INTERNAL_MODULE_TEXT_PREFIX)) return null;
+    const [moduleId, category] = textPayload.slice(INTERNAL_MODULE_TEXT_PREFIX.length).split(':');
+    if (!moduleId || !category) return null;
+    return { moduleId, category };
+  }, []);
 
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
     
     try {
-      const rawData = event.dataTransfer.getData('application/json');
-      if (!rawData) {
-        // Defensive guard: ignore external file/link drops in viewport.
-        return;
-      }
-      const data = JSON.parse(rawData);
-      if (!data || data.type !== 'module' || typeof data.moduleId !== 'string' || typeof data.category !== 'string') {
-        return;
-      }
+      const data = parseModuleDropPayload(event);
+      if (!data) return;
+      // Proper raycast from mouse to ground plane (y=0) using Three.js camera
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      const rayHit = raycastToGround(event.clientX, event.clientY, rect);
       
-      if (data.type === 'module') {
-        // Proper raycast from mouse to ground plane (y=0) using Three.js camera
-        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-        const rayHit = raycastToGround(event.clientX, event.clientY, rect);
-        
-        // Fallback to simple approximation if camera not ready
-        const position: [number, number, number] = rayHit || [
-          (((event.clientX - rect.left) / rect.width) * 2 - 1) * 8,
-          0,
-          -(((event.clientY - rect.top) / rect.height) * 2 + 1) * 8,
-        ];
-        
-        let addedModule = false;
-        switch (data.category) {
-          case 'process':
-          case 'modular':
-          case 'robots':
-          case 'pallets':
-          case 'fmcg':
-          case 'medical':
-            addProcessNode(data.moduleId, position);
-            addedModule = true;
-            break;
-          case 'environment':
-            addEnvironmentAsset(data.moduleId, position);
-            addedModule = true;
-            break;
-          case 'actors':
-            addActor(data.moduleId, position);
-            addedModule = true;
-            break;
-        }
-        if (addedModule) {
-          setHasPlacedModule(true);
-        }
+      // Fallback to simple approximation if camera not ready
+      const position: [number, number, number] = rayHit || [
+        (((event.clientX - rect.left) / rect.width) * 2 - 1) * 8,
+        0,
+        -(((event.clientY - rect.top) / rect.height) * 2 + 1) * 8,
+      ];
+      
+      let addedModule = false;
+      switch (data.category) {
+        case 'process':
+        case 'modular':
+        case 'robots':
+        case 'pallets':
+        case 'fmcg':
+        case 'medical':
+          addProcessNode(data.moduleId, position);
+          addedModule = true;
+          break;
+        case 'environment':
+          addEnvironmentAsset(data.moduleId, position);
+          addedModule = true;
+          break;
+        case 'actors':
+          addActor(data.moduleId, position);
+          addedModule = true;
+          break;
+      }
+      if (addedModule) {
+        setHasPlacedModule(true);
       }
     } catch (error) {
       console.error('Failed to handle drop:', error);
     }
-  }, [addProcessNode, addEnvironmentAsset, addActor]);
+  }, [addProcessNode, addEnvironmentAsset, addActor, parseModuleDropPayload]);
 
   const handleDragEnter = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -764,10 +779,9 @@ const Viewport: React.FC = () => {
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    const dragTypes = Array.from(event.dataTransfer.types || []);
-    const hasModulePayload = dragTypes.includes('application/json');
+    const hasModulePayload = !!parseModuleDropPayload(event);
     event.dataTransfer.dropEffect = hasModulePayload ? 'copy' : 'none';
-  }, []);
+  }, [parseModuleDropPayload]);
 
   const getSelectedObject = () => {
     if (!selectedObjectId || !selectedObjectType) return null;

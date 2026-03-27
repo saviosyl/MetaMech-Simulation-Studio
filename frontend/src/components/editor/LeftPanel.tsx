@@ -60,6 +60,9 @@ const LeftPanel: React.FC = () => {
 
   const handleDragStart = (e: React.DragEvent, module: ModuleDefinition) => {
     e.dataTransfer.setData('application/json', JSON.stringify({ type: 'module', moduleId: module.id, category: module.category }));
+    // Safari/Chromium interoperability: keep a plain-text mirror so drop targets
+    // can reliably detect a valid internal app drag payload.
+    e.dataTransfer.setData('text/plain', `metamech:module:${module.id}:${module.category}`);
     e.dataTransfer.effectAllowed = 'copy';
   };
 
