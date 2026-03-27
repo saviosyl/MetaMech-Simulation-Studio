@@ -1640,7 +1640,9 @@ const AdminAssetEditorPage: React.FC = () => {
       setSelectedNodeIndex(nodes.length);
       return;
     }
-    updateNode(selectedNodeIndex, { position: applyNodeSnap(positionMm) });
+    // Node placement clicks already provide snap-mode-resolved local coordinates.
+    // Apply directly to avoid a second transform layer and keep viewport click snapping reliable.
+    updateNode(selectedNodeIndex, { position: positionMm });
   }
 
   function placeSelectedNodeOnGround(): void {
