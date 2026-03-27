@@ -241,6 +241,32 @@ function nodeColorByType(nodeType: string | undefined): string {
   return '#22d3ee';
 }
 
+function nodeTypeDisplayLabel(nodeType: string | undefined): string {
+  const t = String(nodeType || '').toLowerCase();
+  if (t.includes('infeed') || t === 'product_in') return 'Infeed';
+  if (t.includes('outfeed') || t === 'product_out') return 'Outfeed';
+  if (t === 'center') return 'Center';
+  if (t === 'top_attach') return 'Top Attach';
+  if (t === 'bottom_attach') return 'Bottom Attach';
+  if (t === 'pick') return 'Pick';
+  if (t === 'place') return 'Place';
+  return t ? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Unknown';
+}
+
+function isGenericMovingPartName(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return true;
+  return /^part[-_ ]?\d+$/.test(normalized) || /^moving[-_ ]?part[-_ ]?\d+$/.test(normalized);
+}
+
+function movingPartDisplayName(part: AssetMovingPart, index: number): string {
+  const name = String(part.name || '').trim();
+  const objectName = String(part.objectName || '').trim();
+  if (name && !isGenericMovingPartName(name)) return name;
+  if (objectName) return objectName;
+  return `Moving Part ${index + 1}`;
+}
+
 function defaultBehaviorConfig(template: BehaviorTemplateType): BehaviorConfig {
   if (template === 'straight-conveyor') {
     return {
