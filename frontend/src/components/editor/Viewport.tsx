@@ -702,9 +702,18 @@ const Viewport: React.FC = () => {
 
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
+    event.stopPropagation();
     
     try {
-      const data = JSON.parse(event.dataTransfer.getData('application/json'));
+      const rawData = event.dataTransfer.getData('application/json');
+      if (!rawData) {
+        // Defensive guard: ignore external file/link drops in viewport.
+        return;
+      }
+      const data = JSON.parse(rawData);
+      if (!data || data.type !== 'module' || typeof data.moduleId !== 'string' || typeof data.category !== 'string') {
+        return;
+      }
       
       if (data.type === 'module') {
         // Proper raycast from mouse to ground plane (y=0) using Three.js camera
@@ -747,10 +756,16 @@ const Viewport: React.FC = () => {
     }
   }, [addProcessNode, addEnvironmentAsset, addActor]);
 
+  const handleDragEnter = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    event.dataTransfer.dropEffect = 'copy';
+    const hasModulePayload = !!event.dataTransfer.getData('application/json');
+    event.dataTransfer.dropEffect = hasModulePayload ? 'copy' : 'none';
   }, []);
 
   const getSelectedObject = () => {
@@ -777,6 +792,7 @@ const Viewport: React.FC = () => {
       data-tour="viewport-center"
       style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--mm-bg-viewport)' }}
       onDrop={handleDrop}
+      onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
     >
       <Canvas
