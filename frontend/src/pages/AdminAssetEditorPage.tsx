@@ -513,11 +513,15 @@ function applyMotionPreview(
   const candidate = findObjectByHierarchyPath(targetRoot, part.objectName)
     || targetRoot.getObjectByName(part.objectName)
     || targetRoot;
-  if (part.motionType === 'translate') {
+  if (part.motionType === 'translate' || part.motionType === 'lift') {
     const delta = mmToM(v - part.default) / Math.max(worldScale, 0.000001);
-    if (part.axis === 'x') candidate.position.x += delta;
-    if (part.axis === 'y') candidate.position.y += delta;
-    if (part.axis === 'z') candidate.position.z += delta;
+    if (part.motionType === 'lift') {
+      candidate.position.z += delta;
+    } else {
+      if (part.axis === 'x') candidate.position.x += delta;
+      if (part.axis === 'y') candidate.position.y += delta;
+      if (part.axis === 'z') candidate.position.z += delta;
+    }
   } else {
     const delta = ((v - part.default) * Math.PI) / 180;
     if (part.axis === 'x') candidate.rotation.x += delta;
@@ -3313,7 +3317,12 @@ const AdminAssetEditorPage: React.FC = () => {
                           <input type="number" value={part.speed} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, speed: Number(e.target.value) || 0 } : p)))} placeholder="speed" />
                         </div>
                       </div>
-                      <input type="number" value={Number(part.dwellMs || 0)} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, dwellMs: Number(e.target.value) || 0 } : p)))} placeholder="dwell (ms)" />
+                      {part.motionType !== 'lift' && (
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Dwell Time (ms)</label>
+                          <input type="number" value={Number(part.dwellMs || 0)} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, dwellMs: Number(e.target.value) || 0 } : p)))} placeholder="dwell (ms)" />
+                        </div>
+                      )}
                       <button type="button" onClick={() => setMovableParts((prev) => prev.filter((_, i) => i !== index))} style={{ border: '1px solid color-mix(in oklab, var(--mm-accent-danger) 45%, transparent)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-accent-danger-muted)', color: 'var(--mm-accent-danger)', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
                         <Trash2 size={12} />
                         Remove Part
@@ -3393,6 +3402,11 @@ const AdminAssetEditorPage: React.FC = () => {
                     </option>
                   ))}
                 </select>
+                {previewPartIndex >= 0 && movableParts[previewPartIndex]?.motionType === 'lift' && (
+                  <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                    Lift position preview (Z): Min Height to Max Height
+                  </div>
+                )}
                 <input type="range" min={0} max={1} step={0.01} value={previewT} onChange={(e) => setPreviewT(Number(e.target.value))} />
               </div>
 
