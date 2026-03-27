@@ -2779,56 +2779,72 @@ const AdminAssetEditorPage: React.FC = () => {
                 )}
 
                 {behaviorTemplate === 'lift-conveyor' && (
-                  <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
+                  <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 8 }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Lift Application (V1)</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
-                      <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Moving Part</label>
-                        <select value={String(toLiftV1BehaviorConfig(behaviorConfig).movingPartId || '')} onChange={(e) => setBehaviorField('movingPartId', e.target.value)}>
-                          <option value="">select moving part</option>
-                          {movableParts.map((part, idx) => (
-                            <option key={String(part.id || `part-${idx}`)} value={String(part.id || '')}>
-                              {part.name || part.objectName || `Part ${idx + 1}`}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lift Axis</label>
-                        <input value="z" disabled />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Control Mode</label>
-                        <select value={String(toLiftV1BehaviorConfig(behaviorConfig).controlMode || 'auto')} onChange={(e) => setBehaviorField('controlMode', e.target.value === 'manual' ? 'manual' : 'auto')}>
-                          <option value="auto">auto</option>
-                          <option value="manual">manual</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
-                      <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Min (mm)</label>
-                        <input type="number" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftMinMm || 0)} onChange={(e) => setBehaviorField('liftMinMm', Number(e.target.value) || 0)} />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Max (mm)</label>
-                        <input type="number" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftMaxMm || 2500)} onChange={(e) => setBehaviorField('liftMaxMm', Number(e.target.value) || 0)} />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Default (mm)</label>
-                        <input type="number" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftDefaultMm || 0)} onChange={(e) => setBehaviorField('liftDefaultMm', Number(e.target.value) || 0)} />
+
+                    <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-panel)', display: 'grid', gap: 6 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Lift Settings</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Moving Part</label>
+                          <select value={String(toLiftV1BehaviorConfig(behaviorConfig).movingPartId || '')} onChange={(e) => setBehaviorField('movingPartId', e.target.value)}>
+                            <option value="">select moving part</option>
+                            {movableParts.map((part, idx) => (
+                              <option key={String(part.id || `part-${idx}`)} value={String(part.id || '')}>
+                                {part.name || part.objectName || `Part ${idx + 1}`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Axis (fixed)</label>
+                          <input value="Z" disabled />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Control Mode</label>
+                          <select value={String(toLiftV1BehaviorConfig(behaviorConfig).controlMode || 'auto')} onChange={(e) => setBehaviorField('controlMode', e.target.value === 'manual' ? 'manual' : 'auto')}>
+                            <option value="auto">auto</option>
+                            <option value="manual">manual</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
-                      <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lift Speed (mm/s)</label>
-                        <input type="number" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftSpeedMmPerSec || 0)} onChange={(e) => setBehaviorField('liftSpeedMmPerSec', Number(e.target.value) || 0)} />
+
+                    <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-panel)', display: 'grid', gap: 6 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Range</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Min Height (mm)</label>
+                          <input type="number" placeholder="0" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftMinMm || 0)} onChange={(e) => setBehaviorField('liftMinMm', Number(e.target.value) || 0)} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Max Height (mm)</label>
+                          <input type="number" placeholder="2500" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftMaxMm || 2500)} onChange={(e) => setBehaviorField('liftMaxMm', Number(e.target.value) || 0)} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Default Height (mm)</label>
+                          <input type="number" placeholder="800" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftDefaultMm || 0)} onChange={(e) => setBehaviorField('liftDefaultMm', Number(e.target.value) || 0)} />
+                        </div>
                       </div>
-                      <div>
-                        <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Conveyor Speed (m/min)</label>
-                        <input type="number" value={Number(toLiftV1BehaviorConfig(behaviorConfig).conveyorSpeedMpm || 0)} onChange={(e) => setBehaviorField('conveyorSpeedMpm', Number(e.target.value) || 0)} />
+                      <div style={{ fontSize: 10, color: 'var(--mm-text-disabled)' }}>
+                        Min = lowest position, Max = highest position, Default = start/home position.
                       </div>
                     </div>
+
+                    <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-panel)', display: 'grid', gap: 6 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Motion</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lift Speed (mm/s)</label>
+                          <input type="number" placeholder="350" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftSpeedMmPerSec || 0)} onChange={(e) => setBehaviorField('liftSpeedMmPerSec', Number(e.target.value) || 0)} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Conveyor Speed (m/min)</label>
+                          <input type="number" placeholder="12" value={Number(toLiftV1BehaviorConfig(behaviorConfig).conveyorSpeedMpm || 0)} onChange={(e) => setBehaviorField('conveyorSpeedMpm', Number(e.target.value) || 0)} />
+                        </div>
+                      </div>
+                    </div>
+
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
                       <div>
                         <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Lower Infeed Node</label>
@@ -2856,7 +2872,7 @@ const AdminAssetEditorPage: React.FC = () => {
                       </div>
                       <div>
                         <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Home Target (mm)</label>
-                        <input type="number" value={Number(toLiftV1BehaviorConfig(behaviorConfig).homeTargetMm || 0)} onChange={(e) => setBehaviorField('homeTargetMm', Number(e.target.value) || 0)} />
+                        <input type="number" placeholder="0" value={Number(toLiftV1BehaviorConfig(behaviorConfig).homeTargetMm || 0)} onChange={(e) => setBehaviorField('homeTargetMm', Number(e.target.value) || 0)} />
                       </div>
                     </div>
                   </div>
@@ -3203,17 +3219,28 @@ const AdminAssetEditorPage: React.FC = () => {
                       <input value={String(part.name || '')} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, name: e.target.value } : p)))} placeholder="part name" />
                       <input value={part.objectName} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, objectName: e.target.value } : p)))} placeholder="Object name" />
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
-                        <select value={part.motionType} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, motionType: e.target.value as AssetMovingPart['motionType'] } : p)))}>
+                        <select value={part.motionType} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => {
+                          if (i !== index) return p;
+                          const nextMotionType = e.target.value as AssetMovingPart['motionType'];
+                          if (nextMotionType === 'lift') {
+                            return { ...p, motionType: 'lift', axis: 'z' };
+                          }
+                          return { ...p, motionType: nextMotionType };
+                        }))}>
                           <option value="none">none</option>
                           <option value="translate">translate</option>
                           <option value="rotate">rotate</option>
                           <option value="lift">lift</option>
                         </select>
-                        <select value={part.axis} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, axis: e.target.value as 'x' | 'y' | 'z' } : p)))}>
-                          <option value="x">x</option>
-                          <option value="y">y</option>
-                          <option value="z">z</option>
-                        </select>
+                        {part.motionType === 'lift' ? (
+                          <input value="z (fixed for Lift V1)" disabled />
+                        ) : (
+                          <select value={part.axis} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, axis: e.target.value as 'x' | 'y' | 'z' } : p)))}>
+                            <option value="x">x</option>
+                            <option value="y">y</option>
+                            <option value="z">z</option>
+                          </select>
+                        )}
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 6 }}>
                         <input type="number" value={part.min} onChange={(e) => setMovableParts((prev) => prev.map((p, i) => (i === index ? { ...p, min: Number(e.target.value) || 0 } : p)))} placeholder="min" />

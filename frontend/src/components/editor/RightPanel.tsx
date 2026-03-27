@@ -573,7 +573,7 @@ const RightPanel: React.FC = () => {
               })()}
 
               {liftRuntimeUi && (
-                <Section title="Lift Runtime" icon={Radio} defaultOpen={true} badge="LIFT V1">
+                <Section title="Lift Runtime" icon={Radio} defaultOpen={true} badge="LIFT V1 • Z AXIS">
                   {liftRuntimeUi.controls.showTargetHeight && (
                     <div style={fieldGap}>
                       <label style={labelStyle}>Target Height (mm)</label>
