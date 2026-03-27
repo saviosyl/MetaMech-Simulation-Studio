@@ -1319,6 +1319,7 @@ const AdminAssetEditorPage: React.FC = () => {
   const [pathMode, setPathMode] = useState<PathMode>('none');
   const [pathPoints, setPathPoints] = useState<PathPoint[]>([]);
   const [selectedPathPointIndex, setSelectedPathPointIndex] = useState<number>(-1);
+  const [nodeAdvancedOpen, setNodeAdvancedOpen] = useState(false);
   const [rotateSnapEnabled, setRotateSnapEnabled] = useState(true);
   const [rotateSnapDeg, setRotateSnapDeg] = useState<45 | 15>(45);
   const [behaviorTemplate, setBehaviorTemplate] = useState<BehaviorTemplateType>('none');
@@ -2962,62 +2963,48 @@ const AdminAssetEditorPage: React.FC = () => {
                     Add Node
                   </button>
                 </div>
-                  <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}>Visual Placement</div>
-                  <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4 }}>
-                    Active tool: <strong>{activeTool === 'node' ? 'Node placement/edit' : activeTool === 'measurement' ? 'Measurement' : activeTool === 'move' ? 'Move' : activeTool === 'rotate' ? 'Rotate' : activeTool === 'pivot' ? 'Pivot' : 'Select'}</strong>.
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
-                      <input type="checkbox" checked={showWorldAxis} onChange={(e) => setShowWorldAxis(e.target.checked)} />
-                      Show World Axis
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
-                      <input type="checkbox" checked={showLocalAxis} onChange={(e) => setShowLocalAxis(e.target.checked)} />
-                      Show Local Axis
-                    </label>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
-                    <div>
-                      <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Node Transform</label>
-                      <select value={nodeTransformMode} onChange={(e) => setNodeTransformMode(e.target.value as TransformMode)}>
-                        <option value="translate">Move</option>
-                        <option value="rotate">Rotate</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Node Snap</label>
-                      <select value={nodeSnapMode} onChange={(e) => setNodeSnapMode(e.target.value as NodeGizmoSnapMode)}>
-                        <option value="off">Off</option>
-                        <option value="surface">Surface</option>
-                        <option value="center">Center</option>
-                        <option value="edge">Edge</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <button type="button" onClick={placeSelectedNodeOnGround} disabled={selectedNodeIndex < 0} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}>
-                      Place Selected on Ground
-                    </button>
-                    <button type="button" onClick={focusSelectedNode} disabled={selectedNodeIndex < 0} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11 }}>
-                      Focus Selected Node
-                    </button>
-                  </div>
+                <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
                   <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
-                    Node colors: Infeed = Blue, Outfeed = Green, Stop/Load = Yellow, Pick = Orange, Place = Purple.
+                    Active tool: <strong>{activeTool === 'node' ? 'Node placement/edit' : activeTool === 'measurement' ? 'Measurement' : activeTool === 'move' ? 'Move' : activeTool === 'rotate' ? 'Rotate' : activeTool === 'pivot' ? 'Pivot' : 'Select'}</strong>.
                   </div>
                 </div>
                 <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
                   {nodes.map((node, index) => (
-                    <button key={`${node.id || 'node'}-${index}`} type="button" onClick={() => { setActiveTool('node'); setSelectedNodeIndex(index); }} style={{ textAlign: 'left', border: `1px solid ${selectedNodeIndex === index ? 'color-mix(in oklab, var(--mm-accent-primary) 40%, transparent)' : 'var(--mm-border-subtle)'}`, borderRadius: 8, padding: 8, background: selectedNodeIndex === index ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700 }}>{node.id || `Node ${index + 1}`}</div>
-                      <div style={{ fontSize: 10, color: 'var(--mm-text-tertiary)' }}>type: {node.type || 'unknown'}</div>
+                    <button
+                      key={`${node.id || 'node'}-${index}`}
+                      type="button"
+                      onClick={() => { setActiveTool('node'); setSelectedNodeIndex(index); }}
+                      style={{
+                        textAlign: 'left',
+                        border: `1px solid ${selectedNodeIndex === index ? 'color-mix(in oklab, var(--mm-accent-primary) 40%, transparent)' : 'var(--mm-border-subtle)'}`,
+                        borderRadius: 10,
+                        padding: '8px 10px',
+                        background: selectedNodeIndex === index ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700 }}>{node.id || `Node ${index + 1}`}</div>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            textTransform: 'capitalize',
+                            padding: '2px 7px',
+                            borderRadius: 999,
+                            color: 'var(--mm-text-secondary)',
+                            background: 'var(--mm-bg-panel)',
+                            border: '1px solid var(--mm-border-subtle)',
+                          }}
+                        >
+                          {String(node.type || 'unknown').replace(/_/g, ' ')}
+                        </span>
+                      </div>
                     </button>
                   ))}
                 </div>
                 {selectedNodeIndex >= 0 && nodes[selectedNodeIndex] && (
-                  <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)', display: 'grid', gap: 6 }}>
-                    <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Node ID</label>
+                  <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 10, padding: 10, background: 'var(--mm-bg-surface)', display: 'grid', gap: 8 }}>
+                    <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Node Name</label>
                     <input value={String(nodes[selectedNodeIndex].id || '')} onChange={(e) => updateNode(selectedNodeIndex, { id: e.target.value })} />
                     <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Node Type</label>
                     <select value={String(nodes[selectedNodeIndex].type || 'infeed')} onChange={(e) => updateNode(selectedNodeIndex, { type: e.target.value })}>
@@ -3029,7 +3016,7 @@ const AdminAssetEditorPage: React.FC = () => {
                       <option value="pick">pick</option>
                       <option value="place">place</option>
                     </select>
-                    <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Position [x,y,z] mm</label>
+                    <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Position (mm)</label>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
                       {[0, 1, 2].map((axis) => (
                         <input
@@ -3045,10 +3032,69 @@ const AdminAssetEditorPage: React.FC = () => {
                         />
                       ))}
                     </div>
-                    <button type="button" onClick={() => deleteNode(selectedNodeIndex)} style={{ border: '1px solid color-mix(in oklab, var(--mm-accent-danger) 45%, transparent)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-accent-danger-muted)', color: 'var(--mm-accent-danger)', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                      <Trash2 size={12} />
-                      Remove Node
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={placeSelectedNodeOnGround}
+                        style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11, minHeight: 32 }}
+                      >
+                        Place on Model
+                      </button>
+                      <button
+                        type="button"
+                        onClick={focusSelectedNode}
+                        style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11, minHeight: 32 }}
+                      >
+                        Focus Node
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteNode(selectedNodeIndex)}
+                        style={{ border: '1px solid color-mix(in oklab, var(--mm-accent-danger) 45%, transparent)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-accent-danger-muted)', color: 'var(--mm-accent-danger)', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center', minHeight: 32 }}
+                      >
+                        <Trash2 size={12} />
+                        Remove Node
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setNodeAdvancedOpen((prev) => !prev)}
+                      style={{ textAlign: 'left', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-panel)', fontSize: 11, fontWeight: 600, color: 'var(--mm-text-secondary)' }}
+                    >
+                      {nodeAdvancedOpen ? '▼' : '▶'} Advanced
                     </button>
+                    {nodeAdvancedOpen && (
+                      <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-panel)', display: 'grid', gap: 6 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                          <div>
+                            <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Edit Mode</label>
+                            <select value={nodeTransformMode} onChange={(e) => setNodeTransformMode(e.target.value as TransformMode)}>
+                              <option value="translate">Move</option>
+                              <option value="rotate">Rotate</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Snap To</label>
+                            <select value={nodeSnapMode} onChange={(e) => setNodeSnapMode(e.target.value as NodeGizmoSnapMode)}>
+                              <option value="off">Off</option>
+                              <option value="surface">Surface</option>
+                              <option value="center">Center</option>
+                              <option value="edge">Edge</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                            <input type="checkbox" checked={showWorldAxis} onChange={(e) => setShowWorldAxis(e.target.checked)} />
+                            Show Global Axis
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                            <input type="checkbox" checked={showLocalAxis} onChange={(e) => setShowLocalAxis(e.target.checked)} />
+                            Show Object Axis
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
