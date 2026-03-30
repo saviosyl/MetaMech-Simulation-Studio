@@ -90,6 +90,9 @@ type MeasurementPoint = {
 type LiftV1BehaviorConfig = {
   movingPartId?: string;
   liftAxis?: 'z';
+  lowerLimitMm?: number;
+  upperLimitMm?: number;
+  homeMm?: number;
   liftMinMm?: number;
   liftMaxMm?: number;
   liftDefaultMm?: number;
@@ -442,18 +445,29 @@ function toLiftV1BehaviorConfig(input: unknown): LiftV1BehaviorConfig {
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
   };
+  const lowerLimitMm = toFinite(source.lowerLimitMm, toFinite(source.liftMinMm, 0));
+  const upperLimitMmRaw = toFinite(source.upperLimitMm, toFinite(source.liftMaxMm, 2500));
+  const upperLimitMm = upperLimitMmRaw > lowerLimitMm ? upperLimitMmRaw : lowerLimitMm + 1;
+  const homeMm = toFinite(
+    source.homeMm,
+    toFinite(source.liftDefaultMm, toFinite(source.homeTargetMm, lowerLimitMm))
+  );
+  const clampedHomeMm = clamp(homeMm, lowerLimitMm, upperLimitMm);
   return {
     movingPartId,
     liftAxis: 'z',
-    liftMinMm: toFinite(source.liftMinMm, 0),
-    liftMaxMm: toFinite(source.liftMaxMm, 2500),
-    liftDefaultMm: toFinite(source.liftDefaultMm, 800),
+    lowerLimitMm,
+    upperLimitMm,
+    homeMm: clampedHomeMm,
+    liftMinMm: lowerLimitMm,
+    liftMaxMm: upperLimitMm,
+    liftDefaultMm: clampedHomeMm,
     lowerInfeedNodeId,
     upperOutfeedNodeId,
     liftSpeedMmPerSec: toFinite(source.liftSpeedMmPerSec, 350),
     conveyorSpeedMpm: toFinite(source.conveyorSpeedMpm, 12),
     controlMode: String(source.controlMode || 'auto') === 'manual' ? 'manual' : 'auto',
-    homeTargetMm: toFinite(source.homeTargetMm, 0),
+    homeTargetMm: clampedHomeMm,
   };
 }
 
@@ -587,6 +601,8 @@ const ModelPreview: React.FC<{
   movingParts: AssetMovingPart[];
   previewPartIndex: number;
   previewT: number;
+  behaviorTemplate: BehaviorTemplateType;
+  behaviorConfig: Record<string, unknown>;
   pathPoints: PathPoint[];
   selectedPathPointIndex: number;
   onPathPointsChange: (points: PathPoint[]) => void;
@@ -630,6 +646,8 @@ const ModelPreview: React.FC<{
   movingParts,
   previewPartIndex,
   previewT,
+  behaviorTemplate,
+  behaviorConfig,
   pathPoints,
   selectedPathPointIndex,
   onPathPointsChange,
@@ -778,7 +796,23 @@ const ModelPreview: React.FC<{
         }
       }
     });
-    const part = movingParts[previewPartIndex] || null;
+    let part = movingParts[previewPartIndex] || null;
+    if (behaviorTemplate === 'lift-conveyor') {
+      const lift = toLiftV1BehaviorConfig(behaviorConfig);
+      const liftMovingPartId = String(lift.movingPartId || '').trim();
+      const liftPartIndex = movingParts.findIndex((candidate) => String(candidate.id || '').trim() === liftMovingPartId);
+      const liftPart = (liftPartIndex >= 0 ? movingParts[liftPartIndex] : part) || null;
+      if (liftPart) {
+        part = {
+          ...liftPart,
+          motionType: 'lift',
+          axis: 'z',
+          min: Number(lift.lowerLimitMm ?? liftPart.min ?? 0),
+          max: Number(lift.upperLimitMm ?? liftPart.max ?? ((liftPart.min || 0) + 1)),
+          default: Number(lift.homeMm ?? liftPart.default ?? liftPart.min ?? 0),
+        };
+      }
+    }
     applyMotionPreview(clone, part, previewT, worldScale);
     modelBoundsRef.current = new THREE.Box3().setFromObject(clone);
     return clone;
@@ -787,6 +821,8 @@ const ModelPreview: React.FC<{
     movingParts,
     previewPartIndex,
     previewT,
+    behaviorTemplate,
+    behaviorConfig,
     highlightedObjectNames,
     worldScale,
     pivotOffsetMm,
@@ -1407,6 +1443,42 @@ const AdminAssetEditorPage: React.FC = () => {
   const [historyFuture, setHistoryFuture] = useState<EditorHistorySnapshot[]>([]);
   const historySuspendRef = useRef(false);
   const lastHistorySnapshotRef = useRef<EditorHistorySnapshot | null>(null);
+  const liftPreviewState = useMemo(() => {
+    if (behaviorTemplate !== 'lift-conveyor') return null;
+    const lift = toLiftV1BehaviorConfig(behaviorConfig);
+    const lowerLimitMm = Number(lift.lowerLimitMm ?? 0);
+    const upperRaw = Number(lift.upperLimitMm ?? (lowerLimitMm + 1));
+    const upperLimitMm = upperRaw > lowerLimitMm ? upperRaw : lowerLimitMm + 1;
+    const homeMm = clamp(Number(lift.homeMm ?? lowerLimitMm), lowerLimitMm, upperLimitMm);
+    const movingPartId = String(lift.movingPartId || '').trim();
+    const movingPartIndex = movableParts.findIndex((part) => String(part.id || '').trim() === movingPartId);
+    return {
+      lowerLimitMm,
+      upperLimitMm,
+      homeMm,
+      movingPartId,
+      movingPartIndex,
+    };
+  }, [behaviorTemplate, behaviorConfig, movableParts]);
+  const liftPreviewValueMm = useMemo(() => {
+    if (!liftPreviewState) return 0;
+    const span = Math.max(0.000001, liftPreviewState.upperLimitMm - liftPreviewState.lowerLimitMm);
+    return liftPreviewState.lowerLimitMm + (span * previewT);
+  }, [liftPreviewState, previewT]);
+
+  useEffect(() => {
+    if (!liftPreviewState) return;
+    if (liftPreviewState.movingPartIndex >= 0 && previewPartIndex !== liftPreviewState.movingPartIndex) {
+      setPreviewPartIndex(liftPreviewState.movingPartIndex);
+    }
+  }, [liftPreviewState, previewPartIndex]);
+
+  function setLiftPreviewValueMm(valueMm: number): void {
+    if (!liftPreviewState) return;
+    const span = Math.max(0.000001, liftPreviewState.upperLimitMm - liftPreviewState.lowerLimitMm);
+    const clamped = clamp(valueMm, liftPreviewState.lowerLimitMm, liftPreviewState.upperLimitMm);
+    setPreviewT((clamped - liftPreviewState.lowerLimitMm) / span);
+  }
 
   const captureHistorySnapshot = useMemo<EditorHistorySnapshot>(() => ({
     name,
@@ -2562,6 +2634,8 @@ const AdminAssetEditorPage: React.FC = () => {
               movingParts={movableParts}
               previewPartIndex={previewPartIndex}
               previewT={previewT}
+              behaviorTemplate={behaviorTemplate}
+              behaviorConfig={behaviorConfig}
               pathPoints={pathPoints}
               selectedPathPointIndex={selectedPathPointIndex}
               onPathPointsChange={setPathPoints}
@@ -3051,15 +3125,44 @@ const AdminAssetEditorPage: React.FC = () => {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6 }}>
                         <div>
                           <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Min Height (mm)</label>
-                          <input type="number" placeholder="0" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftMinMm || 0)} onChange={(e) => setBehaviorField('liftMinMm', Number(e.target.value) || 0)} />
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={Number(toLiftV1BehaviorConfig(behaviorConfig).lowerLimitMm || 0)}
+                            onChange={(e) => {
+                              const next = Number(e.target.value) || 0;
+                              setBehaviorConfig((prev) => ({ ...prev, lowerLimitMm: next, liftMinMm: next }));
+                            }}
+                          />
                         </div>
                         <div>
                           <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Max Height (mm)</label>
-                          <input type="number" placeholder="2500" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftMaxMm || 2500)} onChange={(e) => setBehaviorField('liftMaxMm', Number(e.target.value) || 0)} />
+                          <input
+                            type="number"
+                            placeholder="2500"
+                            value={Number(toLiftV1BehaviorConfig(behaviorConfig).upperLimitMm || 2500)}
+                            onChange={(e) => {
+                              const next = Number(e.target.value) || 0;
+                              setBehaviorConfig((prev) => ({ ...prev, upperLimitMm: next, liftMaxMm: next }));
+                            }}
+                          />
                         </div>
                         <div>
                           <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Default Height (mm)</label>
-                          <input type="number" placeholder="800" value={Number(toLiftV1BehaviorConfig(behaviorConfig).liftDefaultMm || 0)} onChange={(e) => setBehaviorField('liftDefaultMm', Number(e.target.value) || 0)} />
+                          <input
+                            type="number"
+                            placeholder="800"
+                            value={Number(toLiftV1BehaviorConfig(behaviorConfig).homeMm || 0)}
+                            onChange={(e) => {
+                              const next = Number(e.target.value) || 0;
+                              setBehaviorConfig((prev) => ({
+                                ...prev,
+                                homeMm: next,
+                                liftDefaultMm: next,
+                                homeTargetMm: next,
+                              }));
+                            }}
+                          />
                         </div>
                       </div>
                       <div style={{ fontSize: 10, color: 'var(--mm-text-disabled)' }}>
@@ -3108,7 +3211,20 @@ const AdminAssetEditorPage: React.FC = () => {
                       </div>
                       <div>
                         <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Home Target (mm)</label>
-                        <input type="number" placeholder="0" value={Number(toLiftV1BehaviorConfig(behaviorConfig).homeTargetMm || 0)} onChange={(e) => setBehaviorField('homeTargetMm', Number(e.target.value) || 0)} />
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={Number(toLiftV1BehaviorConfig(behaviorConfig).homeMm || 0)}
+                          onChange={(e) => {
+                            const next = Number(e.target.value) || 0;
+                            setBehaviorConfig((prev) => ({
+                              ...prev,
+                              homeMm: next,
+                              homeTargetMm: next,
+                              liftDefaultMm: next,
+                            }));
+                          }}
+                        />
                       </div>
                     </div>
                   </div>
@@ -3570,20 +3686,71 @@ const AdminAssetEditorPage: React.FC = () => {
                   <div style={{ padding: 8, display: 'grid', gap: 8 }}>
               <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8, display: 'grid', gap: 6 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--mm-text-tertiary)' }}>Motion Preview</div>
-                <select value={previewPartIndex} onChange={(e) => setPreviewPartIndex(Number(e.target.value))}>
-                  <option value={-1}>none</option>
-                  {movableParts.map((part, index) => (
-                    <option key={`${part.objectName}-${index}`} value={index}>
-                      {part.objectName}
-                    </option>
-                  ))}
-                </select>
-                {previewPartIndex >= 0 && movableParts[previewPartIndex]?.motionType === 'lift' && (
-                  <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
-                    Lift position preview (Z): Min Height to Max Height
-                  </div>
+                {behaviorTemplate === 'lift-conveyor' && liftPreviewState ? (
+                  <>
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Preview Part</label>
+                      <div style={{ fontSize: 12, color: 'var(--mm-text-secondary)' }}>
+                        {liftPreviewState.movingPartIndex >= 0
+                          ? movingPartDisplayName(movableParts[liftPreviewState.movingPartIndex], liftPreviewState.movingPartIndex)
+                          : 'No moving part selected'}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                      Lift preview is Z-only translation.
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => setLiftPreviewValueMm(liftPreviewState.lowerLimitMm)}
+                        style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11 }}
+                      >
+                        Min
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLiftPreviewValueMm(liftPreviewState.homeMm)}
+                        style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11 }}
+                      >
+                        Default
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLiftPreviewValueMm(liftPreviewState.upperLimitMm)}
+                        style={{ border: '1px solid var(--mm-border)', borderRadius: 8, padding: '6px 8px', background: 'var(--mm-bg-surface)', fontSize: 11 }}
+                      >
+                        Max
+                      </button>
+                    </div>
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                        Lift Position (mm): {liftPreviewValueMm.toFixed(0)}
+                      </label>
+                      <input
+                        type="range"
+                        min={liftPreviewState.lowerLimitMm}
+                        max={liftPreviewState.upperLimitMm}
+                        step={1}
+                        value={liftPreviewValueMm}
+                        onChange={(e) => setLiftPreviewValueMm(Number(e.target.value) || liftPreviewState.lowerLimitMm)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Preview Part</label>
+                    <select value={previewPartIndex} onChange={(e) => setPreviewPartIndex(Number(e.target.value))}>
+                      <option value={-1}>none</option>
+                      {movableParts.map((part, index) => (
+                        <option key={`${part.objectName}-${index}`} value={index}>
+                          {part.objectName}
+                        </option>
+                      ))}
+                    </select>
+                    <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Preview Position</label>
+                    <input type="range" min={0} max={1} step={0.01} value={previewT} onChange={(e) => setPreviewT(Number(e.target.value))} />
+                  </>
                 )}
-                <input type="range" min={0} max={1} step={0.01} value={previewT} onChange={(e) => setPreviewT(Number(e.target.value))} />
               </div>
 
               <div style={{ borderTop: '1px solid var(--mm-border-subtle)', paddingTop: 8 }}>
