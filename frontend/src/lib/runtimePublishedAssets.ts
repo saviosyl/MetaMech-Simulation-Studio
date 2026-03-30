@@ -72,9 +72,12 @@ function inferDefaultScale(metadata: AssetMetadata): [number, number, number] | 
   const scaleCorrectionRaw = metadata?.scaleCorrection as unknown;
   const parsedCorrection = Number(scaleCorrectionRaw);
   const hasScaleCorrection = Number.isFinite(parsedCorrection) && parsedCorrection > 0;
+  // Authoring metadata native bounds are generated from raw GLB units.
+  // If source unit is unknown, keep raw units by using a neutral unit factor.
+  const effectiveUnitScale = sourceUnit === 'unknown' ? 1 : sourceUnitScale;
   if (hasScaleCorrection || sourceUnit !== 'unknown') {
     const correction = hasScaleCorrection ? parsedCorrection : 1;
-    const worldScale = sourceUnitScale * correction;
+    const worldScale = effectiveUnitScale * correction;
     if (worldScale > 0) return [worldScale, worldScale, worldScale];
   }
   const declared = metadata?.defaultScale as unknown;
