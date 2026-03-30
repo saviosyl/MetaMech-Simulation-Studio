@@ -17,6 +17,7 @@ import { AssetDefinitionNode, AssetMetadata, AssetMovingPart, BehaviorTemplateTy
 import { simulationUrls } from '../content/simulationMarketingContent';
 import { refreshRuntimePublishedAssets } from '../lib/runtimePublishedAssets';
 import { configureGLTFLoader, toFriendlyGlbLoadError } from '../lib/gltfLoaders';
+import { normalizeAndValidateLiftV1Metadata } from '../lib/liftV1';
 
 type ModelHierarchyItem = {
   id: string;
@@ -1586,7 +1587,7 @@ const AdminAssetEditorPage: React.FC = () => {
     const aliases = Object.fromEntries(
       Object.entries(objectAliasesByPath).filter(([, value]) => String(value || '').trim().length > 0)
     );
-    return {
+    const draftMetadata: AssetMetadata = {
       ...safeAssetMetadata(asset),
       nodes,
       movableParts,
@@ -1620,6 +1621,7 @@ const AdminAssetEditorPage: React.FC = () => {
         }
         : {}),
     };
+    return normalizeAndValidateLiftV1Metadata(draftMetadata, { strictValidation: false }).metadata;
   }, [
     asset,
     nodes,
@@ -1715,6 +1717,16 @@ const AdminAssetEditorPage: React.FC = () => {
       if (!(speed > 0)) problems.push('Lift V1 requires lift speed > 0');
       const conveyorSpeed = Number(lift.conveyorSpeedMpm || 0);
       if (!(conveyorSpeed >= 0)) problems.push('Lift V1 requires conveyor speed >= 0');
+      const sharedLiftValidation = normalizeAndValidateLiftV1Metadata(
+        {
+          ...metadata,
+          behaviorTemplate: 'lift-conveyor',
+        },
+        { strictValidation: true }
+      );
+      for (const issue of sharedLiftValidation.errors) {
+        problems.push(issue);
+      }
       const requiredControls: (keyof RuntimeControlsConfig)[] = [
         'showTargetHeight',
         'showSpeedSlider',
@@ -1726,7 +1738,7 @@ const AdminAssetEditorPage: React.FC = () => {
       }
     }
     return problems;
-  }, [asset, selectedCategoryId, nodes, normalizationWarnings, behaviorTemplate, behaviorConfig, movableParts, runtimeControls]);
+  }, [asset, selectedCategoryId, nodes, normalizationWarnings, behaviorTemplate, behaviorConfig, movableParts, runtimeControls, metadata]);
 
   function hydrateFromAsset(next: LibraryAsset | null): void {
     historySuspendRef.current = true;
@@ -2141,13 +2153,18 @@ const AdminAssetEditorPage: React.FC = () => {
     setError('');
     setMessage('');
     try {
+      const publishValidation = normalizeAndValidateLiftV1Metadata(metadata, { strictValidation: true });
+      if (!publishValidation.isValid) {
+        setError(publishValidation.errors[0] || 'Lift V1 validation failed');
+        return;
+      }
       // Persist current editor metadata first so publish/runtime uses the exact normalized transform.
       const saved = await updateLibraryAsset(asset.id, {
         name: name.trim() || asset.name,
         description: description.trim(),
         tags: tagsText.split(',').map((v) => v.trim()).filter(Boolean),
         categoryId: selectedCategoryId || asset.categoryId,
-        metadata,
+        metadata: publishValidation.metadata,
       });
       const published = await publishLibraryAsset(saved.id);
       setAssets((prev) => prev.map((row) => {

@@ -159,6 +159,26 @@ export interface AssetMetadata {
     showSensorState?: boolean;
     showStopperState?: boolean;
   };
+  runtimeParameterLimits?: {
+    targetHeightMm?: {
+      min?: number;
+      max?: number;
+      default?: number;
+      step?: number;
+    };
+    liftSpeedMmPerSec?: {
+      min?: number;
+      max?: number;
+      default?: number;
+      step?: number;
+    };
+    conveyorSpeedMpm?: {
+      min?: number;
+      max?: number;
+      default?: number;
+      step?: number;
+    };
+  };
   [key: string]: unknown;
 }
 

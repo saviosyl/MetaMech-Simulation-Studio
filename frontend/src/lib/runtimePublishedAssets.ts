@@ -4,6 +4,7 @@ import { AssetMetadata, LibraryAsset, SceneCategory } from '../types';
 import { AssetDef, ConnectionPortDef, getAssetManifest, setRuntimeExternalAssets } from './assetManifest';
 import { ModuleDefinition, setRuntimeExternalModules } from './moduleLibrary';
 import { useEditorStore } from '../store/editorStore';
+import { normalizeAndValidateLiftV1Metadata } from './liftV1';
 
 type SourceUnit = 'mm' | 'cm' | 'm' | 'unknown';
 
@@ -198,7 +199,7 @@ function inferDefaultRotation(metadata: AssetMetadata): [number, number, number]
 }
 
 function toStaticAssetDef(asset: LibraryAsset): AssetDef {
-  const metadata = asset.metadata || {};
+  const metadata = normalizeAndValidateLiftV1Metadata(asset.metadata || {}, { strictValidation: false }).metadata;
   const ports = extractPorts(metadata);
   const scale = inferDefaultScale(metadata);
   const defaultPositionOffset = inferDefaultPositionOffset(metadata, scale);
