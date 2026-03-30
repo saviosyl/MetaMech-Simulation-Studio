@@ -686,6 +686,7 @@ const Viewport: React.FC = () => {
   const exportPreset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
   const dynamicDprMax = isExportRendering ? Math.max(2, Math.min(3, exportPreset.targetDpr)) : 2;
   const INTERNAL_MODULE_TEXT_PREFIX = 'metamech:module:';
+  const INTERNAL_DRAG_SESSION_KEY = 'metamech:drag-module-session';
   const parseModuleDropPayload = useCallback((event: React.DragEvent): { moduleId: string; category: string } | null => {
     const raw = event.dataTransfer.getData('application/json');
     if (raw) {
@@ -699,7 +700,16 @@ const Viewport: React.FC = () => {
       }
     }
     const textPayload = event.dataTransfer.getData('text/plain');
-    if (!textPayload || !textPayload.startsWith(INTERNAL_MODULE_TEXT_PREFIX)) return null;
+    if (!textPayload || !textPayload.startsWith(INTERNAL_MODULE_TEXT_PREFIX)) {
+      // Fallback for browsers that suppress transfer data during drag/drop:
+      // consume session marker set on internal dragstart in LeftPanel.
+      if (typeof window === 'undefined') return null;
+      const sessionPayload = window.sessionStorage.getItem(INTERNAL_DRAG_SESSION_KEY);
+      if (!sessionPayload || !sessionPayload.startsWith(INTERNAL_MODULE_TEXT_PREFIX)) return null;
+      const [sessionModuleId, sessionCategory] = sessionPayload.slice(INTERNAL_MODULE_TEXT_PREFIX.length).split(':');
+      if (!sessionModuleId || !sessionCategory) return null;
+      return { moduleId: sessionModuleId, category: sessionCategory };
+    }
     const [moduleId, category] = textPayload.slice(INTERNAL_MODULE_TEXT_PREFIX.length).split(':');
     if (!moduleId || !category) return null;
     return { moduleId, category };
@@ -749,6 +759,10 @@ const Viewport: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to handle drop:', error);
+    } finally {
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(INTERNAL_DRAG_SESSION_KEY);
+      }
     }
   }, [addProcessNode, addEnvironmentAsset, addActor, parseModuleDropPayload]);
 

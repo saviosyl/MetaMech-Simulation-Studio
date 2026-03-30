@@ -63,6 +63,16 @@ const LeftPanel: React.FC = () => {
     // Keep a deterministic plain-text mirror for browsers that suppress custom MIME during DnD.
     e.dataTransfer.setData('text/plain', `metamech:module:${module.id}:${module.category}`);
     e.dataTransfer.effectAllowed = 'copy';
+    if (typeof window !== 'undefined') {
+      (window as any).__mmDraggingModule = { moduleId: module.id, category: module.category };
+      window.sessionStorage.setItem('metamech:drag-module-session', `metamech:module:${module.id}:${module.category}`);
+    }
+  };
+
+  const handleDragEnd = () => {
+    if (typeof window !== 'undefined') {
+      (window as any).__mmDraggingModule = null;
+    }
   };
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -216,7 +226,7 @@ const LeftPanel: React.FC = () => {
                       {items.map(mod => {
                         const Icon = mod.icon;
                         return (
-                          <div key={mod.id} draggable onDragStart={(e) => handleDragStart(e, mod)}
+                          <div key={mod.id} draggable onDragStart={(e) => handleDragStart(e, mod)} onDragEnd={handleDragEnd}
                             style={{ padding: 10, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, cursor: 'grab', background: 'var(--mm-bg-surface)', transition: 'all 0.15s', textAlign: 'center' }}
                             onMouseEnter={e => { (e.currentTarget).style.borderColor = 'var(--mm-border-strong)'; }}
                             onMouseLeave={e => { (e.currentTarget).style.borderColor = 'var(--mm-border-subtle)'; }}>
@@ -233,7 +243,7 @@ const LeftPanel: React.FC = () => {
                       {items.map(mod => {
                         const Icon = mod.icon;
                         return (
-                          <div key={mod.id} draggable onDragStart={(e) => handleDragStart(e, mod)}
+                          <div key={mod.id} draggable onDragStart={(e) => handleDragStart(e, mod)} onDragEnd={handleDragEnd}
                             style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 7, cursor: 'grab', border: '1px solid transparent', transition: 'background 0.1s, border-color 0.1s' }}
                             onMouseEnter={e => { (e.currentTarget).style.background = 'var(--mm-bg-surface)'; }}
                             onMouseLeave={e => { (e.currentTarget).style.background = 'transparent'; }}>
