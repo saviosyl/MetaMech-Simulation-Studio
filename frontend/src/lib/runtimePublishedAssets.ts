@@ -23,6 +23,12 @@ function nodeTypeToPortType(value: string | null | undefined): 'input' | 'output
 function extractPorts(metadata: AssetMetadata): ConnectionPortDef[] {
   const nodes = Array.isArray(metadata?.nodes) ? metadata.nodes : [];
   const ports: ConnectionPortDef[] = [];
+  const candidatePorts: Array<{
+    id: string;
+    type: 'input' | 'output';
+    localPosition: [number, number, number];
+    direction?: [number, number, number];
+  }> = [];
   for (const node of nodes) {
     const portType = nodeTypeToPortType(node?.type);
     if (!portType) continue;
@@ -46,11 +52,48 @@ function extractPorts(metadata: AssetMetadata): ConnectionPortDef[] {
       }
     }
     // metadata positions are in mm in authoring UI; runtime expects meters
-    ports.push({
-      id: String(node.id || `${portType}-${ports.length + 1}`),
+    candidatePorts.push({
+      id: String(node.id || `${portType}-${candidatePorts.length + 1}`),
       type: portType,
       localPosition: [x / 1000, y / 1000, z / 1000],
       ...(direction ? { direction } : {}),
+    });
+  }
+
+  const firstInput = candidatePorts.find((p) => p.type === 'input');
+  const firstOutput = candidatePorts.find((p) => p.type === 'output');
+  const behaviorTemplate = String(metadata?.behaviorTemplate || '').trim();
+  const isConveyorLikeTemplate = behaviorTemplate === 'straight-conveyor' || behaviorTemplate === 'lift-conveyor';
+
+  let derivedFlowDir: [number, number, number] | null = null;
+  if (firstInput && firstOutput) {
+    const dx = firstOutput.localPosition[0] - firstInput.localPosition[0];
+    const dy = firstOutput.localPosition[1] - firstInput.localPosition[1];
+    const dz = firstOutput.localPosition[2] - firstInput.localPosition[2];
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (len > 0.000001) {
+      derivedFlowDir = [dx / len, dy / len, dz / len];
+    }
+  }
+
+  for (const candidate of candidatePorts) {
+    // Admin-authored conveyor-like assets should mate inline by default.
+    // Derive input/output facing from infeed->outfeed vector for consistency
+    // with built-in conveyor port conventions.
+    const inlineDirection = (
+      isConveyorLikeTemplate && derivedFlowDir
+        ? (
+          candidate.type === 'input'
+            ? ([-derivedFlowDir[0], -derivedFlowDir[1], -derivedFlowDir[2]] as [number, number, number])
+            : derivedFlowDir
+        )
+        : null
+    );
+    ports.push({
+      id: candidate.id,
+      type: candidate.type,
+      localPosition: candidate.localPosition,
+      ...((inlineDirection || candidate.direction) ? { direction: (inlineDirection || candidate.direction) as [number, number, number] } : {}),
     });
   }
   return ports;
