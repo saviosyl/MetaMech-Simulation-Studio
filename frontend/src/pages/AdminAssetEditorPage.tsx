@@ -81,7 +81,6 @@ type RotationTargetInfo = {
 };
 type RotationSnapStep = 'off' | 45 | 15;
 type LiftNodeBindingMap = Record<string, 'assetRoot' | 'movingPart'>;
-
 type MeasurementPoint = {
   id: string;
   positionMm: [number, number, number];
@@ -114,6 +113,32 @@ type ToolbarButton = {
   onClick: () => void;
   disabled?: boolean;
 };
+
+const HISTORY_LIMIT = 100;
+
+type EditorHistorySnapshot = {
+  name: string;
+  description: string;
+  tagsText: string;
+  nodes: AssetDefinitionNode[];
+  movableParts: AssetMovingPart[];
+  assetRootRotationDeg: [number, number, number];
+  objectRotationDegByPath: Record<string, [number, number, number]>;
+  pathMode: PathMode;
+  pathPoints: PathPoint[];
+  behaviorTemplate: BehaviorTemplateType;
+  behaviorConfig: Record<string, unknown>;
+  runtimeControls: NonNullable<AssetMetadata['runtimeControls']>;
+  liftNodeBindings: LiftNodeBindingMap;
+};
+
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function snapshotsEqual(a: EditorHistorySnapshot, b: EditorHistorySnapshot): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
 function errorMessage(error: unknown, fallback: string): string {
   const e = error as { response?: { data?: { error?: string } }; message?: string };
@@ -1377,6 +1402,108 @@ const AdminAssetEditorPage: React.FC = () => {
   const [nodeTransformMode, setNodeTransformMode] = useState<TransformMode>('translate');
   const [rotationSnapStep, setRotationSnapStep] = useState<RotationSnapStep>(45);
   const [liftNodeBindings, setLiftNodeBindings] = useState<LiftNodeBindingMap>({});
+  const [historyPast, setHistoryPast] = useState<EditorHistorySnapshot[]>([]);
+  const [historyFuture, setHistoryFuture] = useState<EditorHistorySnapshot[]>([]);
+  const historySuspendRef = useRef(false);
+  const lastHistorySnapshotRef = useRef<EditorHistorySnapshot | null>(null);
+
+  const captureHistorySnapshot = useMemo<EditorHistorySnapshot>(() => ({
+    name,
+    description,
+    tagsText,
+    nodes: deepClone(nodes),
+    movableParts: deepClone(movableParts),
+    assetRootRotationDeg: deepClone(assetRootRotationDeg),
+    objectRotationDegByPath: deepClone(objectRotationDegByPath),
+    pathMode,
+    pathPoints: deepClone(pathPoints),
+    behaviorTemplate,
+    behaviorConfig: deepClone(behaviorConfig),
+    runtimeControls: deepClone(runtimeControls),
+    liftNodeBindings: deepClone(liftNodeBindings),
+  }), [
+    name,
+    description,
+    tagsText,
+    nodes,
+    movableParts,
+    assetRootRotationDeg,
+    objectRotationDegByPath,
+    pathMode,
+    pathPoints,
+    behaviorTemplate,
+    behaviorConfig,
+    runtimeControls,
+    liftNodeBindings,
+  ]);
+
+  const applyHistorySnapshot = React.useCallback((snapshot: EditorHistorySnapshot) => {
+    historySuspendRef.current = true;
+    setName(snapshot.name);
+    setDescription(snapshot.description);
+    setTagsText(snapshot.tagsText);
+    setNodes(deepClone(snapshot.nodes));
+    setMovableParts(deepClone(snapshot.movableParts));
+    setAssetRootRotationDeg(deepClone(snapshot.assetRootRotationDeg));
+    setObjectRotationDegByPath(deepClone(snapshot.objectRotationDegByPath));
+    setPathMode(snapshot.pathMode);
+    setPathPoints(deepClone(snapshot.pathPoints));
+    setBehaviorTemplate(snapshot.behaviorTemplate);
+    setBehaviorConfig(deepClone(snapshot.behaviorConfig));
+    setRuntimeControls(deepClone(snapshot.runtimeControls));
+    setLiftNodeBindings(deepClone(snapshot.liftNodeBindings));
+    lastHistorySnapshotRef.current = deepClone(snapshot);
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        historySuspendRef.current = false;
+      });
+    } else {
+      historySuspendRef.current = false;
+    }
+  }, []);
+
+  const undoHistory = React.useCallback(() => {
+    setHistoryPast((prevPast) => {
+      if (prevPast.length <= 1) return prevPast;
+      const current = prevPast[prevPast.length - 1];
+      const next = prevPast[prevPast.length - 2];
+      setHistoryFuture((prevFuture) => [deepClone(current), ...prevFuture]);
+      applyHistorySnapshot(deepClone(next));
+      return prevPast.slice(0, -1);
+    });
+  }, [applyHistorySnapshot]);
+
+  const redoHistory = React.useCallback(() => {
+    setHistoryFuture((prevFuture) => {
+      if (prevFuture.length === 0) return prevFuture;
+      const [next, ...rest] = prevFuture;
+      setHistoryPast((prevPast) => {
+        const updated = [...prevPast, deepClone(next)];
+        return updated.length > HISTORY_LIMIT ? updated.slice(updated.length - HISTORY_LIMIT) : updated;
+      });
+      applyHistorySnapshot(deepClone(next));
+      return rest;
+    });
+  }, [applyHistorySnapshot]);
+
+  const canUndo = historyPast.length > 1;
+  const canRedo = historyFuture.length > 0;
+
+  useEffect(() => {
+    if (historySuspendRef.current) return;
+    const snapshot = deepClone(captureHistorySnapshot);
+    const previous = lastHistorySnapshotRef.current;
+    if (previous && snapshotsEqual(previous, snapshot)) return;
+    setHistoryPast((prevPast) => {
+      if (prevPast.length > 0 && snapshotsEqual(prevPast[prevPast.length - 1], snapshot)) {
+        return prevPast;
+      }
+      const nextPast = [...prevPast, snapshot];
+      return nextPast.length > HISTORY_LIMIT ? nextPast.slice(nextPast.length - HISTORY_LIMIT) : nextPast;
+    });
+    setHistoryFuture([]);
+    lastHistorySnapshotRef.current = snapshot;
+  }, [captureHistorySnapshot]);
 
   function setBehaviorField(key: string, value: number | string | boolean): void {
     setBehaviorConfig((prev) => ({ ...prev, [key]: value }));
@@ -1602,13 +1729,16 @@ const AdminAssetEditorPage: React.FC = () => {
   }, [asset, selectedCategoryId, nodes, normalizationWarnings, behaviorTemplate, behaviorConfig, movableParts, runtimeControls]);
 
   function hydrateFromAsset(next: LibraryAsset | null): void {
+    historySuspendRef.current = true;
     setAsset(next);
     setName(next?.name || '');
     setDescription(next?.description || '');
     setTagsText((next?.tags || []).join(', '));
     const m = safeAssetMetadata(next);
-    setNodes(Array.isArray(m.nodes) ? (m.nodes as AssetDefinitionNode[]) : []);
-    setMovableParts(Array.isArray(m.movableParts) ? (m.movableParts as AssetMovingPart[]) : []);
+    const nextNodes = Array.isArray(m.nodes) ? (m.nodes as AssetDefinitionNode[]) : [];
+    const nextMovableParts = Array.isArray(m.movableParts) ? (m.movableParts as AssetMovingPart[]) : [];
+    setNodes(nextNodes);
+    setMovableParts(nextMovableParts);
     const nextSourceUnit = (m.sourceUnit === 'mm' || m.sourceUnit === 'cm' || m.sourceUnit === 'm' || m.sourceUnit === 'unknown')
       ? m.sourceUnit
       : 'unknown';
@@ -1631,13 +1761,14 @@ const AdminAssetEditorPage: React.FC = () => {
         : {}
     );
     setAssetRootRotationDeg(normalizeEulerDeg(m.assetRootRotationDeg, [0, 0, 0]));
-    setObjectRotationDegByPath(
+    const nextObjectRotationsDeg = (
       m.objectRotationsDeg && typeof m.objectRotationsDeg === 'object' && !Array.isArray(m.objectRotationsDeg)
         ? Object.fromEntries(
           Object.entries(m.objectRotationsDeg).map(([path, value]) => [path, normalizeEulerDeg(value, [0, 0, 0])])
         )
         : {}
     );
+    setObjectRotationDegByPath(nextObjectRotationsDeg);
     const templateRaw = String(m.behaviorTemplate || '').trim();
     const nextBehaviorTemplate: BehaviorTemplateType = (
       templateRaw === 'straight-conveyor'
@@ -1650,14 +1781,16 @@ const AdminAssetEditorPage: React.FC = () => {
     setBehaviorTemplate(nextBehaviorTemplate);
     const hasBehaviorConfig =
       m.behaviorConfig && typeof m.behaviorConfig === 'object' && !Array.isArray(m.behaviorConfig);
-    setBehaviorConfig(
+    const nextBehaviorConfig = (
       hasBehaviorConfig
         ? { ...(m.behaviorConfig as Record<string, unknown>) }
         : defaultBehaviorConfig(nextBehaviorTemplate)
     );
-    setLiftNodeBindings(normalizeLiftNodeBindings(m.nodeBindings));
+    setBehaviorConfig(nextBehaviorConfig);
+    const nextLiftNodeBindings = normalizeLiftNodeBindings(m.nodeBindings);
+    setLiftNodeBindings(nextLiftNodeBindings);
     const hasRuntimeControls = m.runtimeControls && typeof m.runtimeControls === 'object';
-    setRuntimeControls(
+    const nextRuntimeControls = (
       hasRuntimeControls
         ? {
           showSpeedSlider: !!m.runtimeControls?.showSpeedSlider,
@@ -1670,6 +1803,7 @@ const AdminAssetEditorPage: React.FC = () => {
         }
         : defaultRuntimeControlsForTemplate(nextBehaviorTemplate)
     );
+    setRuntimeControls(nextRuntimeControls);
     setMeasurementPoints([]);
     setActiveTool('node');
     const existingPath = m.transportPath;
@@ -1699,6 +1833,31 @@ const AdminAssetEditorPage: React.FC = () => {
     setPreviewPartIndex(-1);
     setSelectedObjectPath('');
     setHighlightedObjectNames([]);
+    const baselineSnapshot: EditorHistorySnapshot = {
+      name: next?.name || '',
+      description: next?.description || '',
+      tagsText: (next?.tags || []).join(', '),
+      nodes: deepClone(nextNodes),
+      movableParts: deepClone(nextMovableParts),
+      assetRootRotationDeg: normalizeEulerDeg(m.assetRootRotationDeg, [0, 0, 0]),
+      objectRotationDegByPath: deepClone(nextObjectRotationsDeg),
+      pathMode: existingMode,
+      pathPoints: deepClone(existingPoints),
+      behaviorTemplate: nextBehaviorTemplate,
+      behaviorConfig: deepClone(nextBehaviorConfig),
+      runtimeControls: deepClone(nextRuntimeControls),
+      liftNodeBindings: deepClone(nextLiftNodeBindings),
+    };
+    setHistoryPast([deepClone(baselineSnapshot)]);
+    setHistoryFuture([]);
+    lastHistorySnapshotRef.current = deepClone(baselineSnapshot);
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        historySuspendRef.current = false;
+      });
+    } else {
+      historySuspendRef.current = false;
+    }
   }
 
   async function loadData() {
@@ -2066,13 +2225,13 @@ const AdminAssetEditorPage: React.FC = () => {
         }
       },
     },
-    { key: 'undo', label: 'Undo', icon: <Undo2 size={12} />, onClick: () => {} },
-    { key: 'redo', label: 'Redo', icon: <Redo2 size={12} />, onClick: () => {} },
+    { key: 'undo', label: 'Undo', icon: <Undo2 size={12} />, onClick: undoHistory, disabled: !canUndo },
+    { key: 'redo', label: 'Redo', icon: <Redo2 size={12} />, onClick: redoHistory, disabled: !canRedo },
     { key: 'copy', label: 'Copy', icon: <Copy size={12} />, onClick: () => {} },
     { key: 'frame', label: 'Frame', icon: <Maximize size={12} />, onClick: () => setCameraIntent('fit') },
     { key: 'node', label: 'Node', activeWhen: 'node', onClick: () => setActiveTool('node') },
     { key: 'pivot', label: 'Pivot', activeWhen: 'pivot', onClick: () => setActiveTool('pivot') },
-  ]), [setCameraIntent, selectedObjectPath]);
+  ]), [setCameraIntent, selectedObjectPath, undoHistory, redoHistory, canUndo, canRedo]);
 
   function loadTemplatePreset(kind: 'straight' | 'lift'): void {
     if (kind === 'straight') {
