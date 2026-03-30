@@ -123,9 +123,18 @@ const RightPanel: React.FC = () => {
       const n = Number(value);
       return Number.isFinite(n) ? n : fallback;
     };
-    const minMm = toFinite(behaviorConfig.liftMinMm, toFinite(selectedPart?.min, 0));
-    const maxMm = toFinite(behaviorConfig.liftMaxMm, Math.max(minMm + 1, toFinite(selectedPart?.max, 2500)));
-    const defaultMm = toFinite(behaviorConfig.liftDefaultMm, toFinite(selectedPart?.default, minMm));
+    const minMm = toFinite(
+      behaviorConfig.lowerLimitMm,
+      toFinite(behaviorConfig.liftMinMm, toFinite(selectedPart?.min, 0))
+    );
+    const maxMm = toFinite(
+      behaviorConfig.upperLimitMm,
+      toFinite(behaviorConfig.liftMaxMm, Math.max(minMm + 1, toFinite(selectedPart?.max, 2500)))
+    );
+    const defaultMm = toFinite(
+      behaviorConfig.homeMm,
+      toFinite(behaviorConfig.liftDefaultMm, toFinite(selectedPart?.default, minMm))
+    );
     return {
       controls: {
         showTargetHeight: Boolean(runtimeControls.showTargetHeight),
@@ -635,7 +644,7 @@ const RightPanel: React.FC = () => {
                         const behaviorObj = rawBehavior && typeof rawBehavior === 'object'
                           ? rawBehavior as Record<string, unknown>
                           : {};
-                        const metadataHome = Number(behaviorObj.homeTargetMm);
+                        const metadataHome = Number(behaviorObj.homeMm ?? behaviorObj.homeTargetMm);
                         const paramHome = Number(selectedObject.parameters.homeTargetMm);
                         const resolvedHome = Number.isFinite(paramHome)
                           ? paramHome

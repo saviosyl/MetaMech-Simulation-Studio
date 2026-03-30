@@ -30,12 +30,10 @@ type LiftV1NodeBindingMap = Record<string, { frame?: 'assetRoot' | 'movingPart';
 type LiftV1BehaviorConfig = {
   movingPartId?: string;
   liftAxis?: 'z';
-  liftMinMm?: number;
-  liftMaxMm?: number;
-  liftDefaultMm?: number;
-  homeTargetMm?: number;
+  lowerLimitMm?: number;
+  upperLimitMm?: number;
+  homeMm?: number;
   liftSpeedMmPerSec?: number;
-  conveyorSpeedMpm?: number;
   controlMode?: 'auto' | 'manual';
 };
 
@@ -116,23 +114,19 @@ function asLiftV1BehaviorConfig(input: unknown): LiftV1BehaviorConfig | null {
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
   };
-  const liftMinMm = toFinite(raw.liftMinMm, 0);
-  const liftMaxMm = toFinite(raw.liftMaxMm, 0);
-  const liftDefaultMm = toFinite(raw.liftDefaultMm, liftMinMm);
-  const homeTargetMm = toFinite(raw.homeTargetMm, liftDefaultMm);
+  const lowerLimitMm = toFinite(raw.lowerLimitMm, 0);
+  const upperLimitMm = toFinite(raw.upperLimitMm, 0);
+  const homeMm = toFinite(raw.homeMm, lowerLimitMm);
   const liftSpeedMmPerSec = Math.max(0, toFinite(raw.liftSpeedMmPerSec, 0));
-  const conveyorSpeedMpm = Math.max(0, toFinite(raw.conveyorSpeedMpm, 0));
   const controlMode = String(raw.controlMode || 'auto').toLowerCase() === 'manual' ? 'manual' : 'auto';
-  if (!(liftMaxMm > liftMinMm)) return null;
+  if (!(upperLimitMm > lowerLimitMm)) return null;
   return {
     movingPartId,
     liftAxis: 'z',
-    liftMinMm,
-    liftMaxMm,
-    liftDefaultMm,
-    homeTargetMm,
+    lowerLimitMm,
+    upperLimitMm,
+    homeMm,
     liftSpeedMmPerSec,
-    conveyorSpeedMpm,
     controlMode,
   };
 }
@@ -141,10 +135,10 @@ function resolveLiftCurrentTargetMm(
   behavior: LiftV1BehaviorConfig,
   node: ProcessNode
 ): number {
-  const min = Number(behavior.liftMinMm || 0);
-  const max = Number(behavior.liftMaxMm || 0);
-  const fallback = Number.isFinite(behavior.liftDefaultMm) ? Number(behavior.liftDefaultMm) : min;
-    const requested = Number(node.parameters.liftTargetMm ?? node.parameters.targetHeightMm);
+  const min = Number(behavior.lowerLimitMm || 0);
+  const max = Number(behavior.upperLimitMm || 0);
+  const fallback = Number.isFinite(behavior.homeMm) ? Number(behavior.homeMm) : min;
+  const requested = Number(node.parameters.targetHeightMm);
   const target = Number.isFinite(requested) ? requested : fallback;
   return Math.min(max, Math.max(min, target));
 }
@@ -154,9 +148,14 @@ function getLiftAppliedOffsetMeters(node: ProcessNode): number {
   if (template !== 'lift-conveyor') return 0;
   const behavior = asLiftV1BehaviorConfig(node.parameters.behaviorConfig);
   if (!behavior) return 0;
-  const min = Number(behavior.liftMinMm || 0);
-  const target = resolveLiftCurrentTargetMm(behavior, node);
-  return (target - min) / 1000;
+  const min = Number(behavior.lowerLimitMm || 0);
+  const max = Number(behavior.upperLimitMm || (min + 1));
+  const currentRaw = Number(node.parameters.currentLiftHeightMm);
+  const current = Number.isFinite(currentRaw)
+    ? currentRaw
+    : resolveLiftCurrentTargetMm(behavior, node);
+  const clamped = Math.min(max, Math.max(min, current));
+  return (clamped - min) / 1000;
 }
 
 function getBoundPortWorldPosition(
@@ -555,16 +554,18 @@ export class SimulationEngine {
       const parts = Array.isArray((node.parameters as { movableParts?: unknown }).movableParts)
         ? ((node.parameters as { movableParts?: unknown }).movableParts as unknown[])
         : [];
-      const index = parts.findIndex((part) => {
+      const movingPart = parts.find((part) => {
         if (!part || typeof part !== 'object') return false;
         return String((part as { id?: unknown }).id || '').trim() === movingPartId;
       });
-      if (index < 0) continue;
-      const currentPart = parts[index] as Record<string, unknown>;
-      const min = Number(behavior.liftMinMm || 0);
-      const max = Number(behavior.liftMaxMm || 0);
-      const current = Number(currentPart.default);
-      const currentMm = Number.isFinite(current) ? current : Number(behavior.liftDefaultMm || min);
+      if (!movingPart) continue;
+      const min = Number(behavior.lowerLimitMm || 0);
+      const max = Number(behavior.upperLimitMm || (min + 1));
+      const home = Number.isFinite(behavior.homeMm) ? Number(behavior.homeMm) : min;
+      const currentRaw = Number(node.parameters.currentLiftHeightMm);
+      const currentMm = Number.isFinite(currentRaw)
+        ? Math.min(max, Math.max(min, currentRaw))
+        : Math.min(max, Math.max(min, home));
       const targetMm = resolveLiftCurrentTargetMm(behavior, node);
       const speedMmPerSec = Math.max(0, Number(node.parameters.liftSpeedMmPerSec ?? behavior.liftSpeedMmPerSec ?? 0));
       const maxStep = speedMmPerSec * dt;
@@ -576,20 +577,7 @@ export class SimulationEngine {
         nextMm = currentMm + Math.sign(delta) * maxStep;
       }
       const clamped = Math.min(max, Math.max(min, nextMm));
-      const nextPart = {
-        ...currentPart,
-        motionType: 'lift',
-        axis: 'z',
-        min,
-        max,
-        default: clamped,
-        speed: Number(node.parameters.liftSpeedMmPerSec ?? behavior.liftSpeedMmPerSec ?? currentPart.speed ?? 0),
-      };
-      const nextParts = [...parts];
-      nextParts[index] = nextPart;
-      node.parameters.movableParts = nextParts;
       node.parameters.currentLiftHeightMm = clamped;
-      node.parameters.conveyorSpeedMpm = Number(node.parameters.conveyorSpeedMpm ?? behavior.conveyorSpeedMpm ?? 0);
       node.parameters.controlMode = String(node.parameters.controlMode || behavior.controlMode || 'auto');
     }
   }

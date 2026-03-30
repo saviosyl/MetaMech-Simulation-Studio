@@ -70,13 +70,17 @@ function applyLiftV1MovingPartToModel(
     return Number.isFinite(n) ? n : fallback;
   };
 
-  const minMm = toFinite(rawBehavior.liftMinMm, 0);
-  const maxMm = toFinite(rawBehavior.liftMaxMm, Math.max(1, minMm + 1));
-  const defaultMm = toFinite(rawBehavior.liftDefaultMm, minMm);
+  const lowerLimitMm = toFinite(rawBehavior.lowerLimitMm, toFinite(rawBehavior.liftMinMm, 0));
+  const upperRaw = toFinite(rawBehavior.upperLimitMm, toFinite(rawBehavior.liftMaxMm, lowerLimitMm + 1));
+  const upperLimitMm = upperRaw > lowerLimitMm ? upperRaw : lowerLimitMm + 1;
+  const homeMm = toFinite(rawBehavior.homeMm, toFinite(rawBehavior.liftDefaultMm, lowerLimitMm));
+  const currentMmRaw = Number(runtimeParams.currentLiftHeightMm);
   const requestedTarget = Number(runtimeParams.liftTargetMm ?? runtimeParams.targetHeightMm);
-  const targetMm = Number.isFinite(requestedTarget) ? requestedTarget : defaultMm;
-  const clampedTargetMm = Math.min(maxMm, Math.max(minMm, targetMm));
-  const liftOffsetM = (clampedTargetMm - minMm) / 1000;
+  const fallbackMm = Number.isFinite(currentMmRaw)
+    ? currentMmRaw
+    : (Number.isFinite(requestedTarget) ? requestedTarget : homeMm);
+  const appliedMm = Math.min(upperLimitMm, Math.max(lowerLimitMm, fallbackMm));
+  const liftOffsetM = (appliedMm - lowerLimitMm) / 1000;
   if (Math.abs(liftOffsetM) <= 0.000001) return;
 
   const parts = Array.isArray(runtimeParams.movableParts)

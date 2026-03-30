@@ -36,11 +36,14 @@ function toLiftRuntimeDefaultsFromMetadata(
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
   };
-  const min = toFinite(rawConfig.liftMinMm, 0);
-  const max = toFinite(rawConfig.liftMaxMm, Math.max(min + 100, 2500));
+  const min = toFinite(rawConfig.lowerLimitMm, toFinite(rawConfig.liftMinMm, 0));
+  const max = toFinite(rawConfig.upperLimitMm, toFinite(rawConfig.liftMaxMm, Math.max(min + 100, 2500)));
   const clampedMax = max > min ? max : min + 100;
-  const defaultMm = Math.max(min, Math.min(clampedMax, toFinite(rawConfig.liftDefaultMm, min)));
-  const homeTargetMm = Math.max(min, Math.min(clampedMax, toFinite(rawConfig.homeTargetMm, defaultMm)));
+  const defaultMm = Math.max(min, Math.min(
+    clampedMax,
+    toFinite(rawConfig.homeMm, toFinite(rawConfig.liftDefaultMm, min))
+  ));
+  const homeTargetMm = Math.max(min, Math.min(clampedMax, toFinite(rawConfig.homeMm, toFinite(rawConfig.homeTargetMm, defaultMm))));
   return {
     targetHeightMm: defaultMm,
     currentLiftHeightMm: defaultMm,
