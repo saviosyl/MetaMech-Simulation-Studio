@@ -1,8 +1,8 @@
 import React, { Suspense } from 'react';
 import * as THREE from 'three';
-import { useGLTF } from '@react-three/drei';
 import { StaticAssetDef } from '../../lib/assetManifest';
 import { useDracoGLTF } from '../../lib/gltfLoaders';
+import { useEditorStore } from '../../store/editorStore';
 
 interface StaticModelProps {
   assetDef: StaticAssetDef;
