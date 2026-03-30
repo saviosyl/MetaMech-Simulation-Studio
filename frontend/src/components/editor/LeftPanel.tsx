@@ -60,6 +60,8 @@ const LeftPanel: React.FC = () => {
 
   const handleDragStart = (e: React.DragEvent, module: ModuleDefinition) => {
     e.dataTransfer.setData('application/json', JSON.stringify({ type: 'module', moduleId: module.id, category: module.category }));
+    // Keep a deterministic plain-text mirror for browsers that suppress custom MIME during DnD.
+    e.dataTransfer.setData('text/plain', `metamech:module:${module.id}:${module.category}`);
     e.dataTransfer.effectAllowed = 'copy';
   };
 

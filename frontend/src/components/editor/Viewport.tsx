@@ -685,18 +685,33 @@ const Viewport: React.FC = () => {
 
   const exportPreset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
   const dynamicDprMax = isExportRendering ? Math.max(2, Math.min(3, exportPreset.targetDpr)) : 2;
+  const INTERNAL_MODULE_TEXT_PREFIX = 'metamech:module:';
+  const parseModuleDropPayload = useCallback((event: React.DragEvent): { moduleId: string; category: string } | null => {
+    const raw = event.dataTransfer.getData('application/json');
+    if (raw) {
+      try {
+        const data = JSON.parse(raw);
+        if (data && data.type === 'module' && typeof data.moduleId === 'string' && typeof data.category === 'string') {
+          return { moduleId: data.moduleId, category: data.category };
+        }
+      } catch {
+        // fall through to text/plain marker parsing
+      }
+    }
+    const textPayload = event.dataTransfer.getData('text/plain');
+    if (!textPayload || !textPayload.startsWith(INTERNAL_MODULE_TEXT_PREFIX)) return null;
+    const [moduleId, category] = textPayload.slice(INTERNAL_MODULE_TEXT_PREFIX.length).split(':');
+    if (!moduleId || !category) return null;
+    return { moduleId, category };
+  }, []);
 
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
     
     try {
-      const raw = event.dataTransfer.getData('application/json');
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      if (!data || data.type !== 'module' || typeof data.moduleId !== 'string' || typeof data.category !== 'string') {
-        return;
-      }
+      const data = parseModuleDropPayload(event);
+      if (!data) return;
       
       // Proper raycast from mouse to ground plane (y=0) using Three.js camera
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -735,13 +750,13 @@ const Viewport: React.FC = () => {
     } catch (error) {
       console.error('Failed to handle drop:', error);
     }
-  }, [addProcessNode, addEnvironmentAsset, addActor]);
+  }, [addProcessNode, addEnvironmentAsset, addActor, parseModuleDropPayload]);
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    const types = Array.from(event.dataTransfer.types || []);
-    const isInternalModuleDrag = types.includes('application/json');
+    const dragTypes = Array.from(event.dataTransfer.types || []);
+    const isInternalModuleDrag = dragTypes.includes('application/json') || dragTypes.includes('text/plain');
     event.dataTransfer.dropEffect = isInternalModuleDrag ? 'copy' : 'none';
   }, []);
 
