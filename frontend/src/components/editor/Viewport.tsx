@@ -688,45 +688,49 @@ const Viewport: React.FC = () => {
 
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
+    event.stopPropagation();
     
     try {
-      const data = JSON.parse(event.dataTransfer.getData('application/json'));
+      const raw = event.dataTransfer.getData('application/json');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (!data || data.type !== 'module' || typeof data.moduleId !== 'string' || typeof data.category !== 'string') {
+        return;
+      }
       
-      if (data.type === 'module') {
-        // Proper raycast from mouse to ground plane (y=0) using Three.js camera
-        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-        const rayHit = raycastToGround(event.clientX, event.clientY, rect);
-        
-        // Fallback to simple approximation if camera not ready
-        const position: [number, number, number] = rayHit || [
-          (((event.clientX - rect.left) / rect.width) * 2 - 1) * 8,
-          0,
-          -(((event.clientY - rect.top) / rect.height) * 2 + 1) * 8,
-        ];
-        
-        let addedModule = false;
-        switch (data.category) {
-          case 'process':
-          case 'modular':
-          case 'robots':
-          case 'pallets':
-          case 'fmcg':
-          case 'medical':
-            addProcessNode(data.moduleId, position);
-            addedModule = true;
-            break;
-          case 'environment':
-            addEnvironmentAsset(data.moduleId, position);
-            addedModule = true;
-            break;
-          case 'actors':
-            addActor(data.moduleId, position);
-            addedModule = true;
-            break;
-        }
-        if (addedModule) {
-          setHasPlacedModule(true);
-        }
+      // Proper raycast from mouse to ground plane (y=0) using Three.js camera
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      const rayHit = raycastToGround(event.clientX, event.clientY, rect);
+      
+      // Fallback to simple approximation if camera not ready
+      const position: [number, number, number] = rayHit || [
+        (((event.clientX - rect.left) / rect.width) * 2 - 1) * 8,
+        0,
+        -(((event.clientY - rect.top) / rect.height) * 2 + 1) * 8,
+      ];
+      
+      let addedModule = false;
+      switch (data.category) {
+        case 'process':
+        case 'modular':
+        case 'robots':
+        case 'pallets':
+        case 'fmcg':
+        case 'medical':
+          addProcessNode(data.moduleId, position);
+          addedModule = true;
+          break;
+        case 'environment':
+          addEnvironmentAsset(data.moduleId, position);
+          addedModule = true;
+          break;
+        case 'actors':
+          addActor(data.moduleId, position);
+          addedModule = true;
+          break;
+      }
+      if (addedModule) {
+        setHasPlacedModule(true);
       }
     } catch (error) {
       console.error('Failed to handle drop:', error);
@@ -736,7 +740,9 @@ const Viewport: React.FC = () => {
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    event.dataTransfer.dropEffect = 'copy';
+    const types = Array.from(event.dataTransfer.types || []);
+    const isInternalModuleDrag = types.includes('application/json');
+    event.dataTransfer.dropEffect = isInternalModuleDrag ? 'copy' : 'none';
   }, []);
 
   const getSelectedObject = () => {
