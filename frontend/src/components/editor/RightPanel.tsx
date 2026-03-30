@@ -111,6 +111,9 @@ const RightPanel: React.FC = () => {
     const runtimeControls = (selectedStaticMetadata.runtimeControls && typeof selectedStaticMetadata.runtimeControls === 'object')
       ? selectedStaticMetadata.runtimeControls as Record<string, unknown>
       : {};
+    const runtimeLimits = (selectedStaticMetadata.runtimeParameterLimits && typeof selectedStaticMetadata.runtimeParameterLimits === 'object')
+      ? selectedStaticMetadata.runtimeParameterLimits as Record<string, unknown>
+      : {};
     const behaviorConfig = (selectedStaticMetadata.behaviorConfig && typeof selectedStaticMetadata.behaviorConfig === 'object')
       ? selectedStaticMetadata.behaviorConfig as Record<string, unknown>
       : {};
@@ -135,6 +138,41 @@ const RightPanel: React.FC = () => {
       behaviorConfig.homeMm,
       toFinite(behaviorConfig.liftDefaultMm, toFinite(selectedPart?.default, minMm))
     );
+    const normalizeLimit = (
+      raw: unknown,
+      fallback: { min: number; max: number; default: number; step: number }
+    ): { min: number; max: number; default: number; step: number } => {
+      const source = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+      const min = toFinite(source.min, fallback.min);
+      const maxRaw = toFinite(source.max, fallback.max);
+      const max = maxRaw > min ? maxRaw : (min + Math.max(1, fallback.step));
+      const defaultRaw = toFinite(source.default, fallback.default);
+      const step = Math.max(0.000001, toFinite(source.step, fallback.step));
+      return {
+        min,
+        max,
+        default: Math.min(max, Math.max(min, defaultRaw)),
+        step,
+      };
+    };
+    const targetLimit = normalizeLimit(runtimeLimits.targetHeightMm, {
+      min: minMm,
+      max: Math.max(maxMm, minMm + 1),
+      default: defaultMm,
+      step: 10,
+    });
+    const liftSpeedLimit = normalizeLimit(runtimeLimits.liftSpeedMmPerSec, {
+      min: 1,
+      max: 2000,
+      default: Math.max(1, toFinite(behaviorConfig.liftSpeedMmPerSec, 350)),
+      step: 10,
+    });
+    const conveyorSpeedLimit = normalizeLimit(runtimeLimits.conveyorSpeedMpm, {
+      min: 0,
+      max: 120,
+      default: Math.max(0, toFinite(behaviorConfig.conveyorSpeedMpm, 12)),
+      step: 1,
+    });
     return {
       controls: {
         showTargetHeight: Boolean(runtimeControls.showTargetHeight),
@@ -142,9 +180,9 @@ const RightPanel: React.FC = () => {
         showAutoManual: Boolean(runtimeControls.showAutoManual),
         showHomeCommand: Boolean(runtimeControls.showHomeCommand),
       },
-      minMm,
-      maxMm: Math.max(maxMm, minMm + 1),
-      defaultMm: Math.min(Math.max(defaultMm, minMm), Math.max(maxMm, minMm + 1)),
+      targetLimit,
+      liftSpeedLimit,
+      conveyorSpeedLimit,
     };
   }, [selectedObject, selectedObjectType, selectedStaticMetadata]);
 
@@ -570,7 +608,7 @@ const RightPanel: React.FC = () => {
               </Section>
 
               {/* Module params — always show grouped (covers both parametric + non-parametric) */}
-              {moduleDef && (() => {
+              {moduleDef && !liftRuntimeUi && (() => {
                 const g = groupParams(Object.entries(moduleDef.parameters));
                 return (<>
                   {g.geo.length > 0 && <Section title="Geometry" icon={Maximize} defaultOpen={true}>{g.geo.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
@@ -588,11 +626,22 @@ const RightPanel: React.FC = () => {
                       <label style={labelStyle}>Target Height (mm)</label>
                       <input
                         type="number"
-                        min={liftRuntimeUi.minMm}
-                        max={liftRuntimeUi.maxMm}
-                        step={10}
-                        value={Number(selectedObject.parameters.targetHeightMm ?? liftRuntimeUi.defaultMm)}
-                        onChange={(e) => handleParam('targetHeightMm', Number(e.target.value) || liftRuntimeUi.defaultMm)}
+                        min={liftRuntimeUi.targetLimit.min}
+                        max={liftRuntimeUi.targetLimit.max}
+                        step={liftRuntimeUi.targetLimit.step}
+                        value={Number(selectedObject.parameters.targetHeightMm ?? liftRuntimeUi.targetLimit.default)}
+                        onChange={(e) => {
+                          const next = Number(e.target.value);
+                          const clamped = Math.min(
+                            liftRuntimeUi.targetLimit.max,
+                            Math.max(
+                              liftRuntimeUi.targetLimit.min,
+                              Number.isFinite(next) ? next : liftRuntimeUi.targetLimit.default
+                            )
+                          );
+                          handleParam('targetHeightMm', clamped);
+                          handleParam('liftTargetMm', clamped);
+                        }}
                         style={inputStyle}
                       />
                     </div>
@@ -603,10 +652,21 @@ const RightPanel: React.FC = () => {
                         <label style={labelStyle}>Lift Speed (mm/s)</label>
                         <input
                           type="number"
-                          min={1}
-                          step={10}
-                          value={Number(selectedObject.parameters.liftSpeedMmPerSec ?? 350)}
-                          onChange={(e) => handleParam('liftSpeedMmPerSec', Math.max(1, Number(e.target.value) || 350))}
+                          min={liftRuntimeUi.liftSpeedLimit.min}
+                          max={liftRuntimeUi.liftSpeedLimit.max}
+                          step={liftRuntimeUi.liftSpeedLimit.step}
+                          value={Number(selectedObject.parameters.liftSpeedMmPerSec ?? liftRuntimeUi.liftSpeedLimit.default)}
+                          onChange={(e) => {
+                            const next = Number(e.target.value);
+                            const clamped = Math.min(
+                              liftRuntimeUi.liftSpeedLimit.max,
+                              Math.max(
+                                liftRuntimeUi.liftSpeedLimit.min,
+                                Number.isFinite(next) ? next : liftRuntimeUi.liftSpeedLimit.default
+                              )
+                            );
+                            handleParam('liftSpeedMmPerSec', clamped);
+                          }}
                           style={inputStyle}
                         />
                       </div>
@@ -614,10 +674,21 @@ const RightPanel: React.FC = () => {
                         <label style={labelStyle}>Conveyor Speed (m/min)</label>
                         <input
                           type="number"
-                          min={0}
-                          step={1}
-                          value={Number(selectedObject.parameters.conveyorSpeedMpm ?? 12)}
-                          onChange={(e) => handleParam('conveyorSpeedMpm', Math.max(0, Number(e.target.value) || 12))}
+                          min={liftRuntimeUi.conveyorSpeedLimit.min}
+                          max={liftRuntimeUi.conveyorSpeedLimit.max}
+                          step={liftRuntimeUi.conveyorSpeedLimit.step}
+                          value={Number(selectedObject.parameters.conveyorSpeedMpm ?? liftRuntimeUi.conveyorSpeedLimit.default)}
+                          onChange={(e) => {
+                            const next = Number(e.target.value);
+                            const clamped = Math.min(
+                              liftRuntimeUi.conveyorSpeedLimit.max,
+                              Math.max(
+                                liftRuntimeUi.conveyorSpeedLimit.min,
+                                Number.isFinite(next) ? next : liftRuntimeUi.conveyorSpeedLimit.default
+                              )
+                            );
+                            handleParam('conveyorSpeedMpm', clamped);
+                          }}
                           style={inputStyle}
                         />
                       </div>
@@ -648,9 +719,13 @@ const RightPanel: React.FC = () => {
                         const paramHome = Number(selectedObject.parameters.homeTargetMm);
                         const resolvedHome = Number.isFinite(paramHome)
                           ? paramHome
-                          : (Number.isFinite(metadataHome) ? metadataHome : liftRuntimeUi.minMm);
-                        handleParam('targetHeightMm', Math.min(liftRuntimeUi.maxMm, Math.max(liftRuntimeUi.minMm, resolvedHome)));
-                        handleParam('liftTargetMm', Math.min(liftRuntimeUi.maxMm, Math.max(liftRuntimeUi.minMm, resolvedHome)));
+                          : (Number.isFinite(metadataHome) ? metadataHome : liftRuntimeUi.targetLimit.default);
+                        const clampedHome = Math.min(
+                          liftRuntimeUi.targetLimit.max,
+                          Math.max(liftRuntimeUi.targetLimit.min, resolvedHome)
+                        );
+                        handleParam('targetHeightMm', clampedHome);
+                        handleParam('liftTargetMm', clampedHome);
                         handleParam('goHomeNow', Date.now());
                       }}
                       style={{
@@ -665,7 +740,7 @@ const RightPanel: React.FC = () => {
                         cursor: 'pointer',
                       }}
                     >
-                      Home
+                      Home (Send to Default)
                     </button>
                   )}
                 </Section>
