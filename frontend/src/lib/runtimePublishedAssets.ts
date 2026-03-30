@@ -199,7 +199,7 @@ function inferDefaultRotation(metadata: AssetMetadata): [number, number, number]
 }
 
 function toStaticAssetDef(asset: LibraryAsset): AssetDef {
-  const metadata = normalizeAndValidateLiftV1Metadata(asset.metadata || {}, { strictValidation: false }).metadata;
+  const metadata = normalizeAndValidateLiftV1Metadata(asset.metadata || {}, { strictValidation: true }).metadata;
   const ports = extractPorts(metadata);
   const scale = inferDefaultScale(metadata);
   const defaultPositionOffset = inferDefaultPositionOffset(metadata, scale);
