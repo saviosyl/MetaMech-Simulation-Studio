@@ -1,4 +1,5 @@
 import { Box } from 'lucide-react';
+import * as THREE from 'three';
 import { listPublishedAssets } from '../utils/api';
 import { AssetMetadata, LibraryAsset, SceneCategory } from '../types';
 import { AssetDef, ConnectionPortDef, getAssetManifest, setRuntimeExternalAssets } from './assetManifest';
@@ -16,13 +17,59 @@ function toSceneCategory(input: string | null | undefined): SceneCategory {
 
 function nodeTypeToPortType(value: string | null | undefined): 'input' | 'output' | null {
   const raw = String(value || '').trim().toLowerCase();
-  if (raw.includes('infeed') || raw === 'input' || raw === 'in') return 'input';
-  if (raw.includes('outfeed') || raw === 'output' || raw === 'out') return 'output';
+  if (
+    raw.includes('infeed')
+    || raw === 'input'
+    || raw === 'in'
+    || raw === 'product_in'
+    || raw === 'product-in'
+    || raw === 'node_in'
+    || raw === 'node-in'
+  ) return 'input';
+  if (
+    raw.includes('outfeed')
+    || raw === 'output'
+    || raw === 'out'
+    || raw === 'product_out'
+    || raw === 'product-out'
+    || raw === 'node_out'
+    || raw === 'node-out'
+  ) return 'output';
   return null;
+}
+
+function parseAssetRootRotationRad(
+  metadata: AssetMetadata
+): [number, number, number] | null {
+  const raw = metadata?.assetRootRotationDeg as unknown;
+  if (!Array.isArray(raw) || raw.length < 3) return null;
+  const xDeg = Number(raw[0]);
+  const yDeg = Number(raw[1]);
+  const zDeg = Number(raw[2]);
+  if (!Number.isFinite(xDeg) || !Number.isFinite(yDeg) || !Number.isFinite(zDeg)) return null;
+  return [
+    (xDeg * Math.PI) / 180,
+    (yDeg * Math.PI) / 180,
+    (zDeg * Math.PI) / 180,
+  ];
+}
+
+function applyInverseRootRotation(
+  value: [number, number, number],
+  rootRotationRad: [number, number, number] | null
+): [number, number, number] {
+  if (!rootRotationRad) return value;
+  const quat = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(rootRotationRad[0], rootRotationRad[1], rootRotationRad[2], 'XYZ')
+  );
+  const inverted = quat.clone().invert();
+  const rotated = new THREE.Vector3(value[0], value[1], value[2]).applyQuaternion(inverted);
+  return [rotated.x, rotated.y, rotated.z];
 }
 
 function extractPorts(metadata: AssetMetadata): ConnectionPortDef[] {
   const nodes = Array.isArray(metadata?.nodes) ? metadata.nodes : [];
+  const rootRotationRad = parseAssetRootRotationRad(metadata);
   const ports: ConnectionPortDef[] = [];
   const candidatePorts: Array<{
     id: string;
@@ -52,12 +99,30 @@ function extractPorts(metadata: AssetMetadata): ConnectionPortDef[] {
         }
       }
     }
+    const authoredPosM: [number, number, number] = [x / 1000, y / 1000, z / 1000];
+    const localPosition = applyInverseRootRotation(authoredPosM, rootRotationRad);
+    const correctedDirection = direction
+      ? (() => {
+        const corrected = applyInverseRootRotation(direction, rootRotationRad);
+        const correctedLen = Math.sqrt(
+          (corrected[0] * corrected[0]) +
+          (corrected[1] * corrected[1]) +
+          (corrected[2] * corrected[2])
+        );
+        if (correctedLen <= 0.000001) return direction;
+        return [
+          corrected[0] / correctedLen,
+          corrected[1] / correctedLen,
+          corrected[2] / correctedLen,
+        ] as [number, number, number];
+      })()
+      : undefined;
     // metadata positions are in mm in authoring UI; runtime expects meters
     candidatePorts.push({
       id: String(node.id || `${portType}-${candidatePorts.length + 1}`),
       type: portType,
-      localPosition: [x / 1000, y / 1000, z / 1000],
-      ...(direction ? { direction } : {}),
+      localPosition,
+      ...(correctedDirection ? { direction: correctedDirection } : {}),
     });
   }
 
