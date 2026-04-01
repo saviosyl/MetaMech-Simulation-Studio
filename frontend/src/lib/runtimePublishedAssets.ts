@@ -136,9 +136,18 @@ function extractPorts(metadata: AssetMetadata): ConnectionPortDef[] {
     const dx = firstOutput.localPosition[0] - firstInput.localPosition[0];
     const dy = firstOutput.localPosition[1] - firstInput.localPosition[1];
     const dz = firstOutput.localPosition[2] - firstInput.localPosition[2];
-    const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (len > 0.000001) {
-      derivedFlowDir = [dx / len, dy / len, dz / len];
+    // Keep mating orientation aligned with conveyor inline behavior.
+    // The mate solver operates in the X/Z plane, so derive flow on X/Z first.
+    const planarLen = Math.sqrt((dx * dx) + (dz * dz));
+    if (planarLen > 0.000001) {
+      derivedFlowDir = [dx / planarLen, 0, dz / planarLen];
+    } else {
+      const len = Math.sqrt((dx * dx) + (dy * dy) + (dz * dz));
+      if (len > 0.000001) {
+        // Degenerate planar delta (e.g. purely vertical authored pair) — keep
+        // deterministic inline orientation instead of emitting zero vectors.
+        derivedFlowDir = [1, 0, 0];
+      }
     }
   }
 
