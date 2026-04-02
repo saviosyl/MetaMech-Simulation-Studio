@@ -383,6 +383,142 @@ export function createBacklogControlScenario(): Scenario {
   };
 }
 
+// ─── Scenario 10: Stopper Release One on Downstream Clear ─────
+export function createStopperReleaseOneDownstreamClearScenario(): Scenario {
+  const sourceId = uuidv4();
+  const mainConveyorId = uuidv4();
+  const triggerSensorId = uuidv4();
+  const stopperId = uuidv4();
+  const downstreamSensorId = uuidv4();
+  const outfeedConveyorId = uuidv4();
+  const sinkId = uuidv4();
+
+  return {
+    name: 'Stopper Release One on Downstream Clear',
+    description: 'SE001 near stopper + SE002 downstream zone. Stopper releases exactly one product only when downstream zone is clear.',
+    nodes: [
+      {
+        id: sourceId,
+        type: 'source',
+        position: [-6.5, 0, 0],
+        rotation: [0, 0, 0],
+        parameters: {
+          spawnRate: 24,
+          productType: 'box',
+          productColor: 'blue',
+          productLength: 320,
+          productWidth: 220,
+          productHeight: 160,
+        },
+        name: 'Source',
+      },
+      {
+        id: mainConveyorId,
+        type: 'belt-conveyor',
+        position: [-2.6, 0, 0],
+        rotation: [0, 0, 0],
+        parameters: {
+          length: 5200,
+          width: 600,
+          height: 800,
+          beltSpeed: 12,
+          accumulationMode: true,
+          accumulationZones: 8,
+        },
+        name: 'Main Conveyor',
+      },
+      {
+        id: triggerSensorId,
+        type: 'sensor',
+        position: [0.45, 0, 0],
+        rotation: [0, Math.PI / 2, 0],
+        parameters: {
+          sensorTag: 'SE001',
+          sensorType: 'through-beam',
+          detectPresence: true,
+          detectZone: true,
+          detectionRange: 260,
+          showBeam: true,
+          mountHeight: 800,
+          parentConveyorId: mainConveyorId,
+          mountPosition: 0.84,
+          mountSide: 'center',
+        },
+        name: 'SE001 Trigger',
+      },
+      {
+        id: stopperId,
+        type: 'stopper',
+        position: [0.7, 0, 0],
+        rotation: [0, 0, 0],
+        parameters: {
+          stopperTag: 'ST001',
+          enabled: true,
+          engaged: true,
+          width: 600,
+          mountHeight: 800,
+          stopperMode: 'release-one-downstream-clear',
+          triggerSensorTag: 'SE001',
+          downstreamSensorTag: 'SE002',
+          releaseCount: 1,
+          resetDelaySec: 0.3,
+          releaseDelay: 0.3,
+          parentConveyorId: mainConveyorId,
+          mountPosition: 0.9,
+          mountSide: 'center',
+        },
+        name: 'ST001 Stopper',
+      },
+      {
+        id: outfeedConveyorId,
+        type: 'belt-conveyor',
+        position: [3.0, 0, 0],
+        rotation: [0, 0, 0],
+        parameters: {
+          length: 2400,
+          width: 600,
+          height: 800,
+          beltSpeed: 10,
+        },
+        name: 'Outfeed Conveyor',
+      },
+      {
+        id: downstreamSensorId,
+        type: 'sensor',
+        position: [3.4, 0, 0],
+        rotation: [0, Math.PI / 2, 0],
+        parameters: {
+          sensorTag: 'SE002',
+          sensorType: 'through-beam',
+          detectPresence: true,
+          detectZone: true,
+          detectionRange: 300,
+          showBeam: true,
+          mountHeight: 800,
+          parentConveyorId: outfeedConveyorId,
+          mountPosition: 0.25,
+          mountSide: 'center',
+        },
+        name: 'SE002 Downstream Zone',
+      },
+      {
+        id: sinkId,
+        type: 'sink',
+        position: [6.0, 0, 0],
+        rotation: [0, 0, 0],
+        parameters: {},
+        name: 'Sink',
+      },
+    ],
+    edges: [
+      { id: uuidv4(), from: sourceId, to: mainConveyorId, fromPort: 'output', toPort: 'input' },
+      { id: uuidv4(), from: mainConveyorId, to: outfeedConveyorId, fromPort: 'output', toPort: 'input' },
+      { id: uuidv4(), from: outfeedConveyorId, to: sinkId, fromPort: 'output', toPort: 'input' },
+    ],
+    rules: [],
+  };
+}
+
 // ─── All scenarios ─────────────────────────────────────────────
 export function getAllScenarios(): { id: string; create: () => Scenario }[] {
   return [
@@ -395,5 +531,6 @@ export function getAllScenarios(): { id: string; create: () => Scenario }[] {
     { id: 'end-of-line', create: createEndOfLineScenario },
     { id: 'sensor-stopper', create: createSensorStopperScenario },
     { id: 'backlog-control', create: createBacklogControlScenario },
+    { id: 'stopper-release-one-downstream-clear', create: createStopperReleaseOneDownstreamClearScenario },
   ];
 }

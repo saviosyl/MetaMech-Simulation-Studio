@@ -107,26 +107,47 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
 
   // ── Sensor + Stopper section ──
   if (input.includeSensorLogic) {
-    const sensorTag = 'SE001';
+    const triggerSensorTag = 'SE001';
+    const downstreamSensorTag = 'SE002';
     const sensor = n('sensor', [cursorX, 0, cursorZ], {
-      sensorTag,
+      sensorTag: triggerSensorTag,
       sensorType: 'through-beam',
       mountHeight: convHeight,
       beltWidth: convWidth,
       showBeam: true,
       mountPosition: 0.3,
       parentConveyorId: lastNodeId,
+      detectPresence: true,
+      detectZone: true,
+      detectionRange: 300,
     }, 'Sensor');
     nodes.push(sensor);
+    const downstreamSensor = n('sensor', [cursorX + 0.45, 0, cursorZ], {
+      sensorTag: downstreamSensorTag,
+      sensorType: 'through-beam',
+      mountHeight: convHeight,
+      beltWidth: convWidth,
+      showBeam: true,
+      mountPosition: 0.85,
+      parentConveyorId: lastNodeId,
+      detectPresence: true,
+      detectZone: true,
+      detectionRange: 300,
+    }, 'Downstream Sensor');
+    nodes.push(downstreamSensor);
 
     const stopper = n('stopper', [cursorX + 0.3, 0, cursorZ], {
-      stopperMode: 'sensor-triggered',
-      triggerSensorTag: sensorTag,
+      stopperMode: 'release-one-downstream-clear',
+      triggerSensorTag,
+      downstreamSensorTag,
       engaged: true,
       width: convWidth,
       mountHeight: convHeight,
       mountPosition: 0.7,
       parentConveyorId: lastNodeId,
+      releaseCount: 1,
+      releaseDelay: 0.3,
+      resetDelaySec: 0.3,
     }, 'Stopper');
     nodes.push(stopper);
   }

@@ -7,8 +7,6 @@ import { simulationEngine } from '../../simulation/SimulationEngine';
 import { spaceMouse, SpaceMouseZoomDirection } from '../../lib/spacemouse';
 import { mToMm, mmToM, radToDeg, degToRad } from '../../utils/units';
 import { getPortWorldPosition } from '../../lib/nodeTransform';
-import BOMPanel from './BOMPanel';
-import { generateBOM } from '../../lib/bom/bomEngine';
 
 /* ─── Collapsible Section ─── */
 const Section: React.FC<{ title: string; icon?: any; children: React.ReactNode; defaultOpen?: boolean; badge?: string }> = ({ title, icon: Icon, children, defaultOpen = false, badge }) => {
@@ -42,6 +40,13 @@ const Section: React.FC<{ title: string; icon?: any; children: React.ReactNode; 
 const inputStyle: React.CSSProperties = { width: '100%', padding: '6px 10px', fontSize: 12, background: 'var(--mm-bg-input)', border: '1px solid rgba(148,163,184,0.26)', borderRadius: 7, color: 'var(--mm-text-primary)', outline: 'none' };
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: 'var(--mm-text-tertiary)', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' };
 const fieldGap: React.CSSProperties = { marginBottom: 10 };
+const cardStyle: React.CSSProperties = {
+  border: '1px solid rgba(148,163,184,0.2)',
+  borderRadius: 8,
+  padding: '10px',
+  background: 'var(--mm-bg-surface)',
+  marginBottom: 10,
+};
 const LENGTH_ANCHORED_TYPES = new Set(['conveyor', 'belt-conveyor', 'roller-conveyor', 'incline-conveyor', 'modular-conveyor-straight']);
 
 /* ─── Parameter grouper ─── */
@@ -49,7 +54,7 @@ function groupParams(params: [string, any][]) {
   const geo: [string, any][] = [], sim: [string, any][] = [], logic: [string, any][] = [], appear: [string, any][] = [], adv: [string, any][] = [];
   const geoK = ['length','width','height','radius','angle','angleDeg','bendAngle','pitch','turns','drumDiameter','supportSpacing','conveyorType','driveType','showSupports','showLegs','showSideGuides','sideGuideHeight','adjustableFeetEnabled','footAdjustmentMm','supportType','legCount','ceilingHeight','hangerStyle','hangerCrossbar'];
   const simK = ['beltSpeed','speed','spawnRate','ppm','processTime','capacity','cycleTime','maxItems','productColor','productType','productLength','productWidth','productHeight','speedFactor','pickHeight','placeHeight','approachHeight','pickDelay','placeDelay','accumulationMode','accumulationZones'];
-  const logK = ['stopperMode','stopperTag','triggerSensorTag','secondarySensorTag','stopCondition','releaseCondition','releaseDelay','stopCount','pusherMode','holdTime','releaseCount','openDuration','sensorTag','sensorType','detectColor','detectType','detectSize','colorFilter','typeFilter','cooldown','debounce','dwellTimeThreshold','onDwellEvent','showBeam','mountPosition','mountSide','mountHeight','parentConveyorId','lateralOffset','engaged','enabled','targetColor','targetProductType','routeBy','routeValues','stroke','side','runMode','blockedBySensorTag','dwellBlockThreshold','resumeDelay'];
+  const logK = ['stopperMode','stopperTag','triggerSensorTag','downstreamSensorTag','secondarySensorTag','stopCondition','releaseCondition','releaseDelay','resetDelaySec','stopCount','pusherMode','holdTime','releaseCount','openDuration','sensorTag','sensorType','detectPresence','detectZone','detectColor','detectType','detectSize','colorFilter','typeFilter','cooldown','debounce','dwellTimeThreshold','onDwellEvent','showBeam','mountPosition','mountSide','mountHeight','parentConveyorId','lateralOffset','engaged','enabled','targetColor','targetProductType','routeBy','routeValues','stroke','side','runMode','blockedBySensorTag','dwellBlockThreshold','resumeDelay'];
   const appK = [
     'beltColor','frameColor','color','materialColor','finish',
     'wallColor','textureUrl','wallImageMode','wallImageOpacity','wallPatternRepeat',
@@ -291,11 +296,251 @@ const RightPanel: React.FC = () => {
     forceUpdate(n => n + 1);
   };
 
+  const isSensor = selectedObject?.type === 'sensor';
+  const isStopper = selectedObject?.type === 'stopper';
+  const showLogicCards = isSensor || isStopper;
+  const stopperSimpleMode = isStopper
+    && String(selectedObject?.parameters?.stopperMode || '') === 'release-one-downstream-clear';
+  const [sensorAdvancedOpen, setSensorAdvancedOpen] = useState(false);
+  const [stopperAdvancedOpen, setStopperAdvancedOpen] = useState(false);
+
+  const renderSensorPremiumPanel = () => {
+    if (!selectedObject || !moduleDef || !isSensor) return null;
+    const params = moduleDef.parameters;
+    const sensorTag = String(selectedObject.parameters?.sensorTag || '').trim();
+    const debug = sensorTag ? simulationEngine.getSensorDebugStatus(sensorTag) : null;
+    const signal = sensorTag ? simulationEngine.getSensorSignals().get(sensorTag) : null;
+    const occupied = Boolean(debug?.occupied ?? signal?.active);
+    const zoneOccupied = Boolean(debug?.zoneOccupied ?? signal?.zoneOccupied ?? signal?.active);
+    const lastEvent = String(debug?.lastEvent || 'none');
+    return (
+      <Section title="Sensor Setup" icon={Zap} defaultOpen={true} badge="SIMPLE MODE">
+        <div style={{ ...cardStyle, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)', marginBottom: 8 }}>Identity</div>
+          <div style={fieldGap}>
+            <label style={labelStyle}>{params.sensorTag?.label || 'Sensor Tag'}</label>
+            {renderInput('sensorTag', params.sensorTag)}
+          </div>
+          <div style={{ marginBottom: 0 }}>
+            <label style={labelStyle}>{params.sensorType?.label || 'Sensor Type'}</label>
+            {renderInput('sensorType', params.sensorType)}
+          </div>
+        </div>
+        <div style={{ ...cardStyle, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)', marginBottom: 8 }}>Detection</div>
+          <div style={fieldGap}>
+            <label style={labelStyle}>Detect Presence</label>
+            {renderInput('detectPresence', params.detectPresence)}
+          </div>
+          <div style={fieldGap}>
+            <label style={labelStyle}>Detect Zone</label>
+            {renderInput('detectZone', params.detectZone)}
+            <div style={{ fontSize: 10, color: 'var(--mm-text-disabled)', marginTop: 4 }}>
+              Zone Detection: emits occupied when product enters the sensor area, and clear when area becomes empty.
+            </div>
+          </div>
+          <div style={{ marginBottom: 0 }}>
+            <label style={labelStyle}>{params.detectionRange?.label || 'Detection Range (mm)'}</label>
+            {renderInput('detectionRange', params.detectionRange)}
+          </div>
+        </div>
+        <div style={{ ...cardStyle, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)', marginBottom: 8 }}>Placement</div>
+          <div style={fieldGap}>
+            <label style={labelStyle}>{params.mountPosition?.label || 'Position Along Path'}</label>
+            {renderInput('mountPosition', params.mountPosition)}
+          </div>
+          <div style={fieldGap}>
+            <label style={labelStyle}>{params.mountSide?.label || 'Mount Side'}</label>
+            {renderInput('mountSide', params.mountSide)}
+          </div>
+          <div style={{ marginBottom: 0 }}>
+            <label style={labelStyle}>{params.mountHeight?.label || 'Mount Height (mm)'}</label>
+            {renderInput('mountHeight', params.mountHeight)}
+          </div>
+        </div>
+        <div style={{ ...cardStyle, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)', marginBottom: 8 }}>Live Status</div>
+          <div style={{ fontSize: 11, color: 'var(--mm-text-primary)', display: 'grid', gap: 6 }}>
+            <div>Sensor Tag: <strong>{sensorTag || '—'}</strong></div>
+            <div>Occupied: <strong style={{ color: occupied ? '#10b981' : 'var(--mm-text-tertiary)' }}>{occupied ? 'TRUE' : 'FALSE'}</strong></div>
+            <div>Zone Occupied: <strong style={{ color: zoneOccupied ? '#10b981' : 'var(--mm-text-tertiary)' }}>{zoneOccupied ? 'TRUE' : 'FALSE'}</strong></div>
+            <div>Last Event: <strong>{lastEvent}</strong></div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setSensorAdvancedOpen((v) => !v)}
+          style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', background: 'var(--mm-bg-surface)' }}
+        >
+          {sensorAdvancedOpen ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
+        </button>
+        {sensorAdvancedOpen && (
+          <div style={{ ...cardStyle, marginTop: 8 }}>
+            <div style={fieldGap}>
+              <label style={labelStyle}>{params.detectColor?.label || 'Detect Color'}</label>
+              {renderInput('detectColor', params.detectColor)}
+            </div>
+            <div style={fieldGap}>
+              <label style={labelStyle}>{params.detectType?.label || 'Detect Type'}</label>
+              {renderInput('detectType', params.detectType)}
+            </div>
+            <div style={fieldGap}>
+              <label style={labelStyle}>{params.detectSize?.label || 'Detect Size'}</label>
+              {renderInput('detectSize', params.detectSize)}
+            </div>
+            <div style={fieldGap}>
+              <label style={labelStyle}>{params.colorFilter?.label || 'Color Filter'}</label>
+              {renderInput('colorFilter', params.colorFilter)}
+            </div>
+            <div style={fieldGap}>
+              <label style={labelStyle}>{params.typeFilter?.label || 'Type Filter'}</label>
+              {renderInput('typeFilter', params.typeFilter)}
+            </div>
+            <div style={fieldGap}>
+              <label style={labelStyle}>{params.cooldown?.label || 'Cooldown'}</label>
+              {renderInput('cooldown', params.cooldown)}
+            </div>
+            <div style={{ marginBottom: 0 }}>
+              <label style={labelStyle}>{params.debounce?.label || 'Debounce'}</label>
+              {renderInput('debounce', params.debounce)}
+            </div>
+          </div>
+        )}
+      </Section>
+    );
+  };
+
+  const renderStopperPremiumPanel = () => {
+    if (!selectedObject || !moduleDef || !isStopper) return null;
+    const params = moduleDef.parameters;
+    const debug = simulationEngine.getStopperDebugStatus(selectedObject.id);
+    const triggerTag = String(selectedObject.parameters?.triggerSensorTag || '');
+    const downstreamTag = String(selectedObject.parameters?.downstreamSensorTag || selectedObject.parameters?.secondarySensorTag || '');
+    const triggerSignal = triggerTag ? simulationEngine.getSensorSignals().get(triggerTag) : null;
+    const downstreamSignal = downstreamTag ? simulationEngine.getSensorSignals().get(downstreamTag) : null;
+    return (
+      <Section title="Stopper Setup" icon={Zap} defaultOpen={true} badge={stopperSimpleMode ? 'SIMPLE MODE' : 'ADVANCED MODE'}>
+        <div style={{ ...cardStyle, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)', marginBottom: 8 }}>Identity</div>
+          <div style={fieldGap}>
+            <label style={labelStyle}>{params.stopperTag?.label || 'Stopper Tag'}</label>
+            {renderInput('stopperTag', params.stopperTag)}
+          </div>
+          <div style={fieldGap}>
+            <label style={labelStyle}>Enabled</label>
+            {renderInput('enabled', params.enabled)}
+          </div>
+          <div style={{ marginBottom: 0 }}>
+            <label style={labelStyle}>Engaged</label>
+            {renderInput('engaged', params.engaged)}
+          </div>
+        </div>
+        <div style={{ ...cardStyle, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)', marginBottom: 8 }}>Control Mode</div>
+          <div style={fieldGap}>
+            <label style={labelStyle}>{params.stopperMode?.label || 'Mode'}</label>
+            {renderInput('stopperMode', params.stopperMode)}
+          </div>
+          {stopperSimpleMode && (
+            <>
+              <div style={{ fontSize: 10, color: 'var(--mm-text-disabled)', marginBottom: 8 }}>
+                Hold products at stopper. Release one item whenever downstream sensor zone is clear.
+              </div>
+              <div style={fieldGap}>
+                <label style={labelStyle}>Trigger Sensor Tag</label>
+                {renderInput('triggerSensorTag', params.triggerSensorTag)}
+              </div>
+              <div style={fieldGap}>
+                <label style={labelStyle}>Downstream Sensor Tag</label>
+                {renderInput('downstreamSensorTag', params.downstreamSensorTag)}
+              </div>
+              <div style={fieldGap}>
+                <label style={labelStyle}>Release Count</label>
+                <input type="number" value={1} disabled style={{ ...inputStyle, opacity: 0.75 }} />
+              </div>
+              <div style={{ marginBottom: 0 }}>
+                <label style={labelStyle}>Reset Delay (sec)</label>
+                {renderInput('resetDelaySec', params.resetDelaySec)}
+              </div>
+            </>
+          )}
+          {!stopperSimpleMode && (
+            <div style={{ fontSize: 10, color: 'var(--mm-text-disabled)' }}>
+              Advanced stopper mode selected. Use advanced controls below.
+            </div>
+          )}
+        </div>
+        <div style={{ ...cardStyle, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)', marginBottom: 8 }}>Placement</div>
+          <div style={fieldGap}>
+            <label style={labelStyle}>{params.mountPosition?.label || 'Position Along Path'}</label>
+            {renderInput('mountPosition', params.mountPosition)}
+          </div>
+          <div style={fieldGap}>
+            <label style={labelStyle}>{params.mountSide?.label || 'Mount Side'}</label>
+            {renderInput('mountSide', params.mountSide)}
+          </div>
+          <div style={{ marginBottom: 0 }}>
+            <label style={labelStyle}>{params.mountHeight?.label || 'Mount Height (mm)'}</label>
+            {renderInput('mountHeight', params.mountHeight)}
+          </div>
+        </div>
+        <div style={{ ...cardStyle, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)', marginBottom: 8 }}>Live Status</div>
+          <div style={{ fontSize: 11, color: 'var(--mm-text-primary)', display: 'grid', gap: 6 }}>
+            <div>Simple flow: <strong>{triggerTag || 'SE001'}</strong> triggers hold → <strong>{downstreamTag || 'SE002'}</strong> clear releases one</div>
+            <div>Trigger Sensor: <strong style={{ color: triggerSignal?.active ? '#10b981' : 'var(--mm-text-tertiary)' }}>{triggerSignal?.active ? 'OCCUPIED' : 'CLEAR'}</strong></div>
+            <div>Downstream Sensor: <strong style={{ color: (downstreamSignal?.zoneOccupied ?? downstreamSignal?.active) ? '#ef4444' : '#10b981' }}>{(downstreamSignal?.zoneOccupied ?? downstreamSignal?.active) ? 'OCCUPIED' : 'CLEAR'}</strong></div>
+            <div>Stopper State: <strong>{debug?.state || (selectedObject.parameters?.engaged ? 'engaged' : 'releasing')}</strong></div>
+            <div>Release Pending: <strong>{debug?.releasePending ? 'TRUE' : 'FALSE'}</strong></div>
+            <div>Last Release Time: <strong>{debug?.lastReleaseTime ? `${debug.lastReleaseTime.toFixed(2)}s` : '—'}</strong></div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setStopperAdvancedOpen((v) => !v)}
+          style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', background: 'var(--mm-bg-surface)' }}
+        >
+          {stopperAdvancedOpen ? 'Hide Advanced Controls' : 'Show Advanced Controls'}
+        </button>
+        {stopperAdvancedOpen && (
+          <div style={{ ...cardStyle, marginTop: 8 }}>
+            <div style={fieldGap}>
+              <label style={labelStyle}>{params.stopCondition?.label || 'Stop Condition'}</label>
+              {renderInput('stopCondition', params.stopCondition)}
+            </div>
+            <div style={fieldGap}>
+              <label style={labelStyle}>{params.releaseCondition?.label || 'Release Condition'}</label>
+              {renderInput('releaseCondition', params.releaseCondition)}
+            </div>
+            <div style={fieldGap}>
+              <label style={labelStyle}>{params.holdTime?.label || 'Hold Time'}</label>
+              {renderInput('holdTime', params.holdTime)}
+            </div>
+            <div style={fieldGap}>
+              <label style={labelStyle}>{params.releaseDelay?.label || 'Release Delay'}</label>
+              {renderInput('releaseDelay', params.releaseDelay)}
+            </div>
+            <div style={fieldGap}>
+              <label style={labelStyle}>{params.releaseCount?.label || 'Release Count'}</label>
+              {renderInput('releaseCount', params.releaseCount)}
+            </div>
+            <div style={{ marginBottom: 0 }}>
+              <label style={labelStyle}>{params.secondarySensorTag?.label || 'Secondary Sensor Tag'}</label>
+              {renderInput('secondarySensorTag', params.secondarySensorTag)}
+            </div>
+          </div>
+        )}
+      </Section>
+    );
+  };
+
   const renderInput = (key: string, def: any) => {
     const val = selectedObject?.parameters[key];
 
     // Special: sensor tag dropdowns → populated with available sensor tags
-    if (key === 'triggerSensorTag' || key === 'secondarySensorTag' || key === 'blockedBySensorTag') {
+    if (key === 'triggerSensorTag' || key === 'downstreamSensorTag' || key === 'secondarySensorTag' || key === 'blockedBySensorTag') {
       return (
         <select value={val ?? ''} onChange={e => handleParam(key, e.target.value)} style={inputStyle}>
           <option value="" style={{ background: 'var(--mm-bg-panel)' }}>— None —</option>
@@ -438,76 +683,8 @@ const RightPanel: React.FC = () => {
                 );
               })()}
 
-              {/* Live Sensor Signal — shown for sensors and stoppers */}
-              {selectedObject.type === 'sensor' && selectedObject.parameters?.sensorTag && (() => {
-                const tag = selectedObject.parameters.sensorTag;
-                const signal = simulationEngine.getSensorSignals().get(tag);
-                const isActive = signal?.active ?? false;
-                return (
-                  <div style={{
-                    margin: '0 0 8px 0', padding: '10px 12px', borderRadius: 8,
-                    background: isActive ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.1)',
-                    border: `1px solid ${isActive ? 'rgba(16,185,129,0.3)' : 'var(--mm-border-subtle)'}`,
-                    display: 'flex', alignItems: 'center', gap: 10,
-                  }}>
-                    <Radio size={16} style={{ color: isActive ? '#10b981' : 'var(--mm-text-disabled)' }} />
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Orbitron', monospace", color: isActive ? '#10b981' : 'var(--mm-text-tertiary)' }}>
-                        {tag}: {isActive ? 'TRUE' : 'FALSE'}
-                      </div>
-                      <div style={{ fontSize: 10, color: 'var(--mm-text-disabled)', marginTop: 2 }}>
-                        {isActive ? `Detecting product` : 'No product in zone'}
-                      </div>
-                    </div>
-                    <div style={{
-                      width: 10, height: 10, borderRadius: '50%', flexShrink: 0, marginLeft: 'auto',
-                      background: isActive ? '#10b981' : '#475569',
-                      boxShadow: isActive ? '0 0 8px rgba(16,185,129,0.5)' : 'none',
-                    }} />
-                  </div>
-                );
-              })()}
-
-              {selectedObject.type === 'stopper' && (() => {
-                const stoppedCount = processNodes.length > 0 ? 0 : 0; // placeholder
-                const hasStopped = simulationEngine.getProducts().some(p => p.stoppedBy === selectedObject.id);
-                const state = hasStopped ? 'CLOSED' : 'OPEN';
-                const color = hasStopped ? '#ef4444' : '#10b981';
-                return (
-                  <div style={{
-                    margin: '0 0 8px 0', padding: '8px 12px', borderRadius: 8,
-                    background: `${color}15`, border: `1px solid ${color}30`,
-                    display: 'flex', alignItems: 'center', gap: 8,
-                  }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
-                    <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Orbitron', monospace", color }}>
-                      {selectedObject.parameters?.stopperTag || 'ST???'}: {state}
-                    </span>
-                  </div>
-                );
-              })()}
-
-              {selectedObject.type === 'stopper' && selectedObject.parameters?.triggerSensorTag && (() => {
-                const tag = selectedObject.parameters.triggerSensorTag;
-                const signal = simulationEngine.getSensorSignals().get(tag);
-                const isActive = signal?.active ?? false;
-                return (
-                  <div style={{
-                    margin: '0 0 8px 0', padding: '8px 12px', borderRadius: 8,
-                    background: 'rgba(100,116,139,0.08)', border: '1px solid var(--mm-border-subtle)',
-                    display: 'flex', alignItems: 'center', gap: 8, fontSize: 11,
-                  }}>
-                    <span style={{ color: 'var(--mm-text-tertiary)' }}>Trigger:</span>
-                    <span style={{ fontWeight: 700, fontFamily: "'Orbitron', monospace", color: isActive ? '#10b981' : 'var(--mm-text-disabled)' }}>
-                      {tag} = {isActive ? 'TRUE' : 'FALSE'}
-                    </span>
-                    <div style={{
-                      width: 8, height: 8, borderRadius: '50%', marginLeft: 'auto',
-                      background: isActive ? '#10b981' : '#475569',
-                    }} />
-                  </div>
-                );
-              })()}
+              {selectedObject.type === 'sensor' && renderSensorPremiumPanel()}
+              {selectedObject.type === 'stopper' && renderStopperPremiumPanel()}
 
               {/* Robot Debug View */}
               {['cartesian-robot', 'cobot', 'robot-5axis', 'robot-6axis'].includes(selectedObject.type) && (() => {
@@ -613,7 +790,7 @@ const RightPanel: React.FC = () => {
                 return (<>
                   {g.geo.length > 0 && <Section title="Geometry" icon={Maximize} defaultOpen={true}>{g.geo.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                   {g.sim.length > 0 && <Section title="Simulation" icon={Sliders} defaultOpen={true} badge="SIM">{g.sim.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
-                  {g.logic.length > 0 && <Section title="Logic" icon={Zap} defaultOpen={['sensor','stopper','pusher','source'].includes(selectedObject.type)} badge="LOGIC">{g.logic.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
+                  {showLogicCards ? null : (g.logic.length > 0 && <Section title="Logic" icon={Zap} defaultOpen={['sensor','stopper','pusher','source'].includes(selectedObject.type)} badge="LOGIC">{g.logic.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>)}
                   {g.appear.length > 0 && <Section title="Appearance" icon={Palette} defaultOpen={true}>{g.appear.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                   {g.adv.length > 0 && <Section title="Advanced" icon={Settings} defaultOpen={false}>{g.adv.map(([k,d]) => <div key={k} style={fieldGap}><label style={labelStyle}>{d.label}</label>{renderInput(k,d)}</div>)}</Section>}
                 </>);

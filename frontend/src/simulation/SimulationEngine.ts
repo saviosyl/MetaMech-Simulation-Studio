@@ -303,16 +303,87 @@ export class SimulationEngine {
   rules: Rule[] = [];
   private pendingSensorEvents: SensorEvent[] = [];
   /** Sensor signal registry — updated each tick. Key = sensorTag, Value = signal state */
-  sensorSignals: Map<string, { active: boolean; productId: string | null; productColor: string | null; productType: string | null; activeSince: number }> = new Map();
+  sensorSignals: Map<string, {
+    active: boolean;
+    zoneOccupied: boolean;
+    productId: string | null;
+    productColor: string | null;
+    productType: string | null;
+    activeSince: number;
+  }> = new Map();
   
   // Stopper state (by stopper node id) — avoids node parameter reference issues
-  private stopperState: Map<string, { latched: boolean; lastReleaseTime: number; cooldownSec: number }> = new Map();
+  private stopperState: Map<string, {
+    latched: boolean;
+    lastReleaseTime: number;
+    cooldownSec: number;
+    releasedSinceClear: boolean;
+    lastDownstreamClear: boolean;
+    releasePending: boolean;
+    releasingProductId: string | null;
+    modeState: 'engaged' | 'waiting' | 'releasing';
+  }> = new Map();
+  private sensorDebug: Map<string, { occupied: boolean; zoneOccupied: boolean; lastEvent: string }> = new Map();
+  private stopperDebug: Map<string, {
+    stopperTag: string;
+    state: 'engaged' | 'waiting' | 'releasing';
+    releasePending: boolean;
+    lastReleaseTime: number;
+    downstreamClear: boolean;
+    triggerSensorTag: string;
+    downstreamSensorTag: string;
+  }> = new Map();
   // Sensor dwell state (by sensor node id)
   private sensorDwellFired: Map<string, boolean> = new Map();
   simTime: number = 0;
   nodes: ProcessNode[] = [];
   edges: ProcessEdge[] = [];
   private colorIndex = 0;
+
+  private getOrCreateStopperRuntimeState(node: ProcessNode): {
+    latched: boolean;
+    lastReleaseTime: number;
+    cooldownSec: number;
+    releasedSinceClear: boolean;
+    lastDownstreamClear: boolean;
+    releasePending: boolean;
+    releasingProductId: string | null;
+    modeState: 'engaged' | 'waiting' | 'releasing';
+  } {
+    let runtime = this.stopperState.get(node.id);
+    if (!runtime) {
+      runtime = {
+        latched: false,
+        lastReleaseTime: 0,
+        cooldownSec: Number(node.parameters.resetDelaySec ?? node.parameters.releaseDelay ?? 0.3) || 0.3,
+        releasedSinceClear: false,
+        lastDownstreamClear: false,
+        releasePending: false,
+        releasingProductId: null,
+        modeState: 'engaged',
+      };
+      this.stopperState.set(node.id, runtime);
+    }
+    runtime.cooldownSec = Math.max(0, Number(node.parameters.resetDelaySec ?? node.parameters.releaseDelay ?? runtime.cooldownSec) || runtime.cooldownSec);
+    return runtime;
+  }
+
+  private updateStopperDebug(node: ProcessNode, runtime: {
+    modeState: 'engaged' | 'waiting' | 'releasing';
+    releasePending: boolean;
+    lastReleaseTime: number;
+    lastDownstreamClear: boolean;
+  }): void {
+    this.stopperDebug.set(node.id, {
+      stopperTag: String(node.parameters?.stopperTag || node.name || node.id),
+      state: runtime.modeState,
+      releasePending: runtime.releasePending,
+      lastReleaseTime: runtime.lastReleaseTime,
+      downstreamClear: runtime.lastDownstreamClear,
+      triggerSensorTag: String(node.parameters?.triggerSensorTag || ''),
+      downstreamSensorTag: String(node.parameters?.downstreamSensorTag || node.parameters?.secondarySensorTag || ''),
+    });
+  }
 
   init(nodes: ProcessNode[], edges: ProcessEdge[]) {
     this.nodes = nodes;
@@ -406,6 +477,8 @@ export class SimulationEngine {
     this.sensorStates.clear();
     this.sensorSignals.clear();
     this.stopperState.clear();
+    this.sensorDebug.clear();
+    this.stopperDebug.clear();
     this.sensorDwellFired.clear();
     this.stopperStates.clear();
     this.pusherStates.clear();
@@ -794,11 +867,7 @@ export class SimulationEngine {
       
       if (mode === 'sensor-triggered' && triggerTag) {
         // Get/init stopper state from engine map (NOT node params)
-        let ss = this.stopperState.get(n.id);
-        if (!ss) {
-          ss = { latched: false, lastReleaseTime: 0, cooldownSec: n.parameters.releaseDelay || 3 };
-          this.stopperState.set(n.id, ss);
-        }
+        const ss = this.getOrCreateStopperRuntimeState(n);
         
         // Cooldown: barrier stays OPEN for cooldownSec after release
         const sinceLast = this.simTime - ss.lastReleaseTime;
@@ -819,6 +888,24 @@ export class SimulationEngine {
         }
         
         return ss.latched;
+      }
+
+      if (mode === 'release-one-downstream-clear') {
+        const ss = this.getOrCreateStopperRuntimeState(n);
+        // Dedicated simple mode uses explicit engaged/open state from stopper tick.
+        // During release cooldown keep barrier open.
+        const sinceLast = this.simTime - ss.lastReleaseTime;
+        if (ss.releasePending && ss.lastReleaseTime > 0 && sinceLast < ss.cooldownSec) {
+          ss.latched = false;
+          ss.modeState = 'releasing';
+          this.updateStopperDebug(n, ss);
+          return false;
+        }
+        const engaged = Boolean(n.parameters?.engaged ?? true);
+        ss.latched = engaged;
+        ss.modeState = engaged ? (ss.releasePending ? 'waiting' : 'engaged') : 'releasing';
+        this.updateStopperDebug(n, ss);
+        return engaged;
       }
       
       return n.parameters?.engaged ?? true;
@@ -1432,10 +1519,15 @@ export class SimulationEngine {
     const releaseDelay = node.parameters.releaseDelay || 0;
     const releaseCondition = node.parameters.releaseCondition || 'timed';
     const isMounted = !!node.parameters.parentConveyorId;
+    const runtime = this.getOrCreateStopperRuntimeState(node);
 
     if (!enabled) {
       this.releaseAllStopped(node, stats);
       this.setFlowState(stats, 'idle', dt);
+      runtime.modeState = 'engaged';
+      runtime.releasePending = false;
+      runtime.latched = false;
+      this.updateStopperDebug(node, runtime);
       return;
     }
 
@@ -1520,6 +1612,50 @@ export class SimulationEngine {
         }
         break;
       }
+      case 'release-one-downstream-clear': {
+        const downstreamTag = String(node.parameters.downstreamSensorTag || node.parameters.secondarySensorTag || '').trim();
+        const downstreamSignal = downstreamTag ? this.sensorSignals.get(downstreamTag) : null;
+        const downstreamOccupied = Boolean(downstreamSignal?.zoneOccupied ?? downstreamSignal?.active);
+        const downstreamClear = !downstreamOccupied;
+        runtime.lastDownstreamClear = downstreamClear;
+
+        // A new occupancy cycle resets the "already released on this clear window" latch.
+        if (downstreamOccupied) {
+          runtime.releasedSinceClear = false;
+        }
+
+        const releaseCountForMode = 1;
+        const resetDelaySec = Math.max(
+          0.01,
+          Number(node.parameters.resetDelaySec ?? node.parameters.releaseDelay ?? runtime.cooldownSec ?? 0.3) || 0.3
+        );
+        runtime.cooldownSec = resetDelaySec;
+        node.parameters.releaseCount = 1;
+        node.parameters.engaged = true;
+        runtime.modeState = stopped.length > 0 ? 'waiting' : 'engaged';
+
+        // If one product is currently being released, keep stopper open briefly.
+        if (runtime.releasePending) {
+          if (this.simTime - runtime.lastReleaseTime >= resetDelaySec) {
+            runtime.releasePending = false;
+            runtime.modeState = stopped.length > 0 ? 'waiting' : 'engaged';
+            node.parameters.engaged = true;
+          } else {
+            node.parameters.engaged = false;
+            runtime.modeState = 'releasing';
+          }
+        } else if (stopped.length > 0 && downstreamClear && !runtime.releasedSinceClear) {
+          // Dedicated simple sequence: release exactly one item when downstream zone is clear.
+          const toRelease = stopped.slice(0, releaseCountForMode);
+          for (const p of toRelease) this.releaseProduct(p, node, stats);
+          runtime.releasedSinceClear = true;
+          runtime.releasePending = true;
+          runtime.lastReleaseTime = this.simTime;
+          runtime.modeState = 'releasing';
+          node.parameters.engaged = false;
+        }
+        break;
+      }
     }
 
     // Execute release
@@ -1535,6 +1671,8 @@ export class SimulationEngine {
     } else {
       this.setFlowState(stats, 'idle', dt);
     }
+    runtime.latched = Boolean(node.parameters.engaged ?? true);
+    this.updateStopperDebug(node, runtime);
   }
 
 
@@ -1847,9 +1985,11 @@ export class SimulationEngine {
     if (sensorTag) {
       const prevSignal = this.sensorSignals.get(sensorTag);
       const isActive = nearbyProduct !== null;
+      const zoneOccupied = nearbyProducts.length > 0;
       if (isActive) {
         this.sensorSignals.set(sensorTag, {
           active: true,
+          zoneOccupied,
           productId: nearbyProduct.id,
           productColor: (nearbyProduct as any).color || null,
           productType: (nearbyProduct as any).productType || null,
@@ -1857,10 +1997,20 @@ export class SimulationEngine {
         });
       } else {
         this.sensorSignals.set(sensorTag, {
-          active: false, productId: null, productColor: null, productType: null,
+          active: false, zoneOccupied: false, productId: null, productColor: null, productType: null,
           activeSince: 0,
         });
       }
+
+      const lastEventFromEval = sState?.pendingEvents?.[sState.pendingEvents.length - 1]?.type;
+      const derivedEvent = isActive
+        ? ((prevSignal?.active ?? false) ? 'itemDetected' : 'zoneOccupied')
+        : ((prevSignal?.active ?? false) ? 'zoneClear' : 'none');
+      this.sensorDebug.set(sensorTag, {
+        occupied: isActive,
+        zoneOccupied,
+        lastEvent: String(lastEventFromEval || derivedEvent),
+      });
     }
 
     // Update stats (sensor is detection-only — no physical effect on products)
@@ -2080,8 +2230,24 @@ export class SimulationEngine {
     return this.palletStates;
   }
 
-  getSensorSignals(): Map<string, { active: boolean; productId: string | null }> {
+  getSensorSignals(): Map<string, { active: boolean; zoneOccupied: boolean; productId: string | null }> {
     return this.sensorSignals;
+  }
+
+  getSensorDebugStatus(tag: string): { occupied: boolean; zoneOccupied: boolean; lastEvent: string } | null {
+    return this.sensorDebug.get(tag) || null;
+  }
+
+  getStopperDebugStatus(nodeId: string): {
+    stopperTag: string;
+    state: 'engaged' | 'waiting' | 'releasing';
+    releasePending: boolean;
+    lastReleaseTime: number;
+    downstreamClear: boolean;
+    triggerSensorTag: string;
+    downstreamSensorTag: string;
+  } | null {
+    return this.stopperDebug.get(nodeId) || null;
   }
 
   getNodeStats(): Map<string, NodeStats> {

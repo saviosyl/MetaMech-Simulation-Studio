@@ -113,15 +113,27 @@ function validateScene(nodes: any[], edges: any[]): ValidationIssue[] {
     }
   }
 
-  // Check: stopper without sensor tag (if sensor-release mode)
+  // Check: stopper without trigger sensor tag (for trigger-based/simple modes)
   const stoppers = nodes.filter(n => n.type === 'stopper');
   for (const stopper of stoppers) {
-    if ((stopper.parameters.stopperMode === 'sensor-release' || stopper.parameters.stopperMode === 'sensor-triggered') && !stopper.parameters.sensorTag) {
+    const mode = String(stopper.parameters.stopperMode || '');
+    const requiresTrigger = mode === 'sensor-release' || mode === 'sensor-triggered' || mode === 'release-one-downstream-clear';
+    if (requiresTrigger && !stopper.parameters.triggerSensorTag) {
       issues.push({
         id: `stopper-no-sensor-${stopper.id}`,
         severity: 'warning',
-        title: `Stopper "${stopper.name}" needs sensor tag`,
-        detail: 'Set a sensor tag to link this stopper to a sensor for triggered release.',
+        title: `Stopper "${stopper.name}" needs Trigger Sensor`,
+        detail: 'Set Trigger Sensor Tag (SE001) so this stopper can hold/release correctly.',
+        nodeId: stopper.id,
+        nodeName: stopper.name,
+      });
+    }
+    if (mode === 'release-one-downstream-clear' && !stopper.parameters.downstreamSensorTag && !stopper.parameters.secondarySensorTag) {
+      issues.push({
+        id: `stopper-no-downstream-${stopper.id}`,
+        severity: 'warning',
+        title: `Stopper "${stopper.name}" needs Downstream Sensor`,
+        detail: 'Set Downstream Sensor Tag (SE002) to release one item only when downstream zone is clear.',
         nodeId: stopper.id,
         nodeName: stopper.name,
       });

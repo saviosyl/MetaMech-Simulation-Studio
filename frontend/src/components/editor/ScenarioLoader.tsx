@@ -13,6 +13,7 @@ import {
   createColorSortScenario,
   createMeteredStopperScenario,
   createDownstreamReadyScenario,
+  createStopperReleaseOneDownstreamClearScenario,
   createInclineScenario,
   createBendRoutingScenario,
   createSpiralScenario,
@@ -52,6 +53,13 @@ const SCENARIOS: ScenarioOption[] = [
     description: 'Stopper accumulates then releases products in timed batches',
     icon: <Layers size={16} className="text-yellow-400" />,
     create: createMeteredStopperScenario,
+  },
+  {
+    id: 'stopper-release-one-downstream-clear',
+    name: 'Stopper Release One on Downstream Clear',
+    description: 'SE001 triggers hold, SE002 zone clear releases exactly one item, then stopper re-engages.',
+    icon: <Play size={16} className="text-emerald-400" />,
+    create: createStopperReleaseOneDownstreamClearScenario,
   },
   {
     id: 'downstream-ready',
