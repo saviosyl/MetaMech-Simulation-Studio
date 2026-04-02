@@ -217,6 +217,7 @@ const SnapSystem: React.FC = () => {
             bestMatch.targetWorldDir,
             myPortUpdated.localPosition,
             myPortUpdated.direction,
+            node.rotation as [number, number, number],
             node.scale,
           );
           const updates: Record<string, any> = { position: mate.position, rotation: mate.rotation };
@@ -376,6 +377,7 @@ const SnapSystem: React.FC = () => {
             firstWorldDir,
             secondPortForMate.localPosition,
             secondPortForMate.direction,
+            secondNode.rotation as [number, number, number],
             secondNode.scale,
           );
           const updates: Record<string, any> = {
@@ -566,6 +568,7 @@ export function checkSnap(
               opWorldDir,
               adjustedDp.localPosition,
               adjustedDp.direction,
+              draggedNode.rotation as [number, number, number],
               draggedNode.scale,
             );
             return {

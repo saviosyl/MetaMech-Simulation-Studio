@@ -200,6 +200,8 @@ export function solveMateTransform(
   /** The moving object B's port info in local space */
   movingPortLocalPos: Vec3,
   movingPortLocalDir: Vec3,
+  /** Current rotation of moving object (absolute Euler XYZ) */
+  movingCurrentRotation?: Vec3,
   /** Current transform of moving object */
   movingScale?: Vec3,
 ): { position: Vec3; rotation: Vec3 } {
@@ -209,13 +211,15 @@ export function solveMateTransform(
   // Target direction for the moving port (opposing the target):
   const desiredDir: Vec3 = [-targetPortWorldDir[0], -targetPortWorldDir[1], -targetPortWorldDir[2]];
 
-  // Compute Y rotation needed to align movingPortLocalDir to desiredDir
-  const scaledMovingDir = localDirToWorld(movingPortLocalDir, [0, 0, 0], movingScale);
+  const baseRotation: Vec3 = movingCurrentRotation || [0, 0, 0];
+  // Compute delta-Y needed to align current moving port world dir to desiredDir.
+  // This preserves authored/default orientation baked into the node's current rotation.
+  const scaledMovingDir = localDirToWorld(movingPortLocalDir, baseRotation, movingScale);
   const srcAngle = Math.atan2(scaledMovingDir[0], scaledMovingDir[2]);
   const dstAngle = Math.atan2(desiredDir[0], desiredDir[2]);
-  const rotY = dstAngle - srcAngle;
+  const rotY = baseRotation[1] + (dstAngle - srcAngle);
 
-  const newRotation: Vec3 = [0, rotY, 0];
+  const newRotation: Vec3 = [baseRotation[0], rotY, baseRotation[2]];
 
   // Step 2: Compute position.
   // Apply the new rotation to the port's local position to get its world offset.
