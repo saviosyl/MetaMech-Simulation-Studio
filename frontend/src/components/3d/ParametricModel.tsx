@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { ParametricAssetDef } from '../../lib/assetManifest';
-import { runBuilder, getBuilderRenderVersion } from '../../lib/parametricBuilders';
+import { runBuilder, getBuilderRenderVersion, validateBuilderResult } from '../../lib/parametricBuilders';
 import { isBeltConveyorGLBReady } from '../../lib/parametricBuilders/beltConveyorGLBBuilder';
 
 interface ParametricModelProps {
@@ -38,7 +38,10 @@ const ParametricModel: React.FC<ParametricModelProps> = ({ assetDef, parameters,
 
   // Build the 3D group — rebuilds when params change OR when source assets become available
   const builderResult = useMemo(() => {
-    return runBuilder(assetDef.builder, mergedParams);
+    const result = runBuilder(assetDef.builder, mergedParams);
+    if (!result) return null;
+    if (!validateBuilderResult(assetDef.builder, result)) return null;
+    return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assetDef.builder, JSON.stringify(mergedParams), buildVersion, builderRenderVersion]);
 

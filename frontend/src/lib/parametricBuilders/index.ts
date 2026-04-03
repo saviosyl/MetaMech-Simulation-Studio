@@ -102,7 +102,30 @@ export function runBuilder(name: string, params: Record<string, any>): BuilderRe
     console.warn(`No builder registered for: ${name}`);
     return null;
   }
-  return fn(params);
+  try {
+    const result = fn(params);
+    return result;
+  } catch (error) {
+    console.error(`[ParametricBuilder] ${name} failed during runBuilder`, error);
+    return null;
+  }
+}
+
+export function validateBuilderResult(result: BuilderResult | null): boolean {
+  if (!result) return false;
+  if (!result.group) return false;
+  const b = result.bounds;
+  if (!b) return false;
+  const min = b.min;
+  const max = b.max;
+  if (!Number.isFinite(min.x) || !Number.isFinite(min.y) || !Number.isFinite(min.z)) return false;
+  if (!Number.isFinite(max.x) || !Number.isFinite(max.y) || !Number.isFinite(max.z)) return false;
+  const sx = max.x - min.x;
+  const sy = max.y - min.y;
+  const sz = max.z - min.z;
+  if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(sz)) return false;
+  if (sx <= 0 || sy <= 0 || sz <= 0) return false;
+  return true;
 }
 
 export function getBuilderRenderVersion(name: string): number {

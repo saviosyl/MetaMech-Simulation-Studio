@@ -161,17 +161,24 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { document.body.style.cursor = 'auto'; }}
       >
-        <Suspense fallback={
+        <Model3DErrorBoundary fallback={
           <mesh castShadow>
             <boxGeometry args={[3, 0.8, 0.6]} />
             <meshStandardMaterial color="#666" wireframe />
           </mesh>
         }>
-          <BeltConveyorGLB
-            parameters={node.parameters}
-            isSelected={isSelected}
-          />
-        </Suspense>
+          <Suspense fallback={
+            <mesh castShadow>
+              <boxGeometry args={[3, 0.8, 0.6]} />
+              <meshStandardMaterial color="#666" wireframe />
+            </mesh>
+          }>
+            <BeltConveyorGLB
+              parameters={node.parameters}
+              isSelected={isSelected}
+            />
+          </Suspense>
+        </Model3DErrorBoundary>
         {isSelected && (
           <>
             <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>

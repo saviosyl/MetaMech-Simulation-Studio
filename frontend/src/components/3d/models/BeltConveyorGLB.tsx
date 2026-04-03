@@ -8,6 +8,7 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { buildConveyor, editorParamsToConveyorParams } from '../../../features/assets/parametric/conveyor/conveyorBuilder';
+import { buildSafeGroup } from '../../../lib/modelSafety';
 
 interface Props {
   parameters: Record<string, any>;
@@ -19,14 +20,39 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
 
   // Build the conveyor from parameters — use JSON key to detect nested changes
   const paramKey = JSON.stringify(parameters);
+  const buildFailureRef = useRef<string | null>(null);
   const built = useMemo(() => {
-    const conveyorParams = editorParamsToConveyorParams(parameters);
-    return buildConveyor(conveyorParams);
+    try {
+      const conveyorParams = editorParamsToConveyorParams(parameters);
+      const result = buildConveyor(conveyorParams);
+      const safeRoot = buildSafeGroup(
+        'belt-conveyor-render-root',
+        () => result.root,
+        () => {
+          const fallback = new THREE.Group();
+          const body = new THREE.Mesh(
+            new THREE.BoxGeometry(3, 0.7, 0.7),
+            new THREE.MeshStandardMaterial({ color: 0x666666, wireframe: true }),
+          );
+          body.position.set(0, 0.35, 0);
+          fallback.add(body);
+          return fallback;
+        },
+      );
+      result.root = safeRoot;
+      buildFailureRef.current = null;
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      buildFailureRef.current = message;
+      console.error('[BeltConveyorGLB] build failed, rendering safe fallback:', error);
+      return null;
+    }
   }, [paramKey]);
 
   // Selection highlight
   useEffect(() => {
-    if (!built.root) return;
+    if (!built?.root) return;
     built.root.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
@@ -41,6 +67,21 @@ const BeltConveyorGLB: React.FC<Props> = ({ parameters, isSelected }) => {
       }
     });
   }, [isSelected, built]);
+
+  if (!built?.root) {
+    return (
+      <group ref={groupRef}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[3, 0.7, 0.7]} />
+          <meshStandardMaterial color="#cc3344" wireframe />
+        </mesh>
+        <mesh position={[0, 0.38, 0]} castShadow>
+          <boxGeometry args={[3.05, 0.02, 0.72]} />
+          <meshStandardMaterial color="#3a3a3a" />
+        </mesh>
+      </group>
+    );
+  }
 
   return (
     <group ref={groupRef}>
