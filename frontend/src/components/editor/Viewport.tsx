@@ -370,6 +370,7 @@ const SceneContent: React.FC<{
     directionDebugVisible,
     themeMode,
     activeTool,
+    navigationMode,
     isExportRendering,
     captureQualityPreset,
   } = useEditorStore();
@@ -394,14 +395,24 @@ const SceneContent: React.FC<{
         section: '#334155',
       };
 
-  // Disable orbit rotation when a 3D object is selected AND a manipulation tool is active
-  // Click empty space to deselect → orbit re-enables
+  // Disable orbit rotation when a 3D object is selected AND a manipulation tool is active.
+  // Click empty space to deselect → orbit re-enables.
   useEffect(() => {
     if (!orbitRef.current) return;
     const toolsBlockingRotate = ['move', 'rotate', 'scale', 'mate', 'snap-move', 'path-draw'];
     const shouldBlock = selectedObjectId !== null && toolsBlockingRotate.includes(activeTool);
     orbitRef.current.enableRotate = !shouldBlock;
   }, [activeTool, selectedObjectId, orbitRef]);
+
+  // Explicit navigation mode selection for trackpad/mouse parity.
+  useEffect(() => {
+    if (!orbitRef.current) return;
+    orbitRef.current.enablePan = true;
+    orbitRef.current.enableZoom = true;
+    orbitRef.current.mouseButtons = navigationMode === 'pan'
+      ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }
+      : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+  }, [navigationMode, orbitRef]);
 
   const handleObjectClick = useCallback((objectId: string, objectType: 'process' | 'environment' | 'actor') => {
     setSelectedObject(objectId, objectType);
@@ -656,7 +667,8 @@ const SceneContent: React.FC<{
         ref={orbitRef}
         enablePan={true}
         enableZoom={true}
-        enableRotate={true}
+        enableRotate={navigationMode === 'orbit'}
+        touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
         enableDamping={true}
         dampingFactor={0.08}
         rotateSpeed={0.9}
@@ -696,6 +708,7 @@ const Viewport: React.FC = () => {
     addProcessNode,
     addEnvironmentAsset,
     addActor,
+    navigationMode,
   } = useEditorStore();
 
   const exportPreset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
@@ -817,10 +830,12 @@ const Viewport: React.FC = () => {
     }
   }, [hasPlacedModule, isSceneEmpty]);
 
+  const viewportCursor = navigationMode === 'pan' ? 'grab' : 'default';
+
   return (
     <div 
       data-tour="viewport-center"
-      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--mm-bg-viewport)' }}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--mm-bg-viewport)', cursor: viewportCursor }}
       onDrop={handleDrop}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -941,7 +956,7 @@ const OrientationPad: React.FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: 'clamp(34px, 4.4vw, 44px)',
+        top: 'calc(var(--mm-top-ribbon-height, 56px) + 10px)',
         right: 10,
         zIndex: 30,
         display: 'grid',

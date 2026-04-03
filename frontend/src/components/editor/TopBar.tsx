@@ -376,44 +376,50 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     return { label: 'Expired', detail: validUntil || 'Renew required', color: '#ef4444' };
   })();
 
-  const compact = viewportWidth <= 1440;
+  const twoRow = viewportWidth <= 1400;
   const small = viewportWidth <= 1366;
   const verySmall = viewportWidth <= 1280;
-  const showInlineRecording = !compact;
-  const showInlineSpeedChips = !small;
-  const showInlineEdit = !verySmall;
-  const showInlineScenario = !verySmall;
-  const showInlineSecondaryTools = !small;
+  const showCriticalOnly = verySmall;
+  const showInlineRecording = !twoRow && !showCriticalOnly;
+  const showInlineSpeedChips = !small && !twoRow && !showCriticalOnly;
+  const showInlineEdit = !showCriticalOnly;
+  const showInlineScenario = !showCriticalOnly;
+  const showInlineSecondaryTools = !showCriticalOnly;
+  const showCenterSpeed = !showCriticalOnly && !twoRow;
+  const showRightSpeed = twoRow && !showCriticalOnly;
+  const showReset = !verySmall;
   const showUserBadge = !verySmall;
-  const showMoreActions = compact;
+  const showMoreActions = twoRow;
 
-  const barStyle: React.CSSProperties = compact
+  const barStyle: React.CSSProperties = twoRow
     ? {
         ...S.bar,
         display: 'flex',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
         alignItems: 'center',
-        rowGap: 8,
+        rowGap: verySmall ? 6 : 8,
+        columnGap: verySmall ? 6 : 10,
         minHeight: undefined,
-        padding: '6px 10px',
+        padding: verySmall ? '5px 8px' : '6px 10px',
       }
     : S.bar;
 
   const simulationStripStyle: React.CSSProperties = {
     ...S.strip,
     padding: '4px 6px',
-    gap: compact ? 4 : 6,
+    gap: twoRow ? 5 : 6,
     flexWrap: 'nowrap',
     background: 'var(--mm-bg-surface)',
     border: '1px solid var(--mm-border-subtle)',
-    maxWidth: compact ? '100%' : undefined,
-    overflowX: compact ? 'auto' : undefined,
+    maxWidth: twoRow ? '100%' : undefined,
+    overflowX: twoRow ? 'auto' : undefined,
   };
 
   return (
     <div ref={barRef} style={barStyle} data-tour="top-ribbon">
       {/* ════ LEFT: Project + Edit + Build ════ */}
+      {!showCriticalOnly && (
       <div
         style={{
           display: 'flex',
@@ -421,7 +427,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           gap: verySmall ? 6 : 8,
           justifySelf: 'start',
           minWidth: 0,
-          flex: compact ? '1 1 auto' : undefined,
+          flex: twoRow ? '1 1 auto' : undefined,
         }}
       >
         {/* Brand */}
@@ -486,6 +492,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           </div>
         )}
       </div>
+      )}
 
       {/* ════ CENTER: Simulation (bigger, prominent) ════ */}
       <div
@@ -493,9 +500,9 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           display: 'flex',
           alignItems: 'center',
           justifySelf: 'center',
-          justifyContent: compact ? 'center' : undefined,
-          flex: compact ? '1 1 100%' : undefined,
-          order: compact ? 3 : undefined,
+          justifyContent: twoRow ? 'center' : undefined,
+          flex: twoRow ? '1 1 auto' : undefined,
+          order: twoRow ? 2 : undefined,
           minWidth: 0,
         }}
       >
@@ -507,45 +514,48 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
             {isPlaying ? <Pause size={16} /> : <Play size={16} />}
           </button>
 
-          {/* Reset */}
-          <button onClick={reset} style={S.simBtn('#64748b')} title="Reset simulation and clear transient runtime state">
-            <Square size={14} />
-          </button>
+          {showReset && (
+            <>
+              {/* Reset */}
+              <button onClick={reset} style={S.simBtn('#64748b')} title="Reset simulation and clear transient runtime state">
+                <Square size={14} />
+              </button>
+              <div style={{ width: 1, height: 20, background: 'var(--mm-border-subtle)' }} />
+            </>
+          )}
 
-          {/* Divider */}
-          <div style={{ width: 1, height: 20, background: 'var(--mm-border-subtle)' }} />
-
-          {/* Speed (single-row inline) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'nowrap' }}>
-            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.05em', flexShrink: 0 }}>Speed</span>
-            {showInlineSpeedChips ? (
-              speedOptions.map(o => (
-                <button key={o.value} onClick={() => setSimulationSpeed(o.value)}
-                  title={`Set simulation speed to ${o.label}`}
-                  style={{
-                    height: 24,
-                    padding: '0 7px', borderRadius: 8, border: '1px solid transparent', cursor: 'pointer',
-                    fontSize: 10, fontWeight: 600,
-                    background: simulationSpeed === o.value ? 'var(--mm-accent-primary)' : 'var(--mm-bg-surface)',
-                    color: simulationSpeed === o.value ? '#fff' : 'var(--mm-text-secondary)',
-                    transition: 'all 0.15s',
-                  }}>
-                  {o.label}
-                </button>
-              ))
-            ) : (
-              <select
-                value={simulationSpeed}
-                onChange={(e) => setSimulationSpeed(Number(e.target.value))}
-                style={{ ...S.compactSelect, minWidth: 84 }}
-                title="Simulation speed"
-              >
-                {speedOptions.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            )}
-          </div>
+          {showCenterSpeed && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'nowrap' }}>
+              <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.05em', flexShrink: 0 }}>Speed</span>
+              {showInlineSpeedChips ? (
+                speedOptions.map(o => (
+                  <button key={o.value} onClick={() => setSimulationSpeed(o.value)}
+                    title={`Set simulation speed to ${o.label}`}
+                    style={{
+                      height: 24,
+                      padding: '0 7px', borderRadius: 8, border: '1px solid transparent', cursor: 'pointer',
+                      fontSize: 10, fontWeight: 600,
+                      background: simulationSpeed === o.value ? 'var(--mm-accent-primary)' : 'var(--mm-bg-surface)',
+                      color: simulationSpeed === o.value ? '#fff' : 'var(--mm-text-secondary)',
+                      transition: 'all 0.15s',
+                    }}>
+                    {o.label}
+                  </button>
+                ))
+              ) : (
+                <select
+                  value={simulationSpeed}
+                  onChange={(e) => setSimulationSpeed(Number(e.target.value))}
+                  style={{ ...S.compactSelect, minWidth: 84 }}
+                  title="Simulation speed"
+                >
+                  {speedOptions.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
 
           {showInlineRecording && (
             <>
@@ -606,13 +616,33 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 7,
+          gap: verySmall ? 6 : 7,
           justifySelf: 'end',
-          justifyContent: 'flex-end',
-          flex: compact ? '1 1 auto' : undefined,
+          justifyContent: twoRow && !verySmall ? 'center' : 'flex-end',
+          flex: twoRow && !verySmall ? '1 1 100%' : (twoRow ? '1 1 auto' : undefined),
+          order: twoRow && !verySmall ? 4 : undefined,
           minWidth: 0,
         }}
       >
+        {showRightSpeed && (
+          <>
+            <div style={{ ...S.strip, padding: '3px 6px' }}>
+              <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.05em' }}>Speed</span>
+              <select
+                value={simulationSpeed}
+                onChange={(e) => setSimulationSpeed(Number(e.target.value))}
+                style={{ ...S.compactSelect, minWidth: 88 }}
+                title="Simulation speed"
+              >
+                {speedOptions.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={S.divider} />
+          </>
+        )}
+
         {showInlineSecondaryTools && (
           <>
             <div style={S.strip}>
@@ -724,6 +754,21 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
                   gap: 8,
                 }}
               >
+                {!showCenterSpeed && !showRightSpeed && (
+                  <div style={{ ...S.strip, justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--mm-text-tertiary)' }}>Speed</span>
+                    <select
+                      value={simulationSpeed}
+                      onChange={(e) => setSimulationSpeed(Number(e.target.value))}
+                      style={{ ...S.compactSelect, minWidth: 96 }}
+                      title="Simulation speed"
+                    >
+                      {speedOptions.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {!showInlineEdit && (
                   <div style={{ ...S.strip, justifyContent: 'space-between' }}>
                     <button onClick={handleUndo} style={S.iconBtn()} title="Undo (Ctrl+Z)"><Undo2 size={15} /></button>

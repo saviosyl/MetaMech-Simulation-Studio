@@ -5,6 +5,7 @@ import CameraViewToolbar from './CameraViewToolbar';
 import {
   MousePointer, Move, RotateCcw, Maximize2, Link2, Magnet, Ruler,
   Grid3X3, Eye, EyeOff, Route, Navigation, Trash2, Copy, Download, Package,
+  Hand, Orbit,
 } from 'lucide-react';
 
 type ToolType = 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure';
@@ -45,6 +46,8 @@ const ViewportToolbar: React.FC = () => {
   const pathsVisible = useEditorStore(s => s.pathsVisible);
   const setPathsVisible = useEditorStore(s => s.setPathsVisible);
   const requestFocus = useEditorStore(s => s.requestFocus);
+  const navigationMode = useEditorStore(s => s.navigationMode);
+  const setNavigationMode = useEditorStore(s => s.setNavigationMode);
 
   useEffect(() => {
     const onResize = () => setViewportWidth(window.innerWidth);
@@ -54,9 +57,7 @@ const ViewportToolbar: React.FC = () => {
 
   const compact = viewportWidth <= 1366;
   const veryCompact = viewportWidth <= 1280;
-  const ribbonTopOffset = compact
-    ? 'calc(var(--mm-top-ribbon-height, 72px) + 8px)'
-    : 'calc(var(--mm-top-ribbon-height, 56px) + 10px)';
+  const ribbonTopOffset = 'calc(var(--mm-top-ribbon-height, 56px) + 8px)';
 
   // Check if selected node has any connections
   const selectedEdges = selectedObjectId
@@ -151,6 +152,20 @@ const ViewportToolbar: React.FC = () => {
           style={btnStyle(false)}
         >
           <Maximize2 size={16} />
+        </button>
+        <button
+          title="Orbit mode: drag to rotate view"
+          onClick={() => setNavigationMode('orbit')}
+          style={btnStyle(navigationMode === 'orbit')}
+        >
+          <Orbit size={16} />
+        </button>
+        <button
+          title="Pan mode: drag to pan view"
+          onClick={() => setNavigationMode('pan')}
+          style={btnStyle(navigationMode === 'pan')}
+        >
+          <Hand size={16} />
         </button>
       </div>
 
