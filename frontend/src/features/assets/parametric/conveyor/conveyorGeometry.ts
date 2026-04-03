@@ -239,13 +239,79 @@ function buildDriveAssembly(params: ConveyorParams): THREE.Group {
   roller.castShadow = true;
   group.add(roller);
 
-  // SEW-style geared motor
+  // Mechanically-correct side-mounted gear motor with bracket + aligned coupling.
+  const sideSign = params.motorSide === 'right' ? 1 : -1;
+  const rollerHalfSpan = (widthM + 0.02) / 2;
+  const driveJournalLen = 0.018;
+  const couplingLen = 0.024;
+  const couplingRadius = 0.016;
+  const outputShaftCenterZ = sideSign * (rollerHalfSpan + driveJournalLen + couplingLen / 2);
+
+  // Drive journal from roller end to coupling.
+  const journal = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.01, 0.01, driveJournalLen, 10),
+    matChrome,
+  );
+  journal.rotation.set(Math.PI / 2, 0, 0);
+  journal.position.set(
+    driveX,
+    heightM,
+    sideSign * (rollerHalfSpan + driveJournalLen / 2),
+  );
+  journal.castShadow = true;
+  group.add(journal);
+
+  // Coupling between motor output and drive journal.
+  const coupling = new THREE.Mesh(
+    new THREE.CylinderGeometry(couplingRadius, couplingRadius, couplingLen, 14),
+    matDrive,
+  );
+  coupling.rotation.set(Math.PI / 2, 0, 0);
+  coupling.position.set(driveX, heightM, outputShaftCenterZ);
+  coupling.castShadow = true;
+  group.add(coupling);
+
+  // Motor mount bracket/plate — prevents floating appearance and anchors to frame.
+  const bracketArmLen = 0.11;
+  const bracketPlateW = 0.1;
+  const bracketPlateH = 0.09;
+  const bracketThk = 0.01;
+  const bracketAnchorZ = sideSign * (widthM / 2 + 0.03);
+  const bracketOuterZ = sideSign * (widthM / 2 + 0.08);
+
+  const verticalPlate = new THREE.Mesh(
+    new THREE.BoxGeometry(bracketPlateW, bracketPlateH, bracketThk),
+    matFrame,
+  );
+  verticalPlate.position.set(driveX, heightM - 0.045, bracketOuterZ);
+  verticalPlate.castShadow = true;
+  group.add(verticalPlate);
+
+  const horizontalArm = new THREE.Mesh(
+    new THREE.BoxGeometry(bracketPlateW, bracketThk, bracketArmLen),
+    matFrame,
+  );
+  horizontalArm.position.set(driveX, heightM - 0.09, sideSign * (widthM / 2 + 0.055));
+  horizontalArm.castShadow = true;
+  group.add(horizontalArm);
+
+  const frameTie = new THREE.Mesh(
+    new THREE.BoxGeometry(0.045, 0.028, 0.02),
+    matFrame,
+  );
+  frameTie.position.set(driveX, heightM - 0.06, bracketAnchorZ);
+  frameTie.castShadow = true;
+  group.add(frameTie);
+
+  // SEW-style geared motor.
+  // buildSEWMotor output shaft center is local ~[0.145, -0.005, 0] pointing along +X.
+  // Rotate so shaft points inward to roller and align that shaft center to coupling center.
   const sewMotor = buildSEWMotor(1.0);
-  const motorSideZ = params.motorSide === 'right'
-    ? widthM / 2 + 0.06
-    : -(widthM / 2 + 0.06);
-  sewMotor.position.set(driveX, heightM - 0.05, motorSideZ);
-  sewMotor.rotation.set(0, params.motorSide === 'right' ? -Math.PI / 2 : Math.PI / 2, 0);
+  const shaftDirRotationY = sideSign > 0 ? Math.PI / 2 : -Math.PI / 2;
+  const motorCenterY = heightM + 0.005; // compensates motor local shaft Y=-0.005
+  const motorCenterZ = outputShaftCenterZ + sideSign * 0.145;
+  sewMotor.position.set(driveX, motorCenterY, motorCenterZ);
+  sewMotor.rotation.set(0, shaftDirRotationY, 0);
   group.add(sewMotor);
 
   // Tail/deflection roller (only for end drive)
