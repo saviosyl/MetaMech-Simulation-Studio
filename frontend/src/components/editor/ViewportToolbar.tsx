@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import ImportModelDialog from './ImportModelDialog';
 import CameraViewToolbar from './CameraViewToolbar';
@@ -27,6 +27,7 @@ const tools: ToolButton[] = [
 
 const ViewportToolbar: React.FC = () => {
   const [showImport, setShowImport] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState<number>(() => (typeof window !== 'undefined' ? window.innerWidth : 1920));
   const activeTool = useEditorStore(s => s.activeTool);
   const setActiveTool = useEditorStore(s => s.setActiveTool);
   const gridSnap = useEditorStore(s => s.gridSnap);
@@ -44,6 +45,18 @@ const ViewportToolbar: React.FC = () => {
   const pathsVisible = useEditorStore(s => s.pathsVisible);
   const setPathsVisible = useEditorStore(s => s.setPathsVisible);
   const requestFocus = useEditorStore(s => s.requestFocus);
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const compact = viewportWidth <= 1366;
+  const veryCompact = viewportWidth <= 1280;
+  const ribbonTopOffset = compact
+    ? 'calc(var(--mm-top-ribbon-height, 72px) + 8px)'
+    : 'calc(var(--mm-top-ribbon-height, 56px) + 10px)';
 
   // Check if selected node has any connections
   const selectedEdges = selectedObjectId
@@ -96,7 +109,7 @@ const ViewportToolbar: React.FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: 'clamp(32px, 4.2vw, 42px)',
+        top: ribbonTopOffset,
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 45,
@@ -104,17 +117,19 @@ const ViewportToolbar: React.FC = () => {
         alignItems: 'center',
         gap: 5,
         width: 'fit-content',
-        maxWidth: 'calc(100% - 28px)',
+        maxWidth: veryCompact ? 'calc(100% - 16px)' : 'calc(100% - 28px)',
         flexWrap: 'nowrap',
         overflowX: 'auto',
+        overflowY: 'hidden',
         justifyContent: 'center',
         minHeight: 38,
         background: 'var(--mm-bg-toolbar-secondary)',
         backdropFilter: 'blur(8px)',
         borderRadius: 10,
-        padding: '4px 6px',
+        padding: veryCompact ? '3px 5px' : '4px 6px',
         boxShadow: 'var(--mm-shadow-sm)',
         border: '1px solid var(--mm-border-subtle)',
+        scrollbarWidth: 'thin',
       }}
       title="Main modeling ribbon"
     >

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Play, Pause, Square, Save, Download, Upload, Video,
   ArrowLeft, Undo2, Redo2, Check, AlertCircle,
-  Loader2, HelpCircle, Sun, Moon, Maximize2, Film, LifeBuoy,
+  Loader2, HelpCircle, Sun, Moon, Maximize2, Film, LifeBuoy, MoreHorizontal,
 } from 'lucide-react';
 import * as THREE from 'three';
 import { useEditorStore } from '../../store/editorStore';
@@ -119,9 +119,13 @@ const S = {
 const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus, onSave, onOpenHelpSupport }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showAIBuilder, setShowAIBuilder] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState<number>(() => (typeof window !== 'undefined' ? window.innerWidth : 1920));
   const [videoFormatPreference, setVideoFormatPreference] = useState<VideoFormatPreference>('auto');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -151,6 +155,36 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     { value: 2, label: '2×' },
     { value: 4, label: '4×' },
   ];
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      if (!showMoreMenu) return;
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    };
+    window.addEventListener('mousedown', onPointerDown);
+    return () => window.removeEventListener('mousedown', onPointerDown);
+  }, [showMoreMenu]);
+
+  useEffect(() => {
+    const element = barRef.current;
+    if (!element) return;
+    const applyHeightVar = () => {
+      const rect = element.getBoundingClientRect();
+      document.documentElement.style.setProperty('--mm-top-ribbon-height', `${Math.ceil(rect.height)}px`);
+    };
+    applyHeightVar();
+    const observer = new ResizeObserver(() => applyHeightVar());
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const boostViewportCaptureQuality = useCallback((canvas: HTMLCanvasElement, preset: VideoQualityPreset) => {
     // @ts-ignore — R3F store reference is attached to canvas at runtime
@@ -342,10 +376,54 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
     return { label: 'Expired', detail: validUntil || 'Renew required', color: '#ef4444' };
   })();
 
+  const compact = viewportWidth <= 1440;
+  const small = viewportWidth <= 1366;
+  const verySmall = viewportWidth <= 1280;
+  const showInlineRecording = !compact;
+  const showInlineSpeedChips = !small;
+  const showInlineEdit = !verySmall;
+  const showInlineScenario = !verySmall;
+  const showInlineSecondaryTools = !small;
+  const showUserBadge = !verySmall;
+  const showMoreActions = compact;
+
+  const barStyle: React.CSSProperties = compact
+    ? {
+        ...S.bar,
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        rowGap: 8,
+        minHeight: undefined,
+        padding: '6px 10px',
+      }
+    : S.bar;
+
+  const simulationStripStyle: React.CSSProperties = {
+    ...S.strip,
+    padding: '4px 6px',
+    gap: compact ? 4 : 6,
+    flexWrap: 'nowrap',
+    background: 'var(--mm-bg-surface)',
+    border: '1px solid var(--mm-border-subtle)',
+    maxWidth: compact ? '100%' : undefined,
+    overflowX: compact ? 'auto' : undefined,
+  };
+
   return (
-    <div style={S.bar} data-tour="top-ribbon">
+    <div ref={barRef} style={barStyle} data-tour="top-ribbon">
       {/* ════ LEFT: Project + Edit + Build ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifySelf: 'start', minWidth: 0 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: verySmall ? 6 : 8,
+          justifySelf: 'start',
+          minWidth: 0,
+          flex: compact ? '1 1 auto' : undefined,
+        }}
+      >
         {/* Brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
@@ -360,7 +438,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
             src="/simulation-studio-logo.png"
             alt="Simulation Studio"
             style={{
-              width: 124,
+              width: verySmall ? 98 : 124,
               height: 28,
               borderRadius: 9,
               objectFit: 'cover',
@@ -386,39 +464,42 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           <span
             onClick={() => setIsEditing(true)}
             title={projectName}
-            style={S.projectNameText}
+            style={{ ...S.projectNameText, maxWidth: verySmall ? 96 : 176 }}
           >
             {projectName}
           </span>
         )}
 
-        <div style={{ ...S.divider, margin: '0 1px 0 2px' }} />
+        {showInlineEdit && (
+          <>
+            <div style={{ ...S.divider, margin: '0 1px 0 2px' }} />
+            <div style={{ ...S.strip, marginLeft: 1 }}>
+              <button onClick={handleUndo} style={S.iconBtn()} title="Undo (Ctrl+Z)"><Undo2 size={15} /></button>
+              <button onClick={handleRedo} style={S.iconBtn()} title="Redo (Ctrl+Shift+Z)"><Redo2 size={15} /></button>
+            </div>
+          </>
+        )}
 
-        {/* Edit */}
-        <div style={{ ...S.strip, marginLeft: 1 }}>
-          <button onClick={handleUndo} style={S.iconBtn()} title="Undo (Ctrl+Z)"><Undo2 size={15} /></button>
-          <button onClick={handleRedo} style={S.iconBtn()} title="Redo (Ctrl+Shift+Z)"><Redo2 size={15} /></button>
-        </div>
-
-        {/* Scenarios */}
-        <div style={{ marginLeft: 2 }}>
-          <ScenarioLoader />
-        </div>
+        {showInlineScenario && (
+          <div style={{ marginLeft: 2 }}>
+            <ScenarioLoader />
+          </div>
+        )}
       </div>
 
       {/* ════ CENTER: Simulation (bigger, prominent) ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'center' }}>
-        <div
-          style={{
-            ...S.strip,
-            padding: '4px 6px',
-            gap: 6,
-            flexWrap: 'nowrap',
-            background: 'var(--mm-bg-surface)',
-            border: '1px solid var(--mm-border-subtle)',
-          }}
-          data-tour="simulation-controls"
-        >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifySelf: 'center',
+          justifyContent: compact ? 'center' : undefined,
+          flex: compact ? '1 1 100%' : undefined,
+          order: compact ? 3 : undefined,
+          minWidth: 0,
+        }}
+      >
+        <div style={simulationStripStyle} data-tour="simulation-controls">
           {/* Play/Pause */}
           <button onClick={isPlaying ? pause : play}
             style={S.simBtn(isPlaying ? '#f59e0b' : '#06b6d4')}
@@ -437,94 +518,120 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           {/* Speed (single-row inline) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'nowrap' }}>
             <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--mm-text-tertiary)', letterSpacing: '0.05em', flexShrink: 0 }}>Speed</span>
-            {speedOptions.map(o => (
-              <button key={o.value} onClick={() => setSimulationSpeed(o.value)}
-                title={`Set simulation speed to ${o.label}`}
+            {showInlineSpeedChips ? (
+              speedOptions.map(o => (
+                <button key={o.value} onClick={() => setSimulationSpeed(o.value)}
+                  title={`Set simulation speed to ${o.label}`}
+                  style={{
+                    height: 24,
+                    padding: '0 7px', borderRadius: 8, border: '1px solid transparent', cursor: 'pointer',
+                    fontSize: 10, fontWeight: 600,
+                    background: simulationSpeed === o.value ? 'var(--mm-accent-primary)' : 'var(--mm-bg-surface)',
+                    color: simulationSpeed === o.value ? '#fff' : 'var(--mm-text-secondary)',
+                    transition: 'all 0.15s',
+                  }}>
+                  {o.label}
+                </button>
+              ))
+            ) : (
+              <select
+                value={simulationSpeed}
+                onChange={(e) => setSimulationSpeed(Number(e.target.value))}
+                style={{ ...S.compactSelect, minWidth: 84 }}
+                title="Simulation speed"
+              >
+                {speedOptions.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {showInlineRecording && (
+            <>
+              <div style={{ width: 1, height: 20, background: 'var(--mm-border-subtle)' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, flexWrap: 'nowrap' }}>
+                <Film size={12} style={{ color: 'var(--mm-text-tertiary)', flexShrink: 0 }} />
+                <select
+                  value={captureQualityPreset}
+                  onChange={(e) => setCaptureQualityPreset(e.target.value as VideoQualityPreset)}
+                  style={{ ...S.compactSelect, minWidth: 104 }}
+                  title="Recording quality preset: higher settings increase resolution, bitrate, shadows, and reflections."
+                >
+                  {VIDEO_QUALITY_PRESET_ORDER.map((key) => (
+                    <option key={key} value={key}>
+                      {VIDEO_CAPTURE_PRESETS[key].label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={videoFormatPreference}
+                  onChange={(e) => setVideoFormatPreference(e.target.value as VideoFormatPreference)}
+                  style={{ ...S.compactSelect, minWidth: 100 }}
+                  title="Preferred export format. MP4 is used when browser support is available."
+                >
+                  <option value="auto">Auto (prefer MP4)</option>
+                  <option value="mp4">MP4 (if supported)</option>
+                  <option value="webm">WebM</option>
+                </select>
+              </div>
+
+              <button onClick={isRecording ? stopRecording : () => startRecording()}
                 style={{
-                  height: 24,
-                  padding: '0 7px', borderRadius: 8, border: '1px solid transparent', cursor: 'pointer',
-                  fontSize: 10, fontWeight: 600,
-                  background: simulationSpeed === o.value ? 'var(--mm-accent-primary)' : 'var(--mm-bg-surface)',
-                  color: simulationSpeed === o.value ? '#fff' : 'var(--mm-text-secondary)',
-                  transition: 'all 0.15s',
-                }}>
-                {o.label}
+                  ...S.simBtn(isRecording ? '#ef4444' : '#8b5cf6'),
+                  animation: isRecording ? 'pulse 1.5s ease-in-out infinite' : undefined,
+                }}
+                title={isRecording ? 'Stop recording and export video file' : `Record viewport video (${VIDEO_CAPTURE_PRESETS[captureQualityPreset].label} preset)`}>
+                <Video size={14} />
               </button>
-            ))}
-          </div>
-
-          {/* Divider */}
-          <div style={{ width: 1, height: 20, background: 'var(--mm-border-subtle)' }} />
-
-          {/* Export quality / format (single-row inline group) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, flexWrap: 'nowrap' }}>
-            <Film size={12} style={{ color: 'var(--mm-text-tertiary)', flexShrink: 0 }} />
-            <select
-              value={captureQualityPreset}
-              onChange={(e) => setCaptureQualityPreset(e.target.value as VideoQualityPreset)}
-              style={{ ...S.compactSelect, minWidth: 104 }}
-              title="Recording quality preset: higher settings increase resolution, bitrate, shadows, and reflections."
-            >
-              {VIDEO_QUALITY_PRESET_ORDER.map((key) => (
-                <option key={key} value={key}>
-                  {VIDEO_CAPTURE_PRESETS[key].label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={videoFormatPreference}
-              onChange={(e) => setVideoFormatPreference(e.target.value as VideoFormatPreference)}
-              style={{ ...S.compactSelect, minWidth: 100 }}
-              title="Preferred export format. MP4 is used when browser support is available."
-            >
-              <option value="auto">Auto (prefer MP4)</option>
-              <option value="mp4">MP4 (if supported)</option>
-              <option value="webm">WebM</option>
-            </select>
-          </div>
-
-          {/* Record */}
-          <button onClick={isRecording ? stopRecording : () => startRecording()}
-            style={{
-              ...S.simBtn(isRecording ? '#ef4444' : '#8b5cf6'),
-              animation: isRecording ? 'pulse 1.5s ease-in-out infinite' : undefined,
-            }}
-            title={isRecording ? 'Stop recording and export video file' : `Record viewport video (${VIDEO_CAPTURE_PRESETS[captureQualityPreset].label} preset)`}>
-            <Video size={14} />
-          </button>
-          {/* Record with camera path */}
-          {!isRecording && (
-            <button onClick={startRecordingWithCameraPath}
-              style={S.simBtn('#6366f1')}
-              title={`Record with active camera path (${VIDEO_CAPTURE_PRESETS[captureQualityPreset].label} preset)`}>
-              <Video size={14} /><span style={{ fontSize: 8, marginLeft: -2 }}>🎬</span>
-            </button>
-          )}
-          {isRecording && (
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', animation: 'pulse 1s ease-in-out infinite' }}>
-              REC
-            </span>
+              {!isRecording && (
+                <button onClick={startRecordingWithCameraPath}
+                  style={S.simBtn('#6366f1')}
+                  title={`Record with active camera path (${VIDEO_CAPTURE_PRESETS[captureQualityPreset].label} preset)`}>
+                  <Video size={14} /><span style={{ fontSize: 8, marginLeft: -2 }}>🎬</span>
+                </button>
+              )}
+              {isRecording && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', animation: 'pulse 1s ease-in-out infinite' }}>
+                  REC
+                </span>
+              )}
+            </>
           )}
         </div>
       </div>
 
       {/* ════ RIGHT: View + File + Save + User ════ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, justifySelf: 'end' }}>
-        <div style={S.strip}>
-          <button onClick={toggleTheme} style={S.iconBtn()} title="Toggle Theme">
-            {themeMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
-          <button onClick={() => setPresentationMode(true)} style={S.iconBtn()} title="Presentation Mode"><Maximize2 size={14} /></button>
-          <button onClick={() => setShowShortcuts(true)} style={S.iconBtn()} title="Shortcuts (?)"><HelpCircle size={14} /></button>
-        </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 7,
+          justifySelf: 'end',
+          justifyContent: 'flex-end',
+          flex: compact ? '1 1 auto' : undefined,
+          minWidth: 0,
+        }}
+      >
+        {showInlineSecondaryTools && (
+          <>
+            <div style={S.strip}>
+              <button onClick={toggleTheme} style={S.iconBtn()} title="Toggle Theme">
+                {themeMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+              </button>
+              <button onClick={() => setPresentationMode(true)} style={S.iconBtn()} title="Presentation Mode"><Maximize2 size={14} /></button>
+              <button onClick={() => setShowShortcuts(true)} style={S.iconBtn()} title="Shortcuts (?)"><HelpCircle size={14} /></button>
+            </div>
 
-        <div style={S.divider} />
+            <div style={S.divider} />
 
-        <div style={S.strip}>
-          <button onClick={handleImport} style={S.iconBtn()} title="Import Project"><Upload size={14} /></button>
-          <button onClick={handleExport} style={S.iconBtn()} title="Export Project"><Download size={14} /></button>
-          <button onClick={() => setShowAIBuilder(true)} style={{ ...S.iconBtn(), width: 38, color: 'var(--mm-accent-primary)', fontWeight: 700, fontSize: 10 }} title="AI Layout Builder">AI</button>
-        </div>
+            <div style={S.strip}>
+              <button onClick={handleImport} style={S.iconBtn()} title="Import Project"><Upload size={14} /></button>
+              <button onClick={handleExport} style={S.iconBtn()} title="Export Project"><Download size={14} /></button>
+              <button onClick={() => setShowAIBuilder(true)} style={{ ...S.iconBtn(), width: 38, color: 'var(--mm-accent-primary)', fontWeight: 700, fontSize: 10 }} title="AI Layout Builder">AI</button>
+            </div>
+          </>
+        )}
 
         {/* Save */}
         <button onClick={onSave} disabled={saveStatus === 'saving'}
@@ -535,7 +642,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
 
         <div
           style={{
-            minWidth: 152,
+            minWidth: verySmall ? 126 : 152,
             padding: '5px 10px',
             borderRadius: 10,
             border: '1px solid var(--mm-border-subtle)',
@@ -549,7 +656,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
             {licenseStatus.label}
           </div>
           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--mm-text-tertiary)', lineHeight: 1.15 }}>
-            {licenseStatus.detail || ' '}
+            {verySmall ? '' : (licenseStatus.detail || ' ')}
           </div>
         </div>
 
@@ -575,19 +682,111 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
           data-tour="help-support"
         >
           <LifeBuoy size={11} />
-          HELP
+          {verySmall ? 'HELP' : 'HELP'}
         </button>
 
         <input ref={fileInputRef} type="file" accept=".json,.metamech-sim.json" onChange={handleFileChange} style={{ display: 'none' }} />
 
-        <div style={S.divider} />
+        {showUserBadge && (
+          <>
+            <div style={S.divider} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }}>
+                {user?.displayName?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            </div>
+          </>
+        )}
 
-        {/* User */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }}>
-            {user?.displayName?.charAt(0).toUpperCase() || 'U'}
+        {showMoreActions && (
+          <div ref={moreMenuRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowMoreMenu((v) => !v)}
+              style={S.iconBtn(showMoreMenu)}
+              title="More actions"
+            >
+              <MoreHorizontal size={14} />
+            </button>
+            {showMoreMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: 40,
+                  zIndex: 120,
+                  minWidth: 240,
+                  padding: 8,
+                  borderRadius: 10,
+                  border: '1px solid var(--mm-border-subtle)',
+                  background: 'var(--mm-bg-toolbar-secondary)',
+                  boxShadow: 'var(--mm-shadow-md)',
+                  display: 'grid',
+                  gap: 8,
+                }}
+              >
+                {!showInlineEdit && (
+                  <div style={{ ...S.strip, justifyContent: 'space-between' }}>
+                    <button onClick={handleUndo} style={S.iconBtn()} title="Undo (Ctrl+Z)"><Undo2 size={15} /></button>
+                    <button onClick={handleRedo} style={S.iconBtn()} title="Redo (Ctrl+Shift+Z)"><Redo2 size={15} /></button>
+                    {!showInlineScenario && <ScenarioLoader />}
+                  </div>
+                )}
+                {!showInlineSecondaryTools && (
+                  <>
+                    <div style={{ ...S.strip, justifyContent: 'space-between' }}>
+                      <button onClick={toggleTheme} style={S.iconBtn()} title="Toggle Theme">
+                        {themeMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                      </button>
+                      <button onClick={() => setPresentationMode(true)} style={S.iconBtn()} title="Presentation Mode"><Maximize2 size={14} /></button>
+                      <button onClick={() => setShowShortcuts(true)} style={S.iconBtn()} title="Shortcuts (?)"><HelpCircle size={14} /></button>
+                    </div>
+                    <div style={{ ...S.strip, justifyContent: 'space-between' }}>
+                      <button onClick={handleImport} style={S.iconBtn()} title="Import Project"><Upload size={14} /></button>
+                      <button onClick={handleExport} style={S.iconBtn()} title="Export Project"><Download size={14} /></button>
+                      <button onClick={() => setShowAIBuilder(true)} style={{ ...S.iconBtn(), width: 38, color: 'var(--mm-accent-primary)', fontWeight: 700, fontSize: 10 }} title="AI Layout Builder">AI</button>
+                    </div>
+                  </>
+                )}
+                {!showInlineRecording && (
+                  <>
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      <select
+                        value={captureQualityPreset}
+                        onChange={(e) => setCaptureQualityPreset(e.target.value as VideoQualityPreset)}
+                        style={{ ...S.compactSelect, width: '100%' }}
+                      >
+                        {VIDEO_QUALITY_PRESET_ORDER.map((key) => (
+                          <option key={key} value={key}>
+                            {VIDEO_CAPTURE_PRESETS[key].label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={videoFormatPreference}
+                        onChange={(e) => setVideoFormatPreference(e.target.value as VideoFormatPreference)}
+                        style={{ ...S.compactSelect, width: '100%' }}
+                      >
+                        <option value="auto">Auto (prefer MP4)</option>
+                        <option value="mp4">MP4 (if supported)</option>
+                        <option value="webm">WebM</option>
+                      </select>
+                    </div>
+                    <div style={{ ...S.strip, justifyContent: 'space-between' }}>
+                      <button onClick={isRecording ? stopRecording : () => startRecording()} style={S.simBtn(isRecording ? '#ef4444' : '#8b5cf6')} title="Record video">
+                        <Video size={14} />
+                      </button>
+                      {!isRecording && (
+                        <button onClick={startRecordingWithCameraPath} style={S.simBtn('#6366f1')} title="Record with camera path">
+                          <Video size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
       {showAIBuilder && <AILayoutBuilder onClose={() => setShowAIBuilder(false)} />}
     </div>

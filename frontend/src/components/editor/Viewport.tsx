@@ -896,7 +896,7 @@ const Viewport: React.FC = () => {
             style={{
               position: 'absolute',
               left: 16,
-              top: 84,
+              top: 'calc(var(--mm-top-ribbon-height, 56px) + 72px)',
               maxWidth: 300,
               borderRadius: 12,
               padding: '10px 12px',
