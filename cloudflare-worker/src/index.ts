@@ -1970,6 +1970,170 @@ async function handleAdminUploadThumbnail(env: Env, request: Request, admin: Use
   return toJson({ asset: row ? serializeAsset(row, request) : null });
 }
 
+async function handleAdminMirrorLegacyLibrary(
+  request: Request,
+  env: Env,
+  admin: UserRow
+): Promise<Response> {
+  type MirrorCategoryInput = {
+    key?: string;
+    name?: string;
+    sceneCategory?: string;
+    sortOrder?: number;
+    description?: string;
+  };
+  type MirrorAssetInput = {
+    moduleId?: string;
+    name?: string;
+    description?: string;
+    categoryKey?: string;
+    sortOrder?: number;
+    sceneCategory?: string;
+    subcategory?: string;
+    assetId?: string;
+    legacyAssetType?: string;
+    legacyModelUrl?: string;
+    legacyThumbnailUrl?: string;
+  };
+  const body = await readJson<{ categories?: MirrorCategoryInput[]; assets?: MirrorAssetInput[] }>(request);
+  const categoryInputs = Array.isArray(body?.categories) ? body!.categories : [];
+  const assetInputs = Array.isArray(body?.assets) ? body!.assets : [];
+  if (categoryInputs.length === 0 || assetInputs.length === 0) {
+    return toJson({ error: 'categories and assets are required' }, 400);
+  }
+
+  const categoryIdByKey = new Map<string, number>();
+  let createdCategories = 0;
+  let updatedCategories = 0;
+  let createdAssets = 0;
+  let updatedAssets = 0;
+
+  for (const input of categoryInputs) {
+    const key = String(input?.key || '').trim();
+    const name = String(input?.name || '').trim();
+    if (!key || !name) continue;
+    const sceneCategory = asSceneCategory(String(input?.sceneCategory || 'process'));
+    const sortOrderRaw = Number(input?.sortOrder);
+    const sortOrder = Number.isFinite(sortOrderRaw) && sortOrderRaw > 0
+      ? Math.floor(sortOrderRaw)
+      : Number.MAX_SAFE_INTEGER;
+    const description = String(input?.description || '').trim();
+    const slug = await uniqueCategorySlug(env, name);
+    const existingCategory = await env.DB
+      .prepare('SELECT id FROM asset_categories WHERE name = ? LIMIT 1')
+      .bind(name)
+      .first<{ id: number }>();
+    if (existingCategory) {
+      await env.DB
+        .prepare(
+          `UPDATE asset_categories
+           SET scene_category = ?, sort_order = ?, description = ?, is_archived = 0, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`
+        )
+        .bind(sceneCategory, sortOrder, description, admin.id, Number(existingCategory.id))
+        .run();
+      categoryIdByKey.set(key, Number(existingCategory.id));
+      updatedCategories += 1;
+      continue;
+    }
+    const inserted = await env.DB
+      .prepare(
+        `INSERT INTO asset_categories
+         (name, slug, description, scene_category, sort_order, is_archived, created_by, updated_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 0, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      )
+      .bind(name, slug, description, sceneCategory, sortOrder, admin.id, admin.id)
+      .run();
+    const categoryId = Number(inserted.meta.last_row_id);
+    if (categoryId > 0) {
+      categoryIdByKey.set(key, categoryId);
+      createdCategories += 1;
+    }
+  }
+
+  for (const input of assetInputs) {
+    const moduleId = String(input?.moduleId || '').trim();
+    const categoryKey = String(input?.categoryKey || '').trim();
+    const name = String(input?.name || '').trim();
+    if (!moduleId || !categoryKey || !name) continue;
+    const categoryId = categoryIdByKey.get(categoryKey);
+    if (!categoryId) continue;
+    const sortOrderRaw = Number(input?.sortOrder);
+    const sortOrder = Number.isFinite(sortOrderRaw) && sortOrderRaw > 0 ? Math.floor(sortOrderRaw) : 1;
+    const description = String(input?.description || '').trim();
+    const sceneCategory = asSceneCategory(String(input?.sceneCategory || 'process'));
+    const legacyAssetSlug = `legacy-${slugify(moduleId)}`;
+    const existingAsset = await env.DB
+      .prepare("SELECT id FROM assets WHERE slug = ? LIMIT 1")
+      .bind(legacyAssetSlug)
+      .first<{ id: number }>();
+    const metadata = {
+      legacyMirror: true,
+      legacyModuleId: moduleId,
+      legacyAssetId: String(input?.assetId || '').trim() || null,
+      legacyAssetType: String(input?.legacyAssetType || '').trim() || null,
+      legacyModelUrl: String(input?.legacyModelUrl || '').trim() || null,
+      legacyThumbnailUrl: String(input?.legacyThumbnailUrl || '').trim() || null,
+      legacySubcategory: String(input?.subcategory || '').trim(),
+      sceneCategory,
+    };
+    if (existingAsset) {
+      await env.DB
+        .prepare(
+          `UPDATE assets
+           SET name = ?, category_id = ?, sort_order = ?, description = ?, metadata = ?, deleted_at = NULL,
+               lifecycle_state = COALESCE(lifecycle_state, 'draft'), updated_by = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`
+        )
+        .bind(
+          name,
+          categoryId,
+          sortOrder,
+          description,
+          JSON.stringify(metadata),
+          admin.id,
+          Number(existingAsset.id)
+        )
+        .run();
+      updatedAssets += 1;
+      continue;
+    }
+    const uuid = crypto.randomUUID();
+    const slug = legacyAssetSlug;
+    const modelKey = `legacy/mirror/${slug}.glb`;
+    await env.DB
+      .prepare(
+        `INSERT INTO assets
+         (uuid, name, slug, category_id, asset_type, template_id, parameter_values, status, lifecycle_state, visible_in_runtime_library, version, sort_order, model_r2_key, model_url, description, tags, metadata, created_by, updated_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'static', NULL, '{}', 'draft', 'draft', 0, 0, ?, ?, ?, ?, '[]', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      )
+      .bind(
+        uuid,
+        name,
+        slug,
+        categoryId,
+        sortOrder,
+        modelKey,
+        modelKey,
+        description,
+        JSON.stringify(metadata),
+        admin.id,
+        admin.id
+      )
+      .run();
+    createdAssets += 1;
+  }
+
+  return toJson({
+    result: {
+      createdCategories,
+      updatedCategories,
+      createdAssets,
+      updatedAssets,
+    },
+  });
+}
+
 async function handleAdminAssetFile(
   env: Env,
   assetUuid: string,
@@ -2183,6 +2347,7 @@ export default {
         || path === '/admin/assets'
         || path === '/admin/assets/reorder'
         || path === '/admin/assets/upload'
+        || path === '/admin/assets/mirror-legacy'
         || assetActionMatch
         || assetIdMatch
       ) {
@@ -2233,6 +2398,10 @@ export default {
         }
         if (path === '/admin/assets/reorder' && request.method === 'POST') {
           response = await handleAdminReorderAssets(request, env, admin);
+          return withCors(request, response, env);
+        }
+        if (path === '/admin/assets/mirror-legacy' && request.method === 'POST') {
+          response = await handleAdminMirrorLegacyLibrary(request, env, admin);
           return withCors(request, response, env);
         }
         if (assetActionMatch) {

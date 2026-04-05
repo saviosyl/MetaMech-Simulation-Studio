@@ -29,10 +29,12 @@ import {
   restoreLibraryAsset,
   uploadLibraryAsset,
   updateAssetCategory,
+  mirrorLegacyLibrary,
 } from '../utils/api';
 import { AssetCategory, AssetStatus, LibraryAsset, SceneCategory } from '../types';
 import { simulationUrls } from '../content/simulationMarketingContent';
 import { refreshRuntimePublishedAssets } from '../lib/runtimePublishedAssets';
+import { buildLegacyLibraryMirrorPayload } from '../lib/legacyLibraryMirror';
 
 const SCENE_CATEGORIES: SceneCategory[] = [
   'process',
@@ -96,6 +98,7 @@ const AdminAssetLibraryPage: React.FC = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryScene, setNewCategoryScene] = useState<SceneCategory>('process');
   const [newCategoryDescription, setNewCategoryDescription] = useState('');
+  const [mirroringLegacy, setMirroringLegacy] = useState(false);
 
   const selectedAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedAssetId) || null,
@@ -321,6 +324,24 @@ const AdminAssetLibraryPage: React.FC = () => {
     }
   }
 
+  async function handleMirrorLegacyLibrary() {
+    setMirroringLegacy(true);
+    setError('');
+    try {
+      const payload = buildLegacyLibraryMirrorPayload();
+      const result = await mirrorLegacyLibrary(payload);
+      await loadCategories();
+      await loadAssets();
+      setMessage(
+        `Legacy library mirrored: +${result.createdCategories} categories, +${result.createdAssets} assets (${result.updatedCategories} categories updated, ${result.updatedAssets} assets updated).`
+      );
+    } catch (e) {
+      setError(errorMessage(e, 'Failed to mirror legacy library'));
+    } finally {
+      setMirroringLegacy(false);
+    }
+  }
+
   const pageStyle: React.CSSProperties = {
     minHeight: '100vh',
     background: 'var(--mm-bg-app)',
@@ -367,6 +388,22 @@ const AdminAssetLibraryPage: React.FC = () => {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            onClick={handleMirrorLegacyLibrary}
+            disabled={mirroringLegacy || busy}
+            style={{
+              border: '1px solid color-mix(in oklab, var(--mm-accent-primary) 35%, transparent)',
+              borderRadius: 8,
+              padding: '7px 10px',
+              background: 'var(--mm-accent-primary-muted)',
+              color: 'var(--mm-accent-primary)',
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            {mirroringLegacy ? 'Mirroring Legacy…' : 'Mirror Live Library'}
+          </button>
           <Link to="/admin/assets/editor" style={{ color: 'var(--mm-text-primary)', fontSize: 12, textDecoration: 'none', border: '1px solid var(--mm-border)', borderRadius: 8, padding: '7px 10px', background: 'var(--mm-bg-surface)' }}>
             Open Asset Editor
           </Link>

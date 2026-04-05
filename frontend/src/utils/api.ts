@@ -243,4 +243,39 @@ export async function listPublishedAssets(sceneCategory?: SceneCategory): Promis
   return (res.data?.assets || []) as LibraryAsset[];
 }
 
+export interface LegacyMirrorCategoryPayload {
+  key: string;
+  name: string;
+  sceneCategory: SceneCategory;
+  sortOrder: number;
+  description?: string;
+}
+
+export interface LegacyMirrorAssetPayload {
+  moduleId: string;
+  name: string;
+  description: string;
+  categoryKey: string;
+  sortOrder: number;
+  sceneCategory: SceneCategory;
+  subcategory: string;
+}
+
+export interface LegacyMirrorPayload {
+  categories: LegacyMirrorCategoryPayload[];
+  assets: LegacyMirrorAssetPayload[];
+}
+
+export interface LegacyMirrorResult {
+  createdCategories: number;
+  updatedCategories: number;
+  createdAssets: number;
+  updatedAssets: number;
+}
+
+export async function mirrorLegacyLibrary(payload: LegacyMirrorPayload): Promise<LegacyMirrorResult> {
+  const res = await api.post('/admin/assets/mirror-legacy', payload);
+  return (res.data?.result || {}) as LegacyMirrorResult;
+}
+
 export default api;
