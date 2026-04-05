@@ -1,16 +1,15 @@
-import React, { useCallback, useRef, useState, useMemo } from 'react';
-import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield, Columns } from 'lucide-react';
+import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
+import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
-import { getModulesByCategory, ModuleDefinition } from '../../lib/moduleLibrary';
+import { getModulesByCategory, ModuleDefinition, getRuntimeLibraryCategories } from '../../lib/moduleLibrary';
 import SceneHierarchy from './SceneHierarchy';
 import PathPanel from './PathPanel';
 import CameraPathPanel from './CameraPathPanel';
 
 type ViewLayout = 'compact' | 'grid';
 
-const TABS = [
+const FALLBACK_TABS = [
   { id: 'process' as const, name: 'Process', icon: Factory },
-  { id: 'modular' as const, name: 'Standard Modular Conveyor', icon: Columns },
   { id: 'fmcg' as const, name: 'FMCG', icon: Package },
   { id: 'medical' as const, name: 'Medical', icon: Shield },
   { id: 'robots' as const, name: 'Robots', icon: Cpu },
@@ -19,11 +18,22 @@ const TABS = [
   { id: 'actors' as const, name: 'Actors', icon: Users },
 ];
 
+const BANNED_LIBRARY_IDS = new Set<string>([
+  'spiral-vyeor-conveyor',
+  'spiral-conveyor',
+  'mm85-conveyor-section',
+  'mm85-drive-end',
+  'mm85-idler-end',
+  'mm85-guide-rail',
+  'mm85-support-leg',
+  'mm85-end-drive-support',
+]);
+
 function getSubcategory(module: ModuleDefinition): string {
-  const n = module.id.toLowerCase();
-  if (module.category === 'modular' && n.startsWith('mm85-')) {
-    return 'MM-85';
+  if (module.libraryCategoryName && String(module.libraryCategoryName).trim()) {
+    return String(module.libraryCategoryName);
   }
+  const n = module.id.toLowerCase();
   if (n.includes('conveyor') || n.includes('belt') || n.includes('roller') || n.includes('modular')) return 'Conveyors';
   if (n.includes('stopper') || n.includes('pusher-module')) return 'Accessories';
   if (n.includes('transfer') || n.includes('merge') || n.includes('divert') || n.includes('pusher') || n.includes('popup')) return 'Transfers';
@@ -39,24 +49,91 @@ function getSubcategory(module: ModuleDefinition): string {
 }
 
 const LeftPanel: React.FC = () => {
-  const { activeLibraryTab, setActiveLibraryTab, leftPanelWidth, setLeftPanelWidth, leftPanelCollapsed, setLeftPanelCollapsed } = useEditorStore();
+  const {
+    activeLibraryTab,
+    setActiveLibraryTab,
+    leftPanelWidth,
+    setLeftPanelWidth,
+    leftPanelCollapsed,
+    setLeftPanelCollapsed,
+    assetManifest,
+  } = useEditorStore();
   const isResizing = useRef(false);
   const [viewMode, setViewMode] = useState<'library' | 'scene'>('library');
   const [searchQuery, setSearchQuery] = useState('');
   const [layout, setLayout] = useState<ViewLayout>('compact');
+  const runtimeCategories = useMemo(() => getRuntimeLibraryCategories(), [assetManifest]);
+  const hasRuntimeCategories = runtimeCategories.length > 0;
+  const tabs = hasRuntimeCategories
+    ? runtimeCategories.map((category) => {
+        const iconByScene: Record<string, any> = {
+          process: Factory,
+          modular: Columns,
+          fmcg: Package,
+          medical: Shield,
+          robots: Cpu,
+          pallets: SquareStack,
+          environment: Building,
+          actors: Users,
+        };
+        return {
+          id: category.sceneCategory as any,
+          name: category.name,
+          icon: iconByScene[category.sceneCategory] || Package,
+          key: category.key,
+          order: category.order,
+        };
+      })
+    : FALLBACK_TABS.map((tab, index) => ({ ...tab, key: tab.id, order: index }));
+  const availableSceneCategories = useMemo(
+    () => new Set(tabs.map((tab) => String(tab.id))),
+    [tabs]
+  );
+  const normalizedActiveTab = availableSceneCategories.has(activeLibraryTab) ? activeLibraryTab : (tabs[0]?.id || 'process');
 
-  const allModules = getModulesByCategory(activeLibraryTab);
+  const allModules = getModulesByCategory(normalizedActiveTab);
+  const visibleModules = useMemo(
+    () => allModules.filter((module) => !BANNED_LIBRARY_IDS.has(module.id)),
+    [allModules]
+  );
   const modules = useMemo(() => {
-    if (!searchQuery.trim()) return allModules;
+    if (!searchQuery.trim()) return visibleModules;
     const q = searchQuery.toLowerCase();
-    return allModules.filter(m => m.name.toLowerCase().includes(q) || m.description.toLowerCase().includes(q));
-  }, [allModules, searchQuery]);
+    return visibleModules.filter(m => m.name.toLowerCase().includes(q) || m.description.toLowerCase().includes(q));
+  }, [visibleModules, searchQuery]);
+  const availableGroupOrder = useMemo(() => {
+    const order = new Map<string, number>();
+    modules.forEach((module, index) => {
+      const name = getSubcategory(module);
+      if (!order.has(name)) {
+        const groupOrder = Number(module.libraryCategoryOrder);
+        order.set(name, Number.isFinite(groupOrder) ? groupOrder : index);
+      }
+    });
+    return order;
+  }, [modules]);
 
   const groupedModules = useMemo(() => {
     const g: Record<string, ModuleDefinition[]> = {};
     modules.forEach(m => { const k = getSubcategory(m); if (!g[k]) g[k] = []; g[k].push(m); });
     return g;
   }, [modules]);
+  const groupedEntries = useMemo(() => {
+    return Object.entries(groupedModules).sort(([groupA], [groupB]) => {
+      const orderA = availableGroupOrder.get(groupA) ?? Number.MAX_SAFE_INTEGER;
+      const orderB = availableGroupOrder.get(groupB) ?? Number.MAX_SAFE_INTEGER;
+      if (orderA !== orderB) return orderA - orderB;
+      return groupA.localeCompare(groupB);
+    });
+  }, [groupedModules, availableGroupOrder]);
+
+  useEffect(() => {
+    if (!availableSceneCategories.has(activeLibraryTab)) {
+      if (tabs.length > 0) {
+        setActiveLibraryTab(tabs[0].id);
+      }
+    }
+  }, [activeLibraryTab, availableSceneCategories, setActiveLibraryTab, tabs]);
 
   const handleDragStart = (e: React.DragEvent, module: ModuleDefinition) => {
     e.dataTransfer.setData('application/json', JSON.stringify({ type: 'module', moduleId: module.id, category: module.category }));
@@ -92,9 +169,9 @@ const LeftPanel: React.FC = () => {
         <button onClick={() => setLeftPanelCollapsed(false)} style={{ padding: 6, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mm-text-tertiary)' }} title="Expand">
           <ChevronRight size={14} />
         </button>
-        {TABS.map(tab => {
+        {tabs.map(tab => {
           const Icon = tab.icon;
-          const active = activeLibraryTab === tab.id;
+          const active = normalizedActiveTab === tab.id;
           return (
             <button key={tab.id} onClick={() => { setActiveLibraryTab(tab.id); setLeftPanelCollapsed(false); }}
               style={{ padding: 6, borderRadius: 6, background: active ? 'var(--mm-accent-primary-muted)' : 'none', border: 'none', cursor: 'pointer', color: active ? 'var(--mm-accent-primary)' : 'var(--mm-text-tertiary)', transition: 'all 0.15s' }} title={tab.name}>
@@ -187,11 +264,11 @@ const LeftPanel: React.FC = () => {
                 overflow: 'hidden',
               }}
             >
-              {TABS.map(tab => {
-                const active = activeLibraryTab === tab.id;
+              {tabs.map(tab => {
+                const active = normalizedActiveTab === tab.id;
                 const Icon = tab.icon;
                 return (
-                  <button key={tab.id} onClick={() => setActiveLibraryTab(tab.id)}
+                  <button key={tab.key} onClick={() => setActiveLibraryTab(tab.id)}
                     title={`Show ${tab.name} assets`}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 5,
@@ -211,7 +288,7 @@ const LeftPanel: React.FC = () => {
 
             {/* Module list */}
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '10px 12px' }}>
-              {Object.entries(groupedModules).map(([group, items]) => (
+              {groupedEntries.map(([group, items]) => (
                 <div key={group} style={{ marginBottom: 12, border: '1px solid var(--mm-border-subtle)', borderRadius: 10, background: 'var(--mm-bg-surface)', overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6, position: 'sticky', top: 0, background: 'var(--mm-bg-panel)', zIndex: 5, padding: '6px 8px', borderBottom: '1px solid var(--mm-border-subtle)' }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Orbitron', monospace" }}>
@@ -267,14 +344,14 @@ const LeftPanel: React.FC = () => {
               )}
 
               {/* Path Panel — shown under Actors tab */}
-              {activeLibraryTab === 'actors' && (
+              {normalizedActiveTab === 'actors' && (
                 <div style={{ padding: '12px 14px', borderTop: '1px solid var(--mm-border-subtle)' }}>
                   <PathPanel />
                 </div>
               )}
 
               {/* Camera Path Panel — shown under Actors tab */}
-              {activeLibraryTab === 'actors' && (
+              {normalizedActiveTab === 'actors' && (
                 <div style={{ borderTop: '1px solid var(--mm-border-subtle)' }}>
                   <CameraPathPanel />
                 </div>

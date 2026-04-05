@@ -25,6 +25,17 @@ export interface ModuleDefinition {
   icon: any;
   description: string;
   assetId?: string; // references AssetDef.id in manifest
+  /**
+   * Runtime library grouping metadata (Admin Asset Library).
+   * When present, the left library panel should group by this category key/name
+   * instead of hardcoded category heuristics.
+   */
+  libraryCategoryKey?: string;
+  libraryCategoryName?: string;
+  libraryCategorySlug?: string | null;
+  librarySceneCategory?: string;
+  libraryCategoryOrder?: number;
+  libraryAssetOrder?: number;
   parameters: {
     [key: string]: {
       type: 'number' | 'string' | 'text' | 'select' | 'boolean' | 'color';
@@ -1552,9 +1563,60 @@ export function getModuleDefinition(id: string): ModuleDefinition | undefined {
 }
 
 export function getModulesByCategory(category: string): ModuleDefinition[] {
-  return [...moduleLibrary, ..._runtimeExternalModules].filter(module => module.category === category);
+  return _runtimeExternalModules
+    .filter(module => module.category === category)
+    .sort((a, b) => {
+      const categoryOrderA = Number.isFinite(Number(a.libraryCategoryOrder)) ? Number(a.libraryCategoryOrder) : Number.MAX_SAFE_INTEGER;
+      const categoryOrderB = Number.isFinite(Number(b.libraryCategoryOrder)) ? Number(b.libraryCategoryOrder) : Number.MAX_SAFE_INTEGER;
+      if (categoryOrderA !== categoryOrderB) return categoryOrderA - categoryOrderB;
+      const categoryNameA = String(a.libraryCategoryName || '').toLowerCase();
+      const categoryNameB = String(b.libraryCategoryName || '').toLowerCase();
+      if (categoryNameA !== categoryNameB) return categoryNameA.localeCompare(categoryNameB);
+      const assetOrderA = Number.isFinite(Number(a.libraryAssetOrder)) ? Number(a.libraryAssetOrder) : Number.MAX_SAFE_INTEGER;
+      const assetOrderB = Number.isFinite(Number(b.libraryAssetOrder)) ? Number(b.libraryAssetOrder) : Number.MAX_SAFE_INTEGER;
+      if (assetOrderA !== assetOrderB) return assetOrderA - assetOrderB;
+      return a.name.localeCompare(b.name);
+    });
 }
 
 export function setRuntimeExternalModules(nextModules: ModuleDefinition[]): void {
   _runtimeExternalModules = Array.isArray(nextModules) ? [...nextModules] : [];
+}
+
+export interface RuntimeLibraryCategory {
+  key: string;
+  name: string;
+  slug: string | null;
+  sceneCategory: string;
+  order: number;
+  count: number;
+}
+
+export function getRuntimeLibraryModules(): ModuleDefinition[] {
+  return [..._runtimeExternalModules];
+}
+
+export function getRuntimeLibraryCategories(): RuntimeLibraryCategory[] {
+  const categories = new Map<string, RuntimeLibraryCategory>();
+  for (const module of _runtimeExternalModules) {
+    const key = String(module.libraryCategoryKey || '').trim();
+    if (!key) continue;
+    const existing = categories.get(key);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+    categories.set(key, {
+      key,
+      name: String(module.libraryCategoryName || module.category || 'Uncategorized'),
+      slug: module.libraryCategorySlug ?? null,
+      sceneCategory: String(module.librarySceneCategory || module.category || 'process'),
+      order: Number.isFinite(Number(module.libraryCategoryOrder)) ? Number(module.libraryCategoryOrder) : Number.MAX_SAFE_INTEGER,
+      count: 1,
+    });
+  }
+  return Array.from(categories.values()).sort((a, b) => {
+    if (a.order !== b.order) return a.order - b.order;
+    return a.name.localeCompare(b.name);
+  });
 }

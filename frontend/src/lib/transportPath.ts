@@ -298,37 +298,12 @@ export function createTransportPath(type: string, params: Record<string, any>): 
       return new StraightPath(length, infeedHeight, outfeedHeight);
     }
 
-    case 'mm85-conveyor-section':
-    case 'mm85-drive-end':
-    case 'mm85-idler-end': {
-      const length = params.sectionLength ?? params.moduleLength ?? params.length ?? 1000;
-      const elevation = params.elevation ?? params.height ?? 850;
-      return new StraightPath(length, elevation, elevation);
-    }
-
-    case 'mm85-guide-rail': {
-      const length = params.railLength ?? params.length ?? 1000;
-      const elevation = (params.elevation ?? 900) + 20;
-      return new StraightPath(length, elevation, elevation);
-    }
-
     case 'bend-conveyor': {
       const radius = params.radius || params.radiusMm || 1000;
       const angle = parseInt(params.bendAngle || params.bendAngleDeg || '90', 10);
       const height = params.height || params.heightMm || 800;
       const direction = params.bendDirection || 'right';
       return new CurvedPath(radius, angle, height, direction);
-    }
-
-    case 'spiral-conveyor':
-    case 'spiral-vyeor-conveyor': {
-      const beltWidth = params.beltWidth ?? 400;
-      const turns = params.turns ?? 3;
-      const outfeedAngle = params.outfeedAngle ?? 180;
-      const infeedHeight = params.infeedHeight ?? 800;
-      const outfeedHeight = params.outfeedHeight ?? 3800;
-      const direction = params.direction ?? 'up';
-      return new SpiralPath(beltWidth, turns, outfeedAngle, infeedHeight, outfeedHeight, direction);
     }
 
     default:

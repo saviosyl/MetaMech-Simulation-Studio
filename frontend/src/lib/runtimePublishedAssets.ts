@@ -294,7 +294,9 @@ function toStaticAssetDef(asset: LibraryAsset): AssetDef {
   };
 }
 
-function toModuleDef(asset: LibraryAsset): ModuleDefinition {
+function toModuleDef(asset: LibraryAsset, categoryOrder: number): ModuleDefinition {
+  const categoryKey = String(asset.categoryId || '').trim();
+  const assetOrder = Number(asset.sortOrder);
   return {
     id: asset.id,
     name: asset.name,
@@ -302,15 +304,36 @@ function toModuleDef(asset: LibraryAsset): ModuleDefinition {
     icon: Box,
     description: asset.description || 'Published library asset',
     assetId: asset.id,
+    libraryCategoryKey: categoryKey ? `category:${categoryKey}` : `asset:${asset.id}`,
+    libraryCategoryName: String(asset.categoryName || 'Uncategorized'),
+    libraryCategorySlug: asset.categorySlug || null,
+    librarySceneCategory: String(asset.sceneCategory || 'process'),
+    libraryCategoryOrder: Number.isFinite(categoryOrder) ? categoryOrder : Number.MAX_SAFE_INTEGER,
+    libraryAssetOrder: Number.isFinite(assetOrder) ? assetOrder : Number.MAX_SAFE_INTEGER,
     parameters: {},
   };
 }
 
 export async function refreshRuntimePublishedAssets(): Promise<void> {
   const assets = await listPublishedAssets();
-  const published = assets.filter((asset) => asset.status === 'published');
+  // Runtime library must be fully admin-controlled:
+  // include only assets explicitly marked live for runtime/demo.
+  const published = assets.filter((asset) => {
+    if (asset.lifecycleState) return asset.lifecycleState === 'live';
+    if (typeof asset.visibleInRuntimeLibrary === 'boolean') return asset.visibleInRuntimeLibrary;
+    return asset.status === 'published';
+  });
+  const categoryOrderById = new Map<number, number>();
+  let categoryOrderSeq = 0;
+  for (const asset of published) {
+    if (!categoryOrderById.has(asset.categoryId)) {
+      categoryOrderById.set(asset.categoryId, categoryOrderSeq++);
+    }
+  }
   const externalDefs = published.map(toStaticAssetDef);
-  const externalModules = published.map(toModuleDef);
+  const externalModules = published.map((asset) =>
+    toModuleDef(asset, categoryOrderById.get(asset.categoryId) ?? Number.MAX_SAFE_INTEGER)
+  );
   setRuntimeExternalAssets(externalDefs);
   setRuntimeExternalModules(externalModules);
   useEditorStore.setState({ assetManifest: getAssetManifest() });

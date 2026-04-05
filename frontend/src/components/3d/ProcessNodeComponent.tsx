@@ -208,35 +208,19 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
 
   // SPIRAL CONVEYOR
   if (node.type === 'spiral-conveyor') {
-    return (
-      <group
-        ref={groupRef}
-        position={node.position}
-        rotation={node.rotation}
-        scale={node.scale}
-        onClick={(e) => { e.stopPropagation(); onClick(); }}
-        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
-        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
-      >
-        <Model3DErrorBoundary>
-          <Suspense fallback={
-            <mesh castShadow><cylinderGeometry args={[0.8, 0.8, 3, 16]} /><meshStandardMaterial color="#666" wireframe /></mesh>
-          }>
-            <SpiralConveyorModel parameters={node.parameters} isSelected={isSelected} />
-          </Suspense>
-        </Model3DErrorBoundary>
-        {isSelected && (
-          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[1.5, 1.7, 32]} />
-            <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
-          </mesh>
-        )}
-      </group>
-    );
+    return null;
   }
 
-  // SPIRAL VYEOR CONVEYOR (source-derived GLB)
   if (node.type === 'spiral-vyeor-conveyor') {
+    return null;
+  }
+
+  if (node.type === 'mm85-conveyor-section'
+    || node.type === 'mm85-drive-end'
+    || node.type === 'mm85-idler-end'
+    || node.type === 'mm85-guide-rail'
+    || node.type === 'mm85-support-leg'
+    || node.type === 'mm85-end-drive-support') {
     return (
       <group
         ref={groupRef}
@@ -247,21 +231,18 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { document.body.style.cursor = 'auto'; }}
       >
-        <Model3DErrorBoundary>
-          <Suspense fallback={null}>
-            <GLBModel
-              url="/models/spiral-vyeor/spiral-vyeor.glb"
-              targetSize={3.6}
-              isSelected={isSelected}
-            />
-          </Suspense>
-        </Model3DErrorBoundary>
-        {isSelected && (
-          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[1.5, 1.7, 32]} />
-            <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
-          </mesh>
-        )}
+        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.6, 0.72, 32]} />
+          <meshBasicMaterial color="#ef4444" transparent opacity={0.45} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh position={[0, 0.22, 0]} castShadow>
+          <boxGeometry args={[0.9, 0.2, 0.35]} />
+          <meshStandardMaterial color="#991b1b" metalness={0.2} roughness={0.6} />
+        </mesh>
+        <mesh position={[0, 0.42, 0]} castShadow>
+          <boxGeometry args={[0.58, 0.08, 0.08]} />
+          <meshStandardMaterial color="#fecaca" metalness={0.1} roughness={0.8} />
+        </mesh>
       </group>
     );
   }

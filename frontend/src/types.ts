@@ -198,6 +198,7 @@ export interface LibraryAsset {
   categoryId: number;
   categoryName: string | null;
   categorySlug: string | null;
+  categorySortOrder?: number;
   sceneCategory: SceneCategory;
   modelKey: string;
   modelUrl: string;

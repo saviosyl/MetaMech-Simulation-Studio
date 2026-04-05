@@ -22,13 +22,7 @@ const CONVEYOR_TYPES = [
   'belt-conveyor',
   'roller-conveyor',
   'bend-conveyor',
-  'spiral-conveyor',
-  'spiral-vyeor-conveyor',
   'incline-conveyor',
-  'mm85-conveyor-section',
-  'mm85-drive-end',
-  'mm85-idler-end',
-  'mm85-guide-rail',
 ];
 const SNAP_RANGE = 2.0; // meters — max distance to snap
 

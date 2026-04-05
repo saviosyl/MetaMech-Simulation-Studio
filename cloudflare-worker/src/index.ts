@@ -62,6 +62,7 @@ type AssetRow = {
   category_name?: string;
   category_slug?: string;
   category_scene_category?: string;
+  category_sort_order?: number;
 };
 
 type AssetLifecycleState = 'draft' | 'internal' | 'live' | 'archived' | 'deleted';
@@ -1328,6 +1329,7 @@ function serializeAsset(row: AssetRow, request: Request): Record<string, unknown
     categoryId: row.category_id,
     categoryName: row.category_name ?? null,
     categorySlug: row.category_slug ?? null,
+    categorySortOrder: Number(row.category_sort_order ?? Number.MAX_SAFE_INTEGER),
     sceneCategory: row.category_scene_category ?? 'process',
     modelKey: row.model_r2_key,
     modelUrl: usePublished ? publishedModelUrl : adminModelUrl,
@@ -1365,7 +1367,8 @@ async function readAssetByUuid(env: Env, assetUuid: string): Promise<AssetRow | 
               a.status, a.lifecycle_state, a.version, a.sort_order, a.visible_in_runtime_library,
               a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
               a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
-              c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category
+              c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category,
+              c.sort_order AS category_sort_order
        FROM assets a
        JOIN asset_categories c ON c.id = a.category_id
        WHERE a.uuid = ?
@@ -1526,7 +1529,8 @@ async function handleAdminListAssets(request: Request, env: Env): Promise<Respon
               a.status, a.lifecycle_state, a.version, a.sort_order, a.visible_in_runtime_library,
               a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
               a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
-              c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category
+              c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category,
+              c.sort_order AS category_sort_order
        FROM assets a
        JOIN asset_categories c ON c.id = a.category_id
        ${where}
@@ -2019,7 +2023,8 @@ async function handlePublishedAssets(request: Request, env: Env): Promise<Respon
               a.status, a.lifecycle_state, a.version, a.sort_order, a.visible_in_runtime_library,
               a.model_r2_key, a.model_url, a.thumbnail_r2_key, a.thumbnail_url, a.preview_r2_key, a.preview_url,
               a.description, a.tags, a.metadata, a.published_at, a.archived_at, a.deleted_at, a.created_at, a.updated_at,
-              c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category
+              c.name AS category_name, c.slug AS category_slug, c.scene_category AS category_scene_category,
+              c.sort_order AS category_sort_order
        FROM assets a
        JOIN asset_categories c ON c.id = a.category_id
        WHERE ${clauses.join(' AND ')}
