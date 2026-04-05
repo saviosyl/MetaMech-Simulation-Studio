@@ -8,6 +8,7 @@ import AuthButton from '../components/auth/AuthButton';
 import AuthMessage from '../components/auth/AuthMessage';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
+import { simulationStripeLinks } from '../content/simulationMarketingContent';
 
 type AccessMode = 'signin' | 'signup';
 type AccessState = 'verify' | 'membership' | null;
@@ -455,6 +456,59 @@ const SimulationAccessPage: React.FC = () => {
       <div style={{ display: 'grid', gap: 10 }}>
         {user ? (
           <>
+            <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 12, background: 'var(--mm-bg-panel)', padding: '10px 10px 9px' }}>
+              <a
+                href={simulationStripeLinks.monthly.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  height: 42,
+                  borderRadius: 10,
+                  border: 'none',
+                  background: '#0f172a',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                }}
+              >
+                Full Access Monthly
+              </a>
+              <div style={{ marginTop: 8, fontSize: 20, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.014em' }}>€49.00</div>
+              <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)' }}>per month</div>
+            </div>
+            <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 12, background: 'var(--mm-bg-panel)', padding: '10px 10px 9px' }}>
+              <a
+                href={simulationStripeLinks.yearly.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  height: 42,
+                  borderRadius: 10,
+                  border: '1px solid var(--mm-border)',
+                  background: 'var(--mm-bg-surface)',
+                  color: 'var(--mm-text-secondary)',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                }}
+              >
+                Full Access Yearly
+              </a>
+              <div style={{ marginTop: 8, fontSize: 20, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.014em' }}>€499.00</div>
+              <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)' }}>per year</div>
+              <div style={{ marginTop: 2, fontSize: 12, fontWeight: 600, color: 'var(--mm-accent-primary)' }}>€41.58 / month billed annually</div>
+            </div>
             <Link
               to="/simulation/pricing"
               style={{
