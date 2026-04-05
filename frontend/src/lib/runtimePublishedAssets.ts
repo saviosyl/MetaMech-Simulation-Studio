@@ -315,10 +315,23 @@ function toModuleDef(asset: LibraryAsset, categoryOrder: number): ModuleDefiniti
 }
 
 export async function refreshRuntimePublishedAssets(): Promise<void> {
-  const assets = await listPublishedAssets();
+  let assetsPayload: unknown;
+  try {
+    assetsPayload = await listPublishedAssets();
+  } catch (error) {
+    console.warn('[RuntimeAssets] Failed to fetch /assets/published. Falling back to empty runtime library.', error);
+    setRuntimeExternalAssets([]);
+    setRuntimeExternalModules([]);
+    useEditorStore.setState({ assetManifest: getAssetManifest() });
+    return;
+  }
+
+  console.info('[RuntimeAssets] /assets/published payload:', assetsPayload);
+  const assets = Array.isArray(assetsPayload) ? assetsPayload as LibraryAsset[] : [];
   // Runtime library must be fully admin-controlled:
   // include only assets explicitly marked live for runtime/demo.
   const published = assets.filter((asset) => {
+    if (!asset || typeof asset !== 'object') return false;
     if (asset.lifecycleState) return asset.lifecycleState === 'live';
     if (typeof asset.visibleInRuntimeLibrary === 'boolean') return asset.visibleInRuntimeLibrary;
     return asset.status === 'published';
@@ -330,10 +343,28 @@ export async function refreshRuntimePublishedAssets(): Promise<void> {
       categoryOrderById.set(asset.categoryId, categoryOrderSeq++);
     }
   }
-  const externalDefs = published.map(toStaticAssetDef);
-  const externalModules = published.map((asset) =>
-    toModuleDef(asset, categoryOrderById.get(asset.categoryId) ?? Number.MAX_SAFE_INTEGER)
-  );
+  const externalDefs = published
+    .map((asset) => {
+      try {
+        return toStaticAssetDef(asset);
+      } catch (error) {
+        console.warn('[RuntimeAssets] Skipping malformed published asset (definition)', asset?.id, error);
+        return null;
+      }
+    })
+    .filter((asset): asset is AssetDef => Boolean(asset));
+
+  const externalModules = published
+    .map((asset) => {
+      try {
+        return toModuleDef(asset, categoryOrderById.get(asset.categoryId) ?? Number.MAX_SAFE_INTEGER);
+      } catch (error) {
+        console.warn('[RuntimeAssets] Skipping malformed published asset (module)', asset?.id, error);
+        return null;
+      }
+    })
+    .filter((module): module is ModuleDefinition => Boolean(module));
+
   setRuntimeExternalAssets(externalDefs);
   setRuntimeExternalModules(externalModules);
   useEditorStore.setState({ assetManifest: getAssetManifest() });

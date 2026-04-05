@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
-import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield, Columns } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModulesByCategory, ModuleDefinition, getRuntimeLibraryCategories } from '../../lib/moduleLibrary';
 import SceneHierarchy from './SceneHierarchy';
@@ -65,7 +65,9 @@ const LeftPanel: React.FC = () => {
   const runtimeCategories = useMemo(() => getRuntimeLibraryCategories(), [assetManifest]);
   const hasRuntimeCategories = runtimeCategories.length > 0;
   const tabs = hasRuntimeCategories
-    ? runtimeCategories.map((category) => {
+    ? runtimeCategories
+      .filter((category) => category && typeof category === 'object')
+      .map((category) => {
         const iconByScene: Record<string, any> = {
           process: Factory,
           modular: Columns,
