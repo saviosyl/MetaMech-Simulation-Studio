@@ -6,6 +6,7 @@ import {
   Copy,
   FolderPlus,
   Layers,
+  Link2,
   Pencil,
   Plus,
   Search,
@@ -90,6 +91,15 @@ function splitCategoryAndSubcategory(name: string | null | undefined): { categor
   };
 }
 
+function formatModelBackfillSource(source: string | null | undefined): string {
+  const value = String(source || '').trim();
+  if (!value) return 'none';
+  if (value === 'legacy-static-glb') return 'legacy static glb';
+  if (value === 'legacy-actor-map') return 'legacy actor map';
+  if (value === 'legacy-environment-map') return 'legacy environment map';
+  return value;
+}
+
 const AdminAssetLibraryPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -134,6 +144,18 @@ const AdminAssetLibraryPage: React.FC = () => {
     }
     return Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [assets]);
+  const mirroredAssets = useMemo(
+    () => assets.filter((asset) => asset.legacyMirror),
+    [assets]
+  );
+  const mirroredWithModels = useMemo(
+    () => mirroredAssets.filter((asset) => asset.hasModelFile),
+    [mirroredAssets]
+  );
+  const mirroredMetadataOnly = useMemo(
+    () => mirroredAssets.filter((asset) => !asset.hasModelFile),
+    [mirroredAssets]
+  );
 
   async function loadCategories() {
     setLoadingCategories(true);
@@ -620,12 +642,21 @@ const AdminAssetLibraryPage: React.FC = () => {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10, fontSize: 12, color: 'var(--mm-text-tertiary)' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, fontSize: 12, color: 'var(--mm-text-tertiary)', flexWrap: 'wrap' }}>
             <span style={{ border: '1px solid var(--mm-border)', borderRadius: 999, padding: '4px 8px' }}>
               Category: {selectedCategory?.name || 'All'}
             </span>
             <span style={{ border: '1px solid var(--mm-border)', borderRadius: 999, padding: '4px 8px' }}>
               Assets: {assets.length}
+            </span>
+            <span style={{ border: '1px solid color-mix(in oklab, var(--mm-accent-primary) 35%, transparent)', borderRadius: 999, padding: '4px 8px', color: 'var(--mm-accent-primary)' }}>
+              Mirrored: {mirroredAssets.length}
+            </span>
+            <span style={{ border: '1px solid color-mix(in oklab, var(--mm-accent-success) 35%, transparent)', borderRadius: 999, padding: '4px 8px', color: 'var(--mm-accent-success)' }}>
+              Mirrored with model: {mirroredWithModels.length}
+            </span>
+            <span style={{ border: '1px solid color-mix(in oklab, var(--mm-accent-warning) 35%, transparent)', borderRadius: 999, padding: '4px 8px', color: 'var(--mm-accent-warning)' }}>
+              Mirrored metadata-only: {mirroredMetadataOnly.length}
             </span>
           </div>
 
@@ -738,6 +769,15 @@ const AdminAssetLibraryPage: React.FC = () => {
                     </>
                   )}
                 </div>
+                {selectedAsset.legacyMirror && (
+                  <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Link2 size={12} />
+                    Backfill source:{' '}
+                    <strong style={{ color: 'var(--mm-text-secondary)' }}>
+                      {formatModelBackfillSource(selectedAsset.modelBackfillSource)}
+                    </strong>
+                  </div>
+                )}
                 <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   <Layers size={12} />
                   Model file:{' '}

@@ -1315,7 +1315,19 @@ function serializeAsset(row: AssetRow, request: Request): Record<string, unknown
   const usePublished = !row.deleted_at && isRuntimeLiveLifecycle(lifecycleState);
   const mirroredFromLegacy = metadata.legacyMirror === true;
   const legacyModuleId = typeof metadata.legacyModuleId === 'string' ? metadata.legacyModuleId : null;
-  const modelFileExists = !mirroredFromLegacy || !String(row.model_r2_key || '').startsWith('legacy/mirror/');
+  const legacyBackfillSource = typeof metadata.legacyModelUrl === 'string' ? String(metadata.legacyModelUrl).trim() : '';
+  const modelKeyRaw = String(row.model_r2_key || '').trim();
+  const isPlaceholderMirrorModelKey = modelKeyRaw.startsWith('legacy/mirror/');
+  const modelFileExists = (
+    !mirroredFromLegacy
+    || !!legacyBackfillSource
+    || (!isPlaceholderMirrorModelKey && modelKeyRaw.length > 0)
+  );
+  const resolvedModelUrl = (
+    mirroredFromLegacy && modelFileExists && !!legacyBackfillSource
+      ? legacyBackfillSource
+      : (usePublished ? publishedModelUrl : adminModelUrl)
+  );
   return {
     id: row.uuid,
     dbId: row.id,
@@ -1336,7 +1348,7 @@ function serializeAsset(row: AssetRow, request: Request): Record<string, unknown
     sceneCategory: row.category_scene_category ?? 'process',
     modelKey: row.model_r2_key,
     modelFileExists,
-    modelUrl: usePublished ? publishedModelUrl : adminModelUrl,
+    modelUrl: resolvedModelUrl,
     thumbnailKey: row.thumbnail_r2_key,
     thumbnailUrl: usePublished ? publishedThumbnailUrl : adminThumbnailUrl,
     previewKey: row.preview_r2_key,
@@ -1346,6 +1358,7 @@ function serializeAsset(row: AssetRow, request: Request): Record<string, unknown
     metadata,
     mirroredFromLegacy,
     legacyModuleId,
+    legacyModelUrl: legacyBackfillSource || null,
     publishedAt: row.published_at,
     archivedAt: row.archived_at,
     deletedAt: row.deleted_at,

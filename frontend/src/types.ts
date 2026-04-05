@@ -202,6 +202,7 @@ export interface LibraryAsset {
   sceneCategory: SceneCategory;
   modelKey: string;
   modelUrl: string;
+  modelBackfillSource?: string | null;
   hasModelFile?: boolean;
   modelFileStatus?: 'exists' | 'missing' | 'unknown';
   thumbnailKey: string | null;
