@@ -1313,6 +1313,9 @@ function serializeAsset(row: AssetRow, request: Request): Record<string, unknown
     : null;
   const lifecycleState = deriveLifecycleState(row);
   const usePublished = !row.deleted_at && isRuntimeLiveLifecycle(lifecycleState);
+  const mirroredFromLegacy = metadata.legacyMirror === true;
+  const legacyModuleId = typeof metadata.legacyModuleId === 'string' ? metadata.legacyModuleId : null;
+  const modelFileExists = !mirroredFromLegacy || !String(row.model_r2_key || '').startsWith('legacy/mirror/');
   return {
     id: row.uuid,
     dbId: row.id,
@@ -1332,6 +1335,7 @@ function serializeAsset(row: AssetRow, request: Request): Record<string, unknown
     categorySortOrder: Number(row.category_sort_order ?? Number.MAX_SAFE_INTEGER),
     sceneCategory: row.category_scene_category ?? 'process',
     modelKey: row.model_r2_key,
+    modelFileExists,
     modelUrl: usePublished ? publishedModelUrl : adminModelUrl,
     thumbnailKey: row.thumbnail_r2_key,
     thumbnailUrl: usePublished ? publishedThumbnailUrl : adminThumbnailUrl,
@@ -1340,6 +1344,8 @@ function serializeAsset(row: AssetRow, request: Request): Record<string, unknown
     description: row.description,
     tags,
     metadata,
+    mirroredFromLegacy,
+    legacyModuleId,
     publishedAt: row.published_at,
     archivedAt: row.archived_at,
     deletedAt: row.deleted_at,

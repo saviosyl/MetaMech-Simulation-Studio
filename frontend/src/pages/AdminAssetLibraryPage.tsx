@@ -5,6 +5,7 @@ import {
   ArrowUpDown,
   Copy,
   FolderPlus,
+  Layers,
   Pencil,
   Plus,
   Search,
@@ -77,6 +78,18 @@ function errorMessage(error: unknown, fallback: string): string {
   return e?.response?.data?.error || e?.message || fallback;
 }
 
+function splitCategoryAndSubcategory(name: string | null | undefined): { category: string; subcategory: string } {
+  const value = String(name || '').trim();
+  const divider = value.indexOf('/');
+  if (divider < 0) return { category: value || 'Uncategorized', subcategory: 'General' };
+  const category = value.slice(0, divider).trim();
+  const subcategory = value.slice(divider + 1).trim();
+  return {
+    category: category || 'Uncategorized',
+    subcategory: subcategory || 'General',
+  };
+}
+
 const AdminAssetLibraryPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -109,6 +122,18 @@ const AdminAssetLibraryPage: React.FC = () => {
     () => categories.find((c) => c.id === selectedCategoryId) || null,
     [categories, selectedCategoryId]
   );
+  const groupedAssets = useMemo(() => {
+    const groups = new Map<string, { label: string; items: LibraryAsset[] }>();
+    for (const asset of assets) {
+      const split = splitCategoryAndSubcategory(asset.categoryName);
+      const key = `${split.category}::${split.subcategory}`;
+      if (!groups.has(key)) {
+        groups.set(key, { label: `${split.category} / ${split.subcategory}`, items: [] });
+      }
+      groups.get(key)!.items.push(asset);
+    }
+    return Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [assets]);
 
   async function loadCategories() {
     setLoadingCategories(true);
@@ -604,57 +629,80 @@ const AdminAssetLibraryPage: React.FC = () => {
             </span>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 10, alignContent: 'start' }}>
+          <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gap: 10, alignContent: 'start' }}>
             {loadingAssets && <div style={{ fontSize: 12, color: 'var(--mm-text-tertiary)' }}>Loading assets…</div>}
             {!loadingAssets && assets.length === 0 && (
               <div style={{ fontSize: 12, color: 'var(--mm-text-tertiary)' }}>No assets match the current filter.</div>
             )}
-            {assets.map((asset) => {
-              const selected = selectedAssetId === asset.id;
-              return (
-                <button
-                  key={asset.id}
-                  type="button"
-                  onClick={() => setSelectedAssetId(asset.id)}
-                  style={{
-                    textAlign: 'left',
-                    border: `1px solid ${selected ? 'color-mix(in oklab, var(--mm-accent-primary) 35%, transparent)' : 'var(--mm-border-subtle)'}`,
-                    borderRadius: 10,
-                    background: selected ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)',
-                    padding: 10,
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 8 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--mm-text-primary)', lineHeight: 1.3, wordBreak: 'break-word' }}>{asset.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 2 }}>{asset.categoryName || 'Uncategorized'}</div>
-                    </div>
-                    <span style={{ ...statusBadge[asset.status], fontSize: 10, fontWeight: 700, borderRadius: 999, padding: '2px 6px', textTransform: 'uppercase' }}>{asset.status}</span>
-                  </div>
-                  <div style={{ marginTop: 8, fontSize: 11, color: 'var(--mm-text-secondary)', minHeight: 32 }}>
-                    {asset.description || 'No description'}
-                  </div>
-                  <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--mm-text-tertiary)' }}>
-                    <span>v{asset.version}</span>
-                    <span>{formatDate(asset.updatedAt)}</span>
-                  </div>
-                  <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        moveAsset(asset, -1);
-                      }}
-                      title="Reorder asset"
-                      disabled={busy}
-                      style={{ border: '1px solid var(--mm-border)', borderRadius: 6, padding: 4, background: 'var(--mm-bg-panel)' }}
-                    >
-                      <ArrowUpDown size={12} />
-                    </button>
-                  </div>
-                </button>
-              );
-            })}
+            {groupedAssets.map((group) => (
+              <div key={group.label} style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 10, background: 'var(--mm-bg-surface)' }}>
+                <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--mm-border-subtle)', fontSize: 11, fontWeight: 700, color: 'var(--mm-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {group.label}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 10, padding: 10 }}>
+                  {group.items.map((asset) => {
+                    const selected = selectedAssetId === asset.id;
+                    const mirrored = !!asset.legacyMirror;
+                    const hasModelFile = !!asset.hasModelFile;
+                    return (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        onClick={() => setSelectedAssetId(asset.id)}
+                        style={{
+                          textAlign: 'left',
+                          border: `1px solid ${selected ? 'color-mix(in oklab, var(--mm-accent-primary) 35%, transparent)' : 'var(--mm-border-subtle)'}`,
+                          borderRadius: 10,
+                          background: selected ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-panel)',
+                          padding: 10,
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 8 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--mm-text-primary)', lineHeight: 1.3, wordBreak: 'break-word' }}>{asset.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 2 }}>
+                              {mirrored ? `Legacy ID: ${asset.legacyModuleId || '—'}` : (asset.categoryName || 'Uncategorized')}
+                            </div>
+                          </div>
+                          <span style={{ ...statusBadge[asset.status], fontSize: 10, fontWeight: 700, borderRadius: 999, padding: '2px 6px', textTransform: 'uppercase' }}>{asset.status}</span>
+                        </div>
+                        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--mm-text-secondary)', minHeight: 32 }}>
+                          {asset.description || 'No description'}
+                        </div>
+                        <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {mirrored && (
+                            <span style={{ fontSize: 10, borderRadius: 999, padding: '2px 6px', border: '1px solid var(--mm-border)', color: 'var(--mm-text-secondary)', background: 'var(--mm-bg-panel)' }}>
+                              mirrored
+                            </span>
+                          )}
+                          <span style={{ fontSize: 10, borderRadius: 999, padding: '2px 6px', border: `1px solid ${hasModelFile ? 'color-mix(in oklab, var(--mm-accent-success) 35%, transparent)' : 'color-mix(in oklab, var(--mm-accent-warning) 35%, transparent)'}`, color: hasModelFile ? 'var(--mm-accent-success)' : 'var(--mm-accent-warning)' }}>
+                            {hasModelFile ? 'model file: present' : 'model file: missing'}
+                          </span>
+                        </div>
+                        <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--mm-text-tertiary)' }}>
+                          <span>v{asset.version}</span>
+                          <span>{formatDate(asset.updatedAt)}</span>
+                        </div>
+                        <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveAsset(asset, -1);
+                            }}
+                            title="Reorder asset"
+                            disabled={busy}
+                            style={{ border: '1px solid var(--mm-border)', borderRadius: 6, padding: 4, background: 'var(--mm-bg-panel)' }}
+                          >
+                            <ArrowUpDown size={12} />
+                          </button>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -679,6 +727,22 @@ const AdminAssetLibraryPage: React.FC = () => {
                   Runtime visibility:{' '}
                   <strong style={{ color: selectedAsset.visibleInRuntimeLibrary ? 'var(--mm-accent-success)' : 'var(--mm-text-secondary)' }}>
                     {selectedAsset.visibleInRuntimeLibrary ? 'live (/demo visible)' : 'internal-only'}
+                  </strong>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4 }}>
+                  Legacy mirrored: <strong style={{ color: selectedAsset.legacyMirror ? 'var(--mm-text-secondary)' : 'var(--mm-text-disabled)' }}>{selectedAsset.legacyMirror ? 'yes' : 'no'}</strong>
+                  {selectedAsset.legacyMirror && (
+                    <>
+                      {' '}• module id:{' '}
+                      <strong style={{ color: 'var(--mm-text-secondary)' }}>{selectedAsset.legacyModuleId || '—'}</strong>
+                    </>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Layers size={12} />
+                  Model file:{' '}
+                  <strong style={{ color: selectedAsset.hasModelFile ? 'var(--mm-accent-success)' : 'var(--mm-accent-warning)' }}>
+                    {selectedAsset.hasModelFile ? 'present' : 'missing (metadata-only mirror)'}
                   </strong>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4 }}>

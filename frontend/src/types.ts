@@ -202,10 +202,16 @@ export interface LibraryAsset {
   sceneCategory: SceneCategory;
   modelKey: string;
   modelUrl: string;
+  hasModelFile?: boolean;
+  modelFileStatus?: 'exists' | 'missing' | 'unknown';
   thumbnailKey: string | null;
   thumbnailUrl: string | null;
   previewKey: string | null;
   previewUrl: string | null;
+  legacyMirror?: boolean;
+  legacyModuleId?: string | null;
+  legacyItemName?: string | null;
+  legacySubcategory?: string | null;
   description: string;
   tags: string[];
   metadata: AssetMetadata;
