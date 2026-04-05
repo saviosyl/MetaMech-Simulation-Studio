@@ -1563,8 +1563,9 @@ export function getModuleDefinition(id: string): ModuleDefinition | undefined {
 }
 
 export function getModulesByCategory(category: string): ModuleDefinition[] {
-  return _runtimeExternalModules
-    .filter(module => module.category === category)
+  const baseModules = moduleLibrary.filter((module) => module.category === category);
+  const runtimeModules = _runtimeExternalModules
+    .filter((module) => module.category === category)
     .sort((a, b) => {
       const categoryOrderA = Number.isFinite(Number(a.libraryCategoryOrder)) ? Number(a.libraryCategoryOrder) : Number.MAX_SAFE_INTEGER;
       const categoryOrderB = Number.isFinite(Number(b.libraryCategoryOrder)) ? Number(b.libraryCategoryOrder) : Number.MAX_SAFE_INTEGER;
@@ -1577,6 +1578,13 @@ export function getModulesByCategory(category: string): ModuleDefinition[] {
       if (assetOrderA !== assetOrderB) return assetOrderA - assetOrderB;
       return a.name.localeCompare(b.name);
     });
+
+  // Preserve legacy simulation library as the default source of truth while
+  // allowing Admin-published runtime modules to override by id and add new items.
+  const merged = new Map<string, ModuleDefinition>();
+  for (const module of baseModules) merged.set(module.id, module);
+  for (const module of runtimeModules) merged.set(module.id, module);
+  return Array.from(merged.values());
 }
 
 export function setRuntimeExternalModules(nextModules: ModuleDefinition[]): void {

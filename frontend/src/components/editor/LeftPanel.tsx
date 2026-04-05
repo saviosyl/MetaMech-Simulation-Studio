@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield, Columns } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
-import { getModulesByCategory, ModuleDefinition, getRuntimeLibraryCategories } from '../../lib/moduleLibrary';
+import { getModulesByCategory, ModuleDefinition } from '../../lib/moduleLibrary';
 import SceneHierarchy from './SceneHierarchy';
 import PathPanel from './PathPanel';
 import CameraPathPanel from './CameraPathPanel';
@@ -62,31 +62,7 @@ const LeftPanel: React.FC = () => {
   const [viewMode, setViewMode] = useState<'library' | 'scene'>('library');
   const [searchQuery, setSearchQuery] = useState('');
   const [layout, setLayout] = useState<ViewLayout>('compact');
-  const runtimeCategories = useMemo(() => getRuntimeLibraryCategories(), [assetManifest]);
-  const hasRuntimeCategories = runtimeCategories.length > 0;
-  const tabs = hasRuntimeCategories
-    ? runtimeCategories
-      .filter((category) => category && typeof category === 'object')
-      .map((category) => {
-        const iconByScene: Record<string, any> = {
-          process: Factory,
-          modular: Columns,
-          fmcg: Package,
-          medical: Shield,
-          robots: Cpu,
-          pallets: SquareStack,
-          environment: Building,
-          actors: Users,
-        };
-        return {
-          id: category.sceneCategory as any,
-          name: category.name,
-          icon: iconByScene[category.sceneCategory] || Package,
-          key: category.key,
-          order: category.order,
-        };
-      })
-    : FALLBACK_TABS.map((tab, index) => ({ ...tab, key: tab.id, order: index }));
+  const tabs = FALLBACK_TABS.map((tab, index) => ({ ...tab, key: tab.id, order: index }));
   const availableSceneCategories = useMemo(
     () => new Set(tabs.map((tab) => String(tab.id))),
     [tabs]
