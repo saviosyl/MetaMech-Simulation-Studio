@@ -100,6 +100,23 @@ function formatModelBackfillSource(source: string | null | undefined): string {
   return value;
 }
 
+function missingModelReason(asset: LibraryAsset): 'has-direct-legacy-path' | 'needs-parametric-handling' | 'no-model-source' | null {
+  if (!asset.legacyMirror || asset.hasModelFile) return null;
+  const source = String(asset.modelBackfillSource || '').trim().toLowerCase();
+  if (source === 'legacy-static-glb' || source === 'legacy-actor-map' || source === 'legacy-environment-map') {
+    return 'has-direct-legacy-path';
+  }
+  if (source === 'parametric-builder') return 'needs-parametric-handling';
+  return 'no-model-source';
+}
+
+function missingModelReasonLabel(reason: ReturnType<typeof missingModelReason>): string {
+  if (reason === 'has-direct-legacy-path') return 'Has direct legacy file path';
+  if (reason === 'needs-parametric-handling') return 'Needs parametric/runtime-generated handling';
+  if (reason === 'no-model-source') return 'No model source currently available';
+  return 'Unknown';
+}
+
 const AdminAssetLibraryPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -122,6 +139,7 @@ const AdminAssetLibraryPage: React.FC = () => {
   const [newCategoryScene, setNewCategoryScene] = useState<SceneCategory>('process');
   const [newCategoryDescription, setNewCategoryDescription] = useState('');
   const [mirroringLegacy, setMirroringLegacy] = useState(false);
+  const [mirrorStateFilter, setMirrorStateFilter] = useState<'all' | 'mirrored' | 'ready' | 'missing'>('all');
 
   const selectedAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedAssetId) || null,
@@ -133,8 +151,15 @@ const AdminAssetLibraryPage: React.FC = () => {
     [categories, selectedCategoryId]
   );
   const groupedAssets = useMemo(() => {
+    const filtered = assets.filter((asset) => {
+      if (mirrorStateFilter === 'all') return true;
+      if (mirrorStateFilter === 'mirrored') return !!asset.legacyMirror;
+      if (mirrorStateFilter === 'ready') return !!asset.legacyMirror && !!asset.hasModelFile;
+      if (mirrorStateFilter === 'missing') return !!asset.legacyMirror && !asset.hasModelFile;
+      return true;
+    });
     const groups = new Map<string, { label: string; items: LibraryAsset[] }>();
-    for (const asset of assets) {
+    for (const asset of filtered) {
       const split = splitCategoryAndSubcategory(asset.categoryName);
       const key = `${split.category}::${split.subcategory}`;
       if (!groups.has(key)) {
@@ -143,7 +168,7 @@ const AdminAssetLibraryPage: React.FC = () => {
       groups.get(key)!.items.push(asset);
     }
     return Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [assets]);
+  }, [assets, mirrorStateFilter]);
   const mirroredAssets = useMemo(
     () => assets.filter((asset) => asset.legacyMirror),
     [assets]
@@ -156,6 +181,20 @@ const AdminAssetLibraryPage: React.FC = () => {
     () => mirroredAssets.filter((asset) => !asset.hasModelFile),
     [mirroredAssets]
   );
+  const mirroredMissingBreakdown = useMemo(() => {
+    const summary = {
+      hasDirectLegacyPath: 0,
+      needsParametricHandling: 0,
+      noModelSource: 0,
+    };
+    for (const asset of mirroredMetadataOnly) {
+      const reason = missingModelReason(asset);
+      if (reason === 'has-direct-legacy-path') summary.hasDirectLegacyPath += 1;
+      else if (reason === 'needs-parametric-handling') summary.needsParametricHandling += 1;
+      else summary.noModelSource += 1;
+    }
+    return summary;
+  }, [mirroredMetadataOnly]);
 
   async function loadCategories() {
     setLoadingCategories(true);
@@ -630,6 +669,19 @@ const AdminAssetLibraryPage: React.FC = () => {
               }}
             />
           </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+            <label style={{ fontSize: 12, color: 'var(--mm-text-tertiary)' }}>Mirrored filter:</label>
+            <select
+              value={mirrorStateFilter}
+              onChange={(e) => setMirrorStateFilter(e.target.value as 'all' | 'mirrored' | 'ready' | 'missing')}
+              style={{ width: 220 }}
+            >
+              <option value="all">All assets</option>
+              <option value="mirrored">All mirrored</option>
+              <option value="ready">Ready (mirrored + model file)</option>
+              <option value="missing">Missing model file (mirrored)</option>
+            </select>
+          </div>
 
           {message && (
             <div style={{ marginBottom: 8, border: '1px solid color-mix(in oklab, var(--mm-accent-success) 30%, transparent)', background: 'var(--mm-accent-success-muted)', color: 'var(--mm-accent-success)', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>
@@ -658,6 +710,15 @@ const AdminAssetLibraryPage: React.FC = () => {
             <span style={{ border: '1px solid color-mix(in oklab, var(--mm-accent-warning) 35%, transparent)', borderRadius: 999, padding: '4px 8px', color: 'var(--mm-accent-warning)' }}>
               Mirrored metadata-only: {mirroredMetadataOnly.length}
             </span>
+            <span style={{ border: '1px solid var(--mm-border)', borderRadius: 999, padding: '4px 8px' }}>
+              Missing: direct path {mirroredMissingBreakdown.hasDirectLegacyPath}
+            </span>
+            <span style={{ border: '1px solid var(--mm-border)', borderRadius: 999, padding: '4px 8px' }}>
+              Missing: parametric {mirroredMissingBreakdown.needsParametricHandling}
+            </span>
+            <span style={{ border: '1px solid var(--mm-border)', borderRadius: 999, padding: '4px 8px' }}>
+              Missing: no source {mirroredMissingBreakdown.noModelSource}
+            </span>
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gap: 10, alignContent: 'start' }}>
@@ -675,6 +736,7 @@ const AdminAssetLibraryPage: React.FC = () => {
                     const selected = selectedAssetId === asset.id;
                     const mirrored = !!asset.legacyMirror;
                     const hasModelFile = !!asset.hasModelFile;
+                    const missingReason = missingModelReason(asset);
                     return (
                       <button
                         key={asset.id}
@@ -709,6 +771,11 @@ const AdminAssetLibraryPage: React.FC = () => {
                           <span style={{ fontSize: 10, borderRadius: 999, padding: '2px 6px', border: `1px solid ${hasModelFile ? 'color-mix(in oklab, var(--mm-accent-success) 35%, transparent)' : 'color-mix(in oklab, var(--mm-accent-warning) 35%, transparent)'}`, color: hasModelFile ? 'var(--mm-accent-success)' : 'var(--mm-accent-warning)' }}>
                             {hasModelFile ? 'model file: present' : 'model file: missing'}
                           </span>
+                          {missingReason && (
+                            <span style={{ fontSize: 10, borderRadius: 999, padding: '2px 6px', border: '1px solid var(--mm-border)', color: 'var(--mm-text-secondary)', background: 'var(--mm-bg-panel)' }}>
+                              {missingModelReasonLabel(missingReason)}
+                            </span>
+                          )}
                         </div>
                         <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--mm-text-tertiary)' }}>
                           <span>v{asset.version}</span>
@@ -775,6 +842,14 @@ const AdminAssetLibraryPage: React.FC = () => {
                     Backfill source:{' '}
                     <strong style={{ color: 'var(--mm-text-secondary)' }}>
                       {formatModelBackfillSource(selectedAsset.modelBackfillSource)}
+                    </strong>
+                  </div>
+                )}
+                {selectedAsset.legacyMirror && !selectedAsset.hasModelFile && (
+                  <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 4 }}>
+                    Missing reason:{' '}
+                    <strong style={{ color: 'var(--mm-accent-warning)' }}>
+                      {missingModelReasonLabel(missingModelReason(selectedAsset))}
                     </strong>
                   </div>
                 )}

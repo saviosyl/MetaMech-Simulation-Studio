@@ -1315,13 +1315,34 @@ function serializeAsset(row: AssetRow, request: Request): Record<string, unknown
   const usePublished = !row.deleted_at && isRuntimeLiveLifecycle(lifecycleState);
   const mirroredFromLegacy = metadata.legacyMirror === true;
   const legacyModuleId = typeof metadata.legacyModuleId === 'string' ? metadata.legacyModuleId : null;
+  const legacyItemName = typeof metadata.legacyItemName === 'string' ? metadata.legacyItemName : null;
+  const legacySubcategory = typeof metadata.legacySubcategory === 'string' ? metadata.legacySubcategory : null;
   const legacyBackfillSource = typeof metadata.legacyModelUrl === 'string' ? String(metadata.legacyModelUrl).trim() : '';
+  const legacyAssetType = String(metadata.legacyAssetType || '').trim().toLowerCase();
+  const legacyBackfillReasonRaw = String(metadata.legacyBackfillReason || '').trim().toLowerCase();
   const modelKeyRaw = String(row.model_r2_key || '').trim();
   const isPlaceholderMirrorModelKey = modelKeyRaw.startsWith('legacy/mirror/');
   const modelFileExists = (
     !mirroredFromLegacy
     || !!legacyBackfillSource
     || (!isPlaceholderMirrorModelKey && modelKeyRaw.length > 0)
+  );
+  const missingModelReason = (
+    !mirroredFromLegacy
+      ? null
+      : (
+        modelFileExists
+          ? null
+          : (
+            legacyBackfillReasonRaw === 'no-legacy-model-source'
+              ? 'no-model-source'
+              : (
+                legacyAssetType === 'parametric'
+                  ? 'parametric-runtime'
+                  : 'missing-unknown'
+              )
+          )
+      )
   );
   const resolvedModelUrl = (
     mirroredFromLegacy && modelFileExists && !!legacyBackfillSource
@@ -1358,6 +1379,9 @@ function serializeAsset(row: AssetRow, request: Request): Record<string, unknown
     metadata,
     mirroredFromLegacy,
     legacyModuleId,
+    legacyItemName,
+    legacySubcategory,
+    missingModelReason,
     legacyModelUrl: legacyBackfillSource || null,
     publishedAt: row.published_at,
     archivedAt: row.archived_at,

@@ -20,6 +20,7 @@ export interface LegacyMirrorAssetPayload {
   subcategory: string;
   assetId?: string;
   legacyAssetType?: 'static' | 'parametric';
+  legacyBackfillClass?: 'direct-legacy-file-path-available' | 'needs-parametric-runtime-generated-handling' | 'no-model-source-currently-available';
   legacyModelUrl?: string;
   legacyThumbnailUrl?: string;
 }
@@ -91,6 +92,20 @@ function getAssetMap(): Map<string, AssetDef> {
   return map;
 }
 
+const DIRECT_LEGACY_MODEL_URLS: Record<string, string> = {
+  machine: '/models/machine.glb',
+  'pick-and-place': '/models/industrial-robot.glb',
+  palletizer: '/models/industrial-robot.glb',
+  forklift: '/models/forklift.glb',
+  agv: '/models/agv.glb',
+  pallet: '/models/pallet.glb',
+  'pallet-truck': '/models/pallet-truck.glb',
+  'cardboard-box': '/models/cardboard-box.glb',
+  'operator-1': '/models/operator-walking.glb',
+  'operator-2': '/models/operator-2.glb',
+  'operator-3': '/models/operator-3.glb',
+};
+
 export function buildLegacyLibraryMirrorPayload(): LegacyMirrorPayload {
   const visibleModules = moduleLibrary.filter((moduleDef) => !MIRROR_EXCLUDED_MODULE_IDS.has(moduleDef.id));
   const assetsById = getAssetMap();
@@ -121,9 +136,17 @@ export function buildLegacyLibraryMirrorPayload(): LegacyMirrorPayload {
     const nextSortOrder = (categoryAssetCount.get(categoryKey) || 0) + 1;
     categoryAssetCount.set(categoryKey, nextSortOrder);
     const mappedAsset = assetsById.get(moduleDef.assetId || moduleDef.id);
-    const legacyAssetType = mappedAsset ? mappedAsset.assetType : undefined;
-    const legacyModelUrl = mappedAsset && mappedAsset.assetType === 'static' ? mappedAsset.glbUrl : undefined;
+    const legacyAssetType = mappedAsset
+      ? mappedAsset.assetType
+      : (DIRECT_LEGACY_MODEL_URLS[moduleDef.id] ? 'static' : undefined);
+    const directModelUrl = DIRECT_LEGACY_MODEL_URLS[moduleDef.id];
+    const legacyModelUrl = directModelUrl || (mappedAsset && mappedAsset.assetType === 'static' ? mappedAsset.glbUrl : undefined);
     const legacyThumbnailUrl = mappedAsset && mappedAsset.assetType === 'static' ? mappedAsset.thumbnailUrl : undefined;
+    const legacyBackfillClass = legacyModelUrl
+      ? 'direct-legacy-file-path-available'
+      : ((legacyAssetType === 'parametric' || !moduleDef.assetId)
+        ? 'needs-parametric-runtime-generated-handling'
+        : 'no-model-source-currently-available');
     assets.push({
       moduleId: moduleDef.id,
       name: moduleDef.name,
@@ -134,6 +157,7 @@ export function buildLegacyLibraryMirrorPayload(): LegacyMirrorPayload {
       subcategory,
       assetId: moduleDef.assetId || moduleDef.id,
       legacyAssetType,
+      legacyBackfillClass,
       legacyModelUrl,
       legacyThumbnailUrl,
     });
