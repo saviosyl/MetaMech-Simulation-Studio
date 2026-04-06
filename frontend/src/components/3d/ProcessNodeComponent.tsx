@@ -208,7 +208,42 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
 
   // SPIRAL CONVEYOR
   if (node.type === 'spiral-conveyor') {
-    return null;
+    return (
+      <group
+        ref={groupRef}
+        position={node.position}
+        rotation={node.rotation}
+        scale={node.scale}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      >
+        <Model3DErrorBoundary fallback={
+          <mesh castShadow>
+            <cylinderGeometry args={[1, 1, 2.5, 16]} />
+            <meshStandardMaterial color="#666" wireframe />
+          </mesh>
+        }>
+          <Suspense fallback={
+            <mesh castShadow>
+              <cylinderGeometry args={[1, 1, 2.5, 16]} />
+              <meshStandardMaterial color="#666" wireframe />
+            </mesh>
+          }>
+            <SpiralConveyorModel
+              parameters={node.parameters}
+              isSelected={isSelected}
+            />
+          </Suspense>
+        </Model3DErrorBoundary>
+        {isSelected && (
+          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[1.4, 1.6, 32]} />
+            <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
+          </mesh>
+        )}
+      </group>
+    );
   }
 
   if (node.type === 'spiral-vyeor-conveyor') {

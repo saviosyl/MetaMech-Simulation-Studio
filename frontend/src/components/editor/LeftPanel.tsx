@@ -20,7 +20,6 @@ const FALLBACK_TABS = [
 
 const BANNED_LIBRARY_IDS = new Set<string>([
   'spiral-vyeor-conveyor',
-  'spiral-conveyor',
   'mm85-conveyor-section',
   'mm85-drive-end',
   'mm85-idler-end',

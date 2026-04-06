@@ -306,6 +306,23 @@ export function createTransportPath(type: string, params: Record<string, any>): 
       return new CurvedPath(radius, angle, height, direction);
     }
 
+    case 'spiral-conveyor': {
+      const beltWidth = Number(params.beltWidth ?? 400);
+      const turns = Number(params.turns ?? 3);
+      const outfeedAngle = Number(params.outfeedAngle ?? 180);
+      const infeedHeight = Number(params.infeedHeight ?? 800);
+      const outfeedHeight = Number(params.outfeedHeight ?? 3800);
+      const direction = String(params.direction || 'up').toLowerCase() === 'down' ? 'down' : 'up';
+      return new SpiralPath(
+        Number.isFinite(beltWidth) ? beltWidth : 400,
+        Number.isFinite(turns) ? turns : 3,
+        Number.isFinite(outfeedAngle) ? outfeedAngle : 180,
+        Number.isFinite(infeedHeight) ? infeedHeight : 800,
+        Number.isFinite(outfeedHeight) ? outfeedHeight : 3800,
+        direction,
+      );
+    }
+
     default:
       return null;
   }

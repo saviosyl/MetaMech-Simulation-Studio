@@ -48,7 +48,6 @@ const COLOR_MAP: Record<string, string> = {
 const RANDOM_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 const REMOVED_LIBRARY_TYPES = new Set<string>([
-  'spiral-conveyor',
   'spiral-vyeor-conveyor',
   'mm85-conveyor-section',
   'mm85-drive-end',
@@ -62,6 +61,7 @@ const CONVEYOR_TYPES = [
   'conveyor',
   'belt-conveyor',
   'roller-conveyor',
+  'spiral-conveyor',
   'bend-conveyor',
   'modular-conveyor-straight',
   'modular-conveyor-90-curve',
@@ -541,6 +541,7 @@ export class SimulationEngine {
         case 'conveyor':
         case 'belt-conveyor':
         case 'roller-conveyor':
+        case 'spiral-conveyor':
         case 'bend-conveyor':
         case 'modular-conveyor-straight':
         case 'modular-conveyor-90-curve':

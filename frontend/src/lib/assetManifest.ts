@@ -62,7 +62,6 @@ export const ASSET_BASE_URL = '/assets';
 let _manifest: AssetDef[] | null = null;
 let _runtimeExternalAssets: AssetDef[] = [];
 const REMOVED_LIBRARY_ASSET_IDS = new Set<string>([
-  'spiral-conveyor',
   'spiral-vyeor-conveyor',
   'mm85-conveyor-section',
   'mm85-drive-end',
@@ -74,7 +73,6 @@ const REMOVED_LIBRARY_ASSET_IDS = new Set<string>([
 
 function loadInlineManifest(): AssetDef[] {
   const removedRuntimeIds = new Set<string>([
-    'spiral-conveyor',
     'spiral-vyeor-conveyor',
     'mm85-conveyor-section',
     'mm85-drive-end',
@@ -635,6 +633,51 @@ function loadInlineManifest(): AssetDef[] {
     },
 
     // === PARAMETRIC: Spiral Conveyor ===
+    {
+      id: 'spiral-conveyor',
+      assetType: 'parametric',
+      category: 'process',
+      name: 'Spiral Conveyor',
+      description: 'Premium AmbaFlex-style spiral conveyor for vertical transport',
+      builder: 'spiralConveyorBuilder',
+      parts: {},
+      thumbnailUrl: '',
+      defaults: {
+        direction: 'up',
+        beltWidth: 400,
+        turns: 3,
+        outfeedAngle: 180,
+        infeedHeight: 800,
+        outfeedHeight: 3800,
+        speed: 20,
+        sideGuides: true,
+        guideHeight: 100,
+        showLegs: true,
+        centerStructure: 'column',
+      },
+      limits: {
+        beltWidth: [150, 800],
+        turns: [0.5, 10],
+        outfeedAngle: [0, 360],
+        infeedHeight: [0, 6000],
+        outfeedHeight: [0, 15000],
+        speed: [1, 60],
+        guideHeight: [40, 250],
+      },
+      parameterDefs: {
+        direction: { type: 'select', label: 'Direction', options: ['up', 'down'] },
+        beltWidth: { type: 'number', label: 'Belt Width', unit: 'mm', step: 50 },
+        turns: { type: 'number', label: 'Turns', step: 0.5 },
+        outfeedAngle: { type: 'number', label: 'Outfeed Angle', unit: '°', step: 15 },
+        infeedHeight: { type: 'number', label: 'Infeed Height', unit: 'mm', step: 50 },
+        outfeedHeight: { type: 'number', label: 'Outfeed Height', unit: 'mm', step: 50 },
+        speed: { type: 'number', label: 'Speed', unit: 'm/min', step: 1 },
+        sideGuides: { type: 'boolean', label: 'Side Guides' },
+        guideHeight: { type: 'number', label: 'Guide Height', unit: 'mm', step: 10 },
+        showLegs: { type: 'boolean', label: 'Show Supports' },
+        centerStructure: { type: 'select', label: 'Center Structure', options: ['column', 'framed-core'] },
+      },
+    },
 
     // === PARAMETRIC: Vertical Lifter ===
     {
