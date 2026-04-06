@@ -203,7 +203,7 @@ export interface LibraryAsset {
   modelKey: string;
   modelUrl: string;
   modelBackfillSource?: string | null;
-  modelMissingReason?: 'parametric_or_runtime_generated' | 'no_legacy_model_source' | null;
+  modelMissingReason?: 'parametric-runtime' | 'no-model-source' | 'missing-unknown' | null;
   hasModelFile?: boolean;
   modelFileStatus?: 'exists' | 'missing' | 'unknown';
   thumbnailKey: string | null;

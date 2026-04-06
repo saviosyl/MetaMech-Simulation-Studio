@@ -139,7 +139,15 @@ const AdminAssetLibraryPage: React.FC = () => {
   const [newCategoryScene, setNewCategoryScene] = useState<SceneCategory>('process');
   const [newCategoryDescription, setNewCategoryDescription] = useState('');
   const [mirroringLegacy, setMirroringLegacy] = useState(false);
-  const [mirrorStateFilter, setMirrorStateFilter] = useState<'all' | 'mirrored' | 'ready' | 'missing'>('all');
+  const [mirrorStateFilter, setMirrorStateFilter] = useState<
+    | 'all'
+    | 'mirrored'
+    | 'ready'
+    | 'missing'
+    | 'direct-legacy-path-available'
+    | 'parametric-runtime-generated'
+    | 'no-model-source-available'
+  >('all');
 
   const selectedAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedAssetId) || null,
@@ -156,6 +164,15 @@ const AdminAssetLibraryPage: React.FC = () => {
       if (mirrorStateFilter === 'mirrored') return !!asset.legacyMirror;
       if (mirrorStateFilter === 'ready') return !!asset.legacyMirror && !!asset.hasModelFile;
       if (mirrorStateFilter === 'missing') return !!asset.legacyMirror && !asset.hasModelFile;
+      if (mirrorStateFilter === 'direct-legacy-path-available') {
+        return !!asset.legacyMirror && !asset.hasModelFile && missingModelReason(asset) === 'has-direct-legacy-path';
+      }
+      if (mirrorStateFilter === 'parametric-runtime-generated') {
+        return !!asset.legacyMirror && !asset.hasModelFile && missingModelReason(asset) === 'needs-parametric-handling';
+      }
+      if (mirrorStateFilter === 'no-model-source-available') {
+        return !!asset.legacyMirror && !asset.hasModelFile && missingModelReason(asset) === 'no-model-source';
+      }
       return true;
     });
     const groups = new Map<string, { label: string; items: LibraryAsset[] }>();
@@ -167,7 +184,27 @@ const AdminAssetLibraryPage: React.FC = () => {
       }
       groups.get(key)!.items.push(asset);
     }
-    return Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label));
+    return Array.from(groups.values())
+      .map((group) => {
+        const sortedItems = [...group.items].sort((a, b) => {
+          const reasonRank = (asset: LibraryAsset): number => {
+            const reason = missingModelReason(asset);
+            if (reason === 'has-direct-legacy-path') return 0;
+            if (reason === 'needs-parametric-handling') return 1;
+            if (reason === 'no-model-source') return 2;
+            return 3;
+          };
+          const rankA = reasonRank(a);
+          const rankB = reasonRank(b);
+          if (rankA !== rankB) return rankA - rankB;
+          const nameA = String(a.name || '').toLowerCase();
+          const nameB = String(b.name || '').toLowerCase();
+          if (nameA !== nameB) return nameA.localeCompare(nameB);
+          return String(a.legacyModuleId || '').localeCompare(String(b.legacyModuleId || ''));
+        });
+        return { ...group, items: sortedItems };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
   }, [assets, mirrorStateFilter]);
   const mirroredAssets = useMemo(
     () => assets.filter((asset) => asset.legacyMirror),
@@ -625,7 +662,7 @@ const AdminAssetLibraryPage: React.FC = () => {
               <input
                 type="text"
                 value={search}
-                placeholder="Search assets"
+                placeholder="Search name / legacy module id / category / subcategory"
                 onChange={(e) => setSearch(e.target.value)}
                 style={{ width: '100%', paddingLeft: 30 }}
               />
@@ -673,13 +710,25 @@ const AdminAssetLibraryPage: React.FC = () => {
             <label style={{ fontSize: 12, color: 'var(--mm-text-tertiary)' }}>Mirrored filter:</label>
             <select
               value={mirrorStateFilter}
-              onChange={(e) => setMirrorStateFilter(e.target.value as 'all' | 'mirrored' | 'ready' | 'missing')}
+              onChange={(e) => setMirrorStateFilter(
+                e.target.value as
+                  | 'all'
+                  | 'mirrored'
+                  | 'ready'
+                  | 'missing'
+                  | 'direct-legacy-path-available'
+                  | 'parametric-runtime-generated'
+                  | 'no-model-source-available'
+              )}
               style={{ width: 220 }}
             >
               <option value="all">All assets</option>
               <option value="mirrored">All mirrored</option>
               <option value="ready">Ready (mirrored + model file)</option>
               <option value="missing">Missing model file (mirrored)</option>
+              <option value="direct-legacy-path-available">direct-legacy-path-available</option>
+              <option value="parametric-runtime-generated">parametric-runtime-generated</option>
+              <option value="no-model-source-available">no-model-source-available</option>
             </select>
           </div>
 
