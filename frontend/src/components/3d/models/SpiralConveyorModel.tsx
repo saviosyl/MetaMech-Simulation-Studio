@@ -250,12 +250,17 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
   const towerYaw = -towerAngle + Math.PI / 2;
   const supportLiftFromGround = Math.max(0, bottomY);
   const supportLegRadius = outerRadius + 0.2;
-  const supportLegHeight = Math.max(0.01, supportLiftFromGround);
-  const supportLegCenterY = -supportLiftFromGround / 2;
-  const supportBaseY = -supportLiftFromGround + 0.02;
-  const supportFootY = -supportLiftFromGround + 0.005;
-  const supportFrameNearGroundY = -supportLiftFromGround + Math.min(0.08, supportLegHeight * 0.35);
-  const supportFrameMidY = -supportLiftFromGround + Math.min(0.28, supportLegHeight * 0.65);
+  const supportGroundY = -supportLiftFromGround;
+  const supportColumnTopY = effectiveHeight + 0.04;
+  const supportColumnHeight = Math.max(0.2, supportColumnTopY - supportGroundY);
+  const supportColumnCenterY = supportGroundY + supportColumnHeight / 2;
+  const supportFootY = supportGroundY + 0.005;
+  const supportFrameNearGroundY = supportGroundY + Math.min(0.08, supportColumnHeight * 0.2);
+  const supportFrameMidY = supportGroundY + supportColumnHeight * 0.5;
+  const supportFrameTopY = supportGroundY + supportColumnHeight * 0.9;
+  const supportCrossSpan = supportLegRadius * 2;
+  const supportDiagonalSpan = supportLegRadius * Math.SQRT2;
+  const supportRingAngles = [0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2];
   const supportLegPositions: [number, number][] = [
     [supportLegRadius, 0],
     [-supportLegRadius, 0],
@@ -330,11 +335,11 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
       {/* Ground pedestal extension (keeps center support aligned and grounded) */}
       {supportLiftFromGround > 0.001 && (
         <>
-          <mesh material={matDrumStainless} position={[0, supportLegCenterY, 0]} castShadow receiveShadow>
-            <cylinderGeometry args={[drumRadius * 0.82, drumRadius * 0.82, supportLegHeight, 28]} />
+          <mesh material={matDrumStainless} position={[0, supportColumnCenterY, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[drumRadius * 0.82, drumRadius * 0.82, supportColumnHeight, 28]} />
           </mesh>
-          <mesh material={matBasePlate} position={[0, supportBaseY, 0]} castShadow receiveShadow>
-            <cylinderGeometry args={[supportLegRadius + 0.08, supportLegRadius + 0.08, 0.04, 40]} />
+          <mesh material={matBasePlate} position={[0, supportGroundY + 0.02, 0]} castShadow receiveShadow>
+            <boxGeometry args={[0.3, 0.04, 0.3]} />
           </mesh>
         </>
       )}
@@ -367,13 +372,29 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
         <mesh geometry={helixGeos.outerGuide} material={matOuterBand} castShadow />
       )}
 
-      {/* Support brackets every quarter-turn */}
+      {/* Support arms every quarter-turn (belt-to-frame tie-in) */}
       {bracketData.map((b, i) => (
-        <mesh key={`bracket-${i}`} material={matTowerFrame}
-          position={[b.x, b.y + guideHeightM * 0.2 + beltThickness, b.z]}
-          rotation={[0, -b.angle + Math.PI / 2, 0]} castShadow>
-          <boxGeometry args={[0.02, guideHeightM * 0.6, 0.015]} />
-        </mesh>
+        <group key={`bracket-${i}`}>
+          <mesh
+            material={matTowerFrame}
+            position={[
+              Math.cos(b.angle) * (drumRadius + (outerRadius - drumRadius) * 0.5),
+              b.y - 0.03,
+              Math.sin(b.angle) * (drumRadius + (outerRadius - drumRadius) * 0.5),
+            ]}
+            rotation={[0, -b.angle, 0]}
+            castShadow
+          >
+            <boxGeometry args={[Math.max(0.1, outerRadius - drumRadius - 0.03), 0.018, 0.03]} />
+          </mesh>
+          <mesh
+            material={matTowerFrame}
+            position={[Math.cos(b.angle) * (outerRadius - 0.018), b.y - 0.005, Math.sin(b.angle) * (outerRadius - 0.018)]}
+            castShadow
+          >
+            <boxGeometry args={[0.018, 0.05, 0.018]} />
+          </mesh>
+        </group>
       ))}
 
       {/* ═══ Continuous Inner Guide Rail ═══ */}
@@ -492,8 +513,8 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
           {supportLegPositions.map(([lx, lz], i) => (
             <group key={`leg-${i}`}>
               {/* Vertical leg post */}
-              <mesh material={matTowerFrame} position={[lx, supportLegCenterY, lz]} castShadow>
-                <boxGeometry args={[0.05, supportLegHeight, 0.05]} />
+              <mesh material={matTowerFrame} position={[lx, supportColumnCenterY, lz]} castShadow>
+                <boxGeometry args={[0.05, supportColumnHeight, 0.05]} />
               </mesh>
               {/* Leveling foot on ground */}
               <mesh material={matRubber} position={[lx, supportFootY, lz]}>
@@ -509,29 +530,99 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
           <mesh material={matBasePlate}
             position={[0, supportFrameNearGroundY, 0]}
             castShadow>
-            <boxGeometry args={[supportLegRadius * 2.1, 0.04, 0.06]} />
+            <boxGeometry args={[supportCrossSpan, 0.04, 0.06]} />
           </mesh>
           <mesh material={matBasePlate}
             position={[0, supportFrameNearGroundY, 0]}
             castShadow>
-            <boxGeometry args={[0.06, 0.04, supportLegRadius * 2.1]} />
+            <boxGeometry args={[0.06, 0.04, supportCrossSpan]} />
           </mesh>
-          {/* Mid-height brace (if tall enough) */}
-          {supportLiftFromGround > 0.5 && (
+          {/* Mid-height cross braces */}
+          <mesh material={matBasePlate}
+            position={[0, supportFrameMidY, 0]}
+            castShadow>
+            <boxGeometry args={[supportCrossSpan * 0.95, 0.035, 0.05]} />
+          </mesh>
+          <mesh material={matBasePlate}
+            position={[0, supportFrameMidY, 0]}
+            castShadow>
+            <boxGeometry args={[0.05, 0.035, supportCrossSpan * 0.95]} />
+          </mesh>
+          {/* Top-level ring braces */}
+          <mesh material={matBasePlate}
+            position={[0, supportFrameTopY, 0]}
+            castShadow>
+            <boxGeometry args={[supportCrossSpan * 0.9, 0.03, 0.045]} />
+          </mesh>
+          <mesh material={matBasePlate}
+            position={[0, supportFrameTopY, 0]}
+            castShadow>
+            <boxGeometry args={[0.045, 0.03, supportCrossSpan * 0.9]} />
+          </mesh>
+          {/* Diagonal tie braces for realistic frame triangulation */}
+          {[Math.PI / 4, (Math.PI * 3) / 4, (Math.PI * 5) / 4, (Math.PI * 7) / 4].map((a, i) => (
             <mesh material={matBasePlate}
-              position={[0, supportFrameMidY, 0]}
+              key={`diag-brace-${i}`}
+              position={[Math.cos(a) * (supportLegRadius / 2), supportFrameMidY, Math.sin(a) * (supportLegRadius / 2)]}
+              rotation={[0, -a, 0]}
               castShadow>
-              <boxGeometry args={[supportLegRadius * 1.75, 0.035, 0.05]} />
+              <boxGeometry args={[supportDiagonalSpan, 0.028, 0.04]} />
             </mesh>
-          )}
-          {/* Upper connection plate (at spiral base) */}
+          ))}
+          {/* Upper connection beams (at spiral base level) */}
           <mesh material={matBasePlate}
             position={[0, -0.02, 0]} castShadow>
-            <boxGeometry args={[supportLegRadius * 1.45, 0.04, 0.08]} />
+            <boxGeometry args={[supportCrossSpan * 0.8, 0.04, 0.08]} />
           </mesh>
           <mesh material={matBasePlate}
             position={[0, -0.02, 0]} castShadow>
-            <boxGeometry args={[0.08, 0.04, supportLegRadius * 1.45]} />
+            <boxGeometry args={[0.08, 0.04, supportCrossSpan * 0.8]} />
+          </mesh>
+          {/* Radial connector stubs from central column to each support direction */}
+          {supportRingAngles.map((a, i) => (
+            <mesh
+              key={`radial-conn-${i}`}
+              material={matBasePlate}
+              position={[Math.cos(a) * (supportLegRadius * 0.45), 0, Math.sin(a) * (supportLegRadius * 0.45)]}
+              rotation={[0, -a, 0]}
+              castShadow
+            >
+              <boxGeometry args={[supportLegRadius * 0.9, 0.035, 0.05]} />
+            </mesh>
+          ))}
+          {/* Vertical uprights near spiral body for continuous support appearance */}
+          {supportRingAngles.map((a, i) => (
+            <mesh
+              key={`inner-upright-${i}`}
+              material={matTowerFrame}
+              position={[Math.cos(a) * (outerRadius - 0.06), supportColumnCenterY, Math.sin(a) * (outerRadius - 0.06)]}
+              castShadow
+            >
+              <boxGeometry args={[0.03, supportColumnHeight, 0.03]} />
+            </mesh>
+          ))}
+          {/* Tie bars from outer uprights to central column at multiple levels */}
+          {[supportFrameNearGroundY + 0.1, supportFrameMidY, supportFrameTopY].map((levelY, li) => (
+            <group key={`tie-level-${li}`}>
+              {supportRingAngles.map((a, i) => (
+                <mesh
+                  key={`tie-${li}-${i}`}
+                  material={matBasePlate}
+                  position={[Math.cos(a) * ((outerRadius - 0.06) * 0.5), levelY, Math.sin(a) * ((outerRadius - 0.06) * 0.5)]}
+                  rotation={[0, -a, 0]}
+                  castShadow
+                >
+                  <boxGeometry args={[Math.max(0.1, outerRadius - 0.12), 0.022, 0.03]} />
+                </mesh>
+              ))}
+            </group>
+          ))}
+          {/* Tower grounding post to avoid any floating drive-frame appearance */}
+          <mesh material={matTowerFrame} position={[towerX, supportColumnCenterY, towerZ]} castShadow>
+            <boxGeometry args={[0.06, supportColumnHeight, 0.06]} />
+          </mesh>
+          <mesh material={matRubber} position={[towerX, supportFootY, towerZ]}>
+            <cylinderGeometry args={[0.028, 0.03, 0.01, 8]} />
           </mesh>
         </group>
       )}
