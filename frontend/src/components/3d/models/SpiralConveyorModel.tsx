@@ -214,6 +214,24 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
     return { belt, support, outerGuide, innerGuide };
   }, [innerRadius, outerRadius, startAngle, totalAngle, effectiveHeight, totalSegs, beltThickness, sideGuides, guideHeightM]);
 
+  // Support bracket anchor points along the helix (every quarter turn).
+  const bracketData = useMemo(() => {
+    const brackets: { x: number; y: number; z: number; angle: number }[] = [];
+    const step = Math.max(1, Math.floor(segsPerTurn / 4));
+    for (let i = 0; i <= totalSegs; i += step) {
+      const t = i / totalSegs;
+      const angle = startAngle + t * totalAngle;
+      const y = t * effectiveHeight;
+      brackets.push({
+        x: Math.cos(angle) * outerRadius,
+        y,
+        z: Math.sin(angle) * outerRadius,
+        angle,
+      });
+    }
+    return brackets;
+  }, [totalSegs, segsPerTurn, startAngle, totalAngle, effectiveHeight, outerRadius]);
+
   const supportGroundY = -bottomY;
   const supportTopY = effectiveHeight + 0.06;
   const supportHeight = Math.max(0.2, supportTopY - supportGroundY);
