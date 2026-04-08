@@ -261,12 +261,16 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
   const towerX = Math.cos(towerAngle) * towerDist;
   const towerZ = Math.sin(towerAngle) * towerDist;
   const towerYaw = -towerAngle + Math.PI / 2;
-  const legRadius = Math.max(outerRadius + 0.2, 0.56);
-  const legTopY = 0.035;
+  const spiralOuterDiameter = outerRadius * 2;
+  const legOffsetFromBelt = THREE.MathUtils.clamp(spiralOuterDiameter * 0.08, 0.05, 0.1);
+  const legRadius = outerRadius + legOffsetFromBelt;
+  // Keep leg-frame below belt plane (y=0) so it cannot intersect the transport path.
+  const legTopY = -0.03;
   const legHeight = Math.max(0.12, legTopY - supportGroundY);
   const legCenterY = supportGroundY + legHeight / 2;
-  const legFootPadY = supportGroundY + 0.006;
-  const legStemY = supportGroundY + 0.02;
+  const levelingFootPadY = supportGroundY + 0.005;
+  const levelingRodY = supportGroundY + 0.024;
+  const levelingNutY = supportGroundY + 0.039;
   const supportArmAnchorX = Math.cos(towerAngle) * (outerRadius - 0.03);
   const supportArmAnchorZ = Math.sin(towerAngle) * (outerRadius - 0.03);
   const supportArmDx = supportArmAnchorX - towerX;
@@ -509,10 +513,10 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
 
           {/* Compact lower frame tied into the column base */}
           <mesh material={matTowerFrame} position={[0, legTopY, 0]} castShadow>
-            <boxGeometry args={[legRadius * 2, 0.026, 0.06]} />
+            <boxGeometry args={[legRadius * 2, 0.024, 0.055]} />
           </mesh>
           <mesh material={matTowerFrame} position={[0, legTopY, 0]} castShadow>
-            <boxGeometry args={[0.06, 0.026, legRadius * 2]} />
+            <boxGeometry args={[0.055, 0.024, legRadius * 2]} />
           </mesh>
 
           {/* Four vertical legs at 90° spacing with grounded foot pads */}
@@ -521,11 +525,14 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
               <mesh material={matTowerFrame} position={[lx, legCenterY, lz]} castShadow>
                 <boxGeometry args={[0.042, legHeight, 0.042]} />
               </mesh>
-              <mesh material={matTowerFrame} position={[lx, legStemY, lz]} castShadow>
-                <cylinderGeometry args={[0.013, 0.014, 0.038, 10]} />
+              <mesh material={matDrumStainless} position={[lx, levelingRodY, lz]} castShadow>
+                <cylinderGeometry args={[0.006, 0.006, 0.032, 10]} />
               </mesh>
-              <mesh material={matRubber} position={[lx, legFootPadY, lz]}>
-                <cylinderGeometry args={[0.03, 0.035, 0.012, 12]} />
+              <mesh material={matBasePlate} position={[lx, levelingNutY, lz]} castShadow>
+                <cylinderGeometry args={[0.011, 0.011, 0.008, 8]} />
+              </mesh>
+              <mesh material={matRubber} position={[lx, levelingFootPadY, lz]}>
+                <cylinderGeometry args={[0.028, 0.033, 0.01, 12]} />
               </mesh>
             </group>
           ))}
