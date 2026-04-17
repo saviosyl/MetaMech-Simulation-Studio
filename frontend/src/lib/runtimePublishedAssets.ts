@@ -294,9 +294,7 @@ function toStaticAssetDef(asset: LibraryAsset): AssetDef {
   };
 }
 
-function toModuleDef(asset: LibraryAsset, categoryOrder: number): ModuleDefinition {
-  const categoryKey = String(asset.categoryId || '').trim();
-  const assetOrder = Number(asset.sortOrder);
+function toModuleDef(asset: LibraryAsset): ModuleDefinition {
   return {
     id: asset.id,
     name: asset.name,
@@ -304,67 +302,15 @@ function toModuleDef(asset: LibraryAsset, categoryOrder: number): ModuleDefiniti
     icon: Box,
     description: asset.description || 'Published library asset',
     assetId: asset.id,
-    libraryCategoryKey: categoryKey ? `category:${categoryKey}` : `asset:${asset.id}`,
-    libraryCategoryName: String(asset.categoryName || 'Uncategorized'),
-    libraryCategorySlug: asset.categorySlug || null,
-    librarySceneCategory: String(asset.sceneCategory || 'process'),
-    libraryCategoryOrder: Number.isFinite(categoryOrder) ? categoryOrder : Number.MAX_SAFE_INTEGER,
-    libraryAssetOrder: Number.isFinite(assetOrder) ? assetOrder : Number.MAX_SAFE_INTEGER,
     parameters: {},
   };
 }
 
 export async function refreshRuntimePublishedAssets(): Promise<void> {
-  let assetsPayload: unknown;
-  try {
-    assetsPayload = await listPublishedAssets();
-  } catch (error) {
-    console.warn('[RuntimeAssets] Failed to fetch /assets/published. Falling back to empty runtime library.', error);
-    setRuntimeExternalAssets([]);
-    setRuntimeExternalModules([]);
-    useEditorStore.setState({ assetManifest: getAssetManifest() });
-    return;
-  }
-
-  console.info('[RuntimeAssets] /assets/published payload:', assetsPayload);
-  const assets = Array.isArray(assetsPayload) ? assetsPayload as LibraryAsset[] : [];
-  // Runtime library must be fully admin-controlled:
-  // include only assets explicitly marked live for runtime/demo.
-  const published = assets.filter((asset) => {
-    if (!asset || typeof asset !== 'object') return false;
-    if (asset.lifecycleState) return asset.lifecycleState === 'live';
-    if (typeof asset.visibleInRuntimeLibrary === 'boolean') return asset.visibleInRuntimeLibrary;
-    return asset.status === 'published';
-  });
-  const categoryOrderById = new Map<number, number>();
-  let categoryOrderSeq = 0;
-  for (const asset of published) {
-    if (!categoryOrderById.has(asset.categoryId)) {
-      categoryOrderById.set(asset.categoryId, categoryOrderSeq++);
-    }
-  }
-  const externalDefs = published
-    .map((asset) => {
-      try {
-        return toStaticAssetDef(asset);
-      } catch (error) {
-        console.warn('[RuntimeAssets] Skipping malformed published asset (definition)', asset?.id, error);
-        return null;
-      }
-    })
-    .filter((asset): asset is AssetDef => Boolean(asset));
-
-  const externalModules = published
-    .map((asset) => {
-      try {
-        return toModuleDef(asset, categoryOrderById.get(asset.categoryId) ?? Number.MAX_SAFE_INTEGER);
-      } catch (error) {
-        console.warn('[RuntimeAssets] Skipping malformed published asset (module)', asset?.id, error);
-        return null;
-      }
-    })
-    .filter((module): module is ModuleDefinition => Boolean(module));
-
+  const assets = await listPublishedAssets();
+  const published = assets.filter((asset) => asset.status === 'published');
+  const externalDefs = published.map(toStaticAssetDef);
+  const externalModules = published.map(toModuleDef);
   setRuntimeExternalAssets(externalDefs);
   setRuntimeExternalModules(externalModules);
   useEditorStore.setState({ assetManifest: getAssetManifest() });

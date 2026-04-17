@@ -22,6 +22,7 @@ const NON_FLOW_MODULAR_TYPES = new Set([
   'mm85-end-drive-support',
 ]);
 const FLOW_PROCESS_OVERRIDES = new Set([
+  'spiral-vyeor-conveyor',
 ]);
 
 /**

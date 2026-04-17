@@ -25,17 +25,6 @@ export interface ModuleDefinition {
   icon: any;
   description: string;
   assetId?: string; // references AssetDef.id in manifest
-  /**
-   * Runtime library grouping metadata (Admin Asset Library).
-   * When present, the left library panel should group by this category key/name
-   * instead of hardcoded category heuristics.
-   */
-  libraryCategoryKey?: string;
-  libraryCategoryName?: string;
-  libraryCategorySlug?: string | null;
-  librarySceneCategory?: string;
-  libraryCategoryOrder?: number;
-  libraryAssetOrder?: number;
   parameters: {
     [key: string]: {
       type: 'number' | 'string' | 'text' | 'select' | 'boolean' | 'color';
@@ -164,115 +153,6 @@ export const moduleLibrary: ModuleDefinition[] = [
     },
   },
   {
-    id: 'conveyor',
-    name: 'Conveyor',
-    category: 'process',
-    icon: ArrowRight,
-    description: 'Transports products along a linear path',
-    parameters: {
-      length: {
-        type: 'number',
-        label: 'Length (mm)',
-        default: 5000,
-        min: 1000,
-        max: 20000,
-        step: 500,
-      },
-      width: {
-        type: 'number',
-        label: 'Width (mm)',
-        default: 1000,
-        min: 500,
-        max: 3000,
-        step: 100,
-      },
-      speed: {
-        type: 'number',
-        label: 'Speed (m/min)',
-        default: 20,
-        min: 1,
-        max: 100,
-        step: 1,
-      },
-      beltColor: {
-        type: 'color',
-        label: 'Belt Color',
-        default: '#2d2d2d',
-      },
-    },
-  },
-  {
-    id: 'roller-conveyor',
-    name: 'Roller Conveyor',
-    category: 'process',
-    icon: ArrowRight,
-    description: 'Parametric roller conveyor with adjustable pitch, diameter, drive type',
-    assetId: 'roller-conveyor',
-    parameters: {
-      width: { type: 'number', label: 'Width (mm)', default: 600, min: 300, max: 1200, step: 50 },
-      length: { type: 'number', label: 'Length (mm)', default: 3000, min: 500, max: 12000, step: 100 },
-      height: { type: 'number', label: 'Height (mm)', default: 800, min: 300, max: 3000, step: 50 },
-      rollerPitch: { type: 'number', label: 'Roller Pitch (mm)', default: 100, min: 50, max: 200, step: 10 },
-      rollerDiameter: { type: 'number', label: 'Roller Diameter (mm)', default: 50, min: 30, max: 80, step: 5 },
-      rollerType: { type: 'select', label: 'Roller Type', default: 'driven', options: ['driven', 'gravity'] },
-      driveType: { type: 'select', label: 'Drive Type', default: 'chain-driven', options: ['chain-driven', 'belt-driven', 'mdr'] },
-      sideRails: { type: 'boolean', label: 'Side Rails', default: true },
-    },
-  },
-  {
-    id: 'modular-conveyor-straight',
-    name: 'Modular Conveyor - Straight',
-    category: 'process',
-    icon: ArrowRight,
-    description: 'Modular plastic belt conveyor - straight section with chain edge',
-    assetId: 'modular-conveyor-straight',
-    parameters: {
-      width: { type: 'number', label: 'Width (mm)', default: 600, min: 100, max: 1200, step: 50 },
-      length: { type: 'number', label: 'Length (mm)', default: 2000, min: 300, max: 10000, step: 100 },
-      height: { type: 'number', label: 'Height (mm)', default: 800, min: 300, max: 1500, step: 50 },
-      speed: { type: 'number', label: 'Speed (m/min)', default: 20, min: 1, max: 100, step: 1 },
-      drivePosition: { type: 'select', label: 'Drive Position', default: 'end', options: ['end', 'center'] },
-      beltType: { type: 'select', label: 'Belt Type', default: 'flat-top', options: ['flush-grid', 'raised-rib', 'flat-top'] },
-      sideGuides: { type: 'boolean', label: 'Side Guides', default: true },
-    },
-  },
-  {
-    id: 'modular-conveyor-90-curve',
-    name: 'Modular Conveyor - 90° Curve',
-    category: 'process',
-    icon: ArrowUp,
-    description: 'Modular plastic belt conveyor - 90° curve section',
-    assetId: 'modular-conveyor-90-curve',
-    parameters: {
-      width: { type: 'number', label: 'Width (mm)', default: 600, min: 100, max: 1200, step: 50 },
-      height: { type: 'number', label: 'Height (mm)', default: 800, min: 300, max: 1500, step: 50 },
-      curveAngle: { type: 'number', label: 'Curve Angle (°)', default: 90, min: 15, max: 180, step: 5 },
-      curveRadius: { type: 'number', label: 'Curve Radius (mm)', default: 1000, min: 300, max: 2000, step: 50 },
-      speed: { type: 'number', label: 'Speed (m/min)', default: 20, min: 1, max: 100, step: 1 },
-      drivePosition: { type: 'select', label: 'Drive Position', default: 'end', options: ['end', 'center'] },
-      beltType: { type: 'select', label: 'Belt Type', default: 'flat-top', options: ['flush-grid', 'raised-rib', 'flat-top'] },
-      sideGuides: { type: 'boolean', label: 'Side Guides', default: true },
-    },
-  },
-  {
-    id: 'modular-conveyor-45-curve',
-    name: 'Modular Conveyor - 45° Curve',
-    category: 'process',
-    icon: ArrowUp,
-    description: 'Modular plastic belt conveyor - 45° curve section',
-    assetId: 'modular-conveyor-45-curve',
-    parameters: {
-      width: { type: 'number', label: 'Width (mm)', default: 600, min: 100, max: 1200, step: 50 },
-      height: { type: 'number', label: 'Height (mm)', default: 800, min: 300, max: 1500, step: 50 },
-      curveAngle: { type: 'number', label: 'Curve Angle (°)', default: 45, min: 15, max: 180, step: 5 },
-      curveRadius: { type: 'number', label: 'Curve Radius (mm)', default: 1000, min: 300, max: 2000, step: 50 },
-      speed: { type: 'number', label: 'Speed (m/min)', default: 20, min: 1, max: 100, step: 1 },
-      drivePosition: { type: 'select', label: 'Drive Position', default: 'end', options: ['end', 'center'] },
-      beltType: { type: 'select', label: 'Belt Type', default: 'flat-top', options: ['flush-grid', 'raised-rib', 'flat-top'] },
-      sideGuides: { type: 'boolean', label: 'Side Guides', default: true },
-    },
-  },
-  {
     id: 'belt-conveyor',
     name: 'Belt Conveyor',
     category: 'process',
@@ -335,33 +215,6 @@ export const moduleLibrary: ModuleDefinition[] = [
       adjustableFeetEnabled: { type: 'boolean', label: 'Adjustable Feet', default: true },
       infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
       outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 850, min: 0, max: 3000, step: 50 },
-    },
-  },
-  {
-    id: 'incline-conveyor',
-    name: 'Inclined Conveyor',
-    category: 'process',
-    icon: ArrowUp,
-    description: 'Premium 3-section incline conveyor with parametric chain, supports, and drive package',
-    assetId: 'incline-conveyor',
-    parameters: {
-      conveyorWidth: { type: 'number', label: 'Conveyor Width (mm)', default: 650, min: 250, max: 1800, step: 50 },
-      overallLength: { type: 'number', label: 'Overall Length (mm)', default: 5200, min: 1000, max: 60000, step: 100 },
-      infeedStraightLength: { type: 'number', label: 'Infeed Straight Length (mm)', default: 1200, min: 200, max: 30000, step: 50 },
-      inclinedLength: { type: 'number', label: 'Inclined Length (mm)', default: 2600, min: 200, max: 30000, step: 50 },
-      outfeedStraightLength: { type: 'number', label: 'Outfeed Straight Length (mm)', default: 1400, min: 200, max: 30000, step: 50 },
-      infeedHeightFromFloor: { type: 'number', label: 'Infeed Height From Floor (mm)', default: 800, min: 0, max: 12000, step: 25 },
-      outfeedHeightFromFloor: { type: 'number', label: 'Outfeed Height From Floor (mm)', default: 1500, min: 0, max: 12000, step: 25 },
-      inclineAngle: { type: 'number', label: 'Incline Angle (°)', default: 16, min: 0, max: 45, step: 0.5 },
-      sideGuideHeight: { type: 'number', label: 'Side Guide Height (mm)', default: 90, min: 0, max: 400, step: 10 },
-      sideGuidesEnabled: { type: 'boolean', label: 'Side Guides Enabled', default: true },
-      chainType: { type: 'select', label: 'Chain Type', default: 'Friction Top Chain', options: ['Friction Top Chain', 'Cleated Chain'] },
-      cleatPitch: { type: 'number', label: 'Cleat Pitch (mm)', default: 240, min: 60, max: 1200, step: 10 },
-      supportMode: { type: 'select', label: 'Support Mode', default: 'Standard', options: ['Standard', 'Heavy Duty', 'Minimal'] },
-      supportSpacing: { type: 'number', label: 'Support Spacing (mm)', default: 1500, min: 400, max: 5000, step: 50 },
-      driveSide: { type: 'select', label: 'Drive Side', default: 'Right', options: ['Left', 'Right'] },
-      motorPosition: { type: 'select', label: 'Motor Position', default: 'Outfeed', options: ['Infeed', 'Center', 'Outfeed'] },
-      frameFinish: { type: 'select', label: 'Frame Finish', default: 'Powder-Coated Steel', options: ['Powder-Coated Steel', 'Stainless Steel Brushed', 'Anodized Aluminium'] },
     },
   },
   {
@@ -988,30 +841,6 @@ export const moduleLibrary: ModuleDefinition[] = [
       thickness: { type: 'number', label: 'Thickness (mm)', default: 300, min: 200, max: 500, step: 50 },
     },
   },
-  {
-    id: 'floor',
-    name: 'Floor',
-    category: 'environment',
-    icon: Package,
-    description: 'Factory floor slab',
-    parameters: {
-      width: { type: 'number', label: 'Width (m)', default: 50, min: 5, max: 200, step: 1 },
-      depth: { type: 'number', label: 'Depth (m)', default: 50, min: 5, max: 200, step: 1 },
-      color: { type: 'color', label: 'Color', default: '#f0f0f0' },
-    },
-  },
-  {
-    id: 'floor-marking',
-    name: 'Floor Marking',
-    category: 'environment',
-    icon: Package,
-    description: 'Painted floor marking line/zone',
-    parameters: {
-      length: { type: 'number', label: 'Length (m)', default: 5, min: 0.5, max: 100, step: 0.5 },
-      width: { type: 'number', label: 'Width (m)', default: 0.2, min: 0.05, max: 5, step: 0.05 },
-      color: { type: 'color', label: 'Color', default: '#ffff00' },
-    },
-  },
 
   {
     id: 'pallet',
@@ -1152,36 +981,6 @@ export const moduleLibrary: ModuleDefinition[] = [
   },
 
   // Actor Modules
-  {
-    id: 'operator',
-    name: 'Operator',
-    category: 'actors',
-    icon: Package,
-    description: 'Human operator worker',
-    parameters: {
-      walkSpeed: {
-        type: 'number',
-        label: 'Walk Speed (m/min)',
-        default: 90,
-        min: 30,
-        max: 180,
-        step: 5,
-      },
-      color: {
-        type: 'color',
-        label: 'Uniform Color',
-        default: '#4f46e5',
-      },
-      skillLevel: {
-        type: 'select',
-        label: 'Skill Level',
-        default: 'medium',
-        options: ['low', 'medium', 'high', 'expert'],
-      },
-      pathId: { type: 'string', label: 'Assigned Path ID', default: '' },
-      loopPath: { type: 'boolean', label: 'Loop Path', default: true },
-    },
-  },
   {
     id: 'operator-1',
     name: 'Operator 1',
@@ -1753,68 +1552,9 @@ export function getModuleDefinition(id: string): ModuleDefinition | undefined {
 }
 
 export function getModulesByCategory(category: string): ModuleDefinition[] {
-  const baseModules = moduleLibrary.filter((module) => module.category === category);
-  const runtimeModules = _runtimeExternalModules
-    .filter((module) => module.category === category)
-    .sort((a, b) => {
-      const categoryOrderA = Number.isFinite(Number(a.libraryCategoryOrder)) ? Number(a.libraryCategoryOrder) : Number.MAX_SAFE_INTEGER;
-      const categoryOrderB = Number.isFinite(Number(b.libraryCategoryOrder)) ? Number(b.libraryCategoryOrder) : Number.MAX_SAFE_INTEGER;
-      if (categoryOrderA !== categoryOrderB) return categoryOrderA - categoryOrderB;
-      const categoryNameA = String(a.libraryCategoryName || '').toLowerCase();
-      const categoryNameB = String(b.libraryCategoryName || '').toLowerCase();
-      if (categoryNameA !== categoryNameB) return categoryNameA.localeCompare(categoryNameB);
-      const assetOrderA = Number.isFinite(Number(a.libraryAssetOrder)) ? Number(a.libraryAssetOrder) : Number.MAX_SAFE_INTEGER;
-      const assetOrderB = Number.isFinite(Number(b.libraryAssetOrder)) ? Number(b.libraryAssetOrder) : Number.MAX_SAFE_INTEGER;
-      if (assetOrderA !== assetOrderB) return assetOrderA - assetOrderB;
-      return a.name.localeCompare(b.name);
-    });
-
-  // Preserve legacy simulation library as the default source of truth while
-  // allowing Admin-published runtime modules to override by id and add new items.
-  const merged = new Map<string, ModuleDefinition>();
-  for (const module of baseModules) merged.set(module.id, module);
-  for (const module of runtimeModules) merged.set(module.id, module);
-  return Array.from(merged.values());
+  return [...moduleLibrary, ..._runtimeExternalModules].filter(module => module.category === category);
 }
 
 export function setRuntimeExternalModules(nextModules: ModuleDefinition[]): void {
   _runtimeExternalModules = Array.isArray(nextModules) ? [...nextModules] : [];
-}
-
-export interface RuntimeLibraryCategory {
-  key: string;
-  name: string;
-  slug: string | null;
-  sceneCategory: string;
-  order: number;
-  count: number;
-}
-
-export function getRuntimeLibraryModules(): ModuleDefinition[] {
-  return [..._runtimeExternalModules];
-}
-
-export function getRuntimeLibraryCategories(): RuntimeLibraryCategory[] {
-  const categories = new Map<string, RuntimeLibraryCategory>();
-  for (const module of _runtimeExternalModules) {
-    const key = String(module.libraryCategoryKey || '').trim();
-    if (!key) continue;
-    const existing = categories.get(key);
-    if (existing) {
-      existing.count += 1;
-      continue;
-    }
-    categories.set(key, {
-      key,
-      name: String(module.libraryCategoryName || module.category || 'Uncategorized'),
-      slug: module.libraryCategorySlug ?? null,
-      sceneCategory: String(module.librarySceneCategory || module.category || 'process'),
-      order: Number.isFinite(Number(module.libraryCategoryOrder)) ? Number(module.libraryCategoryOrder) : Number.MAX_SAFE_INTEGER,
-      count: 1,
-    });
-  }
-  return Array.from(categories.values()).sort((a, b) => {
-    if (a.order !== b.order) return a.order - b.order;
-    return a.name.localeCompare(b.name);
-  });
 }

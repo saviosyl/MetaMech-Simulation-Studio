@@ -8,16 +8,6 @@ import { FrameAssemblyExportContract } from '../lib/frameDesigner/model';
 import { toFrameAssemblyParameters } from '../lib/frameDesigner/sceneInterop';
 import { VideoQualityPreset } from '../lib/videoExportPresets';
 
-const REMOVED_LIBRARY_TYPES = new Set<string>([
-  'spiral-vyeor-conveyor',
-  'mm85-conveyor-section',
-  'mm85-drive-end',
-  'mm85-idler-end',
-  'mm85-guide-rail',
-  'mm85-support-leg',
-  'mm85-end-drive-support',
-]);
-
 function toRuntimeDefaultRotationFromMetadata(
   metadata: Record<string, unknown> | null | undefined
 ): [number, number, number] {
@@ -705,7 +695,7 @@ interface EditorState {
   simulationSpeed: number;
   
   // UI state
-  activeLibraryTab: string;
+  activeLibraryTab: 'process' | 'modular' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
   showPropertiesPanel: boolean;
   
   // Panel state
@@ -769,7 +759,7 @@ interface EditorState {
   setPathsVisible: (visible: boolean) => void;
   
   setSceneSettings: (settings: Partial<SceneSettings>) => void;
-  setActiveLibraryTab: (tab: string) => void;
+  setActiveLibraryTab: (tab: 'process' | 'modular' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical') => void;
   
   // Panel actions
   setLeftPanelWidth: (width: number) => void;
@@ -960,10 +950,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   // Actions
   addProcessNode: (type, position) => {
-    if (REMOVED_LIBRARY_TYPES.has(type)) {
-      console.warn(`[Library] Blocked placement of removed type: ${type}`);
-      return;
-    }
     // Check if there's a matching asset in the manifest
     const manifest = get().assetManifest;
     const matchingAsset = manifest.find(
@@ -1528,7 +1514,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   loadScene: (data) => {
     // Migrate old spiral-conveyor params to new format
-    const nodes = (data.processNodes || []).filter((n: { type?: string }) => !REMOVED_LIBRARY_TYPES.has(String(n?.type || '')));
+    const nodes = data.processNodes || [];
     for (const n of nodes) {
       if ((n.type === 'spiral-conveyor' || n.type === 'spiral-vyeor-conveyor') && n.parameters) {
         const p = n.parameters;

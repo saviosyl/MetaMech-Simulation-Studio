@@ -8,6 +8,15 @@ import { buildTransferBridge, buildPopupTransfer, buildPusherTransfer, buildMerg
 import { buildSpiralConveyor } from './spiralConveyorBuilder';
 import { buildVerticalLifter } from './verticalLifterBuilder';
 import { buildFrameAssembly } from './frameAssemblyBuilder';
+import {
+  buildMM85ConveyorSection,
+  buildMM85DriveEnd,
+  buildMM85IdlerEnd,
+  buildMM85GuideRail,
+  buildMM85SupportLeg,
+  buildMM85EndDriveSupport,
+  getMM85SourceReadyVersion,
+} from './mm85Builder';
 
 export type { BuilderResult, ConnectionPort } from './beltConveyorBuilder';
 
@@ -74,6 +83,12 @@ const registry: Record<string, BuilderFunction> = {
   spiralConveyorBuilder: buildSpiralConveyor,
   verticalLifterBuilder: buildVerticalLifter,
   frameAssemblyBuilder: buildFrameAssembly,
+  mm85ConveyorSectionBuilder: buildMM85ConveyorSection,
+  mm85DriveEndBuilder: buildMM85DriveEnd,
+  mm85IdlerEndBuilder: buildMM85IdlerEnd,
+  mm85GuideRailBuilder: buildMM85GuideRail,
+  mm85SupportLegBuilder: buildMM85SupportLeg,
+  mm85EndDriveSupportBuilder: buildMM85EndDriveSupport,
   adminBasicBeltTemplateBuilder,
 };
 
@@ -114,5 +129,8 @@ export function validateBuilderResult(result: BuilderResult | null): boolean {
 }
 
 export function getBuilderRenderVersion(name: string): number {
+  if (name.startsWith('mm85')) {
+    return getMM85SourceReadyVersion();
+  }
   return 0;
 }

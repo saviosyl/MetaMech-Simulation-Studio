@@ -47,26 +47,21 @@ const COLOR_MAP: Record<string, string> = {
 };
 const RANDOM_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
 
-const REMOVED_LIBRARY_TYPES = new Set<string>([
-  'spiral-vyeor-conveyor',
-  'mm85-conveyor-section',
-  'mm85-drive-end',
-  'mm85-idler-end',
-  'mm85-guide-rail',
-  'mm85-support-leg',
-  'mm85-end-drive-support',
-]);
-
 const CONVEYOR_TYPES = [
   'conveyor',
   'belt-conveyor',
   'roller-conveyor',
-  'spiral-conveyor',
   'bend-conveyor',
   'modular-conveyor-straight',
   'modular-conveyor-90-curve',
   'modular-conveyor-45-curve',
+  'spiral-conveyor',
+  'spiral-vyeor-conveyor',
   'incline-conveyor',
+  'mm85-conveyor-section',
+  'mm85-drive-end',
+  'mm85-idler-end',
+  'mm85-guide-rail',
 ];
 
 function hasCustomTransportPath(node: ProcessNode): boolean {
@@ -391,7 +386,7 @@ export class SimulationEngine {
   }
 
   init(nodes: ProcessNode[], edges: ProcessEdge[]) {
-    this.nodes = nodes.filter((node) => !REMOVED_LIBRARY_TYPES.has(String(node.type || '')));
+    this.nodes = nodes;
     this.edges = edges;
     this.products = [];
     this.simTime = 0;
@@ -531,7 +526,6 @@ export class SimulationEngine {
     // ── PASS 2: Tick everything else (conveyors, stoppers, sources, etc.) ──
     for (const node of this.nodes) {
       if (node.type === 'sensor') continue; // already ticked in pass 1
-      if (REMOVED_LIBRARY_TYPES.has(node.type)) continue;
       const stats = this.nodeStats.get(node.id)!;
       stats.totalTime = this.simTime;
       try {
@@ -541,12 +535,17 @@ export class SimulationEngine {
         case 'conveyor':
         case 'belt-conveyor':
         case 'roller-conveyor':
-        case 'spiral-conveyor':
         case 'bend-conveyor':
         case 'modular-conveyor-straight':
         case 'modular-conveyor-90-curve':
         case 'modular-conveyor-45-curve':
+        case 'spiral-conveyor':
+        case 'spiral-vyeor-conveyor':
         case 'incline-conveyor':
+        case 'mm85-conveyor-section':
+        case 'mm85-drive-end':
+        case 'mm85-idler-end':
+        case 'mm85-guide-rail':
           if (node.parameters.accumulationMode) {
             this.tickAccumulationConveyor(node, stats, elapsed);
           } else {
