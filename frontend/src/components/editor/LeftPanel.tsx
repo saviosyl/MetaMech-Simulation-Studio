@@ -38,6 +38,23 @@ function getSubcategory(module: ModuleDefinition): string {
   return 'Other';
 }
 
+function normalizeLibrarySearchText(value: string): string {
+  return String(value || '')
+    .toLowerCase()
+    // Treat separators consistently so "safety-rail" matches "Safety Rail".
+    .replace(/[_-]+/g, ' ')
+    // Ignore copy suffixes from scene object names.
+    .replace(/\(copy\)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeLibrarySearchQuery(value: string): string {
+  const base = normalizeLibrarySearchText(value);
+  // Scene object names often carry timestamp suffixes (e.g. wall_1773389705770).
+  return base.replace(/\s+\d+$/, '').trim();
+}
+
 const LeftPanel: React.FC = () => {
   const { activeLibraryTab, setActiveLibraryTab, leftPanelWidth, setLeftPanelWidth, leftPanelCollapsed, setLeftPanelCollapsed } = useEditorStore();
   const isResizing = useRef(false);
@@ -48,8 +65,18 @@ const LeftPanel: React.FC = () => {
   const allModules = getModulesByCategory(activeLibraryTab);
   const modules = useMemo(() => {
     if (!searchQuery.trim()) return allModules;
-    const q = searchQuery.toLowerCase();
-    return allModules.filter(m => m.name.toLowerCase().includes(q) || m.description.toLowerCase().includes(q));
+    const q = normalizeLibrarySearchQuery(searchQuery);
+    if (!q) return allModules;
+    return allModules.filter((m) => {
+      const haystack = [
+        m.name,
+        m.id,
+        m.description,
+      ]
+        .map(normalizeLibrarySearchText)
+        .join(' ');
+      return haystack.includes(q);
+    });
   }, [allModules, searchQuery]);
 
   const groupedModules = useMemo(() => {
