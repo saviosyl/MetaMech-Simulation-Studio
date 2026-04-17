@@ -988,6 +988,30 @@ export const moduleLibrary: ModuleDefinition[] = [
       thickness: { type: 'number', label: 'Thickness (mm)', default: 300, min: 200, max: 500, step: 50 },
     },
   },
+  {
+    id: 'floor',
+    name: 'Floor',
+    category: 'environment',
+    icon: Package,
+    description: 'Factory floor slab',
+    parameters: {
+      width: { type: 'number', label: 'Width (m)', default: 50, min: 5, max: 200, step: 1 },
+      depth: { type: 'number', label: 'Depth (m)', default: 50, min: 5, max: 200, step: 1 },
+      color: { type: 'color', label: 'Color', default: '#f0f0f0' },
+    },
+  },
+  {
+    id: 'floor-marking',
+    name: 'Floor Marking',
+    category: 'environment',
+    icon: Package,
+    description: 'Painted floor marking line/zone',
+    parameters: {
+      length: { type: 'number', label: 'Length (m)', default: 5, min: 0.5, max: 100, step: 0.5 },
+      width: { type: 'number', label: 'Width (m)', default: 0.2, min: 0.05, max: 5, step: 0.05 },
+      color: { type: 'color', label: 'Color', default: '#ffff00' },
+    },
+  },
 
   {
     id: 'pallet',
