@@ -214,6 +214,24 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
     return { belt, support, outerGuide, innerGuide };
   }, [innerRadius, outerRadius, startAngle, totalAngle, effectiveHeight, totalSegs, beltThickness, sideGuides, guideHeightM]);
 
+  // Support bracket anchor points along the helix (every quarter turn).
+  const bracketData = useMemo(() => {
+    const brackets: { x: number; y: number; z: number; angle: number }[] = [];
+    const step = Math.max(1, Math.floor(segsPerTurn / 4));
+    for (let i = 0; i <= totalSegs; i += step) {
+      const t = i / totalSegs;
+      const angle = startAngle + t * totalAngle;
+      const y = t * effectiveHeight;
+      brackets.push({
+        x: Math.cos(angle) * outerRadius,
+        y,
+        z: Math.sin(angle) * outerRadius,
+        angle,
+      });
+    }
+    return brackets;
+  }, [totalSegs, segsPerTurn, startAngle, totalAngle, effectiveHeight, outerRadius]);
+
   const supportGroundY = -bottomY;
   const supportTopY = effectiveHeight + 0.06;
   const supportHeight = Math.max(0.2, supportTopY - supportGroundY);
@@ -243,23 +261,28 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
   const towerX = Math.cos(towerAngle) * towerDist;
   const towerZ = Math.sin(towerAngle) * towerDist;
   const towerYaw = -towerAngle + Math.PI / 2;
-  const tripodRadius = Math.max(outerRadius + 0.24, 0.55);
-  const tripodBeamY = supportGroundY + 0.045;
-  const tripodFootTopY = supportGroundY + 0.006;
-  const tripodStemY = supportGroundY + 0.02;
+  const spiralOuterDiameter = outerRadius * 2;
+  const legOffsetFromBelt = THREE.MathUtils.clamp(spiralOuterDiameter * 0.08, 0.05, 0.1);
+  const legRadius = outerRadius + legOffsetFromBelt;
+  // Keep leg-frame below belt plane (y=0) so it cannot intersect the transport path.
+  const legTopY = -0.03;
+  const legHeight = Math.max(0.12, legTopY - supportGroundY);
+  const legCenterY = supportGroundY + legHeight / 2;
+  const levelingFootPadY = supportGroundY + 0.005;
+  const levelingRodY = supportGroundY + 0.024;
+  const levelingNutY = supportGroundY + 0.039;
   const supportArmAnchorX = Math.cos(towerAngle) * (outerRadius - 0.03);
   const supportArmAnchorZ = Math.sin(towerAngle) * (outerRadius - 0.03);
   const supportArmDx = supportArmAnchorX - towerX;
   const supportArmDz = supportArmAnchorZ - towerZ;
   const supportArmLen = Math.max(0.12, Math.sqrt(supportArmDx * supportArmDx + supportArmDz * supportArmDz));
   const supportArmYaw = Math.atan2(supportArmDz, supportArmDx);
-  const tripodFootPositions = useMemo<[number, number][]>(() => {
-    const base = towerAngle + Math.PI;
-    return [0, 1, 2].map((i) => {
-      const a = base + ((Math.PI * 2) * i) / 3;
-      return [Math.cos(a) * tripodRadius, Math.sin(a) * tripodRadius] as [number, number];
-    });
-  }, [towerAngle, tripodRadius]);
+  const legPositions = useMemo<[number, number][]>(() => ([
+    [legRadius, 0],
+    [0, legRadius],
+    [-legRadius, 0],
+    [0, -legRadius],
+  ]), [legRadius]);
 
   const tangentYaw = (tx: number, tz: number) => Math.atan2(-tz, tx);
   const startTanX = -Math.sin(startAngle);
@@ -480,7 +503,7 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
         </group>
       </group>
 
-      {/* ═══ Base Frame — compact industrial tripod + level arms ═══ */}
+      {/* ═══ Base Frame — clean 4-leg industrial support ═══ */}
       {showLegs && (
         <group>
           {/* Central support extension to ground */}
@@ -488,36 +511,31 @@ const SpiralConveyorModel: React.FC<Props> = ({ parameters }) => {
             <cylinderGeometry args={[drumRadius * 0.78, drumRadius * 0.78, Math.max(0.08, -supportGroundY + 0.02), 24]} />
           </mesh>
 
-          {/* Tripod beams + feet */}
-          {tripodFootPositions.map(([fx, fz], i) => {
-            const dx = fx;
-            const dz = fz;
-            const len = Math.sqrt(dx * dx + dz * dz);
-            const yaw = Math.atan2(dz, dx);
-            return (
-              <group key={`tripod-${i}`}>
-                <mesh
-                  material={matTowerFrame}
-                  position={[fx * 0.5, tripodBeamY, fz * 0.5]}
-                  rotation={[0, yaw, 0]}
-                  castShadow
-                >
-                  <boxGeometry args={[len, 0.03, 0.05]} />
-                </mesh>
-                <mesh material={matTowerFrame} position={[fx, tripodStemY, fz]} castShadow>
-                  <cylinderGeometry args={[0.014, 0.016, 0.04, 10]} />
-                </mesh>
-                <mesh material={matRubber} position={[fx, tripodFootTopY, fz]}>
-                  <cylinderGeometry args={[0.035, 0.04, 0.012, 12]} />
-                </mesh>
-              </group>
-            );
-          })}
-
-          {/* Rear mast grounding foot */}
-          <mesh material={matRubber} position={[towerX, tripodFootTopY, towerZ]}>
-            <cylinderGeometry args={[0.03, 0.034, 0.012, 12]} />
+          {/* Compact lower frame tied into the column base */}
+          <mesh material={matTowerFrame} position={[0, legTopY, 0]} castShadow>
+            <boxGeometry args={[legRadius * 2, 0.024, 0.055]} />
           </mesh>
+          <mesh material={matTowerFrame} position={[0, legTopY, 0]} castShadow>
+            <boxGeometry args={[0.055, 0.024, legRadius * 2]} />
+          </mesh>
+
+          {/* Four vertical legs at 90° spacing with grounded foot pads */}
+          {legPositions.map(([lx, lz], i) => (
+            <group key={`leg-${i}`}>
+              <mesh material={matTowerFrame} position={[lx, legCenterY, lz]} castShadow>
+                <boxGeometry args={[0.042, legHeight, 0.042]} />
+              </mesh>
+              <mesh material={matDrumStainless} position={[lx, levelingRodY, lz]} castShadow>
+                <cylinderGeometry args={[0.006, 0.006, 0.032, 10]} />
+              </mesh>
+              <mesh material={matBasePlate} position={[lx, levelingNutY, lz]} castShadow>
+                <cylinderGeometry args={[0.011, 0.011, 0.008, 8]} />
+              </mesh>
+              <mesh material={matRubber} position={[lx, levelingFootPadY, lz]}>
+                <cylinderGeometry args={[0.028, 0.033, 0.01, 12]} />
+              </mesh>
+            </group>
+          ))}
 
           {/* Clean horizontal support arms from rear mast to spiral levels */}
           {levelSupportYs.map((yy, i) => (
