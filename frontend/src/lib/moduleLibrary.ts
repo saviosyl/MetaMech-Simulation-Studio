@@ -838,6 +838,32 @@ export const moduleLibrary: ModuleDefinition[] = [
   },
 
   {
+    id: 'floor',
+    name: 'Floor',
+    category: 'environment',
+    icon: Package,
+    description: 'Base factory floor plane',
+    assetId: 'floor',
+    parameters: {
+      width: { type: 'number', label: 'Width (m)', default: 50, min: 1, max: 500, step: 1 },
+      depth: { type: 'number', label: 'Depth (m)', default: 50, min: 1, max: 500, step: 1 },
+      color: { type: 'color', label: 'Floor Color', default: '#f0f0f0' },
+    },
+  },
+  {
+    id: 'floor-marking',
+    name: 'Floor Marking',
+    category: 'environment',
+    icon: Package,
+    description: 'Painted floor line / lane marking',
+    assetId: 'floor-marking',
+    parameters: {
+      length: { type: 'number', label: 'Length (m)', default: 5, min: 0.1, max: 100, step: 0.1 },
+      width: { type: 'number', label: 'Width (m)', default: 0.2, min: 0.02, max: 5, step: 0.01 },
+      color: { type: 'color', label: 'Marking Color', default: '#ffff00' },
+    },
+  },
+  {
     id: 'pallet',
     name: 'Pallet',
     category: 'environment',

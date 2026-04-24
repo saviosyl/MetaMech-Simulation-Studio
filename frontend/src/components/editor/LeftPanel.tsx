@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield, Columns } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModulesByCategory, ModuleDefinition } from '../../lib/moduleLibrary';
@@ -44,6 +44,11 @@ const LeftPanel: React.FC = () => {
   const [viewMode, setViewMode] = useState<'library' | 'scene'>('library');
   const [searchQuery, setSearchQuery] = useState('');
   const [layout, setLayout] = useState<ViewLayout>('compact');
+
+  // Keep browsing behavior predictable across tabs by clearing stale tab-specific searches.
+  useEffect(() => {
+    setSearchQuery('');
+  }, [activeLibraryTab]);
 
   const allModules = getModulesByCategory(activeLibraryTab);
   const modules = useMemo(() => {
