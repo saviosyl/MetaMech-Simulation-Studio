@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useEditorStore } from '../../store/editorStore';
@@ -12,7 +12,11 @@ const _offset = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 const _selectedPos = new THREE.Vector3();
 
-const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMouse?: boolean }> = ({ orbitRef, suspendSpaceMouse = false }) => {
+const CameraControls: React.FC<{
+  orbitRef: React.RefObject<any>;
+  suspendSpaceMouse?: boolean;
+  onSpaceMouseNavigationChange?: (navigating: boolean) => void;
+}> = ({ orbitRef, suspendSpaceMouse = false, onSpaceMouseNavigationChange }) => {
   const { camera } = useThree();
   const {
     cameraTargetPosition,
@@ -32,6 +36,28 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
   const targetUp = useRef(new THREE.Vector3(0, 1, 0));
   const lastFocusRequest = useRef(0);
   const loggedOnce = useRef(false);
+  const isSpaceMouseNavigating = useRef(false);
+
+  const setSpaceMouseNavigating = (navigating: boolean) => {
+    if (isSpaceMouseNavigating.current === navigating) return;
+    isSpaceMouseNavigating.current = navigating;
+    onSpaceMouseNavigationChange?.(navigating);
+  };
+
+  const sceneOrbitCenter = useMemo(() => {
+    const allObjects = [...processNodes, ...environmentAssets, ...actors];
+    if (allObjects.length === 0) return null;
+
+    let sx = 0;
+    let sy = 0;
+    let sz = 0;
+    for (const obj of allObjects) {
+      sx += obj.position[0];
+      sy += obj.position[1];
+      sz += obj.position[2];
+    }
+    return new THREE.Vector3(sx / allObjects.length, sy / allObjects.length, sz / allObjects.length);
+  }, [processNodes, environmentAssets, actors]);
 
   // Handle camera presets
   useEffect(() => {
@@ -68,6 +94,8 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
     animating.current = true;
   }, [focusRequest]);
 
+  useEffect(() => () => setSpaceMouseNavigating(false), []);
+
   useFrame((_, delta) => {
     const controls = orbitRef.current;
     const dt = Math.min(delta, 0.05);
@@ -92,10 +120,16 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
     }
 
     // ── 3Dconnexion SpaceMouse ──
-    if (suspendSpaceMouse) return;
+    if (suspendSpaceMouse) {
+      setSpaceMouseNavigating(false);
+      return;
+    }
 
     const sm = spaceMouse.poll();
-    if (!sm.connected) return;
+    if (!sm.connected) {
+      setSpaceMouseNavigating(false);
+      return;
+    }
 
     const [tx, ty, tz] = sm.translate;  // axes 0,1,2
     const [rx, ry, rz] = sm.rotate;     // axes 3,4,5
@@ -118,9 +152,16 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
     // This matches how you physically twist the SpaceMouse cap
 
     const hasInput = Math.abs(tx) + Math.abs(ty) + Math.abs(tz) +
-                     Math.abs(rx) + Math.abs(ry) + Math.abs(rz) > 0.005;
-    if (!hasInput) return;
-    if (!controls) return;
+                     Math.abs(rx) + Math.abs(ry) + Math.abs(rz) > 0.0075;
+    if (!hasInput) {
+      setSpaceMouseNavigating(false);
+      return;
+    }
+    if (!controls) {
+      setSpaceMouseNavigating(false);
+      return;
+    }
+    setSpaceMouseNavigating(true);
 
     const cfg = spaceMouse.config;
     // Zoom direction modes:
@@ -141,20 +182,35 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
     _offset.copy(camera.position).sub(controls.target);
     const dist = _offset.length();
 
-    // Prefer selected object as a rotation center during pure orbit gestures.
-    if (selectedObjectId && (Math.abs(tx) + Math.abs(ty)) < 0.03 && (Math.abs(rx) + Math.abs(rz)) > 0.03) {
-      const selected =
-        processNodes.find(n => n.id === selectedObjectId) ||
-        environmentAssets.find(a => a.id === selectedObjectId) ||
-        actors.find(a => a.id === selectedObjectId);
-      if (selected) {
-        _selectedPos.set(selected.position[0], selected.position[1], selected.position[2]);
-        controls.target.lerp(_selectedPos, Math.min(1, dt * 3.5));
+    const rotateIntent = Math.abs(rx) + Math.abs(rz);
+    const panIntent = Math.abs(panX) + Math.abs(panY);
+    const zoomIntent = Math.abs(zoomInput);
+
+    // Lock orbit pivot to a stable center: selected object center if available,
+    // otherwise overall layout center.
+    if (rotateIntent > 0.018 && panIntent < 0.02 && zoomIntent < 0.02) {
+      let pivot: THREE.Vector3 | null = null;
+      if (selectedObjectId) {
+        const selected =
+          processNodes.find(n => n.id === selectedObjectId) ||
+          environmentAssets.find(a => a.id === selectedObjectId) ||
+          actors.find(a => a.id === selectedObjectId);
+        if (selected) {
+          _selectedPos.set(selected.position[0], selected.position[1], selected.position[2]);
+          pivot = _selectedPos;
+        }
+      }
+      if (!pivot && sceneOrbitCenter) {
+        _selectedPos.copy(sceneOrbitCenter);
+        pivot = _selectedPos;
+      }
+      if (pivot) {
+        controls.target.lerp(pivot, Math.min(1, dt * 6));
       }
     }
 
     // ── PAN: slide left/right + vertical pan axis chosen by zoom direction mode ──
-    if (Math.abs(panX) > 0.005 || Math.abs(panY) > 0.005) {
+    if (Math.abs(panX) > 0.008 || Math.abs(panY) > 0.008) {
       const panSpeed = dt * dist * 0.85 * cfg.translateSpeed;  // proportional to distance
       _v.set(0, 0, 0);
       _v.addScaledVector(_right, -panX * panSpeed);   // negative: push right = pan right
@@ -164,7 +220,7 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
     }
 
     // ── ZOOM: mapped by configured direction mode ──
-    if (Math.abs(zoomInput) > 0.005) {
+    if (Math.abs(zoomInput) > 0.008) {
       const zoomSpeed = dt * dist * 1.1 * cfg.zoomSpeed;
       const zoomAmount = zoomInput * zoomSpeed;
       // Move camera along the camera→target direction
@@ -175,7 +231,7 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
     }
 
     // ── ORBIT HORIZONTAL: twist/yaw (rZ) — twist left = orbit left ──
-    if (Math.abs(rz) > 0.005) {
+    if (Math.abs(rz) > 0.008) {
       _offset.copy(camera.position).sub(controls.target);
       const yawAngle = rz * dt * 3.0 * cfg.rotateSpeed;
       _offset.applyAxisAngle(_yAxis, yawAngle);
@@ -183,7 +239,9 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
     }
 
     // ── ORBIT VERTICAL: tilt/pitch (rX) — tilt forward = orbit down ──
-    if (Math.abs(rx) > 0.005) {
+    if (Math.abs(rx) > 0.008) {
+      camera.getWorldDirection(_fwd);
+      _right.crossVectors(_fwd, camera.up).normalize();
       _offset.copy(camera.position).sub(controls.target);
       const pitchAngle = rx * dt * 2.5 * cfg.rotateSpeed;
       _offset.applyAxisAngle(_right, pitchAngle);
@@ -199,7 +257,6 @@ const CameraControls: React.FC<{ orbitRef: React.RefObject<any>; suspendSpaceMou
 
     // Stabilize horizon to avoid subtle long-session roll drift.
     camera.up.lerp(_yAxis, Math.min(1, dt * 4));
-    camera.lookAt(controls.target);
     controls.update();
   });
 

@@ -339,8 +339,10 @@ const isMobileSafari = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.te
 const SceneContent: React.FC<{
   orbitRef: React.RefObject<any>;
   isNavigating: boolean;
-  onNavigationChange: (moving: boolean) => void;
-}> = ({ orbitRef, isNavigating, onNavigationChange }) => {
+  isOrbitNavigating: boolean;
+  onOrbitNavigationChange: (moving: boolean) => void;
+  onSpaceMouseNavigationChange: (moving: boolean) => void;
+}> = ({ orbitRef, isNavigating, isOrbitNavigating, onOrbitNavigationChange, onSpaceMouseNavigationChange }) => {
   const {
     processNodes,
     environmentAssets,
@@ -634,7 +636,11 @@ const SceneContent: React.FC<{
       <MeasurementTool />
 
       {/* Camera Animation Controls */}
-      <CameraControls orbitRef={orbitRef} suspendSpaceMouse={isNavigating} />
+      <CameraControls
+        orbitRef={orbitRef}
+        suspendSpaceMouse={isOrbitNavigating}
+        onSpaceMouseNavigationChange={onSpaceMouseNavigationChange}
+      />
 
       {/* Camera Controls */}
       <OrbitControls
@@ -651,8 +657,8 @@ const SceneContent: React.FC<{
         maxDistance={100}
         minPolarAngle={0}
         maxPolarAngle={Math.PI - 0.001}
-        onStart={() => onNavigationChange(true)}
-        onEnd={() => onNavigationChange(false)}
+        onStart={() => onOrbitNavigationChange(true)}
+        onEnd={() => onOrbitNavigationChange(false)}
       />
 
       {/* Scene background color — adapts to theme */}
@@ -665,7 +671,8 @@ const SceneContent: React.FC<{
 
 const Viewport: React.FC = () => {
   const orbitRef = useRef<any>(null);
-  const [isNavigating, setIsNavigating] = useState(false);
+  const [isOrbitNavigating, setIsOrbitNavigating] = useState(false);
+  const [isSpaceMouseNavigating, setIsSpaceMouseNavigating] = useState(false);
   const [hasPlacedModule, setHasPlacedModule] = useState(false);
   
   const {
@@ -685,6 +692,7 @@ const Viewport: React.FC = () => {
 
   const exportPreset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
   const dynamicDprMax = isExportRendering ? Math.max(2, Math.min(3, exportPreset.targetDpr)) : 2;
+  const isNavigating = isOrbitNavigating || isSpaceMouseNavigating;
 
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -786,7 +794,13 @@ const Viewport: React.FC = () => {
         <ExportRendererTuner active={isExportRendering} preset={captureQualityPreset} />
         <InteractionPerformanceTuner isNavigating={isNavigating} isExportRendering={isExportRendering} />
         <Suspense fallback={null}>
-          <SceneContent orbitRef={orbitRef} isNavigating={isNavigating} onNavigationChange={setIsNavigating} />
+          <SceneContent
+            orbitRef={orbitRef}
+            isNavigating={isNavigating}
+            isOrbitNavigating={isOrbitNavigating}
+            onOrbitNavigationChange={setIsOrbitNavigating}
+            onSpaceMouseNavigationChange={setIsSpaceMouseNavigating}
+          />
         </Suspense>
         {/* 3D orientation gizmo */}
         <GizmoHelper alignment="bottom-right" margin={[78, 88]}>
