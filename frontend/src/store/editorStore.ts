@@ -8,6 +8,31 @@ import { FrameAssemblyExportContract } from '../lib/frameDesigner/model';
 import { toFrameAssemblyParameters } from '../lib/frameDesigner/sceneInterop';
 import { VideoQualityPreset } from '../lib/videoExportPresets';
 
+const LEGACY_ENV_PROCESS_TYPES = new Set<string>([
+  'wall',
+  'door',
+  'window',
+  'stairs',
+  'safety-rail',
+  'floor-marking',
+  'pallet-rack',
+  'warehouse-shell',
+  'floor',
+  'pallet',
+  'cardboard-box',
+  'frame-assembly',
+  'fence',
+  'fence-gate',
+  'bollard',
+  'operator-station',
+  'electrical-cabinet',
+  'tower-light',
+  'hmi-stand',
+  'machine-enclosure',
+  'floor-zone',
+  'pallet-stack',
+]);
+
 // Types
 export interface ProcessNode {
   id: string;
@@ -1414,9 +1439,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
       }
     }
+
+    // Legacy recovery: older saves may keep environment assets in processNodes.
+    // Move them back to environmentAssets so they render via EnvironmentAssetComponent.
+    const normalizedProcessNodes = [];
+    const migratedEnvironmentAssets = [];
+    for (const n of nodes) {
+      if (LEGACY_ENV_PROCESS_TYPES.has(String(n?.type || ''))) {
+        migratedEnvironmentAssets.push({
+          ...n,
+          scale: n?.scale || [1, 1, 1],
+          rotation: n?.rotation || [0, 0, 0],
+          parameters: n?.parameters || {},
+        });
+      } else {
+        normalizedProcessNodes.push(n);
+      }
+    }
+
+    const mergedEnvironmentAssets = [...migratedEnvironmentAssets, ...(data.environmentAssets || [])];
+    const dedupedEnvironmentAssets = mergedEnvironmentAssets.filter((asset, index, arr) => (
+      arr.findIndex((x) => x.id === asset.id) === index
+    ));
+
     set({
-      processNodes: nodes,
-      environmentAssets: data.environmentAssets || [],
+      processNodes: normalizedProcessNodes,
+      environmentAssets: dedupedEnvironmentAssets,
       actors: data.actors || [],
       edges: data.edges || [],
       underlay: data.underlay || null,
