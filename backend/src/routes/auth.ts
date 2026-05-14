@@ -292,8 +292,19 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Enforce one active session per account by rotating token_version at each login.
+    const rotatedToken = await query(
+      `UPDATE users
+       SET token_version = COALESCE(token_version, 0) + 1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING token_version`,
+      [user.id]
+    );
+    const tokenVersion = Number(rotatedToken.rows[0]?.token_version || (user.token_version ?? 1));
+
     // Create JWT token
-    const payload: JWTPayload = { userId: user.id, email: user.email, tokenVersion: user.token_version ?? 1 };
+    const payload: JWTPayload = { userId: user.id, email: user.email, tokenVersion };
     const expiresIn = resolveJwtExpiresIn();
     const token = jwt.sign(payload, process.env.JWT_SECRET!, {
       expiresIn
@@ -325,9 +336,29 @@ router.post('/login', async (req, res) => {
 });
 
 // Logout
-router.post('/logout', (req, res) => {
-  res.clearCookie('token');
-  res.json({ message: 'Logout successful' });
+router.post('/logout', async (req, res) => {
+  try {
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
+        if (decoded?.userId) {
+          await query(
+            `UPDATE users
+             SET token_version = COALESCE(token_version, 0) + 1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [decoded.userId]
+          );
+        }
+      } catch {
+        // Ignore invalid/expired token on logout and proceed to clear cookie.
+      }
+    }
+  } finally {
+    res.clearCookie('token');
+    res.json({ message: 'Logout successful' });
+  }
 });
 
 // Get current user

@@ -1210,8 +1210,14 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     );
   }
 
+  await env.DB
+    .prepare('UPDATE users SET token_version = COALESCE(token_version, 0) + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .bind(user.id)
+    .run();
+  const nextTokenVersion = Number(user.token_version || 0) + 1;
+
   const token = await signJwt(
-    { userId: user.id, email: user.email, tokenVersion: user.token_version || 1 },
+    { userId: user.id, email: user.email, tokenVersion: nextTokenVersion || 1 },
     env.JWT_SECRET,
     expiresInSeconds(env)
   );
@@ -1282,7 +1288,14 @@ async function handleMe(request: Request, env: Env): Promise<Response> {
   });
 }
 
-async function handleLogout(): Promise<Response> {
+async function handleLogout(request: Request, env: Env): Promise<Response> {
+  const user = await readAuthedUser(request, env);
+  if (user) {
+    await env.DB
+      .prepare('UPDATE users SET token_version = COALESCE(token_version, 0) + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .bind(user.id)
+      .run();
+  }
   return toJson({ message: 'Logout successful' }, 200, { 'Set-Cookie': clearCookieHeader() });
 }
 
@@ -1514,7 +1527,7 @@ export default {
       }
 
       if (request.method === 'POST' && path === '/auth/logout') {
-        response = await handleLogout();
+        response = await handleLogout(request, env);
         return withCors(request, response, env);
       }
 
