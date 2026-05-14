@@ -38,9 +38,9 @@ const HomePage: React.FC = () => {
 
         <section
           style={{
-            borderRadius: 20,
+            borderRadius: 22,
             border: '1px solid var(--mm-border-subtle)',
-            background: 'var(--mm-bg-surface)',
+            background: 'linear-gradient(180deg, color-mix(in oklab, var(--mm-bg-surface) 82%, #ebf8ff 18%) 0%, var(--mm-bg-surface) 100%)',
             boxShadow: 'var(--mm-shadow-sm)',
             padding: '24px 28px',
           }}

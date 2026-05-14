@@ -56,14 +56,31 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
   return (
     <section
       style={{
-        borderRadius: 20,
+        borderRadius: 22,
         border: '1px solid var(--mm-border-subtle)',
         background: 'var(--mm-bg-surface)',
         boxShadow: 'var(--mm-shadow-sm)',
         padding: compact ? '24px' : '34px',
       }}
     >
-      <div style={{ marginBottom: 18 }}>
+      <div style={{ marginBottom: 18, display: 'grid', gap: 12 }}>
+        <div
+          style={{
+            borderRadius: 12,
+            border: '1px solid var(--mm-border-subtle)',
+            background: 'var(--mm-bg-panel)',
+            padding: '10px 12px',
+            display: 'grid',
+            gap: 6,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--mm-text-primary)' }}>
+            Access policy in one line
+          </div>
+          <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--mm-text-secondary)' }}>
+            Verified account + active entitlement = Simulation access. When plan period ends, entitlement expires automatically.
+          </div>
+        </div>
         <div
           style={{
             fontSize: 11,
@@ -76,7 +93,7 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
         >
           Simulation Tool Pricing
         </div>
-        <h2 style={{ fontSize: compact ? 28 : 34, lineHeight: 1.12, fontWeight: 760, marginBottom: 10, letterSpacing: '-0.014em' }}>
+        <h2 style={{ fontSize: compact ? 30 : 36, lineHeight: 1.1, fontWeight: 780, marginBottom: 10, letterSpacing: '-0.016em' }}>
           Simple access pricing for engineering teams
         </h2>
         <p style={{ fontSize: 15, color: 'var(--mm-text-secondary)', maxWidth: 760 }}>
@@ -94,9 +111,9 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
       >
         <article
           style={{
-            borderRadius: 16,
+            borderRadius: 18,
             border: '1px solid var(--mm-border-subtle)',
-            background: 'var(--mm-bg-panel)',
+            background: 'linear-gradient(180deg, color-mix(in oklab, var(--mm-bg-panel) 86%, #eef8fb 14%) 0%, var(--mm-bg-panel) 100%)',
             padding: '20px 20px 18px',
           }}
         >
@@ -130,7 +147,7 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
               height: 44,
               borderRadius: 12,
               border: 'none',
-              background: 'linear-gradient(135deg, #0891b2, #06b6d4)',
+              background: 'linear-gradient(135deg, #0284c7, #06b6d4)',
               color: '#fff',
               fontSize: 14,
               fontWeight: 700,
@@ -146,10 +163,11 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
 
         <article
           style={{
-            borderRadius: 16,
-            border: '1px solid var(--mm-border-subtle)',
-            background: 'var(--mm-bg-panel)',
+            borderRadius: 18,
+            border: '1px solid color-mix(in oklab, var(--mm-accent-primary) 28%, var(--mm-border-subtle) 72%)',
+            background: 'linear-gradient(180deg, color-mix(in oklab, var(--mm-bg-panel) 82%, #ebf8ff 18%) 0%, var(--mm-bg-panel) 100%)',
             padding: '20px 20px 18px',
+            boxShadow: '0 10px 24px rgba(8, 145, 178, 0.12)',
           }}
         >
           <div
@@ -159,12 +177,12 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
               fontWeight: 700,
               borderRadius: 999,
               padding: '6px 10px',
-              background: 'var(--mm-accent-primary-muted)',
+              background: 'color-mix(in oklab, var(--mm-accent-primary) 14%, var(--mm-bg-panel) 86%)',
               color: 'var(--mm-accent-primary)',
               marginBottom: 10,
             }}
           >
-            Full Access
+            Full Access · Recommended
           </div>
           <h3 style={{ fontSize: 24, marginBottom: 8, fontWeight: 700 }}>Full Access</h3>
           <p style={{ fontSize: 14, color: 'var(--mm-text-secondary)', minHeight: 42 }}>
@@ -186,7 +204,7 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
                   height: 42,
                   borderRadius: 10,
                   border: 'none',
-                  background: '#0f172a',
+                  background: 'linear-gradient(135deg, #0f172a, #1e293b)',
                   color: '#fff',
                   fontSize: 14,
                   fontWeight: 700,
@@ -204,7 +222,7 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
               <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)' }}>per month</div>
             </div>
 
-            <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 12, background: 'var(--mm-bg-surface)', padding: '10px 10px 9px' }}>
+            <div style={{ border: '1px solid color-mix(in oklab, var(--mm-accent-primary) 28%, var(--mm-border-subtle) 72%)', borderRadius: 12, background: 'color-mix(in oklab, var(--mm-bg-surface) 85%, #e9f9ff 15%)', padding: '10px 10px 9px' }}>
               <button
                 type="button"
                 onClick={() => startCheckout('yearly')}
@@ -242,6 +260,37 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
             Secure checkout via Stripe.
           </p>
         </article>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gap: 8,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+          marginBottom: 12,
+        }}
+      >
+        {[
+          'Secure Stripe checkout',
+          'Membership can be managed anytime in billing portal',
+          'Yearly plan offers the best monthly-effective value',
+        ].map((item) => (
+          <div
+            key={item}
+            style={{
+              borderRadius: 10,
+              border: '1px solid var(--mm-border-subtle)',
+              background: 'var(--mm-bg-panel)',
+              padding: '8px 10px',
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--mm-text-secondary)',
+              lineHeight: 1.5,
+            }}
+          >
+            {item}
+          </div>
+        ))}
       </div>
 
       <p style={{ fontSize: 13, color: 'var(--mm-text-tertiary)', marginBottom: 8 }}>

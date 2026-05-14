@@ -55,6 +55,12 @@ const SimulationProductPage: React.FC = () => {
     'Customer demo and proposal support',
   ];
 
+  const proofStats = [
+    'Connection-aware layout modeling',
+    'Simulation-first validation workflow',
+    'Presentation-ready review output',
+  ];
+
   return (
     <div
       style={{
@@ -93,6 +99,25 @@ const SimulationProductPage: React.FC = () => {
               <p style={{ fontSize: 17, color: 'var(--mm-text-secondary)', lineHeight: 1.68, maxWidth: 620, marginBottom: 20, fontWeight: 500 }}>
                 MetaMech Simulation Studio helps engineering teams design layouts, validate flow behavior, and present clear implementation decisions with confidence.
               </p>
+              <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', marginBottom: 14, maxWidth: 690 }}>
+                {proofStats.map((item) => (
+                  <div
+                    key={item}
+                    style={{
+                      borderRadius: 10,
+                      border: '1px solid var(--mm-border-subtle)',
+                      background: 'var(--mm-bg-panel)',
+                      padding: '8px 10px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: 'var(--mm-text-secondary)',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {item}
+                  </div>
+                ))}
+              </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                 <Link to="/simulation/access?mode=signup" style={primaryBtn}>{simulationCtas.startTrial}</Link>
                 <Link to="/simulation/access?mode=signin" style={ghostBtn}>Sign in</Link>
@@ -249,7 +274,14 @@ const SimulationProductPage: React.FC = () => {
           </div>
         </section>
 
-        <section id="final-cta" style={{ ...sectionCard, textAlign: 'center' }}>
+        <section
+          id="final-cta"
+          style={{
+            ...sectionCard,
+            textAlign: 'center',
+            background: 'linear-gradient(180deg, color-mix(in oklab, var(--mm-bg-surface) 80%, #e8f7fc 20%) 0%, var(--mm-bg-surface) 100%)',
+          }}
+        >
           <h2 style={{ fontSize: 'clamp(36px, 5.2vw, 56px)', lineHeight: 1.03, marginBottom: 10, letterSpacing: '-0.022em', fontWeight: 800 }}>
             Ready to validate your layout with confidence?
           </h2>
