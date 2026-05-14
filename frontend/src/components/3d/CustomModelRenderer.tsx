@@ -3,12 +3,12 @@
  */
 import React, { Suspense, useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
+import { useGLTF } from '@react-three/drei';
 import { TransformControls } from '@react-three/drei';
 import { useEditorStore, CustomModel } from '../../store/editorStore';
-import { useDracoGLTF } from '../../lib/gltfLoaders';
 
 const CustomGLB: React.FC<{ url: string; isSelected: boolean }> = ({ url, isSelected }) => {
-  const { scene } = useDracoGLTF(url);
+  const { scene } = useGLTF(url);
   const cloned = useMemo(() => {
     const clone = scene.clone(true);
     // Compute bounding box and center on ground

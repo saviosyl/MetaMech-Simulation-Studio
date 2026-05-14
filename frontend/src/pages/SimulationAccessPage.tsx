@@ -8,7 +8,8 @@ import AuthButton from '../components/auth/AuthButton';
 import AuthMessage from '../components/auth/AuthMessage';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
-import { simulationStripeLinks } from '../content/simulationMarketingContent';
+import { simulationPlans } from '../content/simulationMarketingContent';
+import { createCheckoutSession, createPortalSession, BillingPlan } from '../lib/billing';
 
 type AccessMode = 'signin' | 'signup';
 type AccessState = 'verify' | 'membership' | null;
@@ -73,6 +74,8 @@ const SimulationAccessPage: React.FC = () => {
   const [verifyError, setVerifyError] = useState('');
   const [devVerificationLink, setDevVerificationLink] = useState('');
   const [membershipNotice, setMembershipNotice] = useState('');
+  const [checkoutLoading, setCheckoutLoading] = useState<BillingPlan | null>(null);
+  const [checkoutError, setCheckoutError] = useState('');
   const verifiedTokenRef = useRef<string>('');
 
   const gotoAccess = (
@@ -228,6 +231,43 @@ const SimulationAccessPage: React.FC = () => {
       return;
     }
     setMembershipNotice('Access is still inactive. Select a plan or refresh again after entitlement update.');
+  };
+
+  const startCheckout = async (plan: BillingPlan) => {
+    setCheckoutError('');
+    if (!user) {
+      gotoAccess({ mode: 'signin', state: 'membership' });
+      return;
+    }
+    setCheckoutLoading(plan);
+    try {
+      const checkoutUrl = await createCheckoutSession(plan);
+      window.location.href = checkoutUrl;
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const code = error?.response?.data?.code;
+      if (status === 401) {
+        gotoAccess({ mode: 'signin', state: 'membership' });
+        return;
+      }
+      if (status === 403 && code === 'EMAIL_VERIFICATION_REQUIRED') {
+        gotoAccess({ state: 'verify', email: user.email });
+        return;
+      }
+      if (status === 409 && code === 'MANAGE_IN_PORTAL_REQUIRED') {
+        try {
+          const portalUrl = await createPortalSession();
+          window.location.href = portalUrl;
+          return;
+        } catch {
+          setCheckoutError('Your subscription already exists. Please try the billing portal again in a moment.');
+          return;
+        }
+      }
+      setCheckoutError(error?.response?.data?.error || error?.message || 'Unable to start secure checkout. Please try again.');
+    } finally {
+      setCheckoutLoading(null);
+    }
   };
 
   const membershipStatus = user?.subscription?.status || 'none';
@@ -457,10 +497,10 @@ const SimulationAccessPage: React.FC = () => {
         {user ? (
           <>
             <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 12, background: 'var(--mm-bg-panel)', padding: '10px 10px 9px' }}>
-              <a
-                href={simulationStripeLinks.monthly.url}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => startCheckout('monthly')}
+                disabled={checkoutLoading !== null}
                 style={{
                   height: 42,
                   borderRadius: 10,
@@ -473,20 +513,20 @@ const SimulationAccessPage: React.FC = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   width: '100%',
-                  cursor: 'pointer',
-                  textDecoration: 'none',
+                  cursor: checkoutLoading !== null ? 'wait' : 'pointer',
+                  opacity: checkoutLoading !== null && checkoutLoading !== 'monthly' ? 0.7 : 1,
                 }}
               >
-                Full Access Monthly
-              </a>
+                {checkoutLoading === 'monthly' ? 'Redirecting…' : simulationPlans.monthly.label}
+              </button>
               <div style={{ marginTop: 8, fontSize: 20, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.014em' }}>€49.00</div>
               <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)' }}>per month</div>
             </div>
             <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 12, background: 'var(--mm-bg-panel)', padding: '10px 10px 9px' }}>
-              <a
-                href={simulationStripeLinks.yearly.url}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => startCheckout('yearly')}
+                disabled={checkoutLoading !== null}
                 style={{
                   height: 42,
                   borderRadius: 10,
@@ -499,16 +539,19 @@ const SimulationAccessPage: React.FC = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   width: '100%',
-                  cursor: 'pointer',
-                  textDecoration: 'none',
+                  cursor: checkoutLoading !== null ? 'wait' : 'pointer',
+                  opacity: checkoutLoading !== null && checkoutLoading !== 'yearly' ? 0.7 : 1,
                 }}
               >
-                Full Access Yearly
-              </a>
+                {checkoutLoading === 'yearly' ? 'Redirecting…' : simulationPlans.yearly.label}
+              </button>
               <div style={{ marginTop: 8, fontSize: 20, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.014em' }}>€499.00</div>
               <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)' }}>per year</div>
               <div style={{ marginTop: 2, fontSize: 12, fontWeight: 600, color: 'var(--mm-accent-primary)' }}>€41.58 / month billed annually</div>
             </div>
+            {checkoutError ? (
+              <AuthMessage tone="error">{checkoutError}</AuthMessage>
+            ) : null}
             <Link
               to="/simulation/pricing"
               style={{

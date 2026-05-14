@@ -11,31 +11,12 @@ import { Product, NodeStats, FlowState, FlowEvent } from './Product';
 import { ProcessNode, ProcessEdge, getConnectionPorts } from '../store/editorStore';
 import { getPortWorldPosition } from '../lib/nodeTransform';
 import { createTransportPath } from '../lib/transportPath';
-import { localToWorld } from '../lib/nodeTransform';
 import { createRobotState, tickRobot, RobotState, RobotConfig } from './RobotMotionController';
 import { createPalletState, getNextSlotPosition, fillSlot, paramsToPalletDef, PalletState } from './PalletizingController';
 import { SensorState, createSensorState, evaluateSensor, editorParamsToSensorConfig, SensorEvent } from './SensorLogic';
 import { StopperRunState, createStopperState, evaluateStopper, editorParamsToStopperConfig } from './StopperLogic';
 import { PusherRunState, createPusherState, evaluatePusher, editorParamsToPusherConfig } from './PusherLogic';
 import { RuleEngineState, createRuleEngineState, evaluateRules, RuleContext, ActionCommand, Rule } from './RuleEngine';
-
-type CustomTransportPath = {
-  mode?: 'node-link' | 'straight-node' | 'polyline';
-  sourceNodeId?: string;
-  targetNodeId?: string;
-  points?: [number, number, number][];
-};
-
-type LiftV1NodeBindingMap = Record<string, { frame?: 'assetRoot' | 'movingPart'; movingPartId?: string }>;
-type LiftV1BehaviorConfig = {
-  movingPartId?: string;
-  liftAxis?: 'z';
-  lowerLimitMm?: number;
-  upperLimitMm?: number;
-  homeMm?: number;
-  liftSpeedMmPerSec?: number;
-  controlMode?: 'auto' | 'manual';
-};
 
 const COLOR_MAP: Record<string, string> = {
   brown: '#8B4513',
@@ -47,248 +28,7 @@ const COLOR_MAP: Record<string, string> = {
 };
 const RANDOM_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
 
-const CONVEYOR_TYPES = [
-  'conveyor',
-  'belt-conveyor',
-  'roller-conveyor',
-  'bend-conveyor',
-  'modular-conveyor-straight',
-  'modular-conveyor-90-curve',
-  'modular-conveyor-45-curve',
-  'spiral-conveyor',
-  'spiral-vyeor-conveyor',
-  'incline-conveyor',
-  'mm85-conveyor-section',
-  'mm85-drive-end',
-  'mm85-idler-end',
-  'mm85-guide-rail',
-];
-
-function hasCustomTransportPath(node: ProcessNode): boolean {
-  const tp = (node.parameters as { transportPath?: CustomTransportPath } | undefined)?.transportPath;
-  if (!tp) return false;
-  if (tp.mode === 'polyline') {
-    return Array.isArray(tp.points) && tp.points.length >= 2;
-  }
-  if (tp.mode === 'straight-node' || tp.mode === 'node-link') {
-    return true;
-  }
-  return false;
-}
-
-function asVec3OrNull(input: unknown): [number, number, number] | null {
-  if (!Array.isArray(input) || input.length < 3) return null;
-  const x = Number(input[0]);
-  const y = Number(input[1]);
-  const z = Number(input[2]);
-  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
-  return [x, y, z];
-}
-
-function segmentLength(a: [number, number, number], b: [number, number, number]): number {
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  const dz = b[2] - a[2];
-  return Math.sqrt((dx * dx) + (dy * dy) + (dz * dz));
-}
-
-function lerpPoint(a: [number, number, number], b: [number, number, number], t: number): [number, number, number] {
-  return [
-    a[0] + ((b[0] - a[0]) * t),
-    a[1] + ((b[1] - a[1]) * t),
-    a[2] + ((b[2] - a[2]) * t),
-  ];
-}
-
-function mmVecToMeters(input: [number, number, number]): [number, number, number] {
-  return [input[0] / 1000, input[1] / 1000, input[2] / 1000];
-}
-
-function asLiftV1BehaviorConfig(input: unknown): LiftV1BehaviorConfig | null {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
-  const raw = input as Record<string, unknown>;
-  const movingPartId = String(raw.movingPartId || '').trim();
-  const liftAxis = String(raw.liftAxis || '').trim().toLowerCase();
-  if (!movingPartId || liftAxis !== 'z') return null;
-  const toFinite = (value: unknown, fallback: number): number => {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : fallback;
-  };
-  const lowerLimitMm = toFinite(raw.lowerLimitMm, 0);
-  const upperLimitMm = toFinite(raw.upperLimitMm, 0);
-  const homeMm = toFinite(raw.homeMm, lowerLimitMm);
-  const liftSpeedMmPerSec = Math.max(0, toFinite(raw.liftSpeedMmPerSec, 0));
-  const controlMode = String(raw.controlMode || 'auto').toLowerCase() === 'manual' ? 'manual' : 'auto';
-  if (!(upperLimitMm > lowerLimitMm)) return null;
-  return {
-    movingPartId,
-    liftAxis: 'z',
-    lowerLimitMm,
-    upperLimitMm,
-    homeMm,
-    liftSpeedMmPerSec,
-    controlMode,
-  };
-}
-
-function resolveLiftCurrentTargetMm(
-  behavior: LiftV1BehaviorConfig,
-  node: ProcessNode
-): number {
-  const min = Number(behavior.lowerLimitMm || 0);
-  const max = Number(behavior.upperLimitMm || 0);
-  const fallback = Number.isFinite(behavior.homeMm) ? Number(behavior.homeMm) : min;
-  const requested = Number(node.parameters.targetHeightMm);
-  const target = Number.isFinite(requested) ? requested : fallback;
-  return Math.min(max, Math.max(min, target));
-}
-
-function getLiftAppliedOffsetMeters(node: ProcessNode): number {
-  const template = String(node.parameters.behaviorTemplate || '').trim();
-  if (template !== 'lift-conveyor') return 0;
-  const behavior = asLiftV1BehaviorConfig(node.parameters.behaviorConfig);
-  if (!behavior) return 0;
-  const min = Number(behavior.lowerLimitMm || 0);
-  const max = Number(behavior.upperLimitMm || (min + 1));
-  const currentRaw = Number(node.parameters.currentLiftHeightMm);
-  const current = Number.isFinite(currentRaw)
-    ? currentRaw
-    : resolveLiftCurrentTargetMm(behavior, node);
-  const clamped = Math.min(max, Math.max(min, current));
-  return (clamped - min) / 1000;
-}
-
-function getBoundPortWorldPosition(
-  localPort: [number, number, number],
-  node: ProcessNode
-): [number, number, number] {
-  const template = String(node.parameters.behaviorTemplate || '').trim();
-  if (template !== 'lift-conveyor') {
-    return getPortWorldPosition(localPort, node);
-  }
-  const behavior = asLiftV1BehaviorConfig(node.parameters.behaviorConfig);
-  if (!behavior) {
-    return getPortWorldPosition(localPort, node);
-  }
-  const nodeBindings = (node.parameters.nodeBindings || {}) as LiftV1NodeBindingMap;
-  const portDefs = getConnectionPorts(node.type, node.parameters, node.assetId);
-  const matchedPort = portDefs.find((port) => {
-    const px = Number(port.localPosition[0] || 0);
-    const py = Number(port.localPosition[1] || 0);
-    const pz = Number(port.localPosition[2] || 0);
-    return (
-      Math.abs(px - localPort[0]) < 0.000001
-      && Math.abs(py - localPort[1]) < 0.000001
-      && Math.abs(pz - localPort[2]) < 0.000001
-    );
-  });
-  const nodeId = matchedPort?.id ? String(matchedPort.id) : '';
-  const binding = nodeId ? nodeBindings[nodeId] : undefined;
-  const base = getPortWorldPosition(localPort, node);
-  if (binding?.frame === 'movingPart' && String(binding.movingPartId || '') === String(behavior.movingPartId || '')) {
-    const zOffsetM = getLiftAppliedOffsetMeters(node);
-    return [base[0], base[1], base[2] + zOffsetM];
-  }
-  return base;
-}
-
-function buildWorldPathPoints(node: ProcessNode): [number, number, number][] {
-  const tp = (node.parameters as { transportPath?: CustomTransportPath } | undefined)?.transportPath;
-  if (!tp) return [];
-  if (tp.mode === 'polyline') {
-    const points = Array.isArray(tp.points) ? tp.points : [];
-    const world = points
-      .map((p) => asVec3OrNull(p))
-      .filter((p): p is [number, number, number] => Boolean(p))
-      // Editor metadata stores authored path coordinates in mm; runtime uses meters.
-      .map((localMm) => {
-        const local = mmVecToMeters(localMm);
-        return localToWorld(
-          local,
-          node.position as [number, number, number],
-          node.rotation as [number, number, number],
-          node.scale as [number, number, number]
-        );
-      });
-    return world;
-  }
-
-  // straight-node / node-link: derive from saved node definitions when possible.
-  const nodeDefs = ((node.parameters as { assetNodes?: unknown }).assetNodes || []) as unknown[];
-  const resolvedNodeDefs = Array.isArray(nodeDefs) ? nodeDefs : [];
-  const nodeIn = resolvedNodeDefs.find((n) => String((n as { type?: unknown }).type || '').toLowerCase().includes('infeed')) as
-    | { position?: [number, number, number] }
-    | undefined;
-  const nodeOut = resolvedNodeDefs.find((n) => String((n as { type?: unknown }).type || '').toLowerCase().includes('outfeed')) as
-    | { position?: [number, number, number] }
-    | undefined;
-  const inLocalMm = asVec3OrNull(nodeIn?.position);
-  const outLocalMm = asVec3OrNull(nodeOut?.position);
-  if (inLocalMm && outLocalMm) {
-    const inLocal = mmVecToMeters(inLocalMm);
-    const outLocal = mmVecToMeters(outLocalMm);
-    return [
-      localToWorld(
-        inLocal,
-        node.position as [number, number, number],
-        node.rotation as [number, number, number],
-        node.scale as [number, number, number]
-      ),
-      localToWorld(
-        outLocal,
-        node.position as [number, number, number],
-        node.rotation as [number, number, number],
-        node.scale as [number, number, number]
-      ),
-    ];
-  }
-  return [];
-}
-
-function samplePolyline(points: [number, number, number][], t: number): {
-  position: [number, number, number];
-  tangent: [number, number, number];
-  length: number;
-} | null {
-  if (points.length < 2) return null;
-  const lengths: number[] = [];
-  let total = 0;
-  for (let i = 1; i < points.length; i += 1) {
-    const len = segmentLength(points[i - 1], points[i]);
-    lengths.push(len);
-    total += len;
-  }
-  if (total <= 0.000001) {
-    return {
-      position: points[0],
-      tangent: [1, 0, 0],
-      length: 0.000001,
-    };
-  }
-  const target = Math.max(0, Math.min(1, t)) * total;
-  let acc = 0;
-  for (let i = 0; i < lengths.length; i += 1) {
-    const segLen = lengths[i];
-    const nextAcc = acc + segLen;
-    if (target <= nextAcc || i === lengths.length - 1) {
-      const localT = segLen > 0 ? (target - acc) / segLen : 0;
-      const a = points[i];
-      const b = points[i + 1];
-      const position = lerpPoint(a, b, localT);
-      const dx = b[0] - a[0];
-      const dy = b[1] - a[1];
-      const dz = b[2] - a[2];
-      const mag = Math.sqrt((dx * dx) + (dy * dy) + (dz * dz)) || 1;
-      return {
-        position,
-        tangent: [dx / mag, dy / mag, dz / mag],
-        length: total,
-      };
-    }
-    acc = nextAcc;
-  }
-  return null;
-}
+const CONVEYOR_TYPES = ['conveyor', 'belt-conveyor', 'roller-conveyor', 'bend-conveyor', 'modular-conveyor-straight', 'modular-conveyor-90-curve', 'modular-conveyor-45-curve', 'spiral-conveyor', 'incline-conveyor'];
 const MAX_FLOW_EVENTS = 200; // cap event log size
 
 export class SimulationEngine {
@@ -303,87 +43,16 @@ export class SimulationEngine {
   rules: Rule[] = [];
   private pendingSensorEvents: SensorEvent[] = [];
   /** Sensor signal registry — updated each tick. Key = sensorTag, Value = signal state */
-  sensorSignals: Map<string, {
-    active: boolean;
-    zoneOccupied: boolean;
-    productId: string | null;
-    productColor: string | null;
-    productType: string | null;
-    activeSince: number;
-  }> = new Map();
+  sensorSignals: Map<string, { active: boolean; productId: string | null; productColor: string | null; productType: string | null; activeSince: number }> = new Map();
   
   // Stopper state (by stopper node id) — avoids node parameter reference issues
-  private stopperState: Map<string, {
-    latched: boolean;
-    lastReleaseTime: number;
-    cooldownSec: number;
-    releasedSinceClear: boolean;
-    lastDownstreamClear: boolean;
-    releasePending: boolean;
-    releasingProductId: string | null;
-    modeState: 'engaged' | 'waiting' | 'releasing';
-  }> = new Map();
-  private sensorDebug: Map<string, { occupied: boolean; zoneOccupied: boolean; lastEvent: string }> = new Map();
-  private stopperDebug: Map<string, {
-    stopperTag: string;
-    state: 'engaged' | 'waiting' | 'releasing';
-    releasePending: boolean;
-    lastReleaseTime: number;
-    downstreamClear: boolean;
-    triggerSensorTag: string;
-    downstreamSensorTag: string;
-  }> = new Map();
+  private stopperState: Map<string, { latched: boolean; lastReleaseTime: number; cooldownSec: number }> = new Map();
   // Sensor dwell state (by sensor node id)
   private sensorDwellFired: Map<string, boolean> = new Map();
   simTime: number = 0;
   nodes: ProcessNode[] = [];
   edges: ProcessEdge[] = [];
   private colorIndex = 0;
-
-  private getOrCreateStopperRuntimeState(node: ProcessNode): {
-    latched: boolean;
-    lastReleaseTime: number;
-    cooldownSec: number;
-    releasedSinceClear: boolean;
-    lastDownstreamClear: boolean;
-    releasePending: boolean;
-    releasingProductId: string | null;
-    modeState: 'engaged' | 'waiting' | 'releasing';
-  } {
-    let runtime = this.stopperState.get(node.id);
-    if (!runtime) {
-      runtime = {
-        latched: false,
-        lastReleaseTime: 0,
-        cooldownSec: Number(node.parameters.resetDelaySec ?? node.parameters.releaseDelay ?? 0.3) || 0.3,
-        releasedSinceClear: false,
-        lastDownstreamClear: false,
-        releasePending: false,
-        releasingProductId: null,
-        modeState: 'engaged',
-      };
-      this.stopperState.set(node.id, runtime);
-    }
-    runtime.cooldownSec = Math.max(0, Number(node.parameters.resetDelaySec ?? node.parameters.releaseDelay ?? runtime.cooldownSec) || runtime.cooldownSec);
-    return runtime;
-  }
-
-  private updateStopperDebug(node: ProcessNode, runtime: {
-    modeState: 'engaged' | 'waiting' | 'releasing';
-    releasePending: boolean;
-    lastReleaseTime: number;
-    lastDownstreamClear: boolean;
-  }): void {
-    this.stopperDebug.set(node.id, {
-      stopperTag: String(node.parameters?.stopperTag || node.name || node.id),
-      state: runtime.modeState,
-      releasePending: runtime.releasePending,
-      lastReleaseTime: runtime.lastReleaseTime,
-      downstreamClear: runtime.lastDownstreamClear,
-      triggerSensorTag: String(node.parameters?.triggerSensorTag || ''),
-      downstreamSensorTag: String(node.parameters?.downstreamSensorTag || node.parameters?.secondarySensorTag || ''),
-    });
-  }
 
   init(nodes: ProcessNode[], edges: ProcessEdge[]) {
     this.nodes = nodes;
@@ -477,8 +146,6 @@ export class SimulationEngine {
     this.sensorStates.clear();
     this.sensorSignals.clear();
     this.stopperState.clear();
-    this.sensorDebug.clear();
-    this.stopperDebug.clear();
     this.sensorDwellFired.clear();
     this.stopperStates.clear();
     this.pusherStates.clear();
@@ -540,12 +207,7 @@ export class SimulationEngine {
         case 'modular-conveyor-90-curve':
         case 'modular-conveyor-45-curve':
         case 'spiral-conveyor':
-        case 'spiral-vyeor-conveyor':
         case 'incline-conveyor':
-        case 'mm85-conveyor-section':
-        case 'mm85-drive-end':
-        case 'mm85-idler-end':
-        case 'mm85-guide-rail':
           if (node.parameters.accumulationMode) {
             this.tickAccumulationConveyor(node, stats, elapsed);
           } else {
@@ -576,11 +238,6 @@ export class SimulationEngine {
         case 'pusher': this.tickPusher(node, stats, elapsed); break;
         case 'vertical-lifter': this.tickLift(node, stats, elapsed); break;
         default: {
-          // Runtime-published static assets can carry authored transport paths.
-          if (hasCustomTransportPath(node)) {
-            this.tickConveyor(node, stats, elapsed);
-            break;
-          }
           // Unknown node type: pass products through to output
           const defArrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
           const defOut = this.getOutEdges(node.id);
@@ -605,8 +262,6 @@ export class SimulationEngine {
       stats.queueLength = stats.queue.length;
     }
 
-    this.applyLiftV1Motion(elapsed);
-
     this.tickMovingProducts(elapsed);
 
     // ─── Rule Engine: evaluate trigger→action rules ────────────
@@ -614,45 +269,6 @@ export class SimulationEngine {
 
     // Cleanup completed products that left the system
     this.products = this.products.filter(p => p.state !== 'completed' || (this.simTime - (p.completedAt || 0)) < 2);
-  }
-
-  private applyLiftV1Motion(dt: number): void {
-    if (dt <= 0) return;
-    for (const node of this.nodes) {
-      if (String(node.parameters.behaviorTemplate || '') !== 'lift-conveyor') continue;
-      const behavior = asLiftV1BehaviorConfig(node.parameters.behaviorConfig);
-      if (!behavior) continue;
-      const movingPartId = String(behavior.movingPartId || '').trim();
-      if (!movingPartId) continue;
-      const parts = Array.isArray((node.parameters as { movableParts?: unknown }).movableParts)
-        ? ((node.parameters as { movableParts?: unknown }).movableParts as unknown[])
-        : [];
-      const movingPart = parts.find((part) => {
-        if (!part || typeof part !== 'object') return false;
-        return String((part as { id?: unknown }).id || '').trim() === movingPartId;
-      });
-      if (!movingPart) continue;
-      const min = Number(behavior.lowerLimitMm || 0);
-      const max = Number(behavior.upperLimitMm || (min + 1));
-      const home = Number.isFinite(behavior.homeMm) ? Number(behavior.homeMm) : min;
-      const currentRaw = Number(node.parameters.currentLiftHeightMm);
-      const currentMm = Number.isFinite(currentRaw)
-        ? Math.min(max, Math.max(min, currentRaw))
-        : Math.min(max, Math.max(min, home));
-      const targetMm = resolveLiftCurrentTargetMm(behavior, node);
-      const speedMmPerSec = Math.max(0, Number(node.parameters.liftSpeedMmPerSec ?? behavior.liftSpeedMmPerSec ?? 0));
-      const maxStep = speedMmPerSec * dt;
-      const delta = targetMm - currentMm;
-      let nextMm = currentMm;
-      if (Math.abs(delta) <= maxStep || maxStep <= 0.000001) {
-        nextMm = targetMm;
-      } else {
-        nextMm = currentMm + Math.sign(delta) * maxStep;
-      }
-      const clamped = Math.min(max, Math.max(min, nextMm));
-      node.parameters.currentLiftHeightMm = clamped;
-      node.parameters.controlMode = String(node.parameters.controlMode || behavior.controlMode || 'auto');
-    }
   }
 
   // ─── Rule Engine tick ────────────────────────────────────────
@@ -803,16 +419,9 @@ export class SimulationEngine {
   // ─── Conveyor: products ride the belt via transport path ──────
   private tickConveyor(node: ProcessNode, stats: NodeStats, dt: number) {
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
-    const customPoints = buildWorldPathPoints(node);
-    const customPathAtStart = samplePolyline(customPoints, 0);
-    const customPathAtMid = samplePolyline(customPoints, 0.5);
-    const customPathAtEnd = samplePolyline(customPoints, 1);
-    const hasCustomPath = Boolean(customPathAtStart && customPathAtMid && customPathAtEnd);
-    const path = hasCustomPath ? null : createTransportPath(node.type, node.parameters);
+    const path = createTransportPath(node.type, node.parameters);
     const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
-    const pathLen = hasCustomPath
-      ? (customPathAtStart?.length || ((node.parameters.length || 3000) / 1000))
-      : (path ? path.length : ((node.parameters.length || 3000) / 1000));
+    const pathLen = path ? path.length : ((node.parameters.length || 3000) / 1000);
     const MIN_GAP_M = 0.001; // ~1mm gap — products touch each other when accumulated
 
     // Accept new arrivals at path start
@@ -867,7 +476,11 @@ export class SimulationEngine {
       
       if (mode === 'sensor-triggered' && triggerTag) {
         // Get/init stopper state from engine map (NOT node params)
-        const ss = this.getOrCreateStopperRuntimeState(n);
+        let ss = this.stopperState.get(n.id);
+        if (!ss) {
+          ss = { latched: false, lastReleaseTime: 0, cooldownSec: n.parameters.releaseDelay || 3 };
+          this.stopperState.set(n.id, ss);
+        }
         
         // Cooldown: barrier stays OPEN for cooldownSec after release
         const sinceLast = this.simTime - ss.lastReleaseTime;
@@ -888,24 +501,6 @@ export class SimulationEngine {
         }
         
         return ss.latched;
-      }
-
-      if (mode === 'release-one-downstream-clear') {
-        const ss = this.getOrCreateStopperRuntimeState(n);
-        // Dedicated simple mode uses explicit engaged/open state from stopper tick.
-        // During release cooldown keep barrier open.
-        const sinceLast = this.simTime - ss.lastReleaseTime;
-        if (ss.releasePending && ss.lastReleaseTime > 0 && sinceLast < ss.cooldownSec) {
-          ss.latched = false;
-          ss.modeState = 'releasing';
-          this.updateStopperDebug(n, ss);
-          return false;
-        }
-        const engaged = Boolean(n.parameters?.engaged ?? true);
-        ss.latched = engaged;
-        ss.modeState = engaged ? (ss.releasePending ? 'waiting' : 'engaged') : 'releasing';
-        this.updateStopperDebug(n, ss);
-        return engaged;
       }
       
       return n.parameters?.engaged ?? true;
@@ -957,30 +552,33 @@ export class SimulationEngine {
 
       // Convert 1D path position to 3D world position
       const t = product.pathPosition;
-      if (hasCustomPath) {
-        const sampled = samplePolyline(customPoints, t);
-        if (sampled) {
-          product.currentPosition = sampled.position;
-          product.currentRotationY = Math.atan2(sampled.tangent[0], sampled.tangent[2]);
-        }
-      } else if (path) {
+      if (path) {
         product.currentPosition = path.getWorldPosition(t, node.position, node.rotation, node.scale);
         const tangent = path.getWorldTangent(t, node.rotation);
-        product.currentRotationY = Math.atan2(tangent[0], tangent[2]);
+        const tdx = tangent[0];
+        const tdy = tangent[1];
+        const tdz = tangent[2];
+        const tmag = Math.sqrt(tdx * tdx + tdy * tdy + tdz * tdz) || 1;
+        const tn: [number, number, number] = [tdx / tmag, tdy / tmag, tdz / tmag];
+        product.currentTangent = tn;
+        product.currentRotationY = Math.atan2(tn[0], tn[2]);
       } else {
         const ports = getConnectionPorts(node.type, node.parameters);
         const inputPort = ports.find(p => p.type === 'input');
         const outputPort = ports.find(p => p.type === 'output');
         if (inputPort && outputPort) {
-          const inWorld = getBoundPortWorldPosition(inputPort.localPosition, node);
-          const outWorld = getBoundPortWorldPosition(outputPort.localPosition, node);
+          const inWorld = getPortWorldPosition(inputPort.localPosition, node);
+          const outWorld = getPortWorldPosition(outputPort.localPosition, node);
           product.currentPosition = [
             inWorld[0] + (outWorld[0] - inWorld[0]) * t,
             inWorld[1] + (outWorld[1] - inWorld[1]) * t,
             inWorld[2] + (outWorld[2] - inWorld[2]) * t,
           ];
           const dx = outWorld[0] - inWorld[0];
+          const dy = outWorld[1] - inWorld[1];
           const dz = outWorld[2] - inWorld[2];
+          const mag = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+          product.currentTangent = [dx / mag, dy / mag, dz / mag];
           product.currentRotationY = Math.atan2(dx, dz);
         }
       }
@@ -1018,8 +616,8 @@ export class SimulationEngine {
     const ports = getConnectionPorts(node.type, node.parameters);
     const inPort = ports.find(p => p.type === 'input');
     const outPort = ports.find(p => p.type === 'output');
-    const infeedPos = inPort ? getBoundPortWorldPosition(inPort.localPosition, node) : [node.position[0], node.position[1] + 0.85, node.position[2]] as [number,number,number];
-    const outfeedPos = outPort ? getBoundPortWorldPosition(outPort.localPosition, node) : [node.position[0], node.position[1] + 0.85, node.position[2]] as [number,number,number];
+    const infeedPos = inPort ? getPortWorldPosition(inPort.localPosition, node) : [node.position[0], node.position[1] + 0.85, node.position[2]] as [number,number,number];
+    const outfeedPos = outPort ? getPortWorldPosition(outPort.localPosition, node) : [node.position[0], node.position[1] + 0.85, node.position[2]] as [number,number,number];
 
     // ─ Release finished product ─
     if (stats.processing && stats.processEndTime !== null && this.simTime >= stats.processEndTime) {
@@ -1200,8 +798,8 @@ export class SimulationEngine {
         || toPorts.find(p => p.type === 'input');
       if (!fp || !tp) continue;
 
-      const start = getBoundPortWorldPosition(fp.localPosition, fromNode);
-      const end = getBoundPortWorldPosition(tp.localPosition, toNode);
+      const start = getPortWorldPosition(fp.localPosition, fromNode);
+      const end = getPortWorldPosition(tp.localPosition, toNode);
 
       const dx = end[0] - start[0];
       const dy = end[1] - start[1];
@@ -1216,6 +814,7 @@ export class SimulationEngine {
 
       // Compute rotation from edge direction
       if (dist > 0.01) {
+        product.currentTangent = [dx / dist, dy / dist, dz / dist];
         product.currentRotationY = Math.atan2(dx, dz);
       }
 
@@ -1407,6 +1006,7 @@ export class SimulationEngine {
                 palletNode.position[2] + slot.z,
               ];
               placed.currentRotationY = slot.rotationY;
+              placed.currentTangent = [Math.sin(slot.rotationY), 0, Math.cos(slot.rotationY)];
               placed.state = 'completed';
               fillSlot(palletState, placedId);
               placedOnPallet = true;
@@ -1417,6 +1017,7 @@ export class SimulationEngine {
         if (!placedOnPallet) {
           // Place exactly at resolved outfeed target.
           placed.currentPosition = [...rState.placePosition];
+          placed.currentTangent = [Math.sin(placed.currentRotationY), 0, Math.cos(placed.currentRotationY)];
           placed.currentEdgeId = null;
           if (anchors.preferredOutEdge) {
             // Transfer directly onto connected downstream node at its true input node.
@@ -1473,8 +1074,8 @@ export class SimulationEngine {
       node.position[2],
     ];
 
-    const pickPortWorld = pickPort ? getBoundPortWorldPosition(pickPort.localPosition, node) : pickFallback;
-    const placePortWorld = placePort ? getBoundPortWorldPosition(placePort.localPosition, node) : placeFallback;
+    const pickPortWorld = pickPort ? getPortWorldPosition(pickPort.localPosition, node) : pickFallback;
+    const placePortWorld = placePort ? getPortWorldPosition(placePort.localPosition, node) : placeFallback;
 
     // Use true connected node endpoints as source of truth where possible.
     // This removes generic side-offset behavior and forces node-to-node transfer.
@@ -1486,7 +1087,7 @@ export class SimulationEngine {
         const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters);
         const fromPort = fromPorts.find(p => p.id === edge.fromPort) || fromPorts.find(p => p.type === 'output');
         if (fromPort) {
-          pickPosition = getBoundPortWorldPosition(fromPort.localPosition, fromNode);
+          pickPosition = getPortWorldPosition(fromPort.localPosition, fromNode);
         }
       }
     }
@@ -1501,7 +1102,7 @@ export class SimulationEngine {
         const toPorts = getConnectionPorts(toNode.type, toNode.parameters);
         const toPort = toPorts.find(p => p.id === edge.toPort) || toPorts.find(p => p.type === 'input');
         if (toPort) {
-          placePosition = getBoundPortWorldPosition(toPort.localPosition, toNode);
+          placePosition = getPortWorldPosition(toPort.localPosition, toNode);
         }
       }
     }
@@ -1519,15 +1120,10 @@ export class SimulationEngine {
     const releaseDelay = node.parameters.releaseDelay || 0;
     const releaseCondition = node.parameters.releaseCondition || 'timed';
     const isMounted = !!node.parameters.parentConveyorId;
-    const runtime = this.getOrCreateStopperRuntimeState(node);
 
     if (!enabled) {
       this.releaseAllStopped(node, stats);
       this.setFlowState(stats, 'idle', dt);
-      runtime.modeState = 'engaged';
-      runtime.releasePending = false;
-      runtime.latched = false;
-      this.updateStopperDebug(node, runtime);
       return;
     }
 
@@ -1612,50 +1208,6 @@ export class SimulationEngine {
         }
         break;
       }
-      case 'release-one-downstream-clear': {
-        const downstreamTag = String(node.parameters.downstreamSensorTag || node.parameters.secondarySensorTag || '').trim();
-        const downstreamSignal = downstreamTag ? this.sensorSignals.get(downstreamTag) : null;
-        const downstreamOccupied = Boolean(downstreamSignal?.zoneOccupied ?? downstreamSignal?.active);
-        const downstreamClear = !downstreamOccupied;
-        runtime.lastDownstreamClear = downstreamClear;
-
-        // A new occupancy cycle resets the "already released on this clear window" latch.
-        if (downstreamOccupied) {
-          runtime.releasedSinceClear = false;
-        }
-
-        const releaseCountForMode = 1;
-        const resetDelaySec = Math.max(
-          0.01,
-          Number(node.parameters.resetDelaySec ?? node.parameters.releaseDelay ?? runtime.cooldownSec ?? 0.3) || 0.3
-        );
-        runtime.cooldownSec = resetDelaySec;
-        node.parameters.releaseCount = 1;
-        node.parameters.engaged = true;
-        runtime.modeState = stopped.length > 0 ? 'waiting' : 'engaged';
-
-        // If one product is currently being released, keep stopper open briefly.
-        if (runtime.releasePending) {
-          if (this.simTime - runtime.lastReleaseTime >= resetDelaySec) {
-            runtime.releasePending = false;
-            runtime.modeState = stopped.length > 0 ? 'waiting' : 'engaged';
-            node.parameters.engaged = true;
-          } else {
-            node.parameters.engaged = false;
-            runtime.modeState = 'releasing';
-          }
-        } else if (stopped.length > 0 && downstreamClear && !runtime.releasedSinceClear) {
-          // Dedicated simple sequence: release exactly one item when downstream zone is clear.
-          const toRelease = stopped.slice(0, releaseCountForMode);
-          for (const p of toRelease) this.releaseProduct(p, node, stats);
-          runtime.releasedSinceClear = true;
-          runtime.releasePending = true;
-          runtime.lastReleaseTime = this.simTime;
-          runtime.modeState = 'releasing';
-          node.parameters.engaged = false;
-        }
-        break;
-      }
     }
 
     // Execute release
@@ -1671,8 +1223,6 @@ export class SimulationEngine {
     } else {
       this.setFlowState(stats, 'idle', dt);
     }
-    runtime.latched = Boolean(node.parameters.engaged ?? true);
-    this.updateStopperDebug(node, runtime);
   }
 
 
@@ -1876,12 +1426,8 @@ export class SimulationEngine {
       const t = Math.min(naturalT, targetT);
 
       // Position using transport path
-      const customPoints = buildWorldPathPoints(node);
-      const sampled = samplePolyline(customPoints, t);
-      const accPath = sampled ? null : createTransportPath(node.type, node.parameters);
-      if (sampled) {
-        product.currentPosition = sampled.position;
-      } else if (accPath) {
+      const accPath = createTransportPath(node.type, node.parameters);
+      if (accPath) {
         product.currentPosition = accPath.getWorldPosition(t, node.position, node.rotation, node.scale);
       } else if (inputPort && outputPort) {
         const inWorld = getPortWorldPosition(inputPort.localPosition, node);
@@ -1985,11 +1531,9 @@ export class SimulationEngine {
     if (sensorTag) {
       const prevSignal = this.sensorSignals.get(sensorTag);
       const isActive = nearbyProduct !== null;
-      const zoneOccupied = nearbyProducts.length > 0;
       if (isActive) {
         this.sensorSignals.set(sensorTag, {
           active: true,
-          zoneOccupied,
           productId: nearbyProduct.id,
           productColor: (nearbyProduct as any).color || null,
           productType: (nearbyProduct as any).productType || null,
@@ -1997,20 +1541,10 @@ export class SimulationEngine {
         });
       } else {
         this.sensorSignals.set(sensorTag, {
-          active: false, zoneOccupied: false, productId: null, productColor: null, productType: null,
+          active: false, productId: null, productColor: null, productType: null,
           activeSince: 0,
         });
       }
-
-      const lastEventFromEval = sState?.pendingEvents?.[sState.pendingEvents.length - 1]?.type;
-      const derivedEvent = isActive
-        ? ((prevSignal?.active ?? false) ? 'itemDetected' : 'zoneOccupied')
-        : ((prevSignal?.active ?? false) ? 'zoneClear' : 'none');
-      this.sensorDebug.set(sensorTag, {
-        occupied: isActive,
-        zoneOccupied,
-        lastEvent: String(lastEventFromEval || derivedEvent),
-      });
     }
 
     // Update stats (sensor is detection-only — no physical effect on products)
@@ -2170,6 +1704,7 @@ export class SimulationEngine {
       size: [pL, pW, pH],
       currentPosition: [...node.position] as [number, number, number],
       currentRotationY: 0,
+      currentTangent: [0, 0, 1],
       targetPosition: [0, 0, 0],
       progress: 0,
       currentNodeId: node.id,
@@ -2230,24 +1765,8 @@ export class SimulationEngine {
     return this.palletStates;
   }
 
-  getSensorSignals(): Map<string, { active: boolean; zoneOccupied: boolean; productId: string | null }> {
+  getSensorSignals(): Map<string, { active: boolean; productId: string | null }> {
     return this.sensorSignals;
-  }
-
-  getSensorDebugStatus(tag: string): { occupied: boolean; zoneOccupied: boolean; lastEvent: string } | null {
-    return this.sensorDebug.get(tag) || null;
-  }
-
-  getStopperDebugStatus(nodeId: string): {
-    stopperTag: string;
-    state: 'engaged' | 'waiting' | 'releasing';
-    releasePending: boolean;
-    lastReleaseTime: number;
-    downstreamClear: boolean;
-    triggerSensorTag: string;
-    downstreamSensorTag: string;
-  } | null {
-    return this.stopperDebug.get(nodeId) || null;
   }
 
   getNodeStats(): Map<string, NodeStats> {

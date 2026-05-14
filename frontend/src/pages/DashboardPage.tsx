@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, Calendar, MoreHorizontal, Copy, Trash2, LogOut, User, Download, Upload, Factory, Boxes, Stethoscope, Bot, Layout, Shield } from 'lucide-react';
+import { Plus, FolderOpen, Calendar, MoreHorizontal, Copy, Trash2, LogOut, User, Download, Upload, Factory, Boxes, Stethoscope, Bot, Layout } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Project } from '../types';
 import api from '../utils/api';
@@ -177,11 +177,6 @@ const DashboardPage: React.FC = () => {
               <Upload size={14} /> Import
             </button>
             <input ref={fileInputRef} type="file" accept=".json,.metamech.json" onChange={handleImportFile} style={{ display: 'none' }} />
-            {user?.role === 'admin' && (
-              <button onClick={() => navigate('/admin/assets')} style={S.btnGhost} title="Open admin asset library and authoring tools">
-                <Shield size={14} /> Asset Library
-              </button>
-            )}
             <button onClick={() => navigate('/demo')} style={S.btnGhost}>Quick Demo</button>
             <button onClick={() => navigate('/frame-designer-demo')} style={S.btnGhost}>Frame Designer</button>
             <button onClick={() => setShowCreateModal(true)} style={S.btnPrimary}>

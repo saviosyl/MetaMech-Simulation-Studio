@@ -161,24 +161,17 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { document.body.style.cursor = 'auto'; }}
       >
-        <Model3DErrorBoundary fallback={
+        <Suspense fallback={
           <mesh castShadow>
             <boxGeometry args={[3, 0.8, 0.6]} />
             <meshStandardMaterial color="#666" wireframe />
           </mesh>
         }>
-          <Suspense fallback={
-            <mesh castShadow>
-              <boxGeometry args={[3, 0.8, 0.6]} />
-              <meshStandardMaterial color="#666" wireframe />
-            </mesh>
-          }>
-            <BeltConveyorGLB
-              parameters={node.parameters}
-              isSelected={isSelected}
-            />
-          </Suspense>
-        </Model3DErrorBoundary>
+          <BeltConveyorGLB
+            parameters={node.parameters}
+            isSelected={isSelected}
+          />
+        </Suspense>
         {isSelected && (
           <>
             <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -223,37 +216,6 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
             <mesh castShadow><cylinderGeometry args={[0.8, 0.8, 3, 16]} /><meshStandardMaterial color="#666" wireframe /></mesh>
           }>
             <SpiralConveyorModel parameters={node.parameters} isSelected={isSelected} />
-          </Suspense>
-        </Model3DErrorBoundary>
-        {isSelected && (
-          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[1.5, 1.7, 32]} />
-            <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
-          </mesh>
-        )}
-      </group>
-    );
-  }
-
-  // SPIRAL VYEOR CONVEYOR (source-derived GLB)
-  if (node.type === 'spiral-vyeor-conveyor') {
-    return (
-      <group
-        ref={groupRef}
-        position={node.position}
-        rotation={node.rotation}
-        scale={node.scale}
-        onClick={(e) => { e.stopPropagation(); onClick(); }}
-        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
-        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
-      >
-        <Model3DErrorBoundary>
-          <Suspense fallback={null}>
-            <GLBModel
-              url="/models/spiral-vyeor/spiral-vyeor.glb"
-              targetSize={3.6}
-              isSelected={isSelected}
-            />
           </Suspense>
         </Model3DErrorBoundary>
         {isSelected && (
@@ -612,6 +574,7 @@ const GenericModel: React.FC<{ type: string; isSelected: boolean; params: Record
           })}
         </group>
       );
+
     case 'vertical-lifter': {
       const lPW = (params.platformWidth || 1000) / 1000;
       const lPD = (params.platformDepth || 1000) / 1000;
@@ -790,7 +753,6 @@ function getNodeColor(type: string): string {
     'popup-transfer': '#06b6d4',
     'pusher-transfer': '#06b6d4',
     'spiral-conveyor': '#6b7280',
-    'spiral-vyeor-conveyor': '#6b7280',
     'vertical-lifter': '#f59e0b',
     'pick-and-place': '#ec4899',
     'palletizer': '#84cc16',

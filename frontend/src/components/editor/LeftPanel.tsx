@@ -1,5 +1,5 @@
-import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
-import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield, Columns } from 'lucide-react';
+import React, { useCallback, useRef, useState, useMemo } from 'react';
+import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModulesByCategory, ModuleDefinition } from '../../lib/moduleLibrary';
 import SceneHierarchy from './SceneHierarchy';
@@ -10,7 +10,6 @@ type ViewLayout = 'compact' | 'grid';
 
 const TABS = [
   { id: 'process' as const, name: 'Process', icon: Factory },
-  { id: 'modular' as const, name: 'Standard Modular Conveyor', icon: Columns },
   { id: 'fmcg' as const, name: 'FMCG', icon: Package },
   { id: 'medical' as const, name: 'Medical', icon: Shield },
   { id: 'robots' as const, name: 'Robots', icon: Cpu },
@@ -21,9 +20,6 @@ const TABS = [
 
 function getSubcategory(module: ModuleDefinition): string {
   const n = module.id.toLowerCase();
-  if (module.category === 'modular' && n.startsWith('mm85-')) {
-    return 'MM-85';
-  }
   if (n.includes('conveyor') || n.includes('belt') || n.includes('roller') || n.includes('modular')) return 'Conveyors';
   if (n.includes('stopper') || n.includes('pusher-module')) return 'Accessories';
   if (n.includes('transfer') || n.includes('merge') || n.includes('divert') || n.includes('pusher') || n.includes('popup')) return 'Transfers';
@@ -38,23 +34,6 @@ function getSubcategory(module: ModuleDefinition): string {
   return 'Other';
 }
 
-function normalizeLibrarySearchText(value: string): string {
-  return String(value || '')
-    .toLowerCase()
-    // Treat separators consistently so "safety-rail" matches "Safety Rail".
-    .replace(/[_-]+/g, ' ')
-    // Ignore copy suffixes from scene object names.
-    .replace(/\(copy\)/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function normalizeLibrarySearchQuery(value: string): string {
-  const base = normalizeLibrarySearchText(value);
-  // Scene object names often carry timestamp suffixes (e.g. wall_1773389705770).
-  return base.replace(/\s+\d+$/, '').trim();
-}
-
 const LeftPanel: React.FC = () => {
   const { activeLibraryTab, setActiveLibraryTab, leftPanelWidth, setLeftPanelWidth, leftPanelCollapsed, setLeftPanelCollapsed } = useEditorStore();
   const isResizing = useRef(false);
@@ -62,26 +41,11 @@ const LeftPanel: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [layout, setLayout] = useState<ViewLayout>('compact');
 
-  // Keep browsing behavior predictable across tabs by clearing stale tab-specific searches.
-  useEffect(() => {
-    setSearchQuery('');
-  }, [activeLibraryTab]);
-
   const allModules = getModulesByCategory(activeLibraryTab);
   const modules = useMemo(() => {
     if (!searchQuery.trim()) return allModules;
-    const q = normalizeLibrarySearchQuery(searchQuery);
-    if (!q) return allModules;
-    return allModules.filter((m) => {
-      const haystack = [
-        m.name,
-        m.id,
-        m.description,
-      ]
-        .map(normalizeLibrarySearchText)
-        .join(' ');
-      return haystack.includes(q);
-    });
+    const q = searchQuery.toLowerCase();
+    return allModules.filter(m => m.name.toLowerCase().includes(q) || m.description.toLowerCase().includes(q));
   }, [allModules, searchQuery]);
 
   const groupedModules = useMemo(() => {
@@ -92,20 +56,7 @@ const LeftPanel: React.FC = () => {
 
   const handleDragStart = (e: React.DragEvent, module: ModuleDefinition) => {
     e.dataTransfer.setData('application/json', JSON.stringify({ type: 'module', moduleId: module.id, category: module.category }));
-    // Safari/Chromium interoperability: keep a plain-text mirror so drop targets
-    // can reliably detect a valid internal app drag payload.
-    e.dataTransfer.setData('text/plain', `metamech:module:${module.id}:${module.category}`);
     e.dataTransfer.effectAllowed = 'copy';
-    if (typeof window !== 'undefined') {
-      (window as any).__mmDraggingModule = { moduleId: module.id, category: module.category };
-      window.sessionStorage.setItem('metamech:drag-module-session', `metamech:module:${module.id}:${module.category}`);
-    }
-  };
-
-  const handleDragEnd = () => {
-    if (typeof window !== 'undefined') {
-      (window as any).__mmDraggingModule = null;
-    }
   };
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -259,7 +210,7 @@ const LeftPanel: React.FC = () => {
                       {items.map(mod => {
                         const Icon = mod.icon;
                         return (
-                          <div key={mod.id} draggable onDragStart={(e) => handleDragStart(e, mod)} onDragEnd={handleDragEnd}
+                          <div key={mod.id} draggable onDragStart={(e) => handleDragStart(e, mod)}
                             style={{ padding: 10, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, cursor: 'grab', background: 'var(--mm-bg-surface)', transition: 'all 0.15s', textAlign: 'center' }}
                             onMouseEnter={e => { (e.currentTarget).style.borderColor = 'var(--mm-border-strong)'; }}
                             onMouseLeave={e => { (e.currentTarget).style.borderColor = 'var(--mm-border-subtle)'; }}>
@@ -276,7 +227,7 @@ const LeftPanel: React.FC = () => {
                       {items.map(mod => {
                         const Icon = mod.icon;
                         return (
-                          <div key={mod.id} draggable onDragStart={(e) => handleDragStart(e, mod)} onDragEnd={handleDragEnd}
+                          <div key={mod.id} draggable onDragStart={(e) => handleDragStart(e, mod)}
                             style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 7, cursor: 'grab', border: '1px solid transparent', transition: 'background 0.1s, border-color 0.1s' }}
                             onMouseEnter={e => { (e.currentTarget).style.background = 'var(--mm-bg-surface)'; }}
                             onMouseLeave={e => { (e.currentTarget).style.background = 'transparent'; }}>

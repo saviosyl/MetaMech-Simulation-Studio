@@ -17,24 +17,14 @@ const NON_PROCESS_FALLBACK_TYPES = new Set([
   'pallet-static', 'cardboard-box-static',
 ]);
 
-const NON_FLOW_MODULAR_TYPES = new Set([
-  'mm85-support-leg',
-  'mm85-end-drive-support',
-]);
-const FLOW_PROCESS_OVERRIDES = new Set([
-  'spiral-vyeor-conveyor',
-]);
-
 /**
  * True only for real process-flow equipment that should be checked for edge connectivity.
  */
 export function shouldValidateFlowConnectivity(nodeType: string): boolean {
-  if (FLOW_PROCESS_OVERRIDES.has(nodeType)) return true;
   if (isAccessoryType(nodeType)) return false;
-  if (NON_FLOW_MODULAR_TYPES.has(nodeType)) return false;
 
   const moduleDef = getModuleDefinition(nodeType);
-  if (moduleDef) return moduleDef.category === 'process' || moduleDef.category === 'modular';
+  if (moduleDef) return moduleDef.category === 'process';
 
   return !NON_PROCESS_FALLBACK_TYPES.has(nodeType);
 }

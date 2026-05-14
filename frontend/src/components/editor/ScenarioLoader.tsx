@@ -13,7 +13,6 @@ import {
   createColorSortScenario,
   createMeteredStopperScenario,
   createDownstreamReadyScenario,
-  createStopperReleaseOneDownstreamClearScenario,
   createInclineScenario,
   createBendRoutingScenario,
   createSpiralScenario,
@@ -53,13 +52,6 @@ const SCENARIOS: ScenarioOption[] = [
     description: 'Stopper accumulates then releases products in timed batches',
     icon: <Layers size={16} className="text-yellow-400" />,
     create: createMeteredStopperScenario,
-  },
-  {
-    id: 'stopper-release-one-downstream-clear',
-    name: 'Stopper Release One on Downstream Clear',
-    description: 'SE001 triggers hold, SE002 zone clear releases exactly one item, then stopper re-engages.',
-    icon: <Play size={16} className="text-emerald-400" />,
-    create: createStopperReleaseOneDownstreamClearScenario,
   },
   {
     id: 'downstream-ready',
@@ -178,7 +170,7 @@ const ScenarioLoader: React.FC = () => {
       const processTypes = new Set([
         'source', 'sink', 'conveyor', 'belt-conveyor', 'roller-conveyor', 'buffer', 'machine',
         'router', 'transfer-bridge', 'popup-transfer', 'pusher-transfer', 'merge-divert',
-        'spiral-conveyor', 'spiral-vyeor-conveyor', 'vertical-lifter', 'pick-and-place', 'palletizer',
+        'spiral-conveyor', 'vertical-lifter', 'pick-and-place', 'palletizer',
         'modular-conveyor-straight', 'modular-conveyor-90-curve', 'modular-conveyor-45-curve',
         'bend-conveyor', 'stopper', 'pusher', 'sensor', 'industrial-robot', 'machine-static',
         'cartesian-robot', 'cobot', 'robot-5axis', 'robot-6axis',

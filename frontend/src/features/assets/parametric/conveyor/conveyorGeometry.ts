@@ -19,15 +19,6 @@ import {
   matSidewall,
 } from '../premiumMaterials';
 
-function finiteOr(value: number, fallback: number): number {
-  return Number.isFinite(value) ? value : fallback;
-}
-
-function clampDimensionMeters(value: number, fallback: number, min: number, max: number): number {
-  const safe = finiteOr(value, fallback);
-  return Math.min(max, Math.max(min, safe));
-}
-
 /** Build frame side rails */
 function buildFrame(lengthM: number, widthM: number, heightM: number, frameColor?: string): THREE.Group {
   const frame = new THREE.Group();
@@ -230,14 +221,13 @@ function buildDriveAssembly(params: ConveyorParams): THREE.Group {
   const group = new THREE.Group();
   group.name = 'drive';
 
-  const lengthM = clampDimensionMeters(params.lengthMm / 1000, 3, 0.2, 30);
-  const widthM = clampDimensionMeters(params.widthMm / 1000, 0.6, 0.12, 6);
-  const heightM = clampDimensionMeters(params.heightMm / 1000, 0.8, 0.2, 8);
+  const lengthM = params.lengthMm / 1000;
+  const widthM = params.widthMm / 1000;
+  const heightM = params.heightMm / 1000;
 
   // Drive roller
   const rollerR = 0.03;
-  const rollerLen = clampDimensionMeters(widthM + 0.02, 0.62, 0.14, 6.2);
-  const rollerGeo = new THREE.CylinderGeometry(rollerR, rollerR, rollerLen, 16);
+  const rollerGeo = new THREE.CylinderGeometry(rollerR, rollerR, widthM + 0.02, 16);
   rollerGeo.rotateX(Math.PI / 2);
   const roller = new THREE.Mesh(rollerGeo, matDrive);
 
@@ -249,84 +239,18 @@ function buildDriveAssembly(params: ConveyorParams): THREE.Group {
   roller.castShadow = true;
   group.add(roller);
 
-  // Mechanically-correct side-mounted gear motor with bracket + aligned coupling.
-  const sideSign = params.motorSide === 'right' ? 1 : -1;
-  const rollerHalfSpan = rollerLen / 2;
-  const driveJournalLen = 0.018;
-  const couplingLen = 0.024;
-  const couplingRadius = 0.016;
-  const outputShaftCenterZ = sideSign * finiteOr(rollerHalfSpan + driveJournalLen + couplingLen / 2, rollerHalfSpan + 0.03);
-
-  // Drive journal from roller end to coupling.
-  const journal = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.01, 0.01, driveJournalLen, 10),
-    matRoller,
-  );
-  journal.rotation.set(Math.PI / 2, 0, 0);
-  journal.position.set(
-    driveX,
-    heightM,
-    sideSign * (rollerHalfSpan + driveJournalLen / 2),
-  );
-  journal.castShadow = true;
-  group.add(journal);
-
-  // Coupling between motor output and drive journal.
-  const coupling = new THREE.Mesh(
-    new THREE.CylinderGeometry(couplingRadius, couplingRadius, couplingLen, 14),
-    matDrive,
-  );
-  coupling.rotation.set(Math.PI / 2, 0, 0);
-  coupling.position.set(driveX, heightM, outputShaftCenterZ);
-  coupling.castShadow = true;
-  group.add(coupling);
-
-  // Motor mount bracket/plate — prevents floating appearance and anchors to frame.
-  const bracketArmLen = 0.11;
-  const bracketPlateW = 0.1;
-  const bracketPlateH = 0.09;
-  const bracketThk = 0.01;
-  const bracketAnchorZ = sideSign * finiteOr(widthM / 2 + 0.03, 0.33);
-  const bracketOuterZ = sideSign * finiteOr(widthM / 2 + 0.08, 0.38);
-
-  const verticalPlate = new THREE.Mesh(
-    new THREE.BoxGeometry(bracketPlateW, bracketPlateH, bracketThk),
-    matFrame,
-  );
-  verticalPlate.position.set(driveX, heightM - 0.045, bracketOuterZ);
-  verticalPlate.castShadow = true;
-  group.add(verticalPlate);
-
-  const horizontalArm = new THREE.Mesh(
-    new THREE.BoxGeometry(bracketPlateW, bracketThk, bracketArmLen),
-    matFrame,
-  );
-  horizontalArm.position.set(driveX, heightM - 0.09, sideSign * (widthM / 2 + 0.055));
-  horizontalArm.castShadow = true;
-  group.add(horizontalArm);
-
-  const frameTie = new THREE.Mesh(
-    new THREE.BoxGeometry(0.045, 0.028, 0.02),
-    matFrame,
-  );
-  frameTie.position.set(driveX, heightM - 0.06, bracketAnchorZ);
-  frameTie.castShadow = true;
-  group.add(frameTie);
-
-  // SEW-style geared motor.
-  // buildSEWMotor output shaft center is local ~[0.145, -0.005, 0] pointing along +X.
-  // Rotate so shaft points inward to roller and align that shaft center to coupling center.
+  // SEW-style geared motor
   const sewMotor = buildSEWMotor(1.0);
-  const shaftDirRotationY = sideSign > 0 ? Math.PI / 2 : -Math.PI / 2;
-  const motorCenterY = finiteOr(heightM + 0.005, 0.805); // compensates motor local shaft Y=-0.005
-  const motorCenterZ = finiteOr(outputShaftCenterZ + sideSign * 0.145, sideSign * (rollerHalfSpan + 0.18));
-  sewMotor.position.set(driveX, motorCenterY, motorCenterZ);
-  sewMotor.rotation.set(0, shaftDirRotationY, 0);
+  const motorSideZ = params.motorSide === 'right'
+    ? widthM / 2 + 0.06
+    : -(widthM / 2 + 0.06);
+  sewMotor.position.set(driveX, heightM - 0.05, motorSideZ);
+  sewMotor.rotation.set(0, params.motorSide === 'right' ? -Math.PI / 2 : Math.PI / 2, 0);
   group.add(sewMotor);
 
   // Tail/deflection roller (only for end drive)
   if (params.driveType === 'end') {
-    const tailGeo = new THREE.CylinderGeometry(rollerR * 0.8, rollerR * 0.8, rollerLen, 16);
+    const tailGeo = new THREE.CylinderGeometry(rollerR * 0.8, rollerR * 0.8, widthM + 0.02, 16);
     tailGeo.rotateX(Math.PI / 2);
     const tail = new THREE.Mesh(tailGeo, matDrive);
     tail.position.set(-lengthM / 2 + 0.02, heightM, 0);
@@ -342,9 +266,9 @@ export function buildConveyorBody(params: ConveyorParams): THREE.Group {
   const group = new THREE.Group();
   group.name = 'conveyorBody';
 
-  const lengthM = clampDimensionMeters(params.lengthMm / 1000, 3, 0.2, 30);
-  const widthM = clampDimensionMeters(params.widthMm / 1000, 0.6, 0.12, 6);
-  const heightM = clampDimensionMeters(params.heightMm / 1000, 0.8, 0.2, 8);
+  const lengthM = params.lengthMm / 1000;
+  const widthM = params.widthMm / 1000;
+  const heightM = params.heightMm / 1000;
 
   // Frame
   group.add(buildFrame(lengthM, widthM, heightM, params.frameColor));
@@ -370,8 +294,7 @@ export function buildConveyorBody(params: ConveyorParams): THREE.Group {
 
   // Apply incline
   if (params.angleDeg !== 0) {
-    const safeAngleDeg = Math.min(45, Math.max(-45, finiteOr(params.angleDeg, 0)));
-    const angleRad = (safeAngleDeg * Math.PI) / 180;
+    const angleRad = (params.angleDeg * Math.PI) / 180;
     group.rotation.z = angleRad;
   }
 

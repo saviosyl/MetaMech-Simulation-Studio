@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useDracoGLTF } from '../../lib/gltfLoaders';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface GLBModelProps {
@@ -9,7 +9,7 @@ interface GLBModelProps {
 }
 
 const GLBModel: React.FC<GLBModelProps> = ({ url, targetSize = 2, isSelected }) => {
-  const { scene } = useDracoGLTF(url);
+  const { scene } = useGLTF(url);
 
   const clonedScene = useMemo(() => {
     const clone = scene.clone(true);

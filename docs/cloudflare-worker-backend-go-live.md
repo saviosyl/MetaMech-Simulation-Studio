@@ -103,6 +103,7 @@ Notes:
 - `EMAIL_VERIFICATION_TOKEN_HOURS=24`
 - `EXPOSE_DEV_VERIFICATION_LINK=false`
 - `ENABLE_ADMIN_TEST_EMAIL=false` (set `true` only when you intentionally need test route)
+- `INTERNAL_ADMIN_EMAILS=saviosyl@gmail.com` (optional CSV; this account is hardwired as internal admin full-access in code by default)
 
 ### C) **Local developer env (not stored as Worker secret)**
 

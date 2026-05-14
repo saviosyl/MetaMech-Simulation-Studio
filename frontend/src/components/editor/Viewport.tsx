@@ -142,20 +142,6 @@ import PathRenderer from '../3d/PathRenderer';
 import CameraPathPlayer from '../3d/CameraPathPlayer';
 import ViewportToolbar from '../editor/ViewportToolbar';
 import { VIDEO_CAPTURE_PRESETS, VideoQualityPreset } from '../../lib/videoExportPresets';
-import PortDirectionDebug from '../3d/PortDirectionDebug';
-
-const AXIS_X_COLOR = '#ef4444';
-const AXIS_Y_COLOR = '#22c55e';
-const AXIS_Z_COLOR = '#3b82f6';
-const INTERNAL_MODULE_TEXT_PREFIX = 'metamech:module:';
-
-const ZUpAxisHelper: React.FC<{ size: number }> = ({ size }) => (
-  <group>
-    <arrowHelper args={[new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), size, AXIS_X_COLOR]} />
-    <arrowHelper args={[new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), size, AXIS_Y_COLOR]} />
-    <arrowHelper args={[new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), size, AXIS_Z_COLOR]} />
-  </group>
-);
 
 // Wrapper that attaches TransformControls to the selected object
 const DraggableObject: React.FC<{
@@ -367,10 +353,8 @@ const SceneContent: React.FC<{
     measureActive,
     addMeasurePoint,
     overlaysHidden,
-    directionDebugVisible,
     themeMode,
     activeTool,
-    navigationMode,
     isExportRendering,
     captureQualityPreset,
   } = useEditorStore();
@@ -386,33 +370,22 @@ const SceneContent: React.FC<{
   const majorSectionSize = minorCellSize * 4;
   const gridPalette = themeMode === 'light'
     ? {
-        cell: '#bcc8d6',
-        section: '#8fa0b5',
+        cell: '#c7d2de',
+        section: '#9fb0c4',
       }
     : {
-        // Match editor preview grid style while staying subtle in runtime.
-        cell: '#5f6776',
-        section: '#334155',
+        cell: '#4f5f76',
+        section: '#758aa7',
       };
 
-  // Disable orbit rotation when a 3D object is selected AND a manipulation tool is active.
-  // Click empty space to deselect → orbit re-enables.
+  // Disable orbit rotation when a 3D object is selected AND a manipulation tool is active
+  // Click empty space to deselect → orbit re-enables
   useEffect(() => {
     if (!orbitRef.current) return;
     const toolsBlockingRotate = ['move', 'rotate', 'scale', 'mate', 'snap-move', 'path-draw'];
     const shouldBlock = selectedObjectId !== null && toolsBlockingRotate.includes(activeTool);
     orbitRef.current.enableRotate = !shouldBlock;
   }, [activeTool, selectedObjectId, orbitRef]);
-
-  // Explicit navigation mode selection for trackpad/mouse parity.
-  useEffect(() => {
-    if (!orbitRef.current) return;
-    orbitRef.current.enablePan = true;
-    orbitRef.current.enableZoom = true;
-    orbitRef.current.mouseButtons = navigationMode === 'pan'
-      ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }
-      : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
-  }, [navigationMode, orbitRef]);
 
   const handleObjectClick = useCallback((objectId: string, objectType: 'process' | 'environment' | 'actor') => {
     setSelectedObject(objectId, objectType);
@@ -471,19 +444,21 @@ const SceneContent: React.FC<{
           position={[0, 0, 0]}
           args={[sceneSettings.grid.size, sceneSettings.grid.divisions]}
           cellSize={minorCellSize}
-          cellThickness={0.36}
+          cellThickness={0.34}
           cellColor={gridPalette.cell}
           sectionSize={majorSectionSize}
-          sectionThickness={0.95}
+          sectionThickness={0.9}
           sectionColor={gridPalette.section}
-          fadeDistance={120}
-          fadeStrength={0.85}
+          fadeDistance={68}
+          fadeStrength={1.18}
           infiniteGrid
         />
       )}
 
-      {/* Axes helper (app convention): X red, Y green, Z blue with Z shown as vertical. */}
-      {sceneSettings.axes.visible && <ZUpAxisHelper size={sceneSettings.axes.size} />}
+      {/* Axes Helper */}
+      {sceneSettings.axes.visible && (
+        <axesHelper args={[sceneSettings.axes.size]} />
+      )}
 
       {/* Contact Shadows — premium ground contact effect */}
       {!isMobileSafari && (!isNavigating || isExportRendering) && (
@@ -644,7 +619,6 @@ const SceneContent: React.FC<{
 
       {/* Connection Lines between connected objects (hidden in clean view) */}
       {!overlaysHidden && <ConnectionLines />}
-      {!overlaysHidden && directionDebugVisible && <PortDirectionDebug />}
 
       {/* Custom Imported Models */}
       <CustomModelRenderer orbitRef={orbitRef} />
@@ -667,8 +641,7 @@ const SceneContent: React.FC<{
         ref={orbitRef}
         enablePan={true}
         enableZoom={true}
-        enableRotate={navigationMode === 'orbit'}
-        touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
+        enableRotate={true}
         enableDamping={true}
         dampingFactor={0.08}
         rotateSpeed={0.9}
@@ -708,108 +681,62 @@ const Viewport: React.FC = () => {
     addProcessNode,
     addEnvironmentAsset,
     addActor,
-    navigationMode,
   } = useEditorStore();
 
   const exportPreset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
   const dynamicDprMax = isExportRendering ? Math.max(2, Math.min(3, exportPreset.targetDpr)) : 2;
-  const INTERNAL_MODULE_TEXT_PREFIX = 'metamech:module:';
-  const INTERNAL_DRAG_SESSION_KEY = 'metamech:drag-module-session';
-  const parseModuleDropPayload = useCallback((event: React.DragEvent): { moduleId: string; category: string } | null => {
-    const jsonPayload = event.dataTransfer.getData('application/json');
-    if (jsonPayload) {
-      try {
-        const parsed = JSON.parse(jsonPayload);
-        if (
-          parsed
-          && parsed.type === 'module'
-          && typeof parsed.moduleId === 'string'
-          && typeof parsed.category === 'string'
-        ) {
-          return { moduleId: parsed.moduleId, category: parsed.category };
-        }
-      } catch {
-        // fall through to text payload parser
-      }
-    }
-
-    const textPayload = event.dataTransfer.getData('text/plain');
-    if (!textPayload || !textPayload.startsWith(INTERNAL_MODULE_TEXT_PREFIX)) {
-      // Fallback for browsers that suppress transfer data during drag/drop:
-      // consume session marker set on internal dragstart in LeftPanel.
-      if (typeof window === 'undefined') return null;
-      const sessionPayload = window.sessionStorage.getItem(INTERNAL_DRAG_SESSION_KEY);
-      if (!sessionPayload || !sessionPayload.startsWith(INTERNAL_MODULE_TEXT_PREFIX)) return null;
-      const [sessionModuleId, sessionCategory] = sessionPayload.slice(INTERNAL_MODULE_TEXT_PREFIX.length).split(':');
-      if (!sessionModuleId || !sessionCategory) return null;
-      return { moduleId: sessionModuleId, category: sessionCategory };
-    }
-    const [moduleId, category] = textPayload.slice(INTERNAL_MODULE_TEXT_PREFIX.length).split(':');
-    if (!moduleId || !category) return null;
-    return { moduleId, category };
-  }, []);
 
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
-    event.stopPropagation();
     
     try {
-      const data = parseModuleDropPayload(event);
-      if (!data) return;
-      // Proper raycast from mouse to ground plane (y=0) using Three.js camera
-      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-      const rayHit = raycastToGround(event.clientX, event.clientY, rect);
+      const data = JSON.parse(event.dataTransfer.getData('application/json'));
       
-      // Fallback to simple approximation if camera not ready
-      const position: [number, number, number] = rayHit || [
-        (((event.clientX - rect.left) / rect.width) * 2 - 1) * 8,
-        0,
-        -(((event.clientY - rect.top) / rect.height) * 2 + 1) * 8,
-      ];
-      
-      let addedModule = false;
-      switch (data.category) {
-        case 'process':
-        case 'modular':
-        case 'robots':
-        case 'pallets':
-        case 'fmcg':
-        case 'medical':
-          addProcessNode(data.moduleId, position);
-          addedModule = true;
-          break;
-        case 'environment':
-          addEnvironmentAsset(data.moduleId, position);
-          addedModule = true;
-          break;
-        case 'actors':
-          addActor(data.moduleId, position);
-          addedModule = true;
-          break;
-      }
-      if (addedModule) {
-        setHasPlacedModule(true);
+      if (data.type === 'module') {
+        // Proper raycast from mouse to ground plane (y=0) using Three.js camera
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+        const rayHit = raycastToGround(event.clientX, event.clientY, rect);
+        
+        // Fallback to simple approximation if camera not ready
+        const position: [number, number, number] = rayHit || [
+          (((event.clientX - rect.left) / rect.width) * 2 - 1) * 8,
+          0,
+          -(((event.clientY - rect.top) / rect.height) * 2 + 1) * 8,
+        ];
+        
+        let addedModule = false;
+        switch (data.category) {
+          case 'process':
+          case 'robots':
+          case 'pallets':
+          case 'fmcg':
+          case 'medical':
+            addProcessNode(data.moduleId, position);
+            addedModule = true;
+            break;
+          case 'environment':
+            addEnvironmentAsset(data.moduleId, position);
+            addedModule = true;
+            break;
+          case 'actors':
+            addActor(data.moduleId, position);
+            addedModule = true;
+            break;
+        }
+        if (addedModule) {
+          setHasPlacedModule(true);
+        }
       }
     } catch (error) {
       console.error('Failed to handle drop:', error);
-    } finally {
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.removeItem(INTERNAL_DRAG_SESSION_KEY);
-      }
     }
-  }, [addProcessNode, addEnvironmentAsset, addActor, parseModuleDropPayload]);
-
-  const handleDragEnter = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-  }, []);
+  }, [addProcessNode, addEnvironmentAsset, addActor]);
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    const hasModulePayload = !!parseModuleDropPayload(event);
-    event.dataTransfer.dropEffect = hasModulePayload ? 'copy' : 'none';
-  }, [parseModuleDropPayload]);
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
 
   const getSelectedObject = () => {
     if (!selectedObjectId || !selectedObjectType) return null;
@@ -830,14 +757,11 @@ const Viewport: React.FC = () => {
     }
   }, [hasPlacedModule, isSceneEmpty]);
 
-  const viewportCursor = navigationMode === 'pan' ? 'grab' : 'default';
-
   return (
     <div 
       data-tour="viewport-center"
-      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--mm-bg-viewport)', cursor: viewportCursor }}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--mm-bg-viewport)' }}
       onDrop={handleDrop}
-      onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
     >
       <Canvas
@@ -867,7 +791,7 @@ const Viewport: React.FC = () => {
         {/* 3D orientation gizmo */}
         <GizmoHelper alignment="bottom-right" margin={[78, 88]}>
           <GizmoViewport
-            axisColors={[AXIS_X_COLOR, AXIS_Y_COLOR, AXIS_Z_COLOR]}
+            axisColors={['#ef4444', '#22c55e', '#3b82f6']}
             labelColor="#f8fafc"
           />
         </GizmoHelper>
@@ -911,7 +835,7 @@ const Viewport: React.FC = () => {
             style={{
               position: 'absolute',
               left: 16,
-              top: 'calc(var(--mm-top-ribbon-height, 56px) + 72px)',
+              top: 84,
               maxWidth: 300,
               borderRadius: 12,
               padding: '10px 12px',
@@ -956,7 +880,7 @@ const OrientationPad: React.FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: 'calc(var(--mm-top-ribbon-height, 56px) + 10px)',
+        top: 'clamp(34px, 4.4vw, 44px)',
         right: 10,
         zIndex: 30,
         display: 'grid',

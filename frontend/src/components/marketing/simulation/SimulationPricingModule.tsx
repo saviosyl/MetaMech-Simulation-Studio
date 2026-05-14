@@ -1,11 +1,58 @@
-import React from 'react';
-import { simulationCtas, simulationMarketingAssets, simulationStripeLinks } from '../../../content/simulationMarketingContent';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../contexts/AuthContext';
+import { createCheckoutSession, createPortalSession, BillingPlan } from '../../../lib/billing';
+import { simulationCtas, simulationMarketingAssets, simulationPlans } from '../../../content/simulationMarketingContent';
 
 interface SimulationPricingModuleProps {
   compact?: boolean;
 }
 
 const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compact = false }) => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [checkoutLoading, setCheckoutLoading] = useState<BillingPlan | null>(null);
+  const [checkoutError, setCheckoutError] = useState('');
+
+  const startCheckout = async (plan: BillingPlan) => {
+    setCheckoutError('');
+    if (!user) {
+      navigate('/simulation/access?mode=signin&state=membership');
+      return;
+    }
+    setCheckoutLoading(plan);
+    try {
+      const checkoutUrl = await createCheckoutSession(plan);
+      window.location.href = checkoutUrl;
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const code = error?.response?.data?.code;
+      if (status === 401) {
+        navigate('/simulation/access?mode=signin&state=membership');
+        return;
+      }
+      if (status === 403 && code === 'EMAIL_VERIFICATION_REQUIRED') {
+        const email = encodeURIComponent(error?.response?.data?.email || user.email || '');
+        navigate(`/simulation/access?state=verify&email=${email}`);
+        return;
+      }
+      if (status === 409 && code === 'MANAGE_IN_PORTAL_REQUIRED') {
+        try {
+          const portalUrl = await createPortalSession();
+          window.location.href = portalUrl;
+          return;
+        } catch {
+          setCheckoutError('Your subscription already exists. Please try the billing portal again in a moment.');
+          return;
+        }
+      }
+      setCheckoutError(error?.response?.data?.error || error?.message || 'Unable to start secure checkout. Please try again.');
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
+
   return (
     <section
       style={{
@@ -76,7 +123,8 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
             <li>Use your own realistic layout context</li>
             <li>Fast fit-check for your team</li>
           </ul>
-          <button
+          <Link
+            to="/simulation/access?mode=signup"
             style={{
               width: '100%',
               height: 44,
@@ -86,10 +134,14 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
               color: '#fff',
               fontSize: 14,
               fontWeight: 700,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             {simulationCtas.startTrial}
-          </button>
+          </Link>
         </article>
 
         <article
@@ -125,10 +177,10 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
           </ul>
           <div style={{ display: 'grid', gap: 10 }}>
             <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 12, background: 'var(--mm-bg-surface)', padding: '10px 10px 9px' }}>
-              <a
-                href={simulationStripeLinks.monthly.url}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={() => startCheckout('monthly')}
+                disabled={checkoutLoading !== null}
                 style={{
                   width: '100%',
                   height: 42,
@@ -142,20 +194,21 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer',
+                  cursor: checkoutLoading !== null ? 'wait' : 'pointer',
+                  opacity: checkoutLoading !== null && checkoutLoading !== 'monthly' ? 0.7 : 1,
                 }}
               >
-                Full Access Monthly
-              </a>
+                {checkoutLoading === 'monthly' ? 'Redirecting…' : simulationPlans.monthly.label}
+              </button>
               <div style={{ marginTop: 8, fontSize: 23, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.015em', color: 'var(--mm-text-primary)' }}>€49.00</div>
               <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)' }}>per month</div>
             </div>
 
             <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 12, background: 'var(--mm-bg-surface)', padding: '10px 10px 9px' }}>
-              <a
-                href={simulationStripeLinks.yearly.url}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={() => startCheckout('yearly')}
+                disabled={checkoutLoading !== null}
                 style={{
                   width: '100%',
                   height: 42,
@@ -169,16 +222,22 @@ const SimulationPricingModule: React.FC<SimulationPricingModuleProps> = ({ compa
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer',
+                  cursor: checkoutLoading !== null ? 'wait' : 'pointer',
+                  opacity: checkoutLoading !== null && checkoutLoading !== 'yearly' ? 0.7 : 1,
                 }}
               >
-                Full Access Yearly
-              </a>
+                {checkoutLoading === 'yearly' ? 'Redirecting…' : simulationPlans.yearly.label}
+              </button>
               <div style={{ marginTop: 8, fontSize: 23, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.015em', color: 'var(--mm-text-primary)' }}>€499.00</div>
               <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--mm-text-tertiary)' }}>per year</div>
               <div style={{ marginTop: 2, fontSize: 12, fontWeight: 600, color: 'var(--mm-accent-primary)' }}>€41.58 / month billed annually</div>
             </div>
           </div>
+          {checkoutError ? (
+            <p style={{ marginTop: 10, fontSize: 12, color: 'var(--mm-accent-danger)', lineHeight: 1.4 }}>
+              {checkoutError}
+            </p>
+          ) : null}
           <p style={{ marginTop: 10, fontSize: 12, color: 'var(--mm-text-tertiary)', lineHeight: 1.5 }}>
             Secure checkout via Stripe.
           </p>

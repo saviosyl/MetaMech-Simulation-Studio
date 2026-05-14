@@ -1,11 +1,7 @@
-import type { AssetMetadata } from '../types';
-
 export interface ConnectionPortDef {
   id: string;
   type: 'input' | 'output';
   localPosition: [number, number, number];
-  /** Optional local-space outward direction vector for this port. */
-  direction?: [number, number, number];
 }
 
 export interface StaticAssetDef {
@@ -17,9 +13,6 @@ export interface StaticAssetDef {
   glbUrl: string;
   thumbnailUrl: string;
   defaultScale?: [number, number, number];
-  defaultPositionOffset?: [number, number, number];
-  defaultRotation?: [number, number, number];
-  metadata?: AssetMetadata;
   connectionPorts?: ConnectionPortDef[];
 }
 
@@ -31,14 +24,6 @@ export interface ParametricAssetDef {
   id: string;
   assetType: 'parametric';
   category: string;
-  familyCategory?: string;
-  familyName?: string;
-  sourceMap?: {
-    sourcePlatform: string;
-    sourceFolder: string;
-    sourceArchive: string;
-    sourceAsset: string;
-  };
   name: string;
   description: string;
   builder: string;
@@ -60,7 +45,6 @@ export type AssetDef = StaticAssetDef | ParametricAssetDef;
 export const ASSET_BASE_URL = '/assets';
 
 let _manifest: AssetDef[] | null = null;
-let _runtimeExternalAssets: AssetDef[] = [];
 
 function loadInlineManifest(): AssetDef[] {
   return [
@@ -112,6 +96,67 @@ function loadInlineManifest(): AssetDef[] {
         rollerType: { type: 'select', label: 'Roller Type', options: ['driven', 'gravity'] },
         driveType: { type: 'select', label: 'Drive Type', options: ['chain-driven', 'belt-driven', 'mdr'] },
         sideRails: { type: 'boolean', label: 'Side Rails' },
+      },
+    },
+    {
+      id: 'incline-conveyor',
+      assetType: 'parametric',
+      category: 'process',
+      name: 'Inclined Conveyor',
+      description: 'Premium segmented incline conveyor with configurable chain, supports, and drive package',
+      builder: 'inclineConveyorBuilder',
+      parts: {},
+      thumbnailUrl: '',
+      defaults: {
+        conveyorWidth: 650,
+        overallLength: 5200,
+        infeedStraightLength: 1200,
+        inclinedLength: 2600,
+        outfeedStraightLength: 1400,
+        infeedHeightFromFloor: 800,
+        outfeedHeightFromFloor: 1500,
+        inclineAngle: 16,
+        sideGuideHeight: 90,
+        sideGuidesEnabled: true,
+        chainType: 'Friction Top Chain',
+        cleatPitch: 240,
+        supportMode: 'Standard',
+        supportSpacing: 1500,
+        driveSide: 'Right',
+        motorPosition: 'Outfeed',
+        frameFinish: 'Powder-Coated Steel',
+      },
+      limits: {
+        conveyorWidth: [250, 1800],
+        overallLength: [1000, 60000],
+        infeedStraightLength: [200, 30000],
+        inclinedLength: [200, 30000],
+        outfeedStraightLength: [200, 30000],
+        infeedHeightFromFloor: [0, 12000],
+        outfeedHeightFromFloor: [0, 12000],
+        inclineAngle: [0, 45],
+        sideGuideHeight: [0, 400],
+        cleatPitch: [60, 1200],
+        supportSpacing: [400, 5000],
+      },
+      parameterDefs: {
+        conveyorWidth: { type: 'number', label: 'Conveyor Width', unit: 'mm', step: 50 },
+        overallLength: { type: 'number', label: 'Overall Length', unit: 'mm', step: 100 },
+        infeedStraightLength: { type: 'number', label: 'Infeed Straight Length', unit: 'mm', step: 50 },
+        inclinedLength: { type: 'number', label: 'Inclined Length', unit: 'mm', step: 50 },
+        outfeedStraightLength: { type: 'number', label: 'Outfeed Straight Length', unit: 'mm', step: 50 },
+        infeedHeightFromFloor: { type: 'number', label: 'Infeed Height From Floor', unit: 'mm', step: 25 },
+        outfeedHeightFromFloor: { type: 'number', label: 'Outfeed Height From Floor', unit: 'mm', step: 25 },
+        inclineAngle: { type: 'number', label: 'Incline Angle', unit: '°', step: 0.5 },
+        sideGuideHeight: { type: 'number', label: 'Side Guide Height', unit: 'mm', step: 10 },
+        sideGuidesEnabled: { type: 'boolean', label: 'Side Guides Enabled' },
+        chainType: { type: 'select', label: 'Chain Type', options: ['Friction Top Chain', 'Cleated Chain'] },
+        cleatPitch: { type: 'number', label: 'Cleat Pitch', unit: 'mm', step: 10 },
+        supportMode: { type: 'select', label: 'Support Mode', options: ['Standard', 'Heavy Duty', 'Minimal'] },
+        supportSpacing: { type: 'number', label: 'Support Spacing', unit: 'mm', step: 50 },
+        driveSide: { type: 'select', label: 'Drive Side', options: ['Left', 'Right'] },
+        motorPosition: { type: 'select', label: 'Motor Position', options: ['Infeed', 'Center', 'Outfeed'] },
+        frameFinish: { type: 'select', label: 'Frame Finish', options: ['Powder-Coated Steel', 'Stainless Steel Brushed', 'Anodized Aluminium'] },
       },
     },
 
@@ -179,226 +224,6 @@ function loadInlineManifest(): AssetDef[] {
         drivePosition: { type: 'select', label: 'Drive Position', options: ['end', 'center'] },
         beltType: { type: 'select', label: 'Belt Type', options: ['flush-grid', 'raised-rib', 'flat-top'] },
         sideGuides: { type: 'boolean', label: 'Side Guides' },
-      },
-    },
-    {
-      id: 'mm85-conveyor-section',
-      assetType: 'parametric',
-      category: 'modular',
-      familyCategory: 'Standard Modular Conveyor',
-      familyName: 'MM-85',
-      sourceMap: {
-        sourcePlatform: 'Simulation-3d-Models-',
-        sourceFolder: 'X85',
-        sourceArchive: 'Beam.vcm',
-        sourceAsset: 'flexlink_xbcb_1a85.stl',
-      },
-      name: 'MM-85 Conveyor Section',
-      description: 'MetaMech MM-85 straight conveyor section building block',
-      builder: 'mm85ConveyorSectionBuilder',
-      parts: {},
-      thumbnailUrl: '',
-      defaults: {
-        sectionLength: 1000,
-        chainWidth: 85,
-        elevation: 850,
-        sectionStyle: 'Standard',
-        sideGuidesEnabled: true,
-        guideHeight: 35,
-      },
-      limits: {
-        sectionLength: [300, 6000],
-        chainWidth: [60, 220],
-        elevation: [250, 2500],
-        guideHeight: [10, 120],
-      },
-      parameterDefs: {
-        sectionLength: { type: 'number', label: 'Section Length', unit: 'mm', step: 50 },
-        chainWidth: { type: 'number', label: 'Chain Width', unit: 'mm', step: 5 },
-        elevation: { type: 'number', label: 'Elevation', unit: 'mm', step: 25 },
-        sectionStyle: { type: 'select', label: 'Section Style', options: ['Standard', 'Heavy Duty'] },
-        sideGuidesEnabled: { type: 'boolean', label: 'Side Guides' },
-        guideHeight: { type: 'number', label: 'Guide Height', unit: 'mm', step: 5 },
-      },
-    },
-    {
-      id: 'mm85-drive-end',
-      assetType: 'parametric',
-      category: 'modular',
-      familyCategory: 'Standard Modular Conveyor',
-      familyName: 'MM-85',
-      sourceMap: {
-        sourcePlatform: 'Simulation-3d-Models-',
-        sourceFolder: 'X85',
-        sourceArchive: 'EndDrive.vcm',
-        sourceAsset: 'xbeb_0a85cnrp.stl',
-      },
-      name: 'MM-85 Drive End',
-      description: 'MetaMech MM-85 motorized drive end module',
-      builder: 'mm85DriveEndBuilder',
-      parts: {},
-      thumbnailUrl: '',
-      defaults: {
-        moduleLength: 450,
-        chainWidth: 85,
-        elevation: 850,
-        motorSide: 'Right',
-        includeEncoder: true,
-      },
-      limits: {
-        moduleLength: [280, 1200],
-        chainWidth: [60, 220],
-        elevation: [250, 2500],
-      },
-      parameterDefs: {
-        moduleLength: { type: 'number', label: 'Module Length', unit: 'mm', step: 20 },
-        chainWidth: { type: 'number', label: 'Chain Width', unit: 'mm', step: 5 },
-        elevation: { type: 'number', label: 'Elevation', unit: 'mm', step: 25 },
-        motorSide: { type: 'select', label: 'Motor Side', options: ['Left', 'Right'] },
-        includeEncoder: { type: 'boolean', label: 'Include Encoder' },
-      },
-    },
-    {
-      id: 'mm85-idler-end',
-      assetType: 'parametric',
-      category: 'modular',
-      familyCategory: 'Standard Modular Conveyor',
-      familyName: 'MM-85',
-      sourceMap: {
-        sourcePlatform: 'Simulation-3d-Models-',
-        sourceFolder: 'X85',
-        sourceArchive: 'Idler.vcm',
-        sourceAsset: 'xbej_a85.stl',
-      },
-      name: 'MM-85 Idler End',
-      description: 'MetaMech MM-85 idler end transfer module',
-      builder: 'mm85IdlerEndBuilder',
-      parts: {},
-      thumbnailUrl: '',
-      defaults: {
-        moduleLength: 420,
-        chainWidth: 85,
-        elevation: 850,
-        withProtectionCover: true,
-      },
-      limits: {
-        moduleLength: [260, 1200],
-        chainWidth: [60, 220],
-        elevation: [250, 2500],
-      },
-      parameterDefs: {
-        moduleLength: { type: 'number', label: 'Module Length', unit: 'mm', step: 20 },
-        chainWidth: { type: 'number', label: 'Chain Width', unit: 'mm', step: 5 },
-        elevation: { type: 'number', label: 'Elevation', unit: 'mm', step: 25 },
-        withProtectionCover: { type: 'boolean', label: 'Protection Cover' },
-      },
-    },
-    {
-      id: 'mm85-guide-rail',
-      assetType: 'parametric',
-      category: 'modular',
-      familyCategory: 'Standard Modular Conveyor',
-      familyName: 'MM-85',
-      sourceMap: {
-        sourcePlatform: 'Simulation-3d-Models-',
-        sourceFolder: 'Guide Rails',
-        sourceArchive: 'FixedAluminium.vcm / FixedPlastic.vcm',
-        sourceAsset: 'flexlink_xlrb_48x30.stl / flexlink_xlrb_16x42_c_0.stl',
-      },
-      name: 'MM-85 Guide Rails',
-      description: 'MetaMech MM-85 side guide rail assemblies',
-      builder: 'mm85GuideRailBuilder',
-      parts: {},
-      thumbnailUrl: '',
-      defaults: {
-        railLength: 1000,
-        railSpacing: 130,
-        railHeight: 35,
-        elevation: 900,
-        railType: 'Fixed Aluminium',
-      },
-      limits: {
-        railLength: [300, 6000],
-        railSpacing: [80, 350],
-        railHeight: [15, 120],
-        elevation: [250, 2500],
-      },
-      parameterDefs: {
-        railLength: { type: 'number', label: 'Rail Length', unit: 'mm', step: 50 },
-        railSpacing: { type: 'number', label: 'Rail Spacing', unit: 'mm', step: 5 },
-        railHeight: { type: 'number', label: 'Rail Height', unit: 'mm', step: 5 },
-        elevation: { type: 'number', label: 'Elevation', unit: 'mm', step: 25 },
-        railType: { type: 'select', label: 'Rail Type', options: ['Fixed Aluminium', 'Fixed Plastic'] },
-      },
-    },
-    {
-      id: 'mm85-support-leg',
-      assetType: 'parametric',
-      category: 'modular',
-      familyCategory: 'Standard Modular Conveyor',
-      familyName: 'MM-85',
-      sourceMap: {
-        sourcePlatform: 'Simulation-3d-Models-',
-        sourceFolder: 'Support',
-        sourceArchive: 'SingleSupport.vcm',
-        sourceAsset: 'xucs_44_-_5112469_01-1.stl',
-      },
-      name: 'MM-85 Support Leg',
-      description: 'MetaMech MM-85 standard floor support leg',
-      builder: 'mm85SupportLegBuilder',
-      parts: {},
-      thumbnailUrl: '',
-      defaults: {
-        supportHeight: 850,
-        supportSpan: 220,
-        braceMode: 'Cross Brace',
-        footSize: 80,
-      },
-      limits: {
-        supportHeight: [350, 2500],
-        supportSpan: [120, 550],
-        footSize: [50, 180],
-      },
-      parameterDefs: {
-        supportHeight: { type: 'number', label: 'Support Height', unit: 'mm', step: 25 },
-        supportSpan: { type: 'number', label: 'Support Span', unit: 'mm', step: 10 },
-        braceMode: { type: 'select', label: 'Brace Mode', options: ['Cross Brace', 'No Brace'] },
-        footSize: { type: 'number', label: 'Foot Size', unit: 'mm', step: 5 },
-      },
-    },
-    {
-      id: 'mm85-end-drive-support',
-      assetType: 'parametric',
-      category: 'modular',
-      familyCategory: 'Standard Modular Conveyor',
-      familyName: 'MM-85',
-      sourceMap: {
-        sourcePlatform: 'Simulation-3d-Models-',
-        sourceFolder: 'Support',
-        sourceArchive: 'EndDriveSupport.vcm',
-        sourceAsset: 'flexlink_5116741.stl',
-      },
-      name: 'MM-85 End Drive Support',
-      description: 'MetaMech MM-85 reinforced support for drive end',
-      builder: 'mm85EndDriveSupportBuilder',
-      parts: {},
-      thumbnailUrl: '',
-      defaults: {
-        supportHeight: 850,
-        supportSpan: 260,
-        heavyDuty: true,
-        footSize: 90,
-      },
-      limits: {
-        supportHeight: [350, 2500],
-        supportSpan: [140, 650],
-        footSize: [50, 180],
-      },
-      parameterDefs: {
-        supportHeight: { type: 'number', label: 'Support Height', unit: 'mm', step: 25 },
-        supportSpan: { type: 'number', label: 'Support Span', unit: 'mm', step: 10 },
-        heavyDuty: { type: 'boolean', label: 'Heavy Duty' },
-        footSize: { type: 'number', label: 'Foot Size', unit: 'mm', step: 5 },
       },
     },
 
@@ -854,37 +679,6 @@ function loadInlineManifest(): AssetDef[] {
         speed: { type: 'number', label: 'Speed', unit: 'm/min', step: 1 },
       },
     },
-    {
-      id: 'spiral-vyeor-conveyor',
-      assetType: 'parametric',
-      category: 'process',
-      sourceMap: {
-        sourcePlatform: 'Simulation-3d-Models-',
-        sourceFolder: '3D Models',
-        sourceArchive: 'SpiralVyeor.vcmx',
-        sourceAsset: 'geo-* (merged)',
-      },
-      name: 'Spiral Vyeor Conveyor',
-      description: 'Spiral conveyor using the extracted SpiralVyeor source model',
-      builder: 'spiralConveyorBuilder',
-      parts: {},
-      thumbnailUrl: '',
-      defaults: { beltWidth: 400, turns: 3, infeedHeight: 800, outfeedHeight: 3800, outfeedAngle: 180, direction: 'up', speed: 20, sideGuides: true, guideHeight: 100, showLegs: true, centerStructure: 'column' },
-      limits: { beltWidth: [150, 800], turns: [0.5, 10], infeedHeight: [0, 6000], outfeedHeight: [0, 15000], outfeedAngle: [0, 360], speed: [1, 60], guideHeight: [40, 250] },
-      parameterDefs: {
-        direction: { type: 'select', label: 'Direction', options: ['up', 'down'] },
-        beltWidth: { type: 'number', label: 'Belt Width', unit: 'mm', step: 50 },
-        turns: { type: 'number', label: 'Turns', step: 0.5 },
-        outfeedAngle: { type: 'number', label: 'Outfeed Angle', unit: '°', step: 15 },
-        infeedHeight: { type: 'number', label: 'Infeed Height', unit: 'mm', step: 50 },
-        outfeedHeight: { type: 'number', label: 'Outfeed Height', unit: 'mm', step: 50 },
-        speed: { type: 'number', label: 'Speed', unit: 'm/min', step: 1 },
-        sideGuides: { type: 'boolean', label: 'Side Guides' },
-        guideHeight: { type: 'number', label: 'Guide Height', unit: 'mm', step: 10 },
-        showLegs: { type: 'boolean', label: 'Show Supports' },
-        centerStructure: { type: 'select', label: 'Center Structure', options: ['column', 'framed-core'] },
-      },
-    },
 
     // === PARAMETRIC: Vertical Lifter ===
     {
@@ -964,15 +758,7 @@ function loadInlineManifest(): AssetDef[] {
 
 export function getAssetManifest(): AssetDef[] {
   if (!_manifest) {
-    const base = loadInlineManifest();
-    if (_runtimeExternalAssets.length > 0) {
-      const dedup = new Map<string, AssetDef>();
-      for (const item of base) dedup.set(item.id, item);
-      for (const item of _runtimeExternalAssets) dedup.set(item.id, item);
-      _manifest = Array.from(dedup.values());
-    } else {
-      _manifest = base;
-    }
+    _manifest = loadInlineManifest();
   }
   return _manifest;
 }
@@ -983,9 +769,4 @@ export function getAssetById(id: string): AssetDef | undefined {
 
 export function getAssetsByCategory(category: string): AssetDef[] {
   return getAssetManifest().filter(a => a.category === category);
-}
-
-export function setRuntimeExternalAssets(nextAssets: AssetDef[]): void {
-  _runtimeExternalAssets = Array.isArray(nextAssets) ? [...nextAssets] : [];
-  _manifest = null;
 }

@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { ParametricAssetDef } from '../../lib/assetManifest';
-import { runBuilder, getBuilderRenderVersion, validateBuilderResult } from '../../lib/parametricBuilders';
+import { runBuilder } from '../../lib/parametricBuilders';
 import { isBeltConveyorGLBReady } from '../../lib/parametricBuilders/beltConveyorGLBBuilder';
 
 interface ParametricModelProps {
@@ -34,16 +34,11 @@ const ParametricModel: React.FC<ParametricModelProps> = ({ assetDef, parameters,
     ...parameters,
   }), [assetDef.defaults, parameters]);
 
-  const builderRenderVersion = useMemo(() => getBuilderRenderVersion(assetDef.builder), [assetDef.builder]);
-
-  // Build the 3D group — rebuilds when params change OR when source assets become available
+  // Build the 3D group — rebuilds when params change OR when GLB becomes available
   const builderResult = useMemo(() => {
-    const result = runBuilder(assetDef.builder, mergedParams);
-    if (!result) return null;
-    if (!validateBuilderResult(assetDef.builder, result)) return null;
-    return result;
+    return runBuilder(assetDef.builder, mergedParams);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetDef.builder, JSON.stringify(mergedParams), buildVersion, builderRenderVersion]);
+  }, [assetDef.builder, JSON.stringify(mergedParams), buildVersion]);
 
   // Safely detach old children (without disposing shared GLB geometries)
   const clearGroup = useCallback((parent: THREE.Group) => {

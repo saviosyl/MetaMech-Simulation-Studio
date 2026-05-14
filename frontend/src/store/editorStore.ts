@@ -8,89 +8,15 @@ import { FrameAssemblyExportContract } from '../lib/frameDesigner/model';
 import { toFrameAssemblyParameters } from '../lib/frameDesigner/sceneInterop';
 import { VideoQualityPreset } from '../lib/videoExportPresets';
 
-function toRuntimeDefaultRotationFromMetadata(
-  metadata: Record<string, unknown> | null | undefined
-): [number, number, number] {
-  const raw = metadata?.assetRootRotationDeg;
-  if (!Array.isArray(raw) || raw.length < 3) return [0, 0, 0];
-  const xDeg = Number(raw[0]);
-  const yDeg = Number(raw[1]);
-  const zDeg = Number(raw[2]);
-  if (!Number.isFinite(xDeg) || !Number.isFinite(yDeg) || !Number.isFinite(zDeg)) return [0, 0, 0];
-  return [
-    (xDeg * Math.PI) / 180,
-    (yDeg * Math.PI) / 180,
-    (zDeg * Math.PI) / 180,
-  ];
-}
-
-function toLiftRuntimeDefaultsFromMetadata(
-  metadata: Record<string, unknown> | null | undefined
-): Record<string, unknown> {
-  const behaviorTemplate = String(metadata?.behaviorTemplate || '');
-  if (behaviorTemplate !== 'lift-conveyor') return {};
-  const rawConfig = (metadata?.behaviorConfig && typeof metadata.behaviorConfig === 'object')
-    ? (metadata.behaviorConfig as Record<string, unknown>)
-    : {};
-  const toFinite = (value: unknown, fallback: number): number => {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : fallback;
-  };
-  const min = toFinite(rawConfig.lowerLimitMm, toFinite(rawConfig.liftMinMm, 0));
-  const max = toFinite(rawConfig.upperLimitMm, toFinite(rawConfig.liftMaxMm, Math.max(min + 100, 2500)));
-  const clampedMax = max > min ? max : min + 100;
-  const defaultMm = Math.max(min, Math.min(
-    clampedMax,
-    toFinite(rawConfig.homeMm, toFinite(rawConfig.liftDefaultMm, min))
-  ));
-  const homeTargetMm = Math.max(min, Math.min(clampedMax, toFinite(rawConfig.homeMm, toFinite(rawConfig.homeTargetMm, defaultMm))));
-  return {
-    targetHeightMm: defaultMm,
-    currentLiftHeightMm: defaultMm,
-    liftSpeedMmPerSec: Math.max(1, toFinite(rawConfig.liftSpeedMmPerSec, 350)),
-    conveyorSpeedMpm: Math.max(0, toFinite(rawConfig.conveyorSpeedMpm, 12)),
-    controlMode: String(rawConfig.controlMode || 'auto') === 'manual' ? 'manual' : 'auto',
-    homeTargetMm,
-  };
-}
-
-const LEGACY_ENV_PROCESS_TYPES = new Set<string>([
-  'wall',
-  'door',
-  'window',
-  'stairs',
-  'safety-rail',
-  'floor-marking',
-  'pallet-rack',
-  'warehouse-shell',
-  'floor',
-  'pallet',
-  'cardboard-box',
-  'frame-assembly',
-  'fence',
-  'fence-gate',
-  'bollard',
-  'operator-station',
-  'electrical-cabinet',
-  'tower-light',
-  'hmi-stand',
-  'machine-enclosure',
-  'floor-zone',
-  'pallet-stack',
-]);
-
 // Types
 export interface ProcessNode {
   id: string;
   type: 'source' | 'sink' | 'conveyor' | 'buffer' | 'machine' | 'router' | 
         'transfer-bridge' | 'popup-transfer' | 'pusher-transfer' | 'merge-divert' |
-        'spiral-conveyor' | 'spiral-vyeor-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
+        'spiral-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
         'belt-conveyor' | 'roller-conveyor' | 'industrial-robot' | 'machine-static' |
         'stopper' | 'pusher' | 'bend-conveyor' | 'sensor' |
         'modular-conveyor-straight' | 'modular-conveyor-90-curve' | 'modular-conveyor-45-curve' | 'incline-conveyor' |
-        'mm85-conveyor-section' | 'mm85-drive-end' | 'mm85-idler-end' |
-        'mm85-guide-rail' |
-        'mm85-support-leg' | 'mm85-end-drive-support' |
         'cartesian-robot' | 'cobot' | 'robot-5axis' | 'robot-6axis' |
         'eur-pallet' | 'standard-pallet' | 'custom-pallet' |
         'carton-erector' | 'case-packer' | 'checkweigher' | 'metal-detector' |
@@ -120,7 +46,7 @@ export interface SceneObject {
   scale: [number, number, number];
   parameters: Record<string, any>;
   name: string;
-  category: 'process' | 'modular' | 'environment' | 'actors';
+  category: 'process' | 'environment' | 'actors';
 }
 
 export interface EnvironmentAsset {
@@ -294,7 +220,7 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
   // Spiral ports must always come from the shared spiral transfer geometry so
   // markers, snapping, and visible model endpoints stay in the same frame.
   // Do this before asset-builder lookup (spiral builder ports use a different schema).
-  if (type === 'spiral-conveyor' || type === 'spiral-vyeor-conveyor') {
+  if (type === 'spiral-conveyor') {
     const spiral = computeSpiralTransferGeometry(params ?? {}, 0.35);
     return [
       { id: 'input', type: 'input', localPosition: spiral.input.port, direction: spiral.input.direction },
@@ -302,11 +228,9 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     ];
   }
 
-  // Check asset manifest first. For runtime-published assets, node.type is often
-  // the same as the asset id, so we also attempt lookup by type when assetId is absent.
-  const resolvedAssetId = assetId || type;
-  if (resolvedAssetId) {
-    const assetDef = getAssetById(resolvedAssetId);
+  // Check asset manifest first
+  if (assetId) {
+    const assetDef = getAssetById(assetId);
     if (assetDef) {
       if (assetDef.assetType === 'static' && assetDef.connectionPorts) {
         return assetDef.connectionPorts;
@@ -345,28 +269,6 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
         { id: 'output', type: 'output', localPosition: [pL / 2 - portInset, pOutH, 0] },
       ];
     }
-    case 'mm85-conveyor-section':
-    case 'mm85-drive-end':
-    case 'mm85-idler-end': {
-      const pL = ((params?.sectionLength || params?.moduleLength || params?.length || 1000) / 1000);
-      const pH = ((params?.elevation || params?.height || 850) / 1000);
-      const portInset = 0.01;
-      return [
-        { id: 'input', type: 'input', localPosition: [-pL / 2 + portInset, pH, 0] },
-        { id: 'output', type: 'output', localPosition: [pL / 2 - portInset, pH, 0] },
-      ];
-    }
-    case 'mm85-guide-rail': {
-      const pL = ((params?.railLength || params?.length || 1000) / 1000);
-      const pH = ((params?.elevation || params?.height || 900) / 1000) + 0.02;
-      return [
-        { id: 'input', type: 'input', localPosition: [-pL / 2 + 0.01, pH, 0] },
-        { id: 'output', type: 'output', localPosition: [pL / 2 - 0.01, pH, 0] },
-      ];
-    }
-    case 'mm85-support-leg':
-    case 'mm85-end-drive-support':
-      return [];
     case 'incline-conveyor': {
       const infeedLenMm = Number(params?.infeedStraightLength ?? 1200);
       const inclineLenMm = Number(params?.inclinedLength ?? 2600);
@@ -641,14 +543,7 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
  * - Changing parameters triggers React re-render → ports auto-recompute
  * - Serialization stores only (position, rotation, parameters) — ports derive from params
  */
-export function getWorldConnectionPorts(node: ProcessNode | EnvironmentAsset | Actor): {
-  id: string;
-  type: 'input' | 'output';
-  localPosition: [number, number, number];
-  worldPosition: [number, number, number];
-  localDirection?: [number, number, number];
-  worldDirection?: [number, number, number];
-}[] {
+export function getWorldConnectionPorts(node: ProcessNode | EnvironmentAsset | Actor): { id: string; type: 'input' | 'output'; localPosition: [number, number, number]; worldPosition: [number, number, number] }[] {
   return computeWorldPorts(
     { ...node, type: (node as ProcessNode).type },
     (type, params, assetId) => getConnectionPorts(type, params, assetId),
@@ -681,7 +576,6 @@ interface EditorState {
   selectedIds: string[];
   transformMode: 'translate' | 'rotate' | 'scale';
   activeTool: 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure' | 'path-draw';
-  navigationMode: 'orbit' | 'pan';
   
   // Path drawing
   drawingPathId: string | null;
@@ -720,7 +614,7 @@ interface EditorState {
   simulationSpeed: number;
   
   // UI state
-  activeLibraryTab: 'process' | 'modular' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
+  activeLibraryTab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
   showPropertiesPanel: boolean;
   
   // Panel state
@@ -763,7 +657,6 @@ interface EditorState {
   selectAll: () => void;
   setTransformMode: (mode: 'translate' | 'rotate' | 'scale') => void;
   setActiveTool: (tool: 'select' | 'move' | 'rotate' | 'scale' | 'mate' | 'snap-move' | 'measure' | 'path-draw') => void;
-  setNavigationMode: (mode: 'orbit' | 'pan') => void;
   setMateSelectedPort: (port: { nodeId: string; portId: string; type: 'input' | 'output'; worldPosition: [number, number, number] } | null) => void;
   setGridSnap: (snap: boolean) => void;
   setGridSnapSize: (size: number) => void;
@@ -778,13 +671,11 @@ interface EditorState {
   toggleVisibility: (id: string) => void;
   overlaysHidden: boolean;
   setOverlaysHidden: (hidden: boolean) => void;
-  directionDebugVisible: boolean;
-  setDirectionDebugVisible: (visible: boolean) => void;
   pathsVisible: boolean;
   setPathsVisible: (visible: boolean) => void;
   
   setSceneSettings: (settings: Partial<SceneSettings>) => void;
-  setActiveLibraryTab: (tab: 'process' | 'modular' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical') => void;
+  setActiveLibraryTab: (tab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical') => void;
   
   // Panel actions
   setLeftPanelWidth: (width: number) => void;
@@ -889,7 +780,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedIds: [],
   transformMode: 'translate',
   activeTool: 'select',
-  navigationMode: 'orbit',
   drawingPathId: null,
   setDrawingPathId: (id) => set({ drawingPathId: id, activeTool: id ? 'path-draw' : 'select' }),
 
@@ -919,7 +809,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   focusRequest: 0,
   hiddenIds: new Set(),
   overlaysHidden: false,
-  directionDebugVisible: false,
   pathsVisible: true,
   
   isPlaying: false,
@@ -977,45 +866,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addProcessNode: (type, position) => {
     // Check if there's a matching asset in the manifest
     const manifest = get().assetManifest;
-    const matchingAsset = manifest.find(
-      (a) =>
-        a.id === type
-        && (
-          a.category === 'process'
-          || a.category === 'modular'
-          || a.category === 'robots'
-          || a.category === 'pallets'
-          || a.category === 'fmcg'
-          || a.category === 'medical'
-          || a.category === 'actors'
-        )
-    );
+    const matchingAsset = manifest.find(a => a.id === type && a.category === 'process');
     const isParametric = matchingAsset?.assetType === 'parametric';
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
       : getDefaultParameters(type);
-    const staticMetadata = (!isParametric && matchingAsset?.assetType === 'static')
-      ? ((matchingAsset as AssetDef & { metadata?: Record<string, any> }).metadata || {})
-      : {};
-    const defaultRotation = toRuntimeDefaultRotationFromMetadata(staticMetadata);
-    const withTransportPath = staticMetadata.transportPath && typeof staticMetadata.transportPath === 'object'
-      ? { transportPath: staticMetadata.transportPath }
-      : {};
-    const withAssetNodes = Array.isArray(staticMetadata.nodes) ? { assetNodes: staticMetadata.nodes } : {};
-    const withMovableParts = Array.isArray(staticMetadata.movableParts) ? { movableParts: staticMetadata.movableParts } : {};
-    const withNodeBindings = staticMetadata.nodeBindings && typeof staticMetadata.nodeBindings === 'object'
-      ? { nodeBindings: staticMetadata.nodeBindings }
-      : {};
-    const withLiftRuntimeDefaults = toLiftRuntimeDefaultsFromMetadata(staticMetadata);
-    const withBehaviorTemplate = typeof staticMetadata.behaviorTemplate === 'string'
-      ? { behaviorTemplate: staticMetadata.behaviorTemplate }
-      : {};
-    const withBehaviorConfig = staticMetadata.behaviorConfig && typeof staticMetadata.behaviorConfig === 'object'
-      ? { behaviorConfig: staticMetadata.behaviorConfig }
-      : {};
-    const withRuntimeControls = staticMetadata.runtimeControls && typeof staticMetadata.runtimeControls === 'object'
-      ? { runtimeControls: staticMetadata.runtimeControls }
-      : {};
 
     // Auto-generate unique sensor tag
     if (type === 'sensor' && !defaultParams.sensorTag) {
@@ -1039,19 +894,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       id: uuidv4(),
       type,
       position: [position[0], 0, position[2]], // Force Y=0 (on ground)
-      rotation: defaultRotation,
+      rotation: [0, 0, 0],
       scale: [1, 1, 1],
-      parameters: {
-        ...defaultParams,
-        ...withTransportPath,
-        ...withAssetNodes,
-        ...withMovableParts,
-        ...withNodeBindings,
-        ...withBehaviorTemplate,
-        ...withBehaviorConfig,
-        ...withRuntimeControls,
-        ...withLiftRuntimeDefaults,
-      },
+      parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
       assetId: matchingAsset?.id,
       assetDefType: matchingAsset?.assetType,
@@ -1071,16 +916,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
       : getDefaultParameters(type);
-    const staticMetadata = (!isParametric && matchingAsset?.assetType === 'static')
-      ? ((matchingAsset as AssetDef & { metadata?: Record<string, any> }).metadata || {})
-      : {};
-    const defaultRotation = toRuntimeDefaultRotationFromMetadata(staticMetadata);
 
     const newAsset: EnvironmentAsset = {
       id: uuidv4(),
       type,
       position: [position[0], 0, position[2]], // Force Y=0
-      rotation: defaultRotation,
+      rotation: [0, 0, 0],
       scale: [1, 1, 1],
       parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
@@ -1133,16 +974,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
       : getDefaultParameters(type);
-    const staticMetadata = (!isParametric && matchingAsset?.assetType === 'static')
-      ? ((matchingAsset as AssetDef & { metadata?: Record<string, any> }).metadata || {})
-      : {};
-    const defaultRotation = toRuntimeDefaultRotationFromMetadata(staticMetadata);
 
     const newActor: Actor = {
       id: uuidv4(),
       type,
       position: [position[0], 0, position[2]],
-      rotation: defaultRotation,
+      rotation: [0, 0, 0],
       scale: [1, 1, 1],
       parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
@@ -1256,7 +1093,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     
     set(updates as any);
   },
-  setNavigationMode: (mode) => set({ navigationMode: mode }),
   
   setMateSelectedPort: (port) => {
     set(state => ({
@@ -1298,7 +1134,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   setOverlaysHidden: (hidden) => set({ overlaysHidden: hidden }),
-  setDirectionDebugVisible: (visible) => set({ directionDebugVisible: visible }),
   setPathsVisible: (visible) => set({ pathsVisible: visible }),
   
   setSceneSettings: (settings) => {
@@ -1541,7 +1376,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // Migrate old spiral-conveyor params to new format
     const nodes = data.processNodes || [];
     for (const n of nodes) {
-      if ((n.type === 'spiral-conveyor' || n.type === 'spiral-vyeor-conveyor') && n.parameters) {
+      if (n.type === 'spiral-conveyor' && n.parameters) {
         const p = n.parameters;
         if ((p.diameter || p.totalHeight || p.infeedAngle !== undefined) && !p.outfeedAngle) {
           p.infeedHeight = p.infeedHeight || 800;
@@ -1554,32 +1389,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
       }
     }
-
-    // Legacy recovery: older saves may keep environment assets in processNodes.
-    // Move them back to environmentAssets so they render via EnvironmentAssetComponent.
-    const normalizedProcessNodes = [];
-    const migratedEnvironmentAssets = [];
-    for (const n of nodes) {
-      if (LEGACY_ENV_PROCESS_TYPES.has(String(n?.type || ''))) {
-        migratedEnvironmentAssets.push({
-          ...n,
-          scale: n?.scale || [1, 1, 1],
-          rotation: n?.rotation || [0, 0, 0],
-          parameters: n?.parameters || {},
-        });
-      } else {
-        normalizedProcessNodes.push(n);
-      }
-    }
-
-    const mergedEnvironmentAssets = [...migratedEnvironmentAssets, ...(data.environmentAssets || [])];
-    const dedupedEnvironmentAssets = mergedEnvironmentAssets.filter((asset, index, arr) => (
-      arr.findIndex((x) => x.id === asset.id) === index
-    ));
-
     set({
-      processNodes: normalizedProcessNodes,
-      environmentAssets: dedupedEnvironmentAssets,
+      processNodes: nodes,
+      environmentAssets: data.environmentAssets || [],
       actors: data.actors || [],
       edges: data.edges || [],
       underlay: data.underlay || null,
@@ -1623,46 +1435,6 @@ function getDefaultParameters(type: string): Record<string, any> {
     sink: { capacity: 100 },
     conveyor: { length: 5000, width: 1000, speed: 20 },
     'belt-conveyor': { width: 600, length: 3000, height: 800, angle: 0, beltSpeed: 20, sideGuides: true, driveEnd: 'right', supportSpacing: 1500, showLegs: true, adjustableFeetEnabled: true },
-    'mm85-conveyor-section': {
-      sectionLength: 1000,
-      chainWidth: 85,
-      elevation: 850,
-      sectionStyle: 'Standard',
-      sideGuidesEnabled: true,
-      guideHeight: 35,
-    },
-    'mm85-drive-end': {
-      moduleLength: 450,
-      chainWidth: 85,
-      elevation: 850,
-      motorSide: 'Right',
-      includeEncoder: true,
-    },
-    'mm85-idler-end': {
-      moduleLength: 420,
-      chainWidth: 85,
-      elevation: 850,
-      withProtectionCover: true,
-    },
-    'mm85-guide-rail': {
-      railLength: 1000,
-      railSpacing: 130,
-      railHeight: 35,
-      elevation: 900,
-      railType: 'Fixed Aluminium',
-    },
-    'mm85-support-leg': {
-      supportHeight: 850,
-      supportSpan: 220,
-      braceMode: 'Cross Brace',
-      footSize: 80,
-    },
-    'mm85-end-drive-support': {
-      supportHeight: 850,
-      supportSpan: 260,
-      heavyDuty: true,
-      footSize: 90,
-    },
     'incline-conveyor': {
       conveyorWidth: 650,
       overallLength: 5200,
@@ -1693,11 +1465,10 @@ function getDefaultParameters(type: string): Record<string, any> {
     'pusher-transfer': { width: 600, length: 2000, height: 800, pushAngle: 90, pushForce: 1, pushSide: 'left' },
     'merge-divert': { width: 600, mainLength: 3000, branchLength: 2000, branchAngle: 30, height: 800, mode: 'divert' },
     'bend-conveyor': { bendAngle: '90', bendDirection: 'right', surfaceType: 'belt', width: 600, radius: 1000, height: 800, speed: 20, sideGuides: true, guideHeight: 60, showLegs: true, supportSpacing: 45, adjustableFeetEnabled: true },
-    stopper: { enabled: true, engaged: true, width: 400, bladeHeight: 80, mountHeight: 800, mountPosition: 0.5, mountSide: 'center', heightOffset: 0, flip: false, stopperMode: 'release-one-downstream-clear', triggerSensorTag: '', downstreamSensorTag: '', secondarySensorTag: '', stopCondition: 'any-product', releaseCondition: 'timed', holdTime: 3, releaseCount: 1, releaseDelay: 0.3, resetDelaySec: 0.3, stopCount: 0 },
+    stopper: { enabled: true, engaged: true, width: 400, bladeHeight: 80, mountHeight: 800, mountPosition: 0.5, mountSide: 'center', heightOffset: 0, flip: false, stopperMode: 'sensor-triggered', triggerSensorTag: '', stopCondition: 'any-product', releaseCondition: 'timed', holdTime: 3, releaseCount: 1, releaseDelay: 0, stopCount: 0 },
     pusher: { enabled: true, side: 'right', stroke: 300, plateWidth: 250, plateHeight: 100, mountHeight: 800, extended: false, mountPosition: 0.5, heightOffset: 0, flip: false },
-    sensor: { sensorType: 'through-beam', triggered: false, mountHeight: 800, sensorHeight: 80, beltWidth: 600, showBeam: true, mountPosition: 0.5, mountSide: 'center', heightOffset: 0, flip: false, detectPresence: true, detectZone: true, detectionRange: 300 },
+    sensor: { sensorType: 'through-beam', triggered: false, mountHeight: 800, sensorHeight: 80, beltWidth: 600, showBeam: true, mountPosition: 0.5, mountSide: 'center', heightOffset: 0, flip: false },
     'spiral-conveyor': { beltWidth: 400, turns: 3, infeedHeight: 800, outfeedHeight: 3800, outfeedAngle: 180, direction: 'up', speed: 1, sideGuides: true, guideHeight: 80, showLegs: true, centerStructure: 'column' },
-    'spiral-vyeor-conveyor': { beltWidth: 400, turns: 3, infeedHeight: 800, outfeedHeight: 3800, outfeedAngle: 180, direction: 'up', speed: 1, sideGuides: true, guideHeight: 80, showLegs: true, centerStructure: 'column' },
     'vertical-lifter': { platformWidth: 1000, platformDepth: 1000, infeedHeight: 0, outfeedHeight: 3000, liftDirection: 'up', speed: 20, loadDirection: 'front', fenceEnabled: true, capacity: 4 },
     'pick-and-place': { reach: 3, speed: 1.0 },
     palletizer: { palletSize: [1.2, 0.8], stackHeight: 1.5 },
@@ -1737,4 +1508,3 @@ function getDefaultParameters(type: string): Record<string, any> {
   
   return defaults[type] || {};
 }
-

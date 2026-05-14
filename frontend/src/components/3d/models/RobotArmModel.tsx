@@ -1,14 +1,13 @@
 import React, { Suspense } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
-import { useDracoGLTF } from '../../../lib/gltfLoaders';
 
 interface RobotArmModelProps {
   isSelected: boolean;
 }
 
 const GLBRobot: React.FC<{ isSelected: boolean }> = ({ isSelected }) => {
-  const { scene } = useDracoGLTF('/models/industrial-robot.glb');
+  const { scene } = useGLTF('/models/industrial-robot.glb');
   const cloned = scene.clone();
   
   cloned.traverse((child) => {
@@ -106,6 +105,6 @@ const RobotArmModel: React.FC<RobotArmModelProps> = (props) => {
   );
 };
 
-useDracoGLTF.preload('/models/industrial-robot.glb');
+useGLTF.preload('/models/industrial-robot.glb');
 
 export default RobotArmModel;

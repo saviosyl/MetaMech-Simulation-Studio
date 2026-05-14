@@ -2,7 +2,6 @@ import {
   Cog, 
   Package, 
   ArrowRight, 
-  ArrowLeft,
   ArrowDown,
   Database, 
   GitBranch,
@@ -21,7 +20,7 @@ import {
 export interface ModuleDefinition {
   id: string;
   name: string;
-  category: 'process' | 'modular' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
+  category: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
   icon: any;
   description: string;
   assetId?: string; // references AssetDef.id in manifest
@@ -37,8 +36,6 @@ export interface ModuleDefinition {
     };
   };
 }
-
-let _runtimeExternalModules: ModuleDefinition[] = [];
 
 export const moduleLibrary: ModuleDefinition[] = [
   // Process Modules
@@ -218,6 +215,33 @@ export const moduleLibrary: ModuleDefinition[] = [
     },
   },
   {
+    id: 'incline-conveyor',
+    name: 'Inclined Conveyor',
+    category: 'process',
+    icon: ArrowUp,
+    description: 'Premium 3-section incline conveyor with parametric chain, supports, and drive package',
+    assetId: 'incline-conveyor',
+    parameters: {
+      conveyorWidth: { type: 'number', label: 'Conveyor Width (mm)', default: 650, min: 250, max: 1800, step: 50 },
+      overallLength: { type: 'number', label: 'Overall Length (mm)', default: 5200, min: 1000, max: 60000, step: 100 },
+      infeedStraightLength: { type: 'number', label: 'Infeed Straight Length (mm)', default: 1200, min: 200, max: 30000, step: 50 },
+      inclinedLength: { type: 'number', label: 'Inclined Length (mm)', default: 2600, min: 200, max: 30000, step: 50 },
+      outfeedStraightLength: { type: 'number', label: 'Outfeed Straight Length (mm)', default: 1400, min: 200, max: 30000, step: 50 },
+      infeedHeightFromFloor: { type: 'number', label: 'Infeed Height From Floor (mm)', default: 800, min: 0, max: 12000, step: 25 },
+      outfeedHeightFromFloor: { type: 'number', label: 'Outfeed Height From Floor (mm)', default: 1500, min: 0, max: 12000, step: 25 },
+      inclineAngle: { type: 'number', label: 'Incline Angle (°)', default: 16, min: 0, max: 45, step: 0.5 },
+      sideGuideHeight: { type: 'number', label: 'Side Guide Height (mm)', default: 90, min: 0, max: 400, step: 10 },
+      sideGuidesEnabled: { type: 'boolean', label: 'Side Guides Enabled', default: true },
+      chainType: { type: 'select', label: 'Chain Type', default: 'Friction Top Chain', options: ['Friction Top Chain', 'Cleated Chain'] },
+      cleatPitch: { type: 'number', label: 'Cleat Pitch (mm)', default: 240, min: 60, max: 1200, step: 10 },
+      supportMode: { type: 'select', label: 'Support Mode', default: 'Standard', options: ['Standard', 'Heavy Duty', 'Minimal'] },
+      supportSpacing: { type: 'number', label: 'Support Spacing (mm)', default: 1500, min: 400, max: 5000, step: 50 },
+      driveSide: { type: 'select', label: 'Drive Side', default: 'Right', options: ['Left', 'Right'] },
+      motorPosition: { type: 'select', label: 'Motor Position', default: 'Outfeed', options: ['Infeed', 'Center', 'Outfeed'] },
+      frameFinish: { type: 'select', label: 'Frame Finish', default: 'Powder-Coated Steel', options: ['Powder-Coated Steel', 'Stainless Steel Brushed', 'Anodized Aluminium'] },
+    },
+  },
+  {
     id: 'spiral-conveyor',
     name: 'Spiral Conveyor',
     category: 'process',
@@ -239,115 +263,6 @@ export const moduleLibrary: ModuleDefinition[] = [
     },
   },
   {
-    id: 'spiral-vyeor-conveyor',
-    name: 'Spiral Vyeor Conveyor',
-    category: 'process',
-    icon: RotateCw,
-    description: 'SpiralVyeor source-derived conveyor model with shared spiral transport logic',
-    assetId: 'spiral-vyeor-conveyor',
-    parameters: {
-      direction: { type: 'select', label: 'Direction', default: 'up', options: ['up', 'down'] },
-      beltWidth: { type: 'number', label: 'Belt Width (mm)', default: 400, min: 150, max: 800, step: 50 },
-      turns: { type: 'number', label: 'Turns', default: 3, min: 0.5, max: 10, step: 0.5 },
-      outfeedAngle: { type: 'number', label: 'Outfeed Angle (°)', default: 180, min: 0, max: 360, step: 15 },
-      infeedHeight: { type: 'number', label: 'Infeed Height (mm)', default: 800, min: 0, max: 6000, step: 50 },
-      outfeedHeight: { type: 'number', label: 'Outfeed Height (mm)', default: 3800, min: 0, max: 15000, step: 50 },
-      speed: { type: 'number', label: 'Speed (m/min)', default: 20, min: 1, max: 60, step: 1 },
-      sideGuides: { type: 'boolean', label: 'Side Guides', default: true },
-      guideHeight: { type: 'number', label: 'Guide Height (mm)', default: 100, min: 40, max: 250, step: 10 },
-      showLegs: { type: 'boolean', label: 'Show Supports', default: true },
-      centerStructure: { type: 'select', label: 'Center Structure', default: 'column', options: ['column', 'framed-core'] },
-    },
-  },
-  {
-    id: 'mm85-conveyor-section',
-    name: 'MM-85 Conveyor Section',
-    category: 'modular',
-    icon: ArrowRight,
-    description: 'MetaMech MM-85 straight conveyor section building block',
-    assetId: 'mm85-conveyor-section',
-    parameters: {
-      sectionLength: { type: 'number', label: 'Section Length (mm)', default: 1000, min: 300, max: 6000, step: 50 },
-      chainWidth: { type: 'number', label: 'Chain Width (mm)', default: 85, min: 60, max: 220, step: 5 },
-      elevation: { type: 'number', label: 'Elevation (mm)', default: 850, min: 250, max: 2500, step: 25 },
-      sectionStyle: { type: 'select', label: 'Section Style', default: 'Standard', options: ['Standard', 'Heavy Duty'] },
-      sideGuidesEnabled: { type: 'boolean', label: 'Side Guides', default: true },
-      guideHeight: { type: 'number', label: 'Guide Height (mm)', default: 35, min: 10, max: 120, step: 5 },
-    },
-  },
-  {
-    id: 'mm85-drive-end',
-    name: 'MM-85 Drive End',
-    category: 'modular',
-    icon: ArrowRight,
-    description: 'MetaMech MM-85 motorized drive end module',
-    assetId: 'mm85-drive-end',
-    parameters: {
-      moduleLength: { type: 'number', label: 'Module Length (mm)', default: 450, min: 280, max: 1200, step: 20 },
-      chainWidth: { type: 'number', label: 'Chain Width (mm)', default: 85, min: 60, max: 220, step: 5 },
-      elevation: { type: 'number', label: 'Elevation (mm)', default: 850, min: 250, max: 2500, step: 25 },
-      motorSide: { type: 'select', label: 'Motor Side', default: 'Right', options: ['Left', 'Right'] },
-      includeEncoder: { type: 'boolean', label: 'Include Encoder', default: true },
-    },
-  },
-  {
-    id: 'mm85-idler-end',
-    name: 'MM-85 Idler End',
-    category: 'modular',
-    icon: ArrowLeft,
-    description: 'MetaMech MM-85 idler end transfer module',
-    assetId: 'mm85-idler-end',
-    parameters: {
-      moduleLength: { type: 'number', label: 'Module Length (mm)', default: 420, min: 260, max: 1200, step: 20 },
-      chainWidth: { type: 'number', label: 'Chain Width (mm)', default: 85, min: 60, max: 220, step: 5 },
-      elevation: { type: 'number', label: 'Elevation (mm)', default: 850, min: 250, max: 2500, step: 25 },
-      withProtectionCover: { type: 'boolean', label: 'Protection Cover', default: true },
-    },
-  },
-  {
-    id: 'mm85-guide-rail',
-    name: 'MM-85 Guide Rails',
-    category: 'modular',
-    icon: ArrowRightLeft,
-    description: 'MetaMech MM-85 side guide rail assemblies',
-    assetId: 'mm85-guide-rail',
-    parameters: {
-      railLength: { type: 'number', label: 'Rail Length (mm)', default: 1000, min: 300, max: 6000, step: 50 },
-      railSpacing: { type: 'number', label: 'Rail Spacing (mm)', default: 130, min: 80, max: 350, step: 5 },
-      railHeight: { type: 'number', label: 'Rail Height (mm)', default: 35, min: 15, max: 120, step: 5 },
-      elevation: { type: 'number', label: 'Elevation (mm)', default: 900, min: 250, max: 2500, step: 25 },
-      railType: { type: 'select', label: 'Rail Type', default: 'Fixed Aluminium', options: ['Fixed Aluminium', 'Fixed Plastic'] },
-    },
-  },
-  {
-    id: 'mm85-support-leg',
-    name: 'MM-85 Support Leg',
-    category: 'modular',
-    icon: ArrowDown,
-    description: 'MetaMech MM-85 standard floor support leg',
-    assetId: 'mm85-support-leg',
-    parameters: {
-      supportHeight: { type: 'number', label: 'Support Height (mm)', default: 850, min: 350, max: 2500, step: 25 },
-      supportSpan: { type: 'number', label: 'Support Span (mm)', default: 220, min: 120, max: 550, step: 10 },
-      braceMode: { type: 'select', label: 'Brace Mode', default: 'Cross Brace', options: ['Cross Brace', 'No Brace'] },
-      footSize: { type: 'number', label: 'Foot Size (mm)', default: 80, min: 50, max: 180, step: 5 },
-    },
-  },
-  {
-    id: 'mm85-end-drive-support',
-    name: 'MM-85 End Drive Support',
-    category: 'modular',
-    icon: ArrowDown,
-    description: 'MetaMech MM-85 reinforced support for drive end',
-    assetId: 'mm85-end-drive-support',
-    parameters: {
-      supportHeight: { type: 'number', label: 'Support Height (mm)', default: 850, min: 350, max: 2500, step: 25 },
-      supportSpan: { type: 'number', label: 'Support Span (mm)', default: 260, min: 140, max: 650, step: 10 },
-      heavyDuty: { type: 'boolean', label: 'Heavy Duty', default: true },
-      footSize: { type: 'number', label: 'Foot Size (mm)', default: 90, min: 50, max: 180, step: 5 },
-    },
-  },
-  {
     id: 'stopper',
     name: 'Stopper',
     category: 'process',
@@ -360,22 +275,15 @@ export const moduleLibrary: ModuleDefinition[] = [
       width: { type: 'number', label: 'Belt Width (mm)', default: 400, min: 200, max: 1200, step: 50 },
       bladeHeight: { type: 'number', label: 'Blade Height (mm)', default: 80, min: 30, max: 200, step: 10 },
       mountHeight: { type: 'number', label: 'Mount Height (mm)', default: 800, min: 300, max: 3000, step: 50 },
-      stopperMode: {
-        type: 'select',
-        label: 'Control Mode',
-        default: 'release-one-downstream-clear',
-        options: ['release-one-downstream-clear', 'sensor-triggered', 'always-stop', 'timed-release', 'timed-batch', 'downstream-clear'],
-      },
+      stopperMode: { type: 'select', label: 'Mode', default: 'sensor-triggered', options: ['always-stop', 'sensor-triggered', 'timed-release', 'timed-batch', 'downstream-clear'] },
       triggerSensorTag: { type: 'text', label: 'Trigger Sensor Tag', default: '' },
-      downstreamSensorTag: { type: 'text', label: 'Downstream Sensor Tag', default: '' },
       stopCondition: { type: 'select', label: 'Stop Condition', default: 'any-product', options: ['any-product', 'sensor-true', 'sensor-color', 'sensor-type'] },
       releaseCondition: { type: 'select', label: 'Release Condition', default: 'timed', options: ['timed', 'count', 'downstream-clear', 'sensor-clear', 'sensor-dwell'] },
       holdTime: { type: 'number', label: 'Hold Time (sec)', default: 3, min: 0.1, max: 120, step: 0.5 },
       releaseCount: { type: 'number', label: 'Release Count', default: 1, min: 1, max: 50, step: 1 },
       releaseDelay: { type: 'number', label: 'Release Delay (sec)', default: 0, min: 0, max: 30, step: 0.5 },
-      resetDelaySec: { type: 'number', label: 'Reset Delay (sec)', default: 0.3, min: 0.05, max: 5, step: 0.05 },
       stopCount: { type: 'number', label: 'Stop Count (0=unlimited)', default: 0, min: 0, max: 100, step: 1 },
-      secondarySensorTag: { type: 'text', label: 'Secondary Sensor Tag (Legacy)', default: '' },
+      secondarySensorTag: { type: 'text', label: 'Secondary Sensor Tag (queue)', default: '' },
       mountPosition: { type: 'number', label: 'Position Along Path', default: 0.5, min: 0, max: 1, step: 0.05 },
       mountSide: { type: 'select', label: 'Mount Side', default: 'center', options: ['left', 'right', 'center'] },
       heightOffset: { type: 'number', label: 'Height Offset (mm)', default: 0, min: -200, max: 200, step: 10 },
@@ -426,8 +334,6 @@ export const moduleLibrary: ModuleDefinition[] = [
       beltWidth: { type: 'number', label: 'Belt Width (mm)', default: 600, min: 200, max: 1200, step: 50 },
       showBeam: { type: 'boolean', label: 'Show Beam', default: true },
       detectionRange: { type: 'number', label: 'Detection Range (mm)', default: 300, min: 50, max: 1000, step: 50 },
-      detectPresence: { type: 'boolean', label: 'Detect Presence', default: true },
-      detectZone: { type: 'boolean', label: 'Detect Zone', default: true },
       detectColor: { type: 'boolean', label: 'Detect Color', default: false },
       detectType: { type: 'boolean', label: 'Detect Type', default: false },
       detectSize: { type: 'boolean', label: 'Detect Size', default: false },
@@ -842,32 +748,6 @@ export const moduleLibrary: ModuleDefinition[] = [
     },
   },
 
-  {
-    id: 'floor',
-    name: 'Floor',
-    category: 'environment',
-    icon: Package,
-    description: 'Base factory floor plane',
-    assetId: 'floor',
-    parameters: {
-      width: { type: 'number', label: 'Width (m)', default: 50, min: 1, max: 500, step: 1 },
-      depth: { type: 'number', label: 'Depth (m)', default: 50, min: 1, max: 500, step: 1 },
-      color: { type: 'color', label: 'Floor Color', default: '#f0f0f0' },
-    },
-  },
-  {
-    id: 'floor-marking',
-    name: 'Floor Marking',
-    category: 'environment',
-    icon: Package,
-    description: 'Painted floor line / lane marking',
-    assetId: 'floor-marking',
-    parameters: {
-      length: { type: 'number', label: 'Length (m)', default: 5, min: 0.1, max: 100, step: 0.1 },
-      width: { type: 'number', label: 'Width (m)', default: 0.2, min: 0.02, max: 5, step: 0.01 },
-      color: { type: 'color', label: 'Marking Color', default: '#ffff00' },
-    },
-  },
   {
     id: 'pallet',
     name: 'Pallet',
@@ -1574,13 +1454,9 @@ export const moduleLibrary: ModuleDefinition[] = [
 ];
 
 export function getModuleDefinition(id: string): ModuleDefinition | undefined {
-  return [...moduleLibrary, ..._runtimeExternalModules].find(module => module.id === id);
+  return moduleLibrary.find(module => module.id === id);
 }
 
 export function getModulesByCategory(category: string): ModuleDefinition[] {
-  return [...moduleLibrary, ..._runtimeExternalModules].filter(module => module.category === category);
-}
-
-export function setRuntimeExternalModules(nextModules: ModuleDefinition[]): void {
-  _runtimeExternalModules = Array.isArray(nextModules) ? [...nextModules] : [];
+  return moduleLibrary.filter(module => module.category === category);
 }

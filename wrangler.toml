@@ -13,17 +13,13 @@ JWT_EXPIRES_IN_SECONDS = "604800"
 EMAIL_VERIFICATION_TOKEN_HOURS = "24"
 EXPOSE_DEV_VERIFICATION_LINK = "false"
 ENABLE_ADMIN_TEST_EMAIL = "false"
-ASSETS_PUBLIC_BASE_URL = "https://api.metamechsolutions.com"
+INTERNAL_ADMIN_EMAILS = "saviosyl@gmail.com"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "metamech-api-db"
 database_id = "aeefbbf8-2f52-4391-be86-65b29c08fb93"
 migrations_dir = "cloudflare-worker/migrations"
-
-[[r2_buckets]]
-binding = "ASSETS_BUCKET"
-bucket_name = "metamech-assets-prod"
 
 [[routes]]
 pattern = "api.metamechsolutions.com/*"

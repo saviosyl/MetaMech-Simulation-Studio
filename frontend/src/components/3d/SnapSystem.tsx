@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useEditorStore, getConnectionPorts, ProcessNode, EnvironmentAsset, ConnectionPort } from '../../store/editorStore';
-import { getPortWorldPosition, getPortWorldDirection, alignNodeToPort, solveMateTransform } from '../../lib/nodeTransform';
+import { getPortWorldPosition, alignNodeToPort, solveMateTransform, localDirToWorld } from '../../lib/nodeTransform';
 import { findNearestConveyorSnap, isAccessoryType, isConveyorType, applyAccessorySnap } from '../../lib/accessorySnap';
 
 const SNAP_THRESHOLD = 0.5;
@@ -15,7 +15,7 @@ const MACHINE_TYPES = new Set([
 const CONVEYOR_TYPES_SET = new Set([
   'conveyor', 'belt-conveyor', 'roller-conveyor', 'modular-conveyor-straight',
   'modular-conveyor-90-curve', 'modular-conveyor-45-curve', 'incline-conveyor',
-  'pallet-conveyor', 'bend-conveyor', 'spiral-conveyor', 'spiral-vyeor-conveyor',
+  'pallet-conveyor', 'bend-conveyor', 'spiral-conveyor',
   'transfer-bridge', 'popup-transfer', 'pusher-transfer', 'merge-divert', 'stainless-conveyor',
 ]);
 
@@ -77,7 +77,7 @@ function getMachineConveyorHeightAdjustments(
 
 function isHeightAdjustableForSpiralMate(nodeType: string): boolean {
   // Exclude spiral itself; the non-spiral counterpart should adapt to the spiral endpoint.
-  if (nodeType === 'spiral-conveyor' || nodeType === 'spiral-vyeor-conveyor') return false;
+  if (nodeType === 'spiral-conveyor') return false;
   return CONVEYOR_TYPES_SET.has(nodeType) || MACHINE_TYPES.has(nodeType);
 }
 
@@ -107,7 +107,7 @@ function nodeCategory(id: string, processNodesList: ProcessNode[], _environmentA
 }
 
 const SnapSystem: React.FC = () => {
-  const { processNodes, environmentAssets, edges, selectedObjectId, isDragging, mateMode, activeTool, directionDebugVisible, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
+  const { processNodes, environmentAssets, edges, selectedObjectId, isDragging, mateMode, activeTool, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
   const wasDragging = useRef(false);
 
   // Merged list of all nodes that can have ports (process + environment)
@@ -158,18 +158,14 @@ const SnapSystem: React.FC = () => {
               const dz = mpWorld[2] - opWorld[2];
               const planarDist = Math.sqrt(dx * dx + dz * dz);
               const dist3d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-              const spiralPair =
-                node.type === 'spiral-conveyor' ||
-                node.type === 'spiral-vyeor-conveyor' ||
-                other.type === 'spiral-conveyor' ||
-                other.type === 'spiral-vyeor-conveyor';
+              const spiralPair = node.type === 'spiral-conveyor' || other.type === 'spiral-conveyor';
               const usePlanarDist =
                 spiralPair &&
                 (isHeightAdjustableForSpiralMate(node.type) || isHeightAdjustableForSpiralMate(other.type));
               const dist = usePlanarDist ? planarDist : dist3d;
               if (dist < bestDist) {
                 bestDist = dist;
-                const opWorldDir = getPortWorldDirection(op.direction, other as any);
+                const opWorldDir = localDirToWorld(op.direction, other.rotation);
                 bestMatch = { myPort: mp, targetNode: other, targetPort: op, targetWorldPos: opWorld, targetWorldDir: opWorldDir };
               }
             }
@@ -217,7 +213,6 @@ const SnapSystem: React.FC = () => {
             bestMatch.targetWorldDir,
             myPortUpdated.localPosition,
             myPortUpdated.direction,
-            node.rotation as [number, number, number],
             node.scale,
           );
           const updates: Record<string, any> = { position: mate.position, rotation: mate.rotation };
@@ -241,21 +236,12 @@ const SnapSystem: React.FC = () => {
   }, [isDragging]);
 
   // Show ports for all nodes when something is selected, being dragged, or mate mode
-  const showPorts = selectedObjectId !== null || isDragging || mateMode.active || directionDebugVisible;
+  const showPorts = selectedObjectId !== null || isDragging || mateMode.active;
 
   const portVisuals = useMemo(() => {
     if (!showPorts) return [];
 
-    const visuals: {
-      position: [number, number, number];
-      worldDirection: [number, number, number];
-      localDirection: [number, number, number];
-      type: 'input' | 'output';
-      nodeId: string;
-      portId: string;
-      connected: boolean;
-      category: 'process' | 'environment';
-    }[] = [];
+    const visuals: { position: [number, number, number]; type: 'input' | 'output'; nodeId: string; portId: string; connected: boolean; category: 'process' | 'environment' }[] = [];
 
     // Process nodes
     processNodes.forEach((node: ProcessNode) => {
@@ -266,16 +252,7 @@ const SnapSystem: React.FC = () => {
           (e.from === node.id && e.fromPort === port.id) ||
           (e.to === node.id && e.toPort === port.id)
         );
-        visuals.push({
-          position: worldPos,
-          worldDirection: getPortWorldDirection(port.direction, node as any),
-          localDirection: port.direction,
-          type: port.type,
-          nodeId: node.id,
-          portId: port.id,
-          connected,
-          category: 'process',
-        });
+        visuals.push({ position: worldPos, type: port.type, nodeId: node.id, portId: port.id, connected, category: 'process' });
       });
     });
 
@@ -284,16 +261,7 @@ const SnapSystem: React.FC = () => {
       const ports = getConnectionPorts(asset.type, asset.parameters, (asset as any).assetId);
       ports.forEach((port: ConnectionPort) => {
         const worldPos = getPortWorldPosition(port.localPosition, asset as any);
-        visuals.push({
-          position: worldPos,
-          worldDirection: getPortWorldDirection(port.direction, asset as any),
-          localDirection: port.direction,
-          type: port.type,
-          nodeId: asset.id,
-          portId: port.id,
-          connected: false,
-          category: 'environment',
-        });
+        visuals.push({ position: worldPos, type: port.type, nodeId: asset.id, portId: port.id, connected: false, category: 'environment' });
       });
     });
 
@@ -371,13 +339,15 @@ const SnapSystem: React.FC = () => {
               updateObject(firstAsProcess.id, 'process', { parameters: { ...firstAsProcess.parameters, ...fixedParams } });
             }
           }
-          const firstWorldDir = getPortWorldDirection(firstPort.direction, firstNode as any);
+          const firstWorldDir = localDirToWorld(
+            firstPort.direction,
+            firstNode.rotation,
+          );
           const mate = solveMateTransform(
             selectedPort.worldPosition,
             firstWorldDir,
             secondPortForMate.localPosition,
             secondPortForMate.direction,
-            secondNode.rotation as [number, number, number],
             secondNode.scale,
           );
           const updates: Record<string, any> = {
@@ -454,30 +424,6 @@ const SnapSystem: React.FC = () => {
                 />
               </mesh>
             )}
-            {directionDebugVisible && (
-              <>
-                <arrowHelper
-                  args={[
-                    new THREE.Vector3(...pv.worldDirection),
-                    new THREE.Vector3(0, 0, 0),
-                    0.24,
-                    pv.type === 'input' ? '#3b82f6' : '#22c55e',
-                    0.08,
-                    0.045,
-                  ]}
-                />
-                <arrowHelper
-                  args={[
-                    new THREE.Vector3(...pv.localDirection),
-                    new THREE.Vector3(0, 0, 0),
-                    0.16,
-                    '#f59e0b',
-                    0.055,
-                    0.03,
-                  ]}
-                />
-              </>
-            )}
           </group>
         );
       })}
@@ -523,10 +469,7 @@ export function checkSnap(
           (dpWorld[2] - opWorld[2]) ** 2
         );
         const spiralPair =
-          draggedNode.type === 'spiral-conveyor' ||
-          draggedNode.type === 'spiral-vyeor-conveyor' ||
-          otherNode.type === 'spiral-conveyor' ||
-          otherNode.type === 'spiral-vyeor-conveyor';
+          draggedNode.type === 'spiral-conveyor' || otherNode.type === 'spiral-conveyor';
         const fullDist = Math.sqrt(
           (dpWorld[0] - opWorld[0]) ** 2 +
           (dpWorld[1] - opWorld[1]) ** 2 +
@@ -539,10 +482,7 @@ export function checkSnap(
 
         if (effectiveDist < SNAP_THRESHOLD) {
           const spiralConnection =
-            draggedNode.type === 'spiral-conveyor' ||
-            draggedNode.type === 'spiral-vyeor-conveyor' ||
-            otherNode.type === 'spiral-conveyor' ||
-            otherNode.type === 'spiral-vyeor-conveyor';
+            draggedNode.type === 'spiral-conveyor' || otherNode.type === 'spiral-conveyor';
 
           // Spiral connections should align inline with the spiral tangent direction.
           if (spiralConnection) {
@@ -562,13 +502,12 @@ export function checkSnap(
               );
               adjustedDp = updatedPorts.find(p => p.id === dp.id) || dp;
             }
-            const opWorldDir = getPortWorldDirection(op.direction, otherNode as any);
+            const opWorldDir = localDirToWorld(op.direction, otherNode.rotation);
             const mate = solveMateTransform(
               opWorld,
               opWorldDir,
               adjustedDp.localPosition,
               adjustedDp.direction,
-              draggedNode.rotation as [number, number, number],
               draggedNode.scale,
             );
             return {

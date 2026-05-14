@@ -1,13 +1,13 @@
 import React, { Suspense } from 'react';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
-import { useDracoGLTF } from '../../../lib/gltfLoaders';
 
 interface MachineModelProps {
   isSelected: boolean;
 }
 
 const GLBMachine: React.FC<{ isSelected: boolean }> = ({ isSelected }) => {
-  const { scene } = useDracoGLTF('/models/machine.glb');
+  const { scene } = useGLTF('/models/machine.glb');
   const cloned = scene.clone();
   
   cloned.traverse((child) => {
@@ -94,6 +94,6 @@ const MachineModel: React.FC<MachineModelProps> = (props) => {
   );
 };
 
-useDracoGLTF.preload('/models/machine.glb');
+useGLTF.preload('/models/machine.glb');
 
 export default MachineModel;

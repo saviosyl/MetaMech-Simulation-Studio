@@ -1,13 +1,15 @@
 import React from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { simulationUrls } from '../content/simulationMarketingContent';
+import { simulationPlans, simulationUrls } from '../content/simulationMarketingContent';
+import { createCheckoutSession, createPortalSession, BillingPlan } from '../lib/billing';
 
 const BillingPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, checkAuth, logout } = useAuth();
+  const [checkoutLoading, setCheckoutLoading] = React.useState<BillingPlan | null>(null);
 
   const sub = user?.subscription;
   const status = sub?.status || 'none';
@@ -50,6 +52,31 @@ const BillingPage: React.FC = () => {
           : status === 'none'
             ? 'No active plan is linked to this account yet.'
             : 'Active subscription is required for editor and project APIs.';
+
+  const startCheckout = async (plan: BillingPlan) => {
+    setNotice('');
+    setCheckoutLoading(plan);
+    try {
+      const checkoutUrl = await createCheckoutSession(plan);
+      window.location.href = checkoutUrl;
+    } catch (error: any) {
+      const statusCode = error?.response?.status;
+      const code = error?.response?.data?.code;
+      if (statusCode === 409 && code === 'MANAGE_IN_PORTAL_REQUIRED') {
+        try {
+          const portalUrl = await createPortalSession();
+          window.location.href = portalUrl;
+          return;
+        } catch {
+          setNotice('Your subscription already exists. Please try opening the billing portal again.');
+          return;
+        }
+      }
+      setNotice(error?.response?.data?.error || error?.message || 'Unable to start secure checkout.');
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-6 py-12">
@@ -109,12 +136,31 @@ const BillingPage: React.FC = () => {
           >
             I renewed — refresh access
           </button>
-          <button
-            onClick={() => setNotice('Billing portal integration is in Phase 2. For now, update subscription status in the database/admin backend.')}
-            className="w-full bg-slate-100 text-slate-900 py-3 rounded-lg font-semibold hover:bg-white transition-colors"
-          >
-            Renew / Manage Subscription
-          </button>
+          <div className="w-full rounded-lg border border-slate-700 bg-slate-800/70 p-3">
+            <button
+              type="button"
+              onClick={() => startCheckout('monthly')}
+              disabled={checkoutLoading !== null}
+              className="w-full bg-slate-100 text-slate-900 py-2.5 rounded-lg font-semibold hover:bg-white transition-colors inline-flex items-center justify-center disabled:opacity-70"
+            >
+              {checkoutLoading === 'monthly' ? 'Redirecting…' : simulationPlans.monthly.label}
+            </button>
+            <div className="mt-2 text-2xl font-bold text-white">€49.00</div>
+            <div className="mt-0.5 text-xs text-slate-300 font-semibold">per month</div>
+          </div>
+          <div className="w-full rounded-lg border border-slate-700 bg-slate-800/70 p-3">
+            <button
+              type="button"
+              onClick={() => startCheckout('yearly')}
+              disabled={checkoutLoading !== null}
+              className="w-full bg-slate-100 text-slate-900 py-2.5 rounded-lg font-semibold hover:bg-white transition-colors inline-flex items-center justify-center disabled:opacity-70"
+            >
+              {checkoutLoading === 'yearly' ? 'Redirecting…' : simulationPlans.yearly.label}
+            </button>
+            <div className="mt-2 text-2xl font-bold text-white">€499.00</div>
+            <div className="mt-0.5 text-xs text-slate-300 font-semibold">per year</div>
+            <div className="mt-0.5 text-xs text-teal-300 font-semibold">€41.58 / month billed annually</div>
+          </div>
           <button
             onClick={async () => {
               await logout();
