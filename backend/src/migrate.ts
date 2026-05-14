@@ -136,6 +136,25 @@ const migrations = [
       SET email_verified_at = COALESCE(email_verified_at, created_at)
       WHERE email_verified_at IS NULL;
     `
+  },
+  {
+    name: '006_add_stripe_webhook_events',
+    sql: `
+      CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+        id SERIAL PRIMARY KEY,
+        stripe_event_id VARCHAR(255) UNIQUE NOT NULL,
+        event_type VARCHAR(255) NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'received',
+        processed_at TIMESTAMP NULL,
+        error_message TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_status
+        ON stripe_webhook_events(status);
+      CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_created_at
+        ON stripe_webhook_events(created_at);
+    `
   }
 ];
 

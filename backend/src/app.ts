@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import * as dotenv from 'dotenv';
 
 import authRoutes from './routes/auth';
+import billingRoutes from './routes/billing';
 import projectRoutes from './routes/projects';
 
 dotenv.config();
@@ -59,7 +60,12 @@ app.use(cors({
 }));
 
 // Request parsing middleware
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, _res, buf) => {
+    (req as any).rawBody = buf.toString('utf8');
+  },
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
@@ -79,6 +85,7 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/auth', authRoutes);
+app.use('/billing', billingRoutes);
 app.use('/projects', projectRoutes);
 
 // Global error handler
