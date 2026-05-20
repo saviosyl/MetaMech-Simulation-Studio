@@ -36,54 +36,9 @@ const ScenarioLoader: React.FC = () => {
     setLoading(entry.filename);
     const scenario = await loadScenarioFile(entry.filename, entry.downloadUrl);
     if (scenario) {
+      // Match the same loading behavior as direct project open/import.
       clearScene();
-      // Preserve the scenario's authored buckets to avoid forcing nodes through
-      // the wrong renderer (which can create box fallbacks and oversized walls).
-      const actorTypes = new Set(['operator', 'operator-2', 'engineer', 'agv', 'pallet-truck']);
-      const authoredProcess = Array.isArray(scenario.project.processNodes) ? scenario.project.processNodes : [];
-      const authoredActors = Array.isArray(scenario.project.actors) ? scenario.project.actors : [];
-
-      // Back-compat for old files that stored actors inside processNodes.
-      const extractedActors = authoredActors.length === 0
-        ? authoredProcess.filter((n: any) => actorTypes.has(n.type))
-        : [];
-      const processNodes = authoredProcess.filter((n: any) => !actorTypes.has(n.type));
-      const actors = [...authoredActors, ...extractedActors];
-
-      loadScene({
-        processNodes: processNodes.map((n: any) => ({
-          ...n,
-          scale: n.scale || [1, 1, 1],
-          rotation: n.rotation || [0, 0, 0],
-          parameters: n.parameters || {},
-          locked: n.locked ?? false,
-          visible: n.visible ?? true,
-        })),
-        edges: (scenario.project.edges || []).map((e: any) => ({
-          ...e,
-          fromPort: e.fromPort || 'output',
-          toPort: e.toPort || 'input',
-        })),
-        environmentAssets: (scenario.project.environmentAssets || []).map((n: any) => ({
-          ...n,
-          scale: n.scale || [1, 1, 1],
-          rotation: n.rotation || [0, 0, 0],
-          parameters: n.parameters || {},
-        })),
-        actors: actors.map((n: any) => ({
-          ...n,
-          scale: n.scale || [1, 1, 1],
-          rotation: n.rotation || [0, 0, 0],
-          parameters: n.parameters || {},
-        })),
-        underlay: scenario.project.underlay || null,
-        sceneSettings: scenario.project.sceneSettings,
-        customProducts: scenario.project.customProducts || [],
-        customModels: scenario.project.customModels || [],
-        paths: scenario.project.paths || [],
-        cameraPaths: scenario.project.cameraPaths || [],
-        pathsVisible: scenario.project.pathsVisible ?? true,
-      });
+      loadScene(scenario.project || {});
       simulationEngine.loadRules(Array.isArray(scenario.rules) ? scenario.rules : []);
     } else {
       simulationEngine.loadRules([]);
