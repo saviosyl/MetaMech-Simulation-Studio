@@ -26,6 +26,7 @@ export interface ModuleDefinition {
   assetId?: string; // references AssetDef.id in manifest
   placementCategory?: 'process' | 'environment' | 'actors';
   oemCompany?: string;
+  priceUsd?: number;
   parameters: {
     [key: string]: {
       type: 'number' | 'string' | 'text' | 'select' | 'boolean' | 'color';

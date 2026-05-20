@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Project } from '../types';
 import api from '../utils/api';
 import { simulationUrls } from '../content/simulationMarketingContent';
+import { isOemAdminUser } from '../lib/adminAccess';
 
 const LOCAL_PROJECTS_KEY = 'metamech_projects';
 interface LocalProject { id: number; name: string; data: any; created_at: string; updated_at: string; }
@@ -36,6 +37,7 @@ const DashboardPage: React.FC = () => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const canManageOem = isOemAdminUser(user);
 
   useEffect(() => { fetchProjects(); }, []);
 
@@ -179,6 +181,9 @@ const DashboardPage: React.FC = () => {
             <input ref={fileInputRef} type="file" accept=".json,.metamech.json" onChange={handleImportFile} style={{ display: 'none' }} />
             <button onClick={() => navigate('/demo')} style={S.btnGhost}>Quick Demo</button>
             <button onClick={() => navigate('/frame-designer-demo')} style={S.btnGhost}>Frame Designer</button>
+            {canManageOem && (
+              <button onClick={() => navigate('/oem-admin')} style={S.btnGhost}>OEM Admin</button>
+            )}
             <button onClick={() => setShowCreateModal(true)} style={S.btnPrimary}>
               <Plus size={14} /> New Project
             </button>

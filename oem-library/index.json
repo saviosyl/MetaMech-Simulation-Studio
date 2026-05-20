@@ -11,7 +11,12 @@
           "description": "Example OEM entry. Replace with your OEM GLB models.",
           "placementCategory": "process",
           "glbUrl": "/models/machine.glb",
-          "defaultScale": [1, 1, 1]
+          "defaultScale": [1, 1, 1],
+          "priceUsd": 4500,
+          "connectionPorts": [
+            { "id": "in-1", "type": "input", "localPosition": [-1, 0.8, 0] },
+            { "id": "out-1", "type": "output", "localPosition": [1, 0.8, 0] }
+          ]
         }
       ]
     }

@@ -1,10 +1,16 @@
 import { Package } from 'lucide-react';
-import { AssetDef, StaticAssetDef } from './assetManifest';
+import { AssetDef, ConnectionPortDef, StaticAssetDef } from './assetManifest';
 import { ModuleDefinition } from './moduleLibrary';
 
-type PlacementCategory = 'process' | 'environment' | 'actors';
+export type PlacementCategory = 'process' | 'environment' | 'actors';
 
-interface OemModelEntry {
+export interface OemConnectionPortInput {
+  id: string;
+  type: 'input' | 'output';
+  localPosition: [number, number, number];
+}
+
+export interface OemModelEntry {
   id: string;
   name: string;
   description?: string;
@@ -13,16 +19,18 @@ interface OemModelEntry {
   glbUrl?: string;
   thumbnailUrl?: string;
   defaultScale?: [number, number, number];
+  priceUsd?: number;
+  connectionPorts?: OemConnectionPortInput[];
 }
 
-interface OemCompanyEntry {
+export interface OemCompanyEntry {
   id: string;
   name: string;
   folder?: string;
   models: OemModelEntry[];
 }
 
-interface OemLibraryIndex {
+export interface OemLibraryIndex {
   companies: OemCompanyEntry[];
 }
 
@@ -39,6 +47,7 @@ const LIBRARY_PATH = (import.meta.env.VITE_OEM_GITHUB_PATH || 'oem-library').rep
 const INDEX_FILE = `${LIBRARY_PATH}/index.json`;
 const INDEX_URL = `https://raw.githubusercontent.com/${encodeURIComponent(OWNER)}/${encodeURIComponent(REPO)}/${encodeURIComponent(BRANCH)}/${INDEX_FILE}`;
 export const OEM_LIBRARY_MANAGE_URL = `https://github.com/${encodeURIComponent(OWNER)}/${encodeURIComponent(REPO)}/tree/${encodeURIComponent(BRANCH)}/${LIBRARY_PATH}`;
+const LOCAL_DRAFT_KEY = 'metamech_oem_library_draft_v1';
 
 let loadPromise: Promise<OemLibraryLoadResult> | null = null;
 
@@ -66,7 +75,7 @@ function toAssetId(company: OemCompanyEntry, model: OemModelEntry): string {
   return `oem-${companyId}-${modelId}`;
 }
 
-function resolveGlbUrl(company: OemCompanyEntry, model: OemModelEntry): string | null {
+export function resolveOemModelGlbUrl(company: OemCompanyEntry, model: OemModelEntry): string | null {
   if (typeof model.glbUrl === 'string' && model.glbUrl.trim()) return model.glbUrl.trim();
   if (typeof model.glbPath !== 'string' || !model.glbPath.trim()) return null;
   const folder = (company.folder || company.id || company.name || '').trim();
@@ -74,6 +83,31 @@ function resolveGlbUrl(company: OemCompanyEntry, model: OemModelEntry): string |
     ? `${LIBRARY_PATH}/${folder.replace(/^\/+|\/+$/g, '')}/${model.glbPath.replace(/^\/+/, '')}`
     : `${LIBRARY_PATH}/${model.glbPath.replace(/^\/+/, '')}`;
   return githubRawUrl(path);
+}
+
+function normalizePorts(value: unknown): OemConnectionPortInput[] {
+  if (!Array.isArray(value)) return [];
+  const ports: OemConnectionPortInput[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const type = (item as any).type === 'output' ? 'output' : 'input';
+    const local = Array.isArray((item as any).localPosition) && (item as any).localPosition.length === 3
+      ? [(item as any).localPosition[0], (item as any).localPosition[1], (item as any).localPosition[2]]
+      : [0, 0, 0];
+    const px = Number(local[0]);
+    const py = Number(local[1]);
+    const pz = Number(local[2]);
+    ports.push({
+      id: typeof (item as any).id === 'string' && (item as any).id.trim() ? (item as any).id.trim() : `${type}-${ports.length + 1}`,
+      type,
+      localPosition: [
+        Number.isFinite(px) ? px : 0,
+        Number.isFinite(py) ? py : 0,
+        Number.isFinite(pz) ? pz : 0,
+      ],
+    });
+  }
+  return ports;
 }
 
 function normalizeLibrary(data: unknown): OemLibraryIndex {
@@ -101,6 +135,10 @@ function normalizeLibrary(data: unknown): OemLibraryIndex {
         defaultScale: Array.isArray((m as any).defaultScale) && (m as any).defaultScale.length === 3
           ? [(m as any).defaultScale[0], (m as any).defaultScale[1], (m as any).defaultScale[2]]
           : undefined,
+        priceUsd: typeof (m as any).priceUsd === 'number' && Number.isFinite((m as any).priceUsd)
+          ? Math.max(0, (m as any).priceUsd)
+          : undefined,
+        connectionPorts: normalizePorts((m as any).connectionPorts),
       });
     }
     if (models.length === 0) continue;
@@ -117,13 +155,30 @@ function normalizeLibrary(data: unknown): OemLibraryIndex {
   return { companies };
 }
 
+function mergeLibraries(base: OemLibraryIndex, override: OemLibraryIndex | null): OemLibraryIndex {
+  if (!override || !Array.isArray(override.companies) || override.companies.length === 0) return base;
+  const byId = new Map<string, OemCompanyEntry>();
+  for (const company of base.companies) byId.set(company.id, company);
+  for (const company of override.companies) byId.set(company.id, company);
+  return { companies: Array.from(byId.values()) };
+}
+
+function toConnectionPortsForAsset(ports: OemConnectionPortInput[] | undefined): ConnectionPortDef[] | undefined {
+  if (!Array.isArray(ports) || ports.length === 0) return undefined;
+  return ports.map((port) => ({
+    id: port.id,
+    type: port.type,
+    localPosition: [port.localPosition[0], port.localPosition[1], port.localPosition[2]],
+  }));
+}
+
 function toRuntimeEntities(index: OemLibraryIndex): OemLibraryLoadResult {
   const modules: ModuleDefinition[] = [];
   const assets: AssetDef[] = [];
 
   for (const company of index.companies) {
     for (const model of company.models) {
-      const glbUrl = resolveGlbUrl(company, model);
+      const glbUrl = resolveOemModelGlbUrl(company, model);
       if (!glbUrl) continue;
       const placementCategory = toPlacementCategory(model.placementCategory);
       const assetId = toAssetId(company, model);
@@ -137,18 +192,21 @@ function toRuntimeEntities(index: OemLibraryIndex): OemLibraryLoadResult {
         glbUrl,
         thumbnailUrl: model.thumbnailUrl || '',
         defaultScale: model.defaultScale,
+        connectionPorts: toConnectionPortsForAsset(model.connectionPorts),
       };
       assets.push(asset);
 
+      const priceLabel = typeof model.priceUsd === 'number' ? ` • $${model.priceUsd.toFixed(2)}` : '';
       modules.push({
         id: assetId,
         name: model.name,
         category: 'oem',
         icon: Package,
-        description: model.description || `${company.name} OEM model`,
+        description: `${model.description || `${company.name} OEM model`}${priceLabel}`,
         assetId,
         placementCategory,
         oemCompany: company.name,
+        priceUsd: model.priceUsd,
         parameters: {},
       });
     }
@@ -157,18 +215,48 @@ function toRuntimeEntities(index: OemLibraryIndex): OemLibraryLoadResult {
   return { companies: index.companies, modules, assets };
 }
 
+export function getLocalOemLibraryDraft(): OemLibraryIndex | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_DRAFT_KEY);
+    if (!raw) return null;
+    return normalizeLibrary(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+export function saveLocalOemLibraryDraft(index: OemLibraryIndex): void {
+  localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(index, null, 2));
+  invalidateOemLibraryCache();
+}
+
+export function clearLocalOemLibraryDraft(): void {
+  localStorage.removeItem(LOCAL_DRAFT_KEY);
+  invalidateOemLibraryCache();
+}
+
+export function invalidateOemLibraryCache(): void {
+  loadPromise = null;
+}
+
+export async function fetchGithubOemLibraryIndex(): Promise<OemLibraryIndex> {
+  try {
+    const res = await fetch(INDEX_URL);
+    if (!res.ok) return { companies: [] };
+    const data = await res.json();
+    return normalizeLibrary(data);
+  } catch {
+    return { companies: [] };
+  }
+}
+
 export async function loadOemLibrary(): Promise<OemLibraryLoadResult> {
   if (!loadPromise) {
     loadPromise = (async () => {
-      try {
-        const res = await fetch(INDEX_URL);
-        if (!res.ok) return { companies: [], modules: [], assets: [] };
-        const data = await res.json();
-        const normalized = normalizeLibrary(data);
-        return toRuntimeEntities(normalized);
-      } catch {
-        return { companies: [], modules: [], assets: [] };
-      }
+      const githubLibrary = await fetchGithubOemLibraryIndex();
+      const localDraft = getLocalOemLibraryDraft();
+      const merged = mergeLibraries(githubLibrary, localDraft);
+      return toRuntimeEntities(merged);
     })();
   }
   return loadPromise;

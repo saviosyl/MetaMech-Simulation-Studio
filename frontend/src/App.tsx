@@ -11,6 +11,7 @@ import LegacyAccessRedirectPage from './pages/LegacyAccessRedirectPage';
 import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
 import FrameDesignerPage from './pages/FrameDesignerPage';
+import OemAdminPage from './pages/OemAdminPage';
 import './index.css';
 
 const THEME_STORAGE_KEY = 'metamech-theme';
@@ -71,6 +72,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <FrameDesignerPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/oem-admin"
+            element={
+              <ProtectedRoute>
+                <OemAdminPage />
               </ProtectedRoute>
             }
           />
