@@ -37,65 +37,52 @@ const ScenarioLoader: React.FC = () => {
     const scenario = await loadScenarioFile(entry.filename, entry.downloadUrl);
     if (scenario) {
       clearScene();
+      // Preserve the scenario's authored buckets to avoid forcing nodes through
+      // the wrong renderer (which can create box fallbacks and oversized walls).
+      const actorTypes = new Set(['operator', 'operator-2', 'engineer', 'agv', 'pallet-truck']);
+      const authoredProcess = Array.isArray(scenario.project.processNodes) ? scenario.project.processNodes : [];
+      const authoredActors = Array.isArray(scenario.project.actors) ? scenario.project.actors : [];
 
-      // Separate process nodes from environment/actor nodes based on type
-      const processTypes = new Set([
-        'source', 'sink', 'conveyor', 'belt-conveyor', 'roller-conveyor', 'buffer', 'machine',
-        'router', 'transfer-bridge', 'popup-transfer', 'pusher-transfer', 'merge-divert',
-        'spiral-conveyor', 'vertical-lifter', 'pick-and-place', 'palletizer',
-        'modular-conveyor-straight', 'modular-conveyor-90-curve', 'modular-conveyor-45-curve',
-        'bend-conveyor', 'stopper', 'pusher', 'sensor', 'industrial-robot', 'machine-static',
-        'cartesian-robot', 'cobot', 'robot-5axis', 'robot-6axis',
-        'eur-pallet', 'standard-pallet', 'custom-pallet',
-        'carton-erector', 'case-packer', 'checkweigher', 'metal-detector',
-        'labeler', 'sealing-station', 'reject-station', 'accumulation-table',
-        'stretch-wrapper', 'packing-station', 'pallet-conveyor', 'forklift',
-      ]);
-      const envTypes = new Set([
-        'wall', 'door', 'window', 'stairs', 'safety-rail', 'floor-marking',
-        'pallet-rack', 'warehouse-shell', 'floor', 'pallet', 'cardboard-box',
-        'fence', 'fence-gate', 'bollard', 'operator-station', 'electrical-cabinet',
-        'tower-light', 'hmi-stand', 'machine-enclosure', 'floor-zone', 'pallet-stack',
-      ]);
-      const actorTypes = new Set(['operator', 'engineer', 'forklift', 'agv', 'pallet-truck']);
-
-      const allNodes = scenario.project.processNodes || [];
-      const pNodes = allNodes.filter((n: any) => processTypes.has(n.type));
-      const eNodes = [
-        ...allNodes.filter((n: any) => envTypes.has(n.type)),
-        ...(scenario.project.environmentAssets || []),
-      ];
-      const aNodes = [
-        ...allNodes.filter((n: any) => actorTypes.has(n.type)),
-        ...(scenario.project.actors || []),
-      ];
+      // Back-compat for old files that stored actors inside processNodes.
+      const extractedActors = authoredActors.length === 0
+        ? authoredProcess.filter((n: any) => actorTypes.has(n.type))
+        : [];
+      const processNodes = authoredProcess.filter((n: any) => !actorTypes.has(n.type));
+      const actors = [...authoredActors, ...extractedActors];
 
       loadScene({
-        processNodes: pNodes.map((n: any) => ({
+        processNodes: processNodes.map((n: any) => ({
           ...n,
           scale: n.scale || [1, 1, 1],
           rotation: n.rotation || [0, 0, 0],
           parameters: n.parameters || {},
-          locked: false,
-          visible: true,
+          locked: n.locked ?? false,
+          visible: n.visible ?? true,
         })),
         edges: (scenario.project.edges || []).map((e: any) => ({
           ...e,
           fromPort: e.fromPort || 'output',
           toPort: e.toPort || 'input',
         })),
-        environmentAssets: eNodes.map((n: any) => ({
+        environmentAssets: (scenario.project.environmentAssets || []).map((n: any) => ({
           ...n,
           scale: n.scale || [1, 1, 1],
           rotation: n.rotation || [0, 0, 0],
           parameters: n.parameters || {},
         })),
-        actors: aNodes.map((n: any) => ({
+        actors: actors.map((n: any) => ({
           ...n,
           scale: n.scale || [1, 1, 1],
           rotation: n.rotation || [0, 0, 0],
           parameters: n.parameters || {},
         })),
+        underlay: scenario.project.underlay || null,
+        sceneSettings: scenario.project.sceneSettings,
+        customProducts: scenario.project.customProducts || [],
+        customModels: scenario.project.customModels || [],
+        paths: scenario.project.paths || [],
+        cameraPaths: scenario.project.cameraPaths || [],
+        pathsVisible: scenario.project.pathsVisible ?? true,
       });
       simulationEngine.loadRules(Array.isArray(scenario.rules) ? scenario.rules : []);
     } else {

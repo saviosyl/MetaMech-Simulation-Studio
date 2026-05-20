@@ -15,6 +15,11 @@ interface EnvironmentAssetComponentProps {
 
 const EnvironmentAssetComponent: React.FC<EnvironmentAssetComponentProps> = ({ asset, isSelected, onClick }) => {
   const meshRef = useRef<THREE.Mesh>(null);
+  const toSceneUnits = (value: unknown, fallback: number): number => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+    // Legacy scene exports frequently store dimensions in mm.
+    return Math.abs(value) > 50 ? value / 1000 : value;
+  };
 
   // Check if this asset uses the new asset system
   const assetDef = asset.assetId ? getAssetById(asset.assetId) : undefined;
@@ -89,35 +94,63 @@ const EnvironmentAssetComponent: React.FC<EnvironmentAssetComponentProps> = ({ a
   const getGeometry = () => {
     switch (asset.type) {
       case 'wall':
-        const width = asset.parameters.width || 5;
-        const height = asset.parameters.height || 3;
-        const thickness = asset.parameters.thickness || 0.2;
+        const width = toSceneUnits(asset.parameters.width, 5);
+        const height = toSceneUnits(asset.parameters.height, 3);
+        const thickness = toSceneUnits(asset.parameters.thickness, 0.2);
         return <boxGeometry args={[width, height, thickness]} />;
       
       case 'door':
-        return <boxGeometry args={[2, 2.5, 0.1]} />;
+        return <boxGeometry args={[
+          toSceneUnits(asset.parameters.width, 2),
+          toSceneUnits(asset.parameters.height, 2.5),
+          toSceneUnits(asset.parameters.thickness, 0.1),
+        ]} />;
       
       case 'window':
-        return <boxGeometry args={[2, 1.5, 0.1]} />;
+        return <boxGeometry args={[
+          toSceneUnits(asset.parameters.width, 2),
+          toSceneUnits(asset.parameters.height, 1.5),
+          toSceneUnits(asset.parameters.thickness, 0.1),
+        ]} />;
       
       case 'stairs':
         return <boxGeometry args={[2, 2, 5]} />;
       
       case 'safety-rail':
-        return <boxGeometry args={[5, 1.2, 0.1]} />;
+        return <boxGeometry args={[
+          toSceneUnits(asset.parameters.length, 5),
+          toSceneUnits(asset.parameters.height, 1.2),
+          toSceneUnits(asset.parameters.thickness, 0.1),
+        ]} />;
       
       case 'floor-marking':
-        return <boxGeometry args={[5, 0.01, 0.2]} />;
+        return <boxGeometry args={[
+          toSceneUnits(asset.parameters.length, 5),
+          0.01,
+          toSceneUnits(asset.parameters.width, 0.2),
+        ]} />;
       
       case 'pallet-rack':
-        return <boxGeometry args={[3, 4, 1.2]} />;
+        return <boxGeometry args={[
+          toSceneUnits(asset.parameters.width, 3),
+          toSceneUnits(asset.parameters.height, 4),
+          toSceneUnits(asset.parameters.depth, 1.2),
+        ]} />;
       
       case 'warehouse-shell':
-        return <boxGeometry args={[20, 8, 15]} />;
+        return <boxGeometry args={[
+          toSceneUnits(asset.parameters.width, 20),
+          toSceneUnits(asset.parameters.height, 8),
+          toSceneUnits(asset.parameters.depth, 15),
+        ]} />;
       
       case 'floor':
-        return <boxGeometry args={[50, 0.1, 50]} />;
-      
+        return <boxGeometry args={[
+          toSceneUnits(asset.parameters.width, 50),
+          0.1,
+          toSceneUnits(asset.parameters.depth, 50),
+        ]} />;
+
       default:
         return <boxGeometry args={[1, 1, 1]} />;
     }

@@ -28,6 +28,13 @@ export interface ScenarioProject {
   edges: any[];
   environmentAssets?: any[];
   actors?: any[];
+  underlay?: any;
+  sceneSettings?: any;
+  customProducts?: any[];
+  customModels?: any[];
+  paths?: any[];
+  cameraPaths?: any[];
+  pathsVisible?: boolean;
 }
 
 export interface ScenarioFile {
@@ -77,6 +84,13 @@ function normalizeScenarioPayload(data: any, filename: string): ScenarioFile | n
     edges: Array.isArray(data?.scene?.edges) ? data.scene.edges : null,
     environmentAssets: Array.isArray(data?.scene?.environmentAssets) ? data.scene.environmentAssets : undefined,
     actors: Array.isArray(data?.scene?.actors) ? data.scene.actors : undefined,
+    underlay: data?.scene?.underlay,
+    sceneSettings: data?.scene?.sceneSettings,
+    customProducts: Array.isArray(data?.scene?.customProducts) ? data.scene.customProducts : undefined,
+    customModels: Array.isArray(data?.scene?.customModels) ? data.scene.customModels : undefined,
+    paths: Array.isArray(data?.scene?.paths) ? data.scene.paths : undefined,
+    cameraPaths: Array.isArray(data?.scene?.cameraPaths) ? data.scene.cameraPaths : undefined,
+    pathsVisible: typeof data?.scene?.pathsVisible === 'boolean' ? data.scene.pathsVisible : undefined,
   };
 
   const directProject = {
@@ -84,6 +98,13 @@ function normalizeScenarioPayload(data: any, filename: string): ScenarioFile | n
     edges: Array.isArray(data?.edges) ? data.edges : null,
     environmentAssets: Array.isArray(data?.environmentAssets) ? data.environmentAssets : undefined,
     actors: Array.isArray(data?.actors) ? data.actors : undefined,
+    underlay: data?.underlay,
+    sceneSettings: data?.sceneSettings,
+    customProducts: Array.isArray(data?.customProducts) ? data.customProducts : undefined,
+    customModels: Array.isArray(data?.customModels) ? data.customModels : undefined,
+    paths: Array.isArray(data?.paths) ? data.paths : undefined,
+    cameraPaths: Array.isArray(data?.cameraPaths) ? data.cameraPaths : undefined,
+    pathsVisible: typeof data?.pathsVisible === 'boolean' ? data.pathsVisible : undefined,
   };
 
   const nestedProject = {
@@ -91,6 +112,13 @@ function normalizeScenarioPayload(data: any, filename: string): ScenarioFile | n
     edges: Array.isArray(data?.project?.edges) ? data.project.edges : null,
     environmentAssets: Array.isArray(data?.project?.environmentAssets) ? data.project.environmentAssets : undefined,
     actors: Array.isArray(data?.project?.actors) ? data.project.actors : undefined,
+    underlay: data?.project?.underlay,
+    sceneSettings: data?.project?.sceneSettings,
+    customProducts: Array.isArray(data?.project?.customProducts) ? data.project.customProducts : undefined,
+    customModels: Array.isArray(data?.project?.customModels) ? data.project.customModels : undefined,
+    paths: Array.isArray(data?.project?.paths) ? data.project.paths : undefined,
+    cameraPaths: Array.isArray(data?.project?.cameraPaths) ? data.project.cameraPaths : undefined,
+    pathsVisible: typeof data?.project?.pathsVisible === 'boolean' ? data.project.pathsVisible : undefined,
   };
 
   const sourceProject = sceneProject.processNodes && sceneProject.edges
@@ -117,6 +145,13 @@ function normalizeScenarioPayload(data: any, filename: string): ScenarioFile | n
       edges: sourceProject.edges || [],
       environmentAssets: sourceProject.environmentAssets || [],
       actors: sourceProject.actors || [],
+      underlay: sourceProject.underlay || null,
+      sceneSettings: sourceProject.sceneSettings || undefined,
+      customProducts: sourceProject.customProducts || [],
+      customModels: sourceProject.customModels || [],
+      paths: sourceProject.paths || [],
+      cameraPaths: sourceProject.cameraPaths || [],
+      pathsVisible: sourceProject.pathsVisible,
     },
     rules: Array.isArray(data?.rules)
       ? data.rules
