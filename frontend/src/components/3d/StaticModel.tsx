@@ -1,7 +1,7 @@
-import React, { Suspense } from 'react';
+import React from 'react';
 import * as THREE from 'three';
-import { useGLTF } from '@react-three/drei';
 import { StaticAssetDef } from '../../lib/assetManifest';
+import { loadModelObject } from '../../lib/modelLoader';
 
 interface StaticModelProps {
   assetDef: StaticAssetDef;
@@ -9,14 +9,39 @@ interface StaticModelProps {
   onClick: () => void;
 }
 
-const GLBModel: React.FC<{ url: string; defaultScale?: [number, number, number] }> = ({ url, defaultScale }) => {
-  const { scene } = useGLTF(url);
-  const cloned = React.useMemo(() => {
-    const c = scene.clone(true);
-    if (defaultScale) c.scale.set(...defaultScale);
-    return c;
-  }, [scene, defaultScale]);
+const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
+  const [model, setModel] = React.useState<THREE.Object3D | null>(null);
 
+  React.useEffect(() => {
+    let mounted = true;
+    setModel(null);
+    (async () => {
+      try {
+        const object = await loadModelObject(assetDef.glbUrl, assetDef.sourceFormat);
+        if (!mounted) return;
+        setModel(object);
+      } catch (error) {
+        console.warn('Failed to load static model', assetDef.id, error);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [assetDef.id, assetDef.glbUrl, assetDef.sourceFormat]);
+
+  const cloned = React.useMemo(() => {
+    if (!model) return null;
+    const instance = model.clone(true);
+    if (assetDef.defaultScale) instance.scale.set(...assetDef.defaultScale);
+    instance.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+      }
+    });
+    return instance;
+  }, [model, assetDef.defaultScale]);
+
+  if (!cloned) return <FallbackBox />;
   return <primitive object={cloned} />;
 };
 
@@ -34,9 +59,7 @@ const StaticModel: React.FC<StaticModelProps> = ({ assetDef, isSelected, onClick
       onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
       onPointerOut={() => { document.body.style.cursor = 'auto'; }}
     >
-      <Suspense fallback={<FallbackBox />}>
-        <GLBModel url={assetDef.glbUrl} defaultScale={assetDef.defaultScale} />
-      </Suspense>
+      <RuntimeModel assetDef={assetDef} />
       {isSelected && (
         <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[1.5, 1.7, 32]} />

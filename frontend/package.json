@@ -16,6 +16,7 @@
     "@types/uuid": "^10.0.0",
     "axios": "^1.6.2",
     "lucide-react": "^0.294.0",
+    "occt-import-js": "^0.0.23",
     "postprocessing": "^6.38.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
 import { Grid, OrbitControls } from '@react-three/drei';
 import { ArrowLeft, Building2, Download, Plus, Save, Trash2, Upload } from 'lucide-react';
+import * as THREE from 'three';
 import { useAuth } from '../contexts/AuthContext';
 import { isOemAdminUser } from '../lib/adminAccess';
 import {
@@ -13,11 +14,12 @@ import {
   OemCompanyEntry,
   OemConnectionPortInput,
   OemLibraryIndex,
+  OemModelFormat,
   OemModelEntry,
   resolveOemModelGlbUrl,
   saveLocalOemLibraryDraft,
 } from '../lib/oemLibrary';
-import GLBModel from '../components/3d/GLBModel';
+import { inferModelFormat, loadModelObject } from '../lib/modelLoader';
 
 function slugify(value: string): string {
   return value
@@ -27,13 +29,14 @@ function slugify(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-function defaultModel(companyId: string, modelName = 'New OEM Model'): OemModelEntry {
+function defaultModel(_companyId: string, modelName = 'New OEM Model'): OemModelEntry {
   const base = slugify(modelName) || `model-${Date.now()}`;
   return {
     id: base,
     name: modelName,
     description: '',
     placementCategory: 'environment',
+    modelFormat: 'glb',
     glbPath: '',
     glbUrl: '',
     thumbnailUrl: '',
@@ -42,6 +45,84 @@ function defaultModel(companyId: string, modelName = 'New OEM Model'): OemModelE
     connectionPorts: [],
   };
 }
+
+const PORT_COLOR: Record<'input' | 'output', string> = {
+  input: '#3b82f6',
+  output: '#10b981',
+};
+
+const InteractiveModelPreview: React.FC<{
+  modelUrl: string;
+  modelFormat?: OemModelFormat;
+  defaultScale?: [number, number, number];
+  ports: OemConnectionPortInput[];
+  addPortByClick: boolean;
+  portTypeForClick: 'input' | 'output';
+  onSurfacePick: (localPos: [number, number, number], type: 'input' | 'output') => void;
+}> = ({ modelUrl, modelFormat, defaultScale, ports, addPortByClick, portTypeForClick, onSurfacePick }) => {
+  const [loadedModel, setLoadedModel] = useState<THREE.Object3D | null>(null);
+  const modelRootRef = useRef<THREE.Group>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoadedModel(null);
+    (async () => {
+      try {
+        const model = await loadModelObject(modelUrl, modelFormat);
+        if (!mounted) return;
+        setLoadedModel(model);
+      } catch (error) {
+        console.warn('Model preview failed', error);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [modelUrl, modelFormat]);
+
+  const modelClone = useMemo(() => {
+    if (!loadedModel) return null;
+    const instance = loadedModel.clone(true);
+    if (defaultScale) instance.scale.set(...defaultScale);
+    instance.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+      }
+    });
+    return instance;
+  }, [loadedModel, defaultScale]);
+
+  if (!modelClone) return null;
+
+  return (
+    <group>
+      <group
+        ref={modelRootRef}
+        onPointerDown={(event) => {
+          if (!addPortByClick || !modelRootRef.current) return;
+          event.stopPropagation();
+          const local = modelRootRef.current.worldToLocal(event.point.clone());
+          onSurfacePick([local.x, local.y, local.z], portTypeForClick);
+        }}
+      >
+        <primitive object={modelClone} />
+      </group>
+
+      {ports.map((port) => (
+        <group key={`port-${port.id}`} position={port.localPosition}>
+          <mesh>
+            <sphereGeometry args={[0.08, 14, 10]} />
+            <meshStandardMaterial color={PORT_COLOR[port.type]} emissive={PORT_COLOR[port.type]} emissiveIntensity={0.45} />
+          </mesh>
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.11, 0.14, 20]} />
+            <meshBasicMaterial color={PORT_COLOR[port.type]} transparent opacity={0.7} side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+};
 
 const OemAdminPage: React.FC = () => {
   const { user, loading } = useAuth();
@@ -52,6 +133,8 @@ const OemAdminPage: React.FC = () => {
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [notice, setNotice] = useState<string>('');
   const [loadingLibrary, setLoadingLibrary] = useState(true);
+  const [clickPortMode, setClickPortMode] = useState(false);
+  const [clickPortType, setClickPortType] = useState<'input' | 'output'>('input');
 
   const isAdmin = isOemAdminUser(user);
 
@@ -157,6 +240,26 @@ const OemAdminPage: React.FC = () => {
     setNotice('');
   };
 
+  const addPortFromSurfacePick = (localPos: [number, number, number], type: 'input' | 'output') => {
+    updateSelectedModel((model) => {
+      const nextIndex = (model.connectionPorts?.length || 0) + 1;
+      const nextPort: OemConnectionPortInput = {
+        id: `${type === 'input' ? 'in' : 'out'}-${nextIndex}`,
+        type,
+        localPosition: [
+          Number(localPos[0].toFixed(4)),
+          Number(localPos[1].toFixed(4)),
+          Number(localPos[2].toFixed(4)),
+        ],
+      };
+      return {
+        ...model,
+        connectionPorts: [...(model.connectionPorts || []), nextPort],
+      };
+    });
+    setNotice(`Added ${type} node snapped on model surface.`);
+  };
+
   const updatePort = (index: number, updater: (port: OemConnectionPortInput) => OemConnectionPortInput) => {
     updateSelectedModel((model) => ({
       ...model,
@@ -215,6 +318,27 @@ const OemAdminPage: React.FC = () => {
       }
     };
     reader.readAsText(file);
+    event.target.value = '';
+  };
+
+  const importModelFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const format = inferModelFormat(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const content = String(reader.result || '');
+      updateSelectedModel((model) => ({
+        ...model,
+        modelFormat: format,
+        glbUrl: content,
+        glbPath: '',
+        name: model.name || file.name.replace(/\.[^/.]+$/, ''),
+        id: model.id || slugify(file.name.replace(/\.[^/.]+$/, '')) || model.id,
+      }));
+      setNotice(`${file.name} imported (${format.toUpperCase()}) and ready for 3D node placement.`);
+    };
+    reader.readAsDataURL(file);
     event.target.value = '';
   };
 
@@ -321,8 +445,25 @@ const OemAdminPage: React.FC = () => {
                       </select>
                       <input type="number" min={0} step={0.01} value={selectedModel.priceUsd ?? 0} onChange={(e) => updateSelectedModel((model) => ({ ...model, priceUsd: Number(e.target.value) }))} placeholder="Price USD" />
                     </div>
-                    <input value={selectedModel.glbPath || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, glbPath: e.target.value }))} placeholder="glbPath (inside company folder)" />
-                    <input value={selectedModel.glbUrl || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, glbUrl: e.target.value }))} placeholder="glbUrl (optional absolute URL)" />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <select value={selectedModel.modelFormat || 'glb'} onChange={(e) => updateSelectedModel((model) => ({ ...model, modelFormat: e.target.value as OemModelFormat }))}>
+                        <option value="glb">GLB</option>
+                        <option value="gltf">GLTF</option>
+                        <option value="obj">OBJ</option>
+                        <option value="step">STEP / STP / IGES</option>
+                      </select>
+                      <label style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '8px 10px', cursor: 'pointer', fontSize: 12 }}>
+                        Import 3D model file
+                        <input
+                          type="file"
+                          accept=".glb,.gltf,.obj,.step,.stp,.iges,.igs"
+                          onChange={importModelFile}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    </div>
+                    <input value={selectedModel.glbPath || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, glbPath: e.target.value }))} placeholder="model path in company folder (e.g. robot.obj / machine.step)" />
+                    <input value={selectedModel.glbUrl || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, glbUrl: e.target.value }))} placeholder="model URL or imported data URL" />
                     <input value={selectedModel.thumbnailUrl || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, thumbnailUrl: e.target.value }))} placeholder="thumbnailUrl (optional)" />
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
@@ -343,9 +484,28 @@ const OemAdminPage: React.FC = () => {
                     </div>
 
                     <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                         <strong style={{ fontSize: 12 }}>Model Nodes / Ports (admin only)</strong>
-                        <button onClick={addPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}>+ Port</button>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <select value={clickPortType} onChange={(e) => setClickPortType(e.target.value as 'input' | 'output')} style={{ fontSize: 12 }}>
+                            <option value="input">Input node</option>
+                            <option value="output">Output node</option>
+                          </select>
+                          <button
+                            onClick={() => setClickPortMode((prev) => !prev)}
+                            style={{
+                              border: '1px solid var(--mm-border)',
+                              borderRadius: 6,
+                              background: clickPortMode ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)',
+                              color: clickPortMode ? 'var(--mm-accent-primary)' : 'var(--mm-text-primary)',
+                              cursor: 'pointer',
+                              padding: '2px 8px',
+                            }}
+                          >
+                            {clickPortMode ? 'Click-to-add: ON' : 'Click-to-add: OFF'}
+                          </button>
+                          <button onClick={addPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}>+ Manual Port</button>
+                        </div>
                       </div>
                       {(selectedModel.connectionPorts || []).map((port, idx) => (
                         <div key={`${port.id}-${idx}`} style={{ display: 'grid', gridTemplateColumns: '1fr 90px repeat(3,80px) 34px', gap: 6, marginBottom: 6 }}>
@@ -389,14 +549,22 @@ const OemAdminPage: React.FC = () => {
                 <ambientLight intensity={0.8} />
                 <directionalLight position={[5, 8, 5]} intensity={1.1} castShadow />
                 <Grid args={[8, 8]} cellSize={0.4} cellThickness={0.5} sectionSize={1.6} sectionThickness={1} fadeDistance={20} fadeStrength={1} />
-                <React.Suspense fallback={null}>
-                  <GLBModel url={previewUrl} targetSize={2} isSelected={false} />
-                </React.Suspense>
+                {selectedModel && (
+                  <InteractiveModelPreview
+                    modelUrl={previewUrl}
+                    modelFormat={selectedModel.modelFormat}
+                    defaultScale={selectedModel.defaultScale}
+                    ports={selectedModel.connectionPorts || []}
+                    addPortByClick={clickPortMode}
+                    portTypeForClick={clickPortType}
+                    onSurfacePick={addPortFromSurfacePick}
+                  />
+                )}
                 <OrbitControls />
               </Canvas>
             ) : (
               <div style={{ padding: 10, color: 'var(--mm-text-tertiary)', fontSize: 12 }}>
-                Add <code>glbPath</code> or <code>glbUrl</code> to preview.
+                Add <code>model path/URL</code> or import a local <code>.OBJ/.STEP/.GLB</code> file.
               </div>
             )}
           </div>
@@ -415,7 +583,7 @@ const OemAdminPage: React.FC = () => {
           </div>
 
           <p style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 10, lineHeight: 1.5 }}>
-            Admin workflow: save draft here, export JSON, then commit updated <code>oem-library/index.json</code> and model files to GitHub.
+            Admin workflow: import OBJ/STEP/GLB, snap-click to place nodes on 3D geometry, save draft, export JSON, then commit updated <code>oem-library/index.json</code> and model files to GitHub.
           </p>
           {notice && <div style={{ fontSize: 11, color: 'var(--mm-accent-primary)', marginTop: 8 }}>{notice}</div>}
         </aside>

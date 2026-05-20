@@ -9,18 +9,19 @@ In-app admin editor is available at `/oem-admin` (admin users only).
 oem-library/
   index.json
   <company-folder>/
-    <model-files>.glb
+    <model-files>.glb|.gltf|.obj|.step|.stp
     <thumbnails> (optional)
 ```
 
 ## How admin manages OEM models
 
 1. Create/update a company folder (for example `oem-library/siemens/`).
-2. Add the GLB model files into that folder.
+2. Add model files (`.glb`, `.gltf`, `.obj`, `.step`, `.stp`) into that folder.
 3. Update `oem-library/index.json`:
    - add company entry
    - add model entries under that company
-   - use `glbPath` for files inside the company folder (preferred), or `glbUrl` for explicit URLs
+   - set `modelFormat` (`glb`, `gltf`, `obj`, `step`)
+   - use `glbPath` for files inside the company folder (preferred), or `glbUrl` for explicit URLs/data URLs
 4. Commit and push to GitHub `main`.
 5. Open the Simulation editor and use the **OEM** tab in the library.
 
@@ -39,7 +40,8 @@ oem-library/
           "name": "S7 Station",
           "description": "PLC station model",
           "placementCategory": "environment",
-          "glbPath": "s7-station.glb",
+          "modelFormat": "obj",
+          "glbPath": "s7-station.obj",
           "thumbnailUrl": "thumbs/s7-station.png",
           "defaultScale": [1, 1, 1],
           "priceUsd": 1200,
@@ -69,4 +71,10 @@ oem-library/
 
 - Optional node/port definitions for model connectivity.
 - Used by admin-only OEM editor and runtime connection logic.
+
+### modelFormat
+
+- `glb` / `gltf`: GLTF models.
+- `obj`: Wavefront OBJ models.
+- `step`: STEP/STP/IGES CAD files (triangulated in browser for preview/runtime).
 

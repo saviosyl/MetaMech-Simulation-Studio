@@ -8,8 +8,9 @@
         {
           "id": "demo-machine-cell",
           "name": "Demo OEM Machine Cell",
-          "description": "Example OEM entry. Replace with your OEM GLB models.",
+          "description": "Example OEM entry. Replace with your OEM GLB/OBJ/STEP models.",
           "placementCategory": "process",
+          "modelFormat": "glb",
           "glbUrl": "/models/machine.glb",
           "defaultScale": [1, 1, 1],
           "priceUsd": 4500,

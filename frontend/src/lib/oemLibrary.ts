@@ -3,6 +3,7 @@ import { AssetDef, ConnectionPortDef, StaticAssetDef } from './assetManifest';
 import { ModuleDefinition } from './moduleLibrary';
 
 export type PlacementCategory = 'process' | 'environment' | 'actors';
+export type OemModelFormat = 'glb' | 'gltf' | 'obj' | 'step';
 
 export interface OemConnectionPortInput {
   id: string;
@@ -15,6 +16,7 @@ export interface OemModelEntry {
   name: string;
   description?: string;
   placementCategory?: PlacementCategory;
+  modelFormat?: OemModelFormat;
   glbPath?: string;
   glbUrl?: string;
   thumbnailUrl?: string;
@@ -69,6 +71,23 @@ function toPlacementCategory(value: unknown): PlacementCategory {
   return 'environment';
 }
 
+function toModelFormat(value: unknown): OemModelFormat {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (normalized === 'obj') return 'obj';
+  if (normalized === 'step' || normalized === 'stp' || normalized === 'iges' || normalized === 'igs') return 'step';
+  if (normalized === 'gltf') return 'gltf';
+  return 'glb';
+}
+
+function inferModelFormatFromPath(pathOrUrl: unknown): OemModelFormat {
+  if (typeof pathOrUrl !== 'string') return 'glb';
+  const clean = pathOrUrl.split('?')[0].split('#')[0].toLowerCase();
+  if (clean.endsWith('.obj')) return 'obj';
+  if (clean.endsWith('.step') || clean.endsWith('.stp') || clean.endsWith('.iges') || clean.endsWith('.igs')) return 'step';
+  if (clean.endsWith('.gltf')) return 'gltf';
+  return 'glb';
+}
+
 function toAssetId(company: OemCompanyEntry, model: OemModelEntry): string {
   const companyId = slugify(company.id || company.name || 'oem');
   const modelId = slugify(model.id || model.name || 'model');
@@ -94,16 +113,13 @@ function normalizePorts(value: unknown): OemConnectionPortInput[] {
     const local = Array.isArray((item as any).localPosition) && (item as any).localPosition.length === 3
       ? [(item as any).localPosition[0], (item as any).localPosition[1], (item as any).localPosition[2]]
       : [0, 0, 0];
-    const px = Number(local[0]);
-    const py = Number(local[1]);
-    const pz = Number(local[2]);
     ports.push({
       id: typeof (item as any).id === 'string' && (item as any).id.trim() ? (item as any).id.trim() : `${type}-${ports.length + 1}`,
       type,
       localPosition: [
-        Number.isFinite(px) ? px : 0,
-        Number.isFinite(py) ? py : 0,
-        Number.isFinite(pz) ? pz : 0,
+        Number(local[0]) || 0,
+        Number(local[1]) || 0,
+        Number(local[2]) || 0,
       ],
     });
   }
@@ -124,13 +140,19 @@ function normalizeLibrary(data: unknown): OemLibraryIndex {
       if (!m || typeof m !== 'object') continue;
       const name = typeof (m as any).name === 'string' ? (m as any).name.trim() : '';
       if (!name) continue;
+
+      const glbPath = typeof (m as any).glbPath === 'string' ? (m as any).glbPath : undefined;
+      const glbUrl = typeof (m as any).glbUrl === 'string' ? (m as any).glbUrl : undefined;
+      const inferredFormat = inferModelFormatFromPath(glbPath || glbUrl);
+
       models.push({
         id: typeof (m as any).id === 'string' ? (m as any).id : slugify(name),
         name,
         description: typeof (m as any).description === 'string' ? (m as any).description : '',
         placementCategory: toPlacementCategory((m as any).placementCategory),
-        glbPath: typeof (m as any).glbPath === 'string' ? (m as any).glbPath : undefined,
-        glbUrl: typeof (m as any).glbUrl === 'string' ? (m as any).glbUrl : undefined,
+        modelFormat: (m as any).modelFormat ? toModelFormat((m as any).modelFormat) : inferredFormat,
+        glbPath,
+        glbUrl,
         thumbnailUrl: typeof (m as any).thumbnailUrl === 'string' ? (m as any).thumbnailUrl : '',
         defaultScale: Array.isArray((m as any).defaultScale) && (m as any).defaultScale.length === 3
           ? [(m as any).defaultScale[0], (m as any).defaultScale[1], (m as any).defaultScale[2]]
@@ -178,8 +200,8 @@ function toRuntimeEntities(index: OemLibraryIndex): OemLibraryLoadResult {
 
   for (const company of index.companies) {
     for (const model of company.models) {
-      const glbUrl = resolveOemModelGlbUrl(company, model);
-      if (!glbUrl) continue;
+      const modelUrl = resolveOemModelGlbUrl(company, model);
+      if (!modelUrl) continue;
       const placementCategory = toPlacementCategory(model.placementCategory);
       const assetId = toAssetId(company, model);
 
@@ -189,7 +211,8 @@ function toRuntimeEntities(index: OemLibraryIndex): OemLibraryLoadResult {
         category: placementCategory,
         name: model.name,
         description: model.description || `${company.name} OEM model`,
-        glbUrl,
+        glbUrl: modelUrl,
+        sourceFormat: model.modelFormat,
         thumbnailUrl: model.thumbnailUrl || '',
         defaultScale: model.defaultScale,
         connectionPorts: toConnectionPortsForAsset(model.connectionPorts),
