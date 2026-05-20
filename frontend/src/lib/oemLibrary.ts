@@ -94,13 +94,19 @@ function toAssetId(company: OemCompanyEntry, model: OemModelEntry): string {
   return `oem-${companyId}-${modelId}`;
 }
 
+export function resolveOemModelRepoRelativePath(company: OemCompanyEntry, model: OemModelEntry): string | null {
+  if (typeof model.glbPath !== 'string' || !model.glbPath.trim()) return null;
+  const folder = (company.folder || company.id || company.name || '').trim().replace(/^\/+|\/+$/g, '');
+  const modelPath = model.glbPath.trim().replace(/^\/+/, '');
+  if (!modelPath) return null;
+  return folder ? `${folder}/${modelPath}` : modelPath;
+}
+
 export function resolveOemModelGlbUrl(company: OemCompanyEntry, model: OemModelEntry): string | null {
   if (typeof model.glbUrl === 'string' && model.glbUrl.trim()) return model.glbUrl.trim();
-  if (typeof model.glbPath !== 'string' || !model.glbPath.trim()) return null;
-  const folder = (company.folder || company.id || company.name || '').trim();
-  const path = folder
-    ? `${LIBRARY_PATH}/${folder.replace(/^\/+|\/+$/g, '')}/${model.glbPath.replace(/^\/+/, '')}`
-    : `${LIBRARY_PATH}/${model.glbPath.replace(/^\/+/, '')}`;
+  const relativePath = resolveOemModelRepoRelativePath(company, model);
+  if (!relativePath) return null;
+  const path = `${LIBRARY_PATH}/${relativePath}`;
   return githubRawUrl(path);
 }
 

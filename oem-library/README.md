@@ -25,6 +25,20 @@ oem-library/
 4. Commit and push to GitHub `main`.
 5. Open the Simulation editor and use the **OEM** tab in the library.
 
+### Optional: direct sync from OEM Admin UI
+
+The `/oem-admin` page includes **Sync to GitHub** for admins. It can:
+- upload imported OEM model files
+- update `oem-library/index.json`
+- delete model files queued by company/model deletion
+
+Worker configuration required:
+- `GITHUB_OEM_OWNER`
+- `GITHUB_OEM_REPO`
+- `GITHUB_OEM_BRANCH`
+- `GITHUB_OEM_LIBRARY_PATH`
+- secret: `GITHUB_TOKEN` (repo contents write access)
+
 ## index.json format
 
 ```json

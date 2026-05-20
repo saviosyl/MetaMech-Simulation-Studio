@@ -14,6 +14,10 @@ EMAIL_VERIFICATION_TOKEN_HOURS = "24"
 EXPOSE_DEV_VERIFICATION_LINK = "false"
 ENABLE_ADMIN_TEST_EMAIL = "false"
 INTERNAL_ADMIN_EMAILS = "saviosyl@gmail.com"
+GITHUB_OEM_OWNER = "saviosyl"
+GITHUB_OEM_REPO = "MetaMech-Simulation-Studio"
+GITHUB_OEM_BRANCH = "main"
+GITHUB_OEM_LIBRARY_PATH = "oem-library"
 
 [[d1_databases]]
 binding = "DB"

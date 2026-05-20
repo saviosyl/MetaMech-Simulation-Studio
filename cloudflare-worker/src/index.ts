@@ -41,6 +41,11 @@ type Env = {
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PRICE_MONTHLY_ID?: string;
   STRIPE_PRICE_YEARLY_ID?: string;
+  GITHUB_TOKEN?: string;
+  GITHUB_OEM_OWNER?: string;
+  GITHUB_OEM_REPO?: string;
+  GITHUB_OEM_BRANCH?: string;
+  GITHUB_OEM_LIBRARY_PATH?: string;
 };
 
 type BillingPlanInterval = 'monthly' | 'yearly';
@@ -76,6 +81,11 @@ function isInternalAdminEmail(email: string, env: Env): boolean {
     .map((entry) => normalizeEmail(entry))
     .filter((entry) => entry.length > 0);
   return configured.includes(normalized);
+}
+
+function isAdminRole(role: string | null | undefined): boolean {
+  const normalized = String(role || '').toLowerCase();
+  return normalized === 'admin' || normalized === 'superadmin' || normalized === 'owner';
 }
 
 function internalAdminEntitlement(): SubscriptionEntitlement {
@@ -122,6 +132,12 @@ function base64UrlDecode(input: string): Uint8Array {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
+}
+
+function base64EncodeBytes(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
 }
 
 async function hmacSha256(data: string, secret: string): Promise<string> {
@@ -682,6 +698,233 @@ async function createPortalSession(env: Env, user: UserRow): Promise<string> {
   const url = String(session?.url || '');
   if (!url) throw new Error('Stripe portal URL missing');
   return url;
+}
+
+type OemSyncUploadRequest = {
+  companyId: string;
+  modelId: string;
+  contentBase64: string;
+};
+
+type OemSyncRequestBody = {
+  index?: {
+    companies?: Array<{
+      id?: string;
+      name?: string;
+      folder?: string;
+      models?: Array<{
+        id?: string;
+        name?: string;
+        glbPath?: string;
+      }>;
+    }>;
+  };
+  uploads?: OemSyncUploadRequest[];
+  deletions?: string[];
+};
+
+type GithubOemConfig = {
+  token: string;
+  owner: string;
+  repo: string;
+  branch: string;
+  libraryPath: string;
+};
+
+function sanitizeRelativeRepoPath(rawPath: string): string | null {
+  const normalized = rawPath.replace(/\\/g, '/').trim().replace(/^\/+|\/+$/g, '');
+  if (!normalized || normalized.includes('..')) return null;
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length === 0) return null;
+  for (const segment of segments) {
+    if (!/^[a-zA-Z0-9._\- ]+$/.test(segment)) return null;
+  }
+  return segments.join('/');
+}
+
+function encodeRepoPath(path: string): string {
+  return path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+}
+
+function githubOemConfig(env: Env): GithubOemConfig | null {
+  const token = (env.GITHUB_TOKEN || '').trim();
+  if (!token) return null;
+  const owner = (env.GITHUB_OEM_OWNER || 'saviosyl').trim();
+  const repo = (env.GITHUB_OEM_REPO || 'MetaMech-Simulation-Studio').trim();
+  const branch = (env.GITHUB_OEM_BRANCH || 'main').trim();
+  const libraryPath = sanitizeRelativeRepoPath(env.GITHUB_OEM_LIBRARY_PATH || 'oem-library');
+  if (!owner || !repo || !branch || !libraryPath) return null;
+  return { token, owner, repo, branch, libraryPath };
+}
+
+async function githubContentsRequest(
+  config: GithubOemConfig,
+  method: 'GET' | 'PUT' | 'DELETE',
+  repoPath: string,
+  body?: Record<string, unknown>
+): Promise<{ status: number; data: any }> {
+  const url = `https://api.github.com/repos/${encodeURIComponent(config.owner)}/${encodeURIComponent(config.repo)}/contents/${encodeRepoPath(repoPath)}${method === 'GET' ? `?ref=${encodeURIComponent(config.branch)}` : ''}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${config.token}`,
+      'User-Agent': 'metamech-oem-sync',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const text = await res.text();
+  let parsed: any = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = null;
+  }
+  return { status: res.status, data: parsed };
+}
+
+async function githubGetFileSha(config: GithubOemConfig, repoPath: string): Promise<string | null> {
+  const response = await githubContentsRequest(config, 'GET', repoPath);
+  if (response.status === 404) return null;
+  if (response.status < 200 || response.status >= 300) {
+    const message = response.data?.message || `GitHub get failed (${response.status})`;
+    throw new Error(message);
+  }
+  const sha = String(response.data?.sha || '');
+  return sha || null;
+}
+
+async function githubUpsertFile(config: GithubOemConfig, repoPath: string, contentBase64: string, message: string): Promise<void> {
+  const sha = await githubGetFileSha(config, repoPath);
+  const payload: Record<string, unknown> = {
+    message,
+    content: contentBase64,
+    branch: config.branch,
+  };
+  if (sha) payload.sha = sha;
+  const response = await githubContentsRequest(config, 'PUT', repoPath, payload);
+  if (response.status < 200 || response.status >= 300) {
+    const errorMessage = response.data?.message || `GitHub update failed (${response.status})`;
+    throw new Error(errorMessage);
+  }
+}
+
+async function githubDeleteFile(config: GithubOemConfig, repoPath: string, message: string): Promise<boolean> {
+  const sha = await githubGetFileSha(config, repoPath);
+  if (!sha) return false;
+  const response = await githubContentsRequest(config, 'DELETE', repoPath, {
+    message,
+    sha,
+    branch: config.branch,
+  });
+  if (response.status < 200 || response.status >= 300) {
+    const errorMessage = response.data?.message || `GitHub delete failed (${response.status})`;
+    throw new Error(errorMessage);
+  }
+  return true;
+}
+
+async function handleOemLibrarySync(request: Request, env: Env): Promise<Response> {
+  const user = await readAuthedUser(request, env);
+  if (!user) return toJson({ error: 'Authentication required' }, 401);
+
+  const allowed = isInternalAdminEmail(user.email, env) || isAdminRole(user.role);
+  if (!allowed) return toJson({ error: 'Admin access required' }, 403);
+
+  const config = githubOemConfig(env);
+  if (!config) {
+    return toJson({ error: 'GitHub sync not configured on server' }, 500);
+  }
+
+  const body = await readJson<OemSyncRequestBody>(request);
+  const index = body?.index;
+  const companies = index?.companies;
+  if (!Array.isArray(companies)) {
+    return toJson({ error: 'Invalid OEM index payload' }, 400);
+  }
+
+  const uploads = Array.isArray(body?.uploads) ? body!.uploads! : [];
+  const deletions = Array.isArray(body?.deletions) ? body!.deletions! : [];
+  if (uploads.length > 40) return toJson({ error: 'Too many uploads in one sync (max 40)' }, 400);
+  if (deletions.length > 200) return toJson({ error: 'Too many deletions in one sync (max 200)' }, 400);
+
+  const uploadedPaths = new Set<string>();
+  const deletedPaths = new Set<string>();
+
+  try {
+    for (const upload of uploads) {
+      const company = companies.find((entry) => String(entry?.id || '') === String(upload.companyId || ''));
+      const model = company?.models?.find((entry) => String(entry?.id || '') === String(upload.modelId || ''));
+      if (!company || !model) continue;
+
+      const folderRaw = String(company.folder || company.id || company.name || '').trim();
+      const folder = sanitizeRelativeRepoPath(folderRaw);
+      const modelFile = sanitizeRelativeRepoPath(String(model.glbPath || ''));
+      if (!modelFile) {
+        return toJson({ error: `Model "${model.name || model.id || upload.modelId}" is missing glbPath for GitHub sync` }, 400);
+      }
+
+      const relativePath = folder ? `${folder}/${modelFile}` : modelFile;
+      const safeRelativePath = sanitizeRelativeRepoPath(relativePath);
+      if (!safeRelativePath) {
+        return toJson({ error: `Invalid model file path for "${model.name || model.id || upload.modelId}"` }, 400);
+      }
+
+      const rawBase64 = String(upload.contentBase64 || '').trim();
+      const base64Payload = rawBase64.includes(',') ? rawBase64.split(',').pop() || '' : rawBase64;
+      if (!base64Payload) return toJson({ error: 'Invalid upload file payload' }, 400);
+
+      // Validate base64 and enforce a conservative per-file limit.
+      const decoded = atob(base64Payload);
+      if (decoded.length > 15 * 1024 * 1024) {
+        return toJson({ error: `File "${modelFile}" is too large (limit 15MB)` }, 400);
+      }
+
+      const repoPath = `${config.libraryPath}/${safeRelativePath}`;
+      await githubUpsertFile(
+        config,
+        repoPath,
+        base64Payload,
+        `OEM Admin: upload ${safeRelativePath} by ${user.email}`
+      );
+      uploadedPaths.add(safeRelativePath);
+    }
+
+    for (const deletion of deletions) {
+      const safeRelativePath = sanitizeRelativeRepoPath(String(deletion || ''));
+      if (!safeRelativePath) continue;
+      if (uploadedPaths.has(safeRelativePath)) continue;
+      const repoPath = `${config.libraryPath}/${safeRelativePath}`;
+      const deleted = await githubDeleteFile(
+        config,
+        repoPath,
+        `OEM Admin: delete ${safeRelativePath} by ${user.email}`
+      );
+      if (deleted) deletedPaths.add(safeRelativePath);
+    }
+
+    const indexJson = JSON.stringify(index, null, 2);
+    const indexBase64 = base64EncodeBytes(textEncoder.encode(indexJson));
+    await githubUpsertFile(
+      config,
+      `${config.libraryPath}/index.json`,
+      indexBase64,
+      `OEM Admin: update OEM index by ${user.email}`
+    );
+
+    return toJson({
+      ok: true,
+      uploadedCount: uploadedPaths.size,
+      deletedCount: deletedPaths.size,
+      indexUpdated: true,
+      branch: config.branch,
+      repo: `${config.owner}/${config.repo}`,
+    });
+  } catch (error: any) {
+    return toJson({ error: error?.message || 'GitHub sync failed' }, 500);
+  }
 }
 
 function stripeSignatureTimestampAndV1(signatureHeader: string): { t: string; v1: string } | null {
@@ -1543,6 +1786,11 @@ export default {
 
       if (request.method === 'POST' && path === '/billing/create-portal-session') {
         response = await handleCreatePortalSession(request, env);
+        return withCors(request, response, env);
+      }
+
+      if (request.method === 'POST' && path === '/admin/oem-library/sync') {
+        response = await handleOemLibrarySync(request, env);
         return withCors(request, response, env);
       }
 

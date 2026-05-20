@@ -17,9 +17,11 @@ import {
   OemModelFormat,
   OemModelEntry,
   resolveOemModelGlbUrl,
+  resolveOemModelRepoRelativePath,
   saveLocalOemLibraryDraft,
 } from '../lib/oemLibrary';
 import { inferModelFormat, loadModelObject } from '../lib/modelLoader';
+import api from '../utils/api';
 
 function slugify(value: string): string {
   return value
@@ -44,6 +46,25 @@ function defaultModel(_companyId: string, modelName = 'New OEM Model'): OemModel
     priceUsd: 0,
     connectionPorts: [],
   };
+}
+
+interface PendingUpload {
+  companyId: string;
+  modelId: string;
+  contentBase64: string;
+  sizeBytes: number;
+}
+
+function modelKey(companyId: string, modelId: string): string {
+  return `${companyId}::${modelId}`;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 const PORT_COLOR: Record<'input' | 'output', string> = {
@@ -135,6 +156,11 @@ const OemAdminPage: React.FC = () => {
   const [loadingLibrary, setLoadingLibrary] = useState(true);
   const [clickPortMode, setClickPortMode] = useState(false);
   const [clickPortType, setClickPortType] = useState<'input' | 'output'>('input');
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  const [pendingDeletes, setPendingDeletes] = useState<string[]>([]);
+  const [localPreviewUrls, setLocalPreviewUrls] = useState<Record<string, string>>({});
+  const [syncingGithub, setSyncingGithub] = useState(false);
+  const previewUrlsRef = useRef<Record<string, string>>({});
 
   const isAdmin = isOemAdminUser(user);
 
@@ -155,6 +181,16 @@ const OemAdminPage: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    previewUrlsRef.current = localPreviewUrls;
+  }, [localPreviewUrls]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(previewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
+
   const selectedCompany = useMemo(
     () => library.companies.find((company) => company.id === selectedCompanyId) || null,
     [library, selectedCompanyId],
@@ -167,8 +203,11 @@ const OemAdminPage: React.FC = () => {
 
   const previewUrl = useMemo(() => {
     if (!selectedCompany || !selectedModel) return null;
+    const localKey = modelKey(selectedCompany.id, selectedModel.id);
+    const localPreview = localPreviewUrls[localKey];
+    if (localPreview) return localPreview;
     return resolveOemModelGlbUrl(selectedCompany, selectedModel);
-  }, [selectedCompany, selectedModel]);
+  }, [selectedCompany, selectedModel, localPreviewUrls]);
 
   const updateCompany = (companyId: string, updater: (company: OemCompanyEntry) => OemCompanyEntry) => {
     setLibrary((prev) => ({
@@ -200,6 +239,25 @@ const OemAdminPage: React.FC = () => {
   };
 
   const removeCompany = (companyId: string) => {
+    const companyToDelete = library.companies.find((company) => company.id === companyId) || null;
+    if (companyToDelete) {
+      const deletePaths = companyToDelete.models
+        .map((model) => resolveOemModelRepoRelativePath(companyToDelete, model))
+        .filter((path): path is string => !!path);
+      if (deletePaths.length > 0) {
+        setPendingDeletes((prev) => Array.from(new Set([...prev, ...deletePaths])));
+      }
+      setPendingUploads((prev) => prev.filter((entry) => entry.companyId !== companyId));
+      setLocalPreviewUrls((prev) => {
+        const next = { ...prev };
+        for (const model of companyToDelete.models) {
+          const key = modelKey(companyToDelete.id, model.id);
+          if (next[key]) URL.revokeObjectURL(next[key]);
+          delete next[key];
+        }
+        return next;
+      });
+    }
     setLibrary((prev) => {
       const nextCompanies = prev.companies.filter((company) => company.id !== companyId);
       if (companyId === selectedCompanyId) {
@@ -221,6 +279,21 @@ const OemAdminPage: React.FC = () => {
 
   const removeModel = (modelId: string) => {
     if (!selectedCompany) return;
+    const removed = selectedCompany.models.find((model) => model.id === modelId) || null;
+    if (removed) {
+      const path = resolveOemModelRepoRelativePath(selectedCompany, removed);
+      if (path) {
+        setPendingDeletes((prev) => Array.from(new Set([...prev, path])));
+      }
+      setPendingUploads((prev) => prev.filter((entry) => !(entry.companyId === selectedCompany.id && entry.modelId === modelId)));
+      const key = modelKey(selectedCompany.id, modelId);
+      setLocalPreviewUrls((prev) => {
+        const next = { ...prev };
+        if (next[key]) URL.revokeObjectURL(next[key]);
+        delete next[key];
+        return next;
+      });
+    }
     updateCompany(selectedCompany.id, (company) => {
       const models = company.models.filter((model) => model.id !== modelId);
       if (modelId === selectedModelId) setSelectedModelId(models[0]?.id || '');
@@ -283,6 +356,10 @@ const OemAdminPage: React.FC = () => {
 
   const resetToGithub = () => {
     clearLocalOemLibraryDraft();
+    Object.values(localPreviewUrls).forEach((url) => URL.revokeObjectURL(url));
+    setLocalPreviewUrls({});
+    setPendingUploads([]);
+    setPendingDeletes([]);
     setLibrary(githubLibrary);
     setSelectedCompanyId(githubLibrary.companies[0]?.id || '');
     setSelectedModelId(githubLibrary.companies[0]?.models?.[0]?.id || '');
@@ -323,23 +400,71 @@ const OemAdminPage: React.FC = () => {
 
   const importModelFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !selectedCompany || !selectedModel) return;
     const format = inferModelFormat(file.name);
     const reader = new FileReader();
-    reader.onload = () => {
-      const content = String(reader.result || '');
+    reader.onload = async () => {
+      const buffer = reader.result;
+      if (!(buffer instanceof ArrayBuffer)) {
+        setNotice('Failed to read model file.');
+        return;
+      }
+
+      const bytes = new Uint8Array(buffer);
+      const contentBase64 = bytesToBase64(bytes);
+      const objectUrl = URL.createObjectURL(file);
+      const key = modelKey(selectedCompany.id, selectedModel.id);
+
       updateSelectedModel((model) => ({
         ...model,
-        modelFormat: format,
-        glbUrl: content,
-        glbPath: '',
-        name: model.name || file.name.replace(/\.[^/.]+$/, ''),
-        id: model.id || slugify(file.name.replace(/\.[^/.]+$/, '')) || model.id,
+        modelFormat: format as OemModelFormat,
+        glbPath: file.name,
+        glbUrl: '',
       }));
-      setNotice(`${file.name} imported (${format.toUpperCase()}) and ready for 3D node placement.`);
+
+      setPendingUploads((prev) => {
+        const next = prev.filter((entry) => !(entry.companyId === selectedCompany.id && entry.modelId === selectedModel.id));
+        next.push({
+          companyId: selectedCompany.id,
+          modelId: selectedModel.id,
+          contentBase64,
+          sizeBytes: bytes.length,
+        });
+        return next;
+      });
+      setLocalPreviewUrls((prev) => {
+        const next = { ...prev };
+        if (next[key]) URL.revokeObjectURL(next[key]);
+        next[key] = objectUrl;
+        return next;
+      });
+      setNotice(`${file.name} imported (${format.toUpperCase()}). It will be uploaded to GitHub on sync.`);
     };
-    reader.readAsDataURL(file);
+    reader.readAsArrayBuffer(file);
     event.target.value = '';
+  };
+
+  const syncToGithub = async () => {
+    try {
+      setSyncingGithub(true);
+      const payload = {
+        index: library,
+        uploads: pendingUploads,
+        deletions: pendingDeletes,
+      };
+      const res = await api.post('/admin/oem-library/sync', payload);
+      const uploadedCount = Number(res?.data?.uploadedCount || 0);
+      const deletedCount = Number(res?.data?.deletedCount || 0);
+      const indexUpdated = !!res?.data?.indexUpdated;
+      setPendingUploads([]);
+      setPendingDeletes([]);
+      setNotice(`GitHub synced: index ${indexUpdated ? 'updated' : 'unchanged'}, uploads ${uploadedCount}, deletions ${deletedCount}.`);
+    } catch (error: any) {
+      const message = error?.response?.data?.error || error?.message || 'GitHub sync failed';
+      setNotice(`GitHub sync failed: ${message}`);
+    } finally {
+      setSyncingGithub(false);
+    }
   };
 
   if (loading || loadingLibrary) {
@@ -375,6 +500,13 @@ const OemAdminPage: React.FC = () => {
           <a href={OEM_LIBRARY_MANAGE_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', padding: '8px 10px', border: '1px solid var(--mm-border)', borderRadius: 8, color: 'var(--mm-text-primary)' }}>
             Open GitHub Folder
           </a>
+          <button
+            onClick={syncToGithub}
+            disabled={syncingGithub}
+            style={{ padding: '8px 10px', border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-accent-primary)', color: '#fff', cursor: syncingGithub ? 'not-allowed' : 'pointer', opacity: syncingGithub ? 0.7 : 1 }}
+          >
+            {syncingGithub ? 'Syncing…' : 'Sync to GitHub'}
+          </button>
           <button onClick={saveDraft} style={{ padding: '8px 10px', border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-accent-primary-muted)', color: 'var(--mm-accent-primary)', cursor: 'pointer' }}>
             <Save size={14} style={{ marginRight: 6 }} />Save Draft
           </button>
@@ -434,7 +566,32 @@ const OemAdminPage: React.FC = () => {
 
                 {selectedModel ? (
                   <div style={{ display: 'grid', gap: 8 }}>
-                    <input value={selectedModel.id} onChange={(e) => updateSelectedModel((model) => ({ ...model, id: slugify(e.target.value) || model.id }))} placeholder="Model ID" />
+                    <input
+                      value={selectedModel.id}
+                      onChange={(e) => {
+                        const nextId = slugify(e.target.value) || selectedModel.id;
+                        const prevId = selectedModel.id;
+                        if (nextId === prevId) return;
+                        setPendingUploads((prev) => prev.map((entry) => (
+                          entry.companyId === selectedCompany.id && entry.modelId === prevId
+                            ? { ...entry, modelId: nextId }
+                            : entry
+                        )));
+                        setLocalPreviewUrls((prev) => {
+                          const next = { ...prev };
+                          const oldKey = modelKey(selectedCompany.id, prevId);
+                          const newKey = modelKey(selectedCompany.id, nextId);
+                          if (next[oldKey]) {
+                            next[newKey] = next[oldKey];
+                            delete next[oldKey];
+                          }
+                          return next;
+                        });
+                        updateSelectedModel((model) => ({ ...model, id: nextId }));
+                        setSelectedModelId(nextId);
+                      }}
+                      placeholder="Model ID"
+                    />
                     <input value={selectedModel.name} onChange={(e) => updateSelectedModel((model) => ({ ...model, name: e.target.value }))} placeholder="Model Name" />
                     <textarea value={selectedModel.description || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, description: e.target.value }))} placeholder="Description" rows={2} />
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -585,6 +742,9 @@ const OemAdminPage: React.FC = () => {
           <p style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 10, lineHeight: 1.5 }}>
             Admin workflow: import OBJ/STEP/GLB, snap-click to place nodes on 3D geometry, save draft, export JSON, then commit updated <code>oem-library/index.json</code> and model files to GitHub.
           </p>
+          <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 6 }}>
+            Pending GitHub changes: uploads <strong>{pendingUploads.length}</strong>, deletions <strong>{pendingDeletes.length}</strong>
+          </div>
           {notice && <div style={{ fontSize: 11, color: 'var(--mm-accent-primary)', marginTop: 8 }}>{notice}</div>}
         </aside>
       </div>
