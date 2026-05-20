@@ -20,10 +20,12 @@ import {
 export interface ModuleDefinition {
   id: string;
   name: string;
-  category: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
+  category: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical' | 'oem';
   icon: any;
   description: string;
   assetId?: string; // references AssetDef.id in manifest
+  placementCategory?: 'process' | 'environment' | 'actors';
+  oemCompany?: string;
   parameters: {
     [key: string]: {
       type: 'number' | 'string' | 'text' | 'select' | 'boolean' | 'color';
@@ -1453,10 +1455,32 @@ export const moduleLibrary: ModuleDefinition[] = [
   },
 ];
 
+let runtimeModules: ModuleDefinition[] = [];
+
+function mergeModules(base: ModuleDefinition[], runtime: ModuleDefinition[]): ModuleDefinition[] {
+  const byId = new Map<string, ModuleDefinition>();
+  for (const mod of base) byId.set(mod.id, mod);
+  for (const mod of runtime) byId.set(mod.id, mod);
+  return Array.from(byId.values());
+}
+
+export function registerRuntimeModules(modules: ModuleDefinition[]): void {
+  if (!Array.isArray(modules) || modules.length === 0) return;
+  runtimeModules = mergeModules(runtimeModules, modules);
+}
+
+export function clearRuntimeModules(): void {
+  runtimeModules = [];
+}
+
+export function getAllModules(): ModuleDefinition[] {
+  return mergeModules(moduleLibrary, runtimeModules);
+}
+
 export function getModuleDefinition(id: string): ModuleDefinition | undefined {
-  return moduleLibrary.find(module => module.id === id);
+  return getAllModules().find(module => module.id === id);
 }
 
 export function getModulesByCategory(category: string): ModuleDefinition[] {
-  return moduleLibrary.filter(module => module.category === category);
+  return getAllModules().filter(module => module.category === category);
 }

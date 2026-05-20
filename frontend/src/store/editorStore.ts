@@ -7,6 +7,7 @@ import { computeSpiralTransferGeometry } from '../lib/spiralTransfer';
 import { FrameAssemblyExportContract } from '../lib/frameDesigner/model';
 import { toFrameAssemblyParameters } from '../lib/frameDesigner/sceneInterop';
 import { VideoQualityPreset } from '../lib/videoExportPresets';
+import { getModuleDefinition } from '../lib/moduleLibrary';
 
 // Types
 export interface ProcessNode {
@@ -556,6 +557,7 @@ export { getPortWorldPosition };
 interface EditorState {
   // Asset manifest
   assetManifest: AssetDef[];
+  setAssetManifest: (manifest: AssetDef[]) => void;
 
   // Scene objects
   processNodes: ProcessNode[];
@@ -614,7 +616,7 @@ interface EditorState {
   simulationSpeed: number;
   
   // UI state
-  activeLibraryTab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical';
+  activeLibraryTab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical' | 'oem';
   showPropertiesPanel: boolean;
   
   // Panel state
@@ -675,7 +677,7 @@ interface EditorState {
   setPathsVisible: (visible: boolean) => void;
   
   setSceneSettings: (settings: Partial<SceneSettings>) => void;
-  setActiveLibraryTab: (tab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical') => void;
+  setActiveLibraryTab: (tab: 'process' | 'environment' | 'actors' | 'robots' | 'pallets' | 'fmcg' | 'medical' | 'oem') => void;
   
   // Panel actions
   setLeftPanelWidth: (width: number) => void;
@@ -759,6 +761,7 @@ const defaultSceneSettings: SceneSettings = {
 export const useEditorStore = create<EditorState>((set, get) => ({
   // Initial state
   assetManifest: getAssetManifest(),
+  setAssetManifest: (manifest) => set({ assetManifest: manifest }),
   processNodes: [],
   environmentAssets: [],
   actors: [],
@@ -866,7 +869,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addProcessNode: (type, position) => {
     // Check if there's a matching asset in the manifest
     const manifest = get().assetManifest;
-    const matchingAsset = manifest.find(a => a.id === type && a.category === 'process');
+    const moduleDef = getModuleDefinition(type);
+    const preferredAssetId = moduleDef?.assetId || type;
+    const matchingAsset = manifest.find(a => a.id === preferredAssetId);
     const isParametric = matchingAsset?.assetType === 'parametric';
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
@@ -911,7 +916,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   addEnvironmentAsset: (type, position) => {
     const manifest = get().assetManifest;
-    const matchingAsset = manifest.find(a => a.id === type && a.category === 'environment');
+    const moduleDef = getModuleDefinition(type);
+    const preferredAssetId = moduleDef?.assetId || type;
+    const matchingAsset = manifest.find(a => a.id === preferredAssetId);
     const isParametric = matchingAsset?.assetType === 'parametric';
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
@@ -969,7 +976,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   addActor: (type, position) => {
     const manifest = get().assetManifest;
-    const matchingAsset = manifest.find(a => a.id === type && a.category === 'actors');
+    const moduleDef = getModuleDefinition(type);
+    const preferredAssetId = moduleDef?.assetId || type;
+    const matchingAsset = manifest.find(a => a.id === preferredAssetId);
     const isParametric = matchingAsset?.assetType === 'parametric';
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }

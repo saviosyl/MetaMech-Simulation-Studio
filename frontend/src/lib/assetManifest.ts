@@ -45,6 +45,7 @@ export type AssetDef = StaticAssetDef | ParametricAssetDef;
 export const ASSET_BASE_URL = '/assets';
 
 let _manifest: AssetDef[] | null = null;
+let _runtimeManifest: AssetDef[] = [];
 
 function loadInlineManifest(): AssetDef[] {
   return [
@@ -758,9 +759,26 @@ function loadInlineManifest(): AssetDef[] {
 
 export function getAssetManifest(): AssetDef[] {
   if (!_manifest) {
-    _manifest = loadInlineManifest();
+    const merged = new Map<string, AssetDef>();
+    for (const asset of loadInlineManifest()) merged.set(asset.id, asset);
+    for (const asset of _runtimeManifest) merged.set(asset.id, asset);
+    _manifest = Array.from(merged.values());
   }
   return _manifest;
+}
+
+export function registerRuntimeAssetDefs(assets: AssetDef[]): void {
+  if (!Array.isArray(assets) || assets.length === 0) return;
+  const merged = new Map<string, AssetDef>();
+  for (const asset of _runtimeManifest) merged.set(asset.id, asset);
+  for (const asset of assets) merged.set(asset.id, asset);
+  _runtimeManifest = Array.from(merged.values());
+  _manifest = null;
+}
+
+export function clearRuntimeAssetDefs(): void {
+  _runtimeManifest = [];
+  _manifest = null;
 }
 
 export function getAssetById(id: string): AssetDef | undefined {

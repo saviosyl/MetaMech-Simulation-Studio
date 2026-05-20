@@ -142,6 +142,7 @@ import PathRenderer from '../3d/PathRenderer';
 import CameraPathPlayer from '../3d/CameraPathPlayer';
 import ViewportToolbar from '../editor/ViewportToolbar';
 import { VIDEO_CAPTURE_PRESETS, VideoQualityPreset } from '../../lib/videoExportPresets';
+import { getModuleDefinition } from '../../lib/moduleLibrary';
 
 // Wrapper that attaches TransformControls to the selected object
 const DraggableObject: React.FC<{
@@ -726,6 +727,15 @@ const Viewport: React.FC = () => {
             addEnvironmentAsset(data.moduleId, position);
             addedModule = true;
             break;
+          case 'oem': {
+            const moduleDef = getModuleDefinition(data.moduleId);
+            const placement = moduleDef?.placementCategory || 'environment';
+            if (placement === 'process') addProcessNode(data.moduleId, position);
+            else if (placement === 'actors') addActor(data.moduleId, position);
+            else addEnvironmentAsset(data.moduleId, position);
+            addedModule = true;
+            break;
+          }
           case 'actors':
             addActor(data.moduleId, position);
             addedModule = true;

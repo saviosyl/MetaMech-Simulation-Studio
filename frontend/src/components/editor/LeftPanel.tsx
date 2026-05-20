@@ -1,7 +1,9 @@
-import React, { useCallback, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
-import { getModulesByCategory, ModuleDefinition } from '../../lib/moduleLibrary';
+import { getModulesByCategory, ModuleDefinition, registerRuntimeModules } from '../../lib/moduleLibrary';
+import { getAssetManifest, registerRuntimeAssetDefs } from '../../lib/assetManifest';
+import { loadOemLibrary, OEM_LIBRARY_MANAGE_URL } from '../../lib/oemLibrary';
 import SceneHierarchy from './SceneHierarchy';
 import PathPanel from './PathPanel';
 import CameraPathPanel from './CameraPathPanel';
@@ -15,10 +17,12 @@ const TABS = [
   { id: 'robots' as const, name: 'Robots', icon: Cpu },
   { id: 'pallets' as const, name: 'Pallets', icon: SquareStack },
   { id: 'environment' as const, name: 'Environ', icon: Building },
+  { id: 'oem' as const, name: 'OEM', icon: Package },
   { id: 'actors' as const, name: 'Actors', icon: Users },
 ];
 
 function getSubcategory(module: ModuleDefinition): string {
+  if (module.category === 'oem') return module.oemCompany || 'OEM';
   const n = module.id.toLowerCase();
   if (n.includes('conveyor') || n.includes('belt') || n.includes('roller') || n.includes('modular')) return 'Conveyors';
   if (n.includes('stopper') || n.includes('pusher-module')) return 'Accessories';
@@ -35,17 +39,33 @@ function getSubcategory(module: ModuleDefinition): string {
 }
 
 const LeftPanel: React.FC = () => {
-  const { activeLibraryTab, setActiveLibraryTab, leftPanelWidth, setLeftPanelWidth, leftPanelCollapsed, setLeftPanelCollapsed } = useEditorStore();
+  const { activeLibraryTab, setActiveLibraryTab, leftPanelWidth, setLeftPanelWidth, leftPanelCollapsed, setLeftPanelCollapsed, setAssetManifest } = useEditorStore();
   const isResizing = useRef(false);
   const [viewMode, setViewMode] = useState<'library' | 'scene'>('library');
   const [searchQuery, setSearchQuery] = useState('');
   const [layout, setLayout] = useState<ViewLayout>('compact');
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const oemLibrary = await loadOemLibrary();
+      if (cancelled || oemLibrary.modules.length === 0) return;
+      registerRuntimeModules(oemLibrary.modules);
+      registerRuntimeAssetDefs(oemLibrary.assets);
+      setAssetManifest(getAssetManifest());
+    })();
+    return () => { cancelled = true; };
+  }, [setAssetManifest]);
+
   const allModules = getModulesByCategory(activeLibraryTab);
   const modules = useMemo(() => {
     if (!searchQuery.trim()) return allModules;
     const q = searchQuery.toLowerCase();
-    return allModules.filter(m => m.name.toLowerCase().includes(q) || m.description.toLowerCase().includes(q));
+    return allModules.filter(m =>
+      m.name.toLowerCase().includes(q) ||
+      m.description.toLowerCase().includes(q) ||
+      (m.oemCompany || '').toLowerCase().includes(q),
+    );
   }, [allModules, searchQuery]);
 
   const groupedModules = useMemo(() => {
@@ -194,6 +214,21 @@ const LeftPanel: React.FC = () => {
 
             {/* Module list */}
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '10px 12px' }}>
+              {activeLibraryTab === 'oem' && (
+                <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--mm-border-subtle)', background: 'var(--mm-bg-surface)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)', marginBottom: 4 }}>
+                    OEM models are managed from GitHub folders by company.
+                  </div>
+                  <a
+                    href={OEM_LIBRARY_MANAGE_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 11, color: 'var(--mm-accent-primary)', textDecoration: 'none', fontWeight: 600 }}
+                  >
+                    Manage OEM Library in GitHub
+                  </a>
+                </div>
+              )}
               {Object.entries(groupedModules).map(([group, items]) => (
                 <div key={group} style={{ marginBottom: 12, border: '1px solid var(--mm-border-subtle)', borderRadius: 10, background: 'var(--mm-bg-surface)', overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6, position: 'sticky', top: 0, background: 'var(--mm-bg-panel)', zIndex: 5, padding: '6px 8px', borderBottom: '1px solid var(--mm-border-subtle)' }}>

@@ -1,0 +1,19 @@
+{
+  "companies": [
+    {
+      "id": "demo-oem",
+      "name": "Demo OEM",
+      "folder": "demo-oem",
+      "models": [
+        {
+          "id": "demo-machine-cell",
+          "name": "Demo OEM Machine Cell",
+          "description": "Example OEM entry. Replace with your OEM GLB models.",
+          "placementCategory": "process",
+          "glbUrl": "/models/machine.glb",
+          "defaultScale": [1, 1, 1]
+        }
+      ]
+    }
+  ]
+}
