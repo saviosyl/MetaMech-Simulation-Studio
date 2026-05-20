@@ -72,6 +72,13 @@ function githubRawUrl(path: string): string {
 }
 
 function normalizeScenarioPayload(data: any, filename: string): ScenarioFile | null {
+  const sceneProject = {
+    processNodes: Array.isArray(data?.scene?.processNodes) ? data.scene.processNodes : null,
+    edges: Array.isArray(data?.scene?.edges) ? data.scene.edges : null,
+    environmentAssets: Array.isArray(data?.scene?.environmentAssets) ? data.scene.environmentAssets : undefined,
+    actors: Array.isArray(data?.scene?.actors) ? data.scene.actors : undefined,
+  };
+
   const directProject = {
     processNodes: Array.isArray(data?.processNodes) ? data.processNodes : null,
     edges: Array.isArray(data?.edges) ? data.edges : null,
@@ -86,9 +93,11 @@ function normalizeScenarioPayload(data: any, filename: string): ScenarioFile | n
     actors: Array.isArray(data?.project?.actors) ? data.project.actors : undefined,
   };
 
-  const sourceProject = nestedProject.processNodes && nestedProject.edges
+  const sourceProject = sceneProject.processNodes && sceneProject.edges
+    ? sceneProject
+    : (nestedProject.processNodes && nestedProject.edges
     ? nestedProject
-    : (directProject.processNodes && directProject.edges ? directProject : null);
+    : (directProject.processNodes && directProject.edges ? directProject : null));
 
   if (!sourceProject) return null;
 
@@ -109,7 +118,11 @@ function normalizeScenarioPayload(data: any, filename: string): ScenarioFile | n
       environmentAssets: sourceProject.environmentAssets || [],
       actors: sourceProject.actors || [],
     },
-    rules: Array.isArray(data?.rules) ? data.rules : [],
+    rules: Array.isArray(data?.rules)
+      ? data.rules
+      : (Array.isArray(data?.scene?.rules)
+        ? data.scene.rules
+        : (Array.isArray(data?.scene?.simulationRules) ? data.scene.simulationRules : [])),
   };
 }
 
