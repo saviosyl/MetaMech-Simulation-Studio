@@ -111,16 +111,21 @@ const InteractiveModelPreview: React.FC<{
         const currentMaterial = mesh.material as THREE.Material | THREE.Material[] | undefined;
         const boostMaterial = (material: THREE.Material): THREE.Material => {
           if (material instanceof THREE.MeshStandardMaterial) {
+            if (material.color && material.color.getHex() === 0x000000) {
+              material.color.set('#aab6c4');
+            }
             material.metalness = Math.min(1, Math.max(0, material.metalness ?? 0.35));
-            material.roughness = Math.min(1, Math.max(0.12, material.roughness ?? 0.4));
+            material.roughness = Math.min(1, Math.max(0.1, material.roughness ?? 0.28));
             material.envMapIntensity = 1.1;
+            material.side = THREE.DoubleSide;
             return material;
           }
           const fallback = new THREE.MeshStandardMaterial({
             color: (material as any)?.color || '#aab6c4',
             metalness: 0.3,
-            roughness: 0.35,
+            roughness: 0.22,
             envMapIntensity: 1.1,
+            side: THREE.DoubleSide,
           });
           return fallback;
         };
@@ -138,10 +143,21 @@ const InteractiveModelPreview: React.FC<{
     return instance;
   }, [loadedModel, defaultScale]);
 
+  const previewScale = useMemo(() => {
+    if (!modelClone) return 1;
+    const box = new THREE.Box3().setFromObject(modelClone);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (!Number.isFinite(maxDim) || maxDim <= 0) return 1;
+    const targetSize = 2.4;
+    const scale = targetSize / maxDim;
+    return Math.min(12, Math.max(0.015, scale));
+  }, [modelClone]);
+
   if (!modelClone) return null;
 
   return (
-    <group>
+    <group scale={[previewScale, previewScale, previewScale]}>
       <group
         ref={modelRootRef}
         onPointerDown={(event) => {
@@ -495,17 +511,25 @@ const OemAdminPage: React.FC = () => {
   };
 
   const renderPreviewCanvas = () => (
-    <Canvas shadows camera={{ position: [3.4, 2.4, 3.6], fov: 45 }}>
+    <Canvas
+      shadows
+      camera={{ position: [3.4, 2.4, 3.6], fov: 45 }}
+      onCreated={({ gl }) => {
+        gl.toneMapping = THREE.ACESFilmicToneMapping;
+        gl.toneMappingExposure = 1.45;
+      }}
+    >
       <color attach="background" args={['#090d14']} />
       <fog attach="fog" args={['#090d14', 10, 30]} />
-      <ambientLight intensity={0.3} />
-      <hemisphereLight args={['#d9f0ff', '#1f2937', 0.45]} />
-      <directionalLight position={[5, 8, 5]} intensity={1.5} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
-      <directionalLight position={[-4, 4, -3]} intensity={0.55} />
-      <Environment preset="warehouse" />
+      <ambientLight intensity={0.75} />
+      <hemisphereLight args={['#d9f0ff', '#1f2937', 0.95]} />
+      <directionalLight position={[5, 8, 5]} intensity={2.1} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+      <directionalLight position={[-4, 4, -3]} intensity={1.1} />
+      <pointLight position={[0, 3.5, 0]} intensity={0.9} />
+      <Environment preset="studio" />
       <Grid args={[10, 10]} cellSize={0.5} cellThickness={0.4} sectionSize={2} sectionThickness={0.9} fadeDistance={28} fadeStrength={1} />
       {selectedModel && previewUrl && (
-        <Bounds fit clip observe margin={1.2}>
+        <Bounds fit observe margin={1.2}>
           <InteractiveModelPreview
             modelUrl={previewUrl}
             modelFormat={selectedModel.modelFormat}
@@ -543,7 +567,25 @@ const OemAdminPage: React.FC = () => {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--mm-bg-app)', color: 'var(--mm-text-primary)' }}>
+    <div className="oem-admin-page" style={{ minHeight: '100vh', background: 'var(--mm-bg-app)', color: '#eaf0fa' }}>
+      <style>
+        {`
+          .oem-admin-page input,
+          .oem-admin-page select,
+          .oem-admin-page textarea {
+            background: rgba(15, 23, 42, 0.86);
+            color: #eaf0fa;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 12px;
+          }
+          .oem-admin-page input::placeholder,
+          .oem-admin-page textarea::placeholder {
+            color: rgba(226, 232, 240, 0.72);
+          }
+        `}
+      </style>
       <header style={{ padding: '12px 20px', borderBottom: '1px solid var(--mm-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Link to="/dashboard" style={{ color: 'var(--mm-text-secondary)', textDecoration: 'none', display: 'inline-flex' }}>

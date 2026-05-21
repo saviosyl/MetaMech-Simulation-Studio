@@ -191,6 +191,7 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
 
   return (
     <div
+      className="simulation-bom-panel"
       style={{
         position: 'fixed',
         left: position?.x ?? 24,
@@ -203,8 +204,23 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
         boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
         overflow: 'hidden',
         zIndex: 90,
+        color: '#eaf0fa',
       }}
     >
+      <style>
+        {`
+          .simulation-bom-panel input,
+          .simulation-bom-panel select {
+            background: rgba(15, 23, 42, 0.92);
+            color: #eaf0fa;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            border-radius: 6px;
+          }
+          .simulation-bom-panel input::placeholder {
+            color: rgba(226, 232, 240, 0.7);
+          }
+        `}
+      </style>
       <div
         onMouseDown={beginDrag}
         style={{
@@ -218,14 +234,14 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <GripHorizontal size={14} />
-          <strong style={{ fontSize: 12 }}>Simulation BOM</strong>
+          <GripHorizontal size={14} color="#cbd5e1" />
+          <strong style={{ fontSize: 12, color: '#f8fafc' }}>Simulation BOM</strong>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             onMouseDown={(e) => e.stopPropagation()}
             onClick={exportCsv}
-            style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', color: 'var(--mm-text-primary)', padding: '4px 8px', cursor: 'pointer', fontSize: 11 }}
+            style={{ border: '1px solid rgba(148,163,184,0.45)', borderRadius: 8, background: 'rgba(30,41,59,0.85)', color: '#f8fafc', padding: '4px 8px', cursor: 'pointer', fontSize: 11 }}
           >
             <Download size={12} style={{ marginRight: 4, verticalAlign: -2 }} />
             Export
@@ -233,7 +249,7 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
           <button
             onMouseDown={(e) => e.stopPropagation()}
             onClick={onClose}
-            style={{ border: 'none', background: 'transparent', color: 'var(--mm-text-tertiary)', cursor: 'pointer' }}
+            style={{ border: 'none', background: 'transparent', color: '#cbd5e1', cursor: 'pointer' }}
           >
             <X size={14} />
           </button>
@@ -242,7 +258,7 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
 
       <div style={{ borderBottom: '1px solid var(--mm-border-subtle)', padding: '10px 12px', display: 'grid', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Output Currency</label>
+          <label style={{ fontSize: 11, color: '#dbe5f3' }}>Output Currency</label>
           <select
             value={outputCurrency}
             onChange={(e) => setOutputCurrency(asCurrency(e.target.value))}
@@ -253,12 +269,12 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
             ))}
           </select>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+        <div style={{ fontSize: 11, color: '#dbe5f3' }}>
           Enter conversion rates (required): <strong>1 source currency = ? {outputCurrency}</strong>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {CURRENCIES.map((currency) => (
-            <label key={currency} style={{ display: 'grid', gap: 4, fontSize: 10, color: 'var(--mm-text-tertiary)' }}>
+            <label key={currency} style={{ display: 'grid', gap: 4, fontSize: 10, color: '#dbe5f3' }}>
               <span>{currency} → {outputCurrency}</span>
               <input
                 type="number"
@@ -276,13 +292,13 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
 
       <div style={{ overflow: 'auto', maxHeight: 'calc(70vh - 180px)', padding: '8px 10px' }}>
         {rows.length === 0 ? (
-          <div style={{ color: 'var(--mm-text-tertiary)', fontSize: 12, padding: '14px 4px' }}>
+          <div style={{ color: '#dbe5f3', fontSize: 12, padding: '14px 4px' }}>
             No priced OEM modules currently placed in the simulation scene.
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
             <thead>
-              <tr style={{ color: 'var(--mm-text-tertiary)' }}>
+              <tr style={{ color: '#dbe5f3' }}>
                 <th style={{ textAlign: 'left', padding: '6px 4px' }}>Company</th>
                 <th style={{ textAlign: 'left', padding: '6px 4px' }}>Model</th>
                 <th style={{ textAlign: 'right', padding: '6px 4px' }}>Qty</th>
@@ -321,7 +337,7 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
       </div>
 
       <div style={{ borderTop: '1px solid var(--mm-border-subtle)', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-        <span style={{ color: 'var(--mm-text-tertiary)' }}>Grand Total ({outputCurrency})</span>
+        <span style={{ color: '#dbe5f3' }}>Grand Total ({outputCurrency})</span>
         <strong style={{ color: 'var(--mm-accent-primary)' }}>{toMoney(grandTotal, outputCurrency)}</strong>
       </div>
     </div>

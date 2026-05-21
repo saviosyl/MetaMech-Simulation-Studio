@@ -101,11 +101,15 @@ export async function loadModelObject(url: string, explicitFormat?: string | nul
     obj.traverse((child) => {
       if (!(child as THREE.Mesh).isMesh) return;
       const mesh = child as THREE.Mesh;
+      if (!mesh.geometry.getAttribute('normal')) {
+        mesh.geometry.computeVertexNormals();
+      }
       const baseColor = (mesh.material as any)?.color || new THREE.Color('#a3adb8');
       mesh.material = new THREE.MeshStandardMaterial({
         color: baseColor,
         metalness: 0.28,
         roughness: 0.45,
+        side: THREE.DoubleSide,
       });
       mesh.castShadow = true;
       mesh.receiveShadow = true;
