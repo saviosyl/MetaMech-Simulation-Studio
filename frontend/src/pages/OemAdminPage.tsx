@@ -154,11 +154,19 @@ const InteractiveModelPreview: React.FC<{
     return Math.min(12, Math.max(0.015, scale));
   }, [modelClone]);
 
+  const previewGroundLift = useMemo(() => {
+    if (!modelClone) return 0;
+    const box = new THREE.Box3().setFromObject(modelClone);
+    if (!Number.isFinite(box.min.y)) return 0;
+    return box.min.y < 0 ? -box.min.y : 0;
+  }, [modelClone]);
+
   if (!modelClone) return null;
 
   return (
     <group scale={[previewScale, previewScale, previewScale]}>
       <group
+        position={[0, previewGroundLift, 0]}
         ref={modelRootRef}
         onPointerDown={(event) => {
           if (!addPortByClick || !modelRootRef.current) return;
@@ -168,20 +176,19 @@ const InteractiveModelPreview: React.FC<{
         }}
       >
         <primitive object={modelClone} />
+        {ports.map((port) => (
+          <group key={`port-${port.id}`} position={port.localPosition}>
+            <mesh>
+              <sphereGeometry args={[0.08, 14, 10]} />
+              <meshStandardMaterial color={PORT_COLOR[port.type]} emissive={PORT_COLOR[port.type]} emissiveIntensity={0.45} />
+            </mesh>
+            <mesh rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[0.11, 0.14, 20]} />
+              <meshBasicMaterial color={PORT_COLOR[port.type]} transparent opacity={0.7} side={THREE.DoubleSide} />
+            </mesh>
+          </group>
+        ))}
       </group>
-
-      {ports.map((port) => (
-        <group key={`port-${port.id}`} position={port.localPosition}>
-          <mesh>
-            <sphereGeometry args={[0.08, 14, 10]} />
-            <meshStandardMaterial color={PORT_COLOR[port.type]} emissive={PORT_COLOR[port.type]} emissiveIntensity={0.45} />
-          </mesh>
-          <mesh rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[0.11, 0.14, 20]} />
-            <meshBasicMaterial color={PORT_COLOR[port.type]} transparent opacity={0.7} side={THREE.DoubleSide} />
-          </mesh>
-        </group>
-      ))}
     </group>
   );
 };
@@ -498,10 +505,14 @@ const OemAdminPage: React.FC = () => {
       const syncEndpoints = [
         '/admin/oem-library/sync',
         '/api/admin/oem-library/sync',
+        '/oem-library/sync',
+        '/api/oem-library/sync',
       ];
       if (window.location.hostname.endsWith('metamechsolutions.com')) {
         syncEndpoints.push('https://api.metamechsolutions.com/admin/oem-library/sync');
         syncEndpoints.push('https://api.metamechsolutions.com/api/admin/oem-library/sync');
+        syncEndpoints.push('https://api.metamechsolutions.com/oem-library/sync');
+        syncEndpoints.push('https://api.metamechsolutions.com/api/oem-library/sync');
       }
       let res: any = null;
       let lastError: any = null;
@@ -512,7 +523,8 @@ const OemAdminPage: React.FC = () => {
         } catch (endpointError: any) {
           lastError = endpointError;
           const status = Number(endpointError?.response?.status || 0);
-          if (status !== 404) throw endpointError;
+          const isEndpointMissing = status === 404 || status === 405 || status === 501 || status === 0;
+          if (!isEndpointMissing) throw endpointError;
         }
       }
       if (!res) throw lastError || new Error('Route not found');

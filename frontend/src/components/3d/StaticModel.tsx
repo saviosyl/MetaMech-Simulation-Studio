@@ -31,6 +31,16 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
     if (!model) return null;
     const instance = model.clone(true);
     if (assetDef.defaultScale) instance.scale.set(...assetDef.defaultScale);
+    const shouldGroundToPlane = assetDef.category === 'environment'
+      || assetDef.category === 'actors'
+      || !assetDef.connectionPorts
+      || assetDef.connectionPorts.length === 0;
+    if (shouldGroundToPlane) {
+      const bounds = new THREE.Box3().setFromObject(instance);
+      if (Number.isFinite(bounds.min.y)) {
+        instance.position.y += -bounds.min.y;
+      }
+    }
     instance.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;

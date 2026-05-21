@@ -90,6 +90,8 @@ app.use('/billing', billingRoutes);
 app.use('/projects', projectRoutes);
 app.use('/admin', adminRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/oem-library', adminRoutes);
+app.use('/api/oem-library', adminRoutes);
 
 // Global error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

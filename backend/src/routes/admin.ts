@@ -146,7 +146,7 @@ async function githubDeleteFile(config: GithubOemConfig, repoPath: string, messa
   return true;
 }
 
-router.post('/oem-library/sync', async (req: Request, res: Response) => {
+router.post(['/oem-library/sync', '/sync'], async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Authentication required' });
     if (!isAdminUser(req)) return res.status(403).json({ error: 'Admin access required' });
