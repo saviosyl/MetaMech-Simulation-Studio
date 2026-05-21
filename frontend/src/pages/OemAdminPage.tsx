@@ -495,7 +495,20 @@ const OemAdminPage: React.FC = () => {
         uploads: pendingUploads,
         deletions: pendingDeletes,
       };
-      const res = await api.post('/admin/oem-library/sync', payload);
+      const syncEndpoints = ['/admin/oem-library/sync', '/api/admin/oem-library/sync'];
+      let res: any = null;
+      let lastError: any = null;
+      for (const endpoint of syncEndpoints) {
+        try {
+          res = await api.post(endpoint, payload);
+          break;
+        } catch (endpointError: any) {
+          lastError = endpointError;
+          const status = Number(endpointError?.response?.status || 0);
+          if (status !== 404) throw endpointError;
+        }
+      }
+      if (!res) throw lastError || new Error('Route not found');
       const uploadedCount = Number(res?.data?.uploadedCount || 0);
       const deletedCount = Number(res?.data?.deletedCount || 0);
       const indexUpdated = !!res?.data?.indexUpdated;
@@ -516,16 +529,16 @@ const OemAdminPage: React.FC = () => {
       camera={{ position: [3.4, 2.4, 3.6], fov: 45 }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1.45;
+        gl.toneMappingExposure = 1.58;
       }}
     >
-      <color attach="background" args={['#090d14']} />
-      <fog attach="fog" args={['#090d14', 10, 30]} />
-      <ambientLight intensity={0.75} />
-      <hemisphereLight args={['#d9f0ff', '#1f2937', 0.95]} />
-      <directionalLight position={[5, 8, 5]} intensity={2.1} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
-      <directionalLight position={[-4, 4, -3]} intensity={1.1} />
-      <pointLight position={[0, 3.5, 0]} intensity={0.9} />
+      <color attach="background" args={['#f3f6fb']} />
+      <fog attach="fog" args={['#f3f6fb', 12, 36]} />
+      <ambientLight intensity={1.05} />
+      <hemisphereLight args={['#ffffff', '#dbe4f0', 1.35]} />
+      <directionalLight position={[5, 8, 5]} intensity={2.6} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+      <directionalLight position={[-4, 4, -3]} intensity={1.45} />
+      <pointLight position={[0, 3.5, 0]} intensity={1.35} />
       <Environment preset="studio" />
       <Grid args={[10, 10]} cellSize={0.5} cellThickness={0.4} sectionSize={2} sectionThickness={0.9} fadeDistance={28} fadeStrength={1} />
       {selectedModel && previewUrl && (
@@ -567,22 +580,35 @@ const OemAdminPage: React.FC = () => {
   }
 
   return (
-    <div className="oem-admin-page" style={{ minHeight: '100vh', background: 'var(--mm-bg-app)', color: '#eaf0fa' }}>
+    <div className="oem-admin-page" style={{ minHeight: '100vh', background: 'var(--mm-bg-app)', color: 'var(--mm-text-primary)' }}>
       <style>
         {`
+          .oem-admin-page {
+            --mm-bg-app: #f5f7fb;
+            --mm-bg-panel: #ffffff;
+            --mm-bg-surface: #ffffff;
+            --mm-bg-input: #ffffff;
+            --mm-border: #d7dee9;
+            --mm-border-subtle: #e5eaf2;
+            --mm-text-primary: #0f172a;
+            --mm-text-secondary: #1f2937;
+            --mm-text-tertiary: #334155;
+            --mm-accent-primary: #2563eb;
+            --mm-accent-primary-muted: #dbeafe;
+          }
           .oem-admin-page input,
           .oem-admin-page select,
           .oem-admin-page textarea {
-            background: rgba(15, 23, 42, 0.86);
-            color: #eaf0fa;
-            border: 1px solid rgba(148, 163, 184, 0.4);
+            background: #ffffff;
+            color: #0f172a;
+            border: 1px solid #cbd5e1;
             border-radius: 8px;
             padding: 8px 10px;
             font-size: 12px;
           }
           .oem-admin-page input::placeholder,
           .oem-admin-page textarea::placeholder {
-            color: rgba(226, 232, 240, 0.72);
+            color: #64748b;
           }
         `}
       </style>
@@ -600,11 +626,11 @@ const OemAdminPage: React.FC = () => {
           <button
             onClick={syncToGithub}
             disabled={syncingGithub}
-            style={{ padding: '8px 10px', border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-accent-primary)', color: '#fff', cursor: syncingGithub ? 'not-allowed' : 'pointer', opacity: syncingGithub ? 0.7 : 1 }}
+            style={{ padding: '8px 10px', border: '1px solid #bfdbfe', borderRadius: 8, background: '#dbeafe', color: '#0f172a', cursor: syncingGithub ? 'not-allowed' : 'pointer', opacity: syncingGithub ? 0.7 : 1 }}
           >
             {syncingGithub ? 'Syncing…' : 'Sync to GitHub'}
           </button>
-          <button onClick={saveDraft} style={{ padding: '8px 10px', border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-accent-primary-muted)', color: 'var(--mm-accent-primary)', cursor: 'pointer' }}>
+          <button onClick={saveDraft} style={{ padding: '8px 10px', border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-accent-primary-muted)', color: '#0f172a', cursor: 'pointer' }}>
             <Save size={14} style={{ marginRight: 6 }} />Save Draft
           </button>
         </div>
@@ -759,7 +785,7 @@ const OemAdminPage: React.FC = () => {
                               border: '1px solid var(--mm-border)',
                               borderRadius: 6,
                               background: clickPortMode ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)',
-                              color: clickPortMode ? 'var(--mm-accent-primary)' : 'var(--mm-text-primary)',
+                              color: 'var(--mm-text-primary)',
                               cursor: 'pointer',
                               padding: '2px 8px',
                             }}
@@ -803,7 +829,7 @@ const OemAdminPage: React.FC = () => {
           )}
         </section>
 
-        <aside style={{ border: '1px solid var(--mm-border)', borderRadius: 10, background: 'linear-gradient(180deg, rgba(15,23,42,0.85), rgba(2,6,23,0.88))', padding: 10, position: 'sticky', top: 10, maxHeight: 'calc(100vh - 92px)', overflow: 'auto' }}>
+        <aside style={{ border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 10, position: 'sticky', top: 10, maxHeight: 'calc(100vh - 92px)', overflow: 'auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             <strong style={{ fontSize: 13 }}>Premium 3D Preview</strong>
             <button
@@ -841,7 +867,7 @@ const OemAdminPage: React.FC = () => {
           <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 6 }}>
             Pending GitHub changes: uploads <strong>{pendingUploads.length}</strong>, deletions <strong>{pendingDeletes.length}</strong>
           </div>
-          {notice && <div style={{ fontSize: 11, color: 'var(--mm-accent-primary)', marginTop: 8 }}>{notice}</div>}
+          {notice && <div style={{ fontSize: 11, color: '#0f172a', marginTop: 8, fontWeight: 600 }}>{notice}</div>}
         </aside>
       </div>
 
@@ -850,13 +876,13 @@ const OemAdminPage: React.FC = () => {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(2, 6, 23, 0.94)',
+            background: 'rgba(248, 250, 252, 0.96)',
             zIndex: 80,
             display: 'flex',
             flexDirection: 'column',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid rgba(148,163,184,0.25)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #d7dee9' }}>
             <strong>Fullscreen OEM 3D Preview</strong>
             <button onClick={() => setPreviewFullscreen(false)} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', color: 'var(--mm-text-primary)', padding: '6px 10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <Minimize2 size={14} />

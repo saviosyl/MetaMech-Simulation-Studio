@@ -1789,7 +1789,7 @@ export default {
         return withCors(request, response, env);
       }
 
-      if (request.method === 'POST' && path === '/admin/oem-library/sync') {
+      if (request.method === 'POST' && (path === '/admin/oem-library/sync' || path === '/api/admin/oem-library/sync')) {
         response = await handleOemLibrarySync(request, env);
         return withCors(request, response, env);
       }

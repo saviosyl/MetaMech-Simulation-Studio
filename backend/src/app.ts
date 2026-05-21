@@ -8,6 +8,7 @@ import * as dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import billingRoutes from './routes/billing';
 import projectRoutes from './routes/projects';
+import adminRoutes from './routes/admin';
 
 dotenv.config();
 
@@ -87,6 +88,8 @@ app.get('/health', (req, res) => {
 app.use('/auth', authRoutes);
 app.use('/billing', billingRoutes);
 app.use('/projects', projectRoutes);
+app.use('/admin', adminRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Global error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
