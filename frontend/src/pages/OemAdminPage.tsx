@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { isOemAdminUser } from '../lib/adminAccess';
 import {
   clearLocalOemLibraryDraft,
-  fetchGithubOemLibraryIndex,
+  fetchOemLibraryIndex,
   getLocalOemLibraryDraft,
   OEM_LIBRARY_MANAGE_URL,
   OemCompanyEntry,
@@ -189,7 +189,7 @@ const InteractiveModelPreview: React.FC<{
 const OemAdminPage: React.FC = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [githubLibrary, setGithubLibrary] = useState<OemLibraryIndex>({ companies: [] });
+  const [remoteLibrary, setRemoteLibrary] = useState<OemLibraryIndex>({ companies: [] });
   const [library, setLibrary] = useState<OemLibraryIndex>({ companies: [] });
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [selectedModelId, setSelectedModelId] = useState<string>('');
@@ -209,11 +209,11 @@ const OemAdminPage: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const github = await fetchGithubOemLibraryIndex();
+      const remote = await fetchOemLibraryIndex();
       const draft = getLocalOemLibraryDraft();
       if (cancelled) return;
-      const initial = draft || github;
-      setGithubLibrary(github);
+      const initial = draft || remote;
+      setRemoteLibrary(remote);
       setLibrary(initial);
       const firstCompany = initial.companies[0];
       setSelectedCompanyId(firstCompany?.id || '');
@@ -397,16 +397,16 @@ const OemAdminPage: React.FC = () => {
     setNotice('Draft saved locally. OEM tab uses this draft immediately after refresh.');
   };
 
-  const resetToGithub = () => {
+  const resetToRemote = () => {
     clearLocalOemLibraryDraft();
     Object.values(localPreviewUrls).forEach((url) => URL.revokeObjectURL(url));
     setLocalPreviewUrls({});
     setPendingUploads([]);
     setPendingDeletes([]);
-    setLibrary(githubLibrary);
-    setSelectedCompanyId(githubLibrary.companies[0]?.id || '');
-    setSelectedModelId(githubLibrary.companies[0]?.models?.[0]?.id || '');
-    setNotice('Local draft cleared. Reverted to GitHub source.');
+    setLibrary(remoteLibrary);
+    setSelectedCompanyId(remoteLibrary.companies[0]?.id || '');
+    setSelectedModelId(remoteLibrary.companies[0]?.models?.[0]?.id || '');
+    setNotice('Local draft cleared. Reverted to remote source.');
   };
 
   const downloadIndexJson = () => {
@@ -481,7 +481,7 @@ const OemAdminPage: React.FC = () => {
         next[key] = objectUrl;
         return next;
       });
-      setNotice(`${file.name} imported (${format.toUpperCase()}). It will be uploaded to GitHub on sync.`);
+      setNotice(`${file.name} imported (${format.toUpperCase()}). It will be uploaded on next sync.`);
     };
     reader.readAsArrayBuffer(file);
     event.target.value = '';
@@ -495,10 +495,17 @@ const OemAdminPage: React.FC = () => {
         uploads: pendingUploads,
         deletions: pendingDeletes,
       };
-      const syncEndpoints = ['/admin/oem-library/sync', '/api/admin/oem-library/sync'];
+      const syncEndpoints = [
+        '/admin/oem-library/sync',
+        '/api/admin/oem-library/sync',
+      ];
+      if (window.location.hostname.endsWith('metamechsolutions.com')) {
+        syncEndpoints.push('https://api.metamechsolutions.com/admin/oem-library/sync');
+        syncEndpoints.push('https://api.metamechsolutions.com/api/admin/oem-library/sync');
+      }
       let res: any = null;
       let lastError: any = null;
-      for (const endpoint of syncEndpoints) {
+      for (const endpoint of Array.from(new Set(syncEndpoints))) {
         try {
           res = await api.post(endpoint, payload);
           break;
@@ -512,12 +519,13 @@ const OemAdminPage: React.FC = () => {
       const uploadedCount = Number(res?.data?.uploadedCount || 0);
       const deletedCount = Number(res?.data?.deletedCount || 0);
       const indexUpdated = !!res?.data?.indexUpdated;
+      const backend = String(res?.data?.backend || 'remote');
       setPendingUploads([]);
       setPendingDeletes([]);
-      setNotice(`GitHub synced: index ${indexUpdated ? 'updated' : 'unchanged'}, uploads ${uploadedCount}, deletions ${deletedCount}.`);
+      setNotice(`Library synced (${backend}): index ${indexUpdated ? 'updated' : 'unchanged'}, uploads ${uploadedCount}, deletions ${deletedCount}.`);
     } catch (error: any) {
-      const message = error?.response?.data?.error || error?.message || 'GitHub sync failed';
-      setNotice(`GitHub sync failed: ${message}`);
+      const message = error?.response?.data?.error || error?.message || 'Library sync failed';
+      setNotice(`Library sync failed: ${message}`);
     } finally {
       setSyncingGithub(false);
     }
@@ -621,14 +629,14 @@ const OemAdminPage: React.FC = () => {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <a href={OEM_LIBRARY_MANAGE_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', padding: '8px 10px', border: '1px solid var(--mm-border)', borderRadius: 8, color: 'var(--mm-text-primary)' }}>
-            Open GitHub Folder
+            Open Library Source
           </a>
           <button
             onClick={syncToGithub}
             disabled={syncingGithub}
             style={{ padding: '8px 10px', border: '1px solid #bfdbfe', borderRadius: 8, background: '#dbeafe', color: '#0f172a', cursor: syncingGithub ? 'not-allowed' : 'pointer', opacity: syncingGithub ? 0.7 : 1 }}
           >
-            {syncingGithub ? 'Syncing…' : 'Sync to GitHub'}
+            {syncingGithub ? 'Syncing…' : 'Sync Library'}
           </button>
           <button onClick={saveDraft} style={{ padding: '8px 10px', border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-accent-primary-muted)', color: '#0f172a', cursor: 'pointer' }}>
             <Save size={14} style={{ marginRight: 6 }} />Save Draft
@@ -662,7 +670,7 @@ const OemAdminPage: React.FC = () => {
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
                 <input value={selectedCompany.name} onChange={(e) => updateCompany(selectedCompany.id, (company) => ({ ...company, name: e.target.value }))} placeholder="Company name" />
-                <input value={selectedCompany.folder || ''} onChange={(e) => updateCompany(selectedCompany.id, (company) => ({ ...company, folder: e.target.value }))} placeholder="GitHub folder name" />
+                <input value={selectedCompany.folder || ''} onChange={(e) => updateCompany(selectedCompany.id, (company) => ({ ...company, folder: e.target.value }))} placeholder="Library folder name" />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -856,16 +864,16 @@ const OemAdminPage: React.FC = () => {
               <Upload size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Import Library
               <input type="file" accept=".json,.oemlib" onChange={importIndexJson} style={{ display: 'none' }} />
             </label>
-            <button onClick={resetToGithub} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer' }}>
-              Reset from GitHub
+            <button onClick={resetToRemote} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer' }}>
+              Reset from Remote
             </button>
           </div>
 
           <p style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 10, lineHeight: 1.5 }}>
-            Millimeter workflow active for imported CAD assets. Import OBJ/STEP/GLB, place nodes by clicking geometry, then sync updates directly to GitHub.
+            Millimeter workflow active for imported CAD assets. Import OBJ/STEP/GLB, place nodes by clicking geometry, then sync updates to Cloudflare storage.
           </p>
           <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 6 }}>
-            Pending GitHub changes: uploads <strong>{pendingUploads.length}</strong>, deletions <strong>{pendingDeletes.length}</strong>
+            Pending changes: uploads <strong>{pendingUploads.length}</strong>, deletions <strong>{pendingDeletes.length}</strong>
           </div>
           {notice && <div style={{ fontSize: 11, color: '#0f172a', marginTop: 8, fontWeight: 600 }}>{notice}</div>}
         </aside>

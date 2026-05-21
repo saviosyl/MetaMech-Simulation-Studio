@@ -52,6 +52,8 @@ const INDEX_FILE = `${LIBRARY_PATH}/index.json`;
 const INDEX_URL = `https://raw.githubusercontent.com/${encodeURIComponent(OWNER)}/${encodeURIComponent(REPO)}/${encodeURIComponent(BRANCH)}/${INDEX_FILE}`;
 export const OEM_LIBRARY_MANAGE_URL = `https://github.com/${encodeURIComponent(OWNER)}/${encodeURIComponent(REPO)}/tree/${encodeURIComponent(BRANCH)}/${LIBRARY_PATH}`;
 const LOCAL_DRAFT_KEY = 'metamech_oem_library_draft_v1';
+const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
+const API_BASE_URL = configuredApiUrl || (import.meta.env.DEV ? 'http://localhost:3000' : window.location.origin);
 
 let loadPromise: Promise<OemLibraryLoadResult> | null = null;
 
@@ -66,6 +68,23 @@ function slugify(value: string): string {
 function githubRawUrl(path: string): string {
   const encodedPath = path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
   return `https://raw.githubusercontent.com/${encodeURIComponent(OWNER)}/${encodeURIComponent(REPO)}/${encodeURIComponent(BRANCH)}/${encodedPath}`;
+}
+
+function joinUrl(base: string, path: string): string {
+  const normalizedBase = base.replace(/\/+$/, '');
+  return `${normalizedBase}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+function cloudApiCandidates(path: string): string[] {
+  const candidates = [
+    joinUrl(API_BASE_URL, path),
+    joinUrl(API_BASE_URL, `/api${path.startsWith('/') ? path : `/${path}`}`),
+  ];
+  if (typeof window !== 'undefined' && window.location.hostname.endsWith('metamechsolutions.com')) {
+    candidates.push(`https://api.metamechsolutions.com${path.startsWith('/') ? path : `/${path}`}`);
+    candidates.push(`https://api.metamechsolutions.com/api${path.startsWith('/') ? path : `/${path}`}`);
+  }
+  return Array.from(new Set(candidates));
 }
 
 function toPlacementCategory(value: unknown): PlacementCategory {
@@ -291,10 +310,35 @@ export async function fetchGithubOemLibraryIndex(): Promise<OemLibraryIndex> {
   }
 }
 
+export async function fetchCloudflareOemLibraryIndex(): Promise<OemLibraryIndex | null> {
+  const endpoints = cloudApiCandidates('/oem-library/index');
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint, { credentials: 'include' });
+      if (!res.ok) {
+        if (res.status === 404) continue;
+        continue;
+      }
+      const payload = await res.json();
+      const data = payload?.index ?? payload;
+      return normalizeLibrary(data);
+    } catch {
+      // Try next endpoint candidate.
+    }
+  }
+  return null;
+}
+
+export async function fetchOemLibraryIndex(): Promise<OemLibraryIndex> {
+  const cloudLibrary = await fetchCloudflareOemLibraryIndex();
+  if (cloudLibrary && Array.isArray(cloudLibrary.companies)) return cloudLibrary;
+  return fetchGithubOemLibraryIndex();
+}
+
 export async function loadOemLibrary(): Promise<OemLibraryLoadResult> {
   if (!loadPromise) {
     loadPromise = (async () => {
-      const githubLibrary = await fetchGithubOemLibraryIndex();
+      const githubLibrary = await fetchOemLibraryIndex();
       const localDraft = getLocalOemLibraryDraft();
       const merged = mergeLibraries(githubLibrary, localDraft);
       return toRuntimeEntities(merged);

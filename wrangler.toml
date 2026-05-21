@@ -18,6 +18,7 @@ GITHUB_OEM_OWNER = "saviosyl"
 GITHUB_OEM_REPO = "MetaMech-Simulation-Studio"
 GITHUB_OEM_BRANCH = "main"
 GITHUB_OEM_LIBRARY_PATH = "oem-library"
+OEM_LIBRARY_STORAGE_BACKEND = "d1"
 
 [[d1_databases]]
 binding = "DB"

@@ -46,6 +46,7 @@ type Env = {
   GITHUB_OEM_REPO?: string;
   GITHUB_OEM_BRANCH?: string;
   GITHUB_OEM_LIBRARY_PATH?: string;
+  OEM_LIBRARY_STORAGE_BACKEND?: string;
 };
 
 type BillingPlanInterval = 'monthly' | 'yearly';
@@ -731,6 +732,15 @@ type GithubOemConfig = {
   libraryPath: string;
 };
 
+type GithubOemPublicConfig = {
+  owner: string;
+  repo: string;
+  branch: string;
+  libraryPath: string;
+};
+
+type OemStorageBackend = 'github' | 'd1';
+
 function sanitizeRelativeRepoPath(rawPath: string): string | null {
   const normalized = rawPath.replace(/\\/g, '/').trim().replace(/^\/+|\/+$/g, '');
   if (!normalized || normalized.includes('..')) return null;
@@ -744,6 +754,141 @@ function sanitizeRelativeRepoPath(rawPath: string): string | null {
 
 function encodeRepoPath(path: string): string {
   return path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+}
+
+function encodedPathSegments(path: string): string {
+  return path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+}
+
+function preferredOemStorageBackend(env: Env): OemStorageBackend {
+  const configured = String(env.OEM_LIBRARY_STORAGE_BACKEND || '').trim().toLowerCase();
+  if (configured === 'github') return 'github';
+  return 'd1';
+}
+
+function githubOemPublicConfig(env: Env): GithubOemPublicConfig | null {
+  const owner = (env.GITHUB_OEM_OWNER || 'saviosyl').trim();
+  const repo = (env.GITHUB_OEM_REPO || 'MetaMech-Simulation-Studio').trim();
+  const branch = (env.GITHUB_OEM_BRANCH || 'main').trim();
+  const libraryPath = sanitizeRelativeRepoPath(env.GITHUB_OEM_LIBRARY_PATH || 'oem-library');
+  if (!owner || !repo || !branch || !libraryPath) return null;
+  return { owner, repo, branch, libraryPath };
+}
+
+function githubRawFileUrl(config: GithubOemPublicConfig, relativePath: string): string {
+  const fullPath = `${config.libraryPath}/${relativePath}`;
+  return `https://raw.githubusercontent.com/${encodeURIComponent(config.owner)}/${encodeURIComponent(config.repo)}/${encodeURIComponent(config.branch)}/${encodedPathSegments(fullPath)}`;
+}
+
+function mimeTypeFromPath(path: string): string {
+  const clean = path.toLowerCase();
+  if (clean.endsWith('.glb')) return 'model/gltf-binary';
+  if (clean.endsWith('.gltf')) return 'model/gltf+json';
+  if (clean.endsWith('.obj')) return 'text/plain; charset=utf-8';
+  if (clean.endsWith('.step') || clean.endsWith('.stp') || clean.endsWith('.iges') || clean.endsWith('.igs')) return 'application/step';
+  if (clean.endsWith('.json') || clean.endsWith('.oemlib')) return 'application/json; charset=utf-8';
+  return 'application/octet-stream';
+}
+
+function base64DecodedLength(base64Payload: string): number {
+  try {
+    return atob(base64Payload).length;
+  } catch {
+    return 0;
+  }
+}
+
+function buildCloudOemFileUrl(request: Request, relativePath: string): string {
+  const origin = new URL(request.url).origin;
+  return `${origin}/oem-library/files/${encodedPathSegments(relativePath)}`;
+}
+
+async function ensureOemLibraryStorageTables(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS oem_library_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      index_json TEXT NOT NULL,
+      storage_backend TEXT NOT NULL DEFAULT 'd1',
+      updated_by_email TEXT,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS oem_library_objects (
+      path TEXT PRIMARY KEY,
+      content_base64 TEXT NOT NULL,
+      content_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`
+  ).run();
+}
+
+async function readD1OemIndex(env: Env): Promise<{ index: any; updatedAt: string | null } | null> {
+  await ensureOemLibraryStorageTables(env);
+  const row = await env.DB
+    .prepare('SELECT index_json, updated_at FROM oem_library_state WHERE id = 1 LIMIT 1')
+    .first<{ index_json: string; updated_at: string | null }>();
+  if (!row?.index_json) return null;
+  try {
+    const parsed = JSON.parse(String(row.index_json));
+    return { index: parsed, updatedAt: row.updated_at || null };
+  } catch {
+    return null;
+  }
+}
+
+async function writeD1OemIndex(env: Env, index: unknown, updatedByEmail: string): Promise<void> {
+  await ensureOemLibraryStorageTables(env);
+  const indexJson = JSON.stringify(index ?? { companies: [] }, null, 2);
+  await env.DB
+    .prepare(
+      `INSERT INTO oem_library_state (id, index_json, storage_backend, updated_by_email, updated_at)
+       VALUES (1, ?, 'd1', ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(id) DO UPDATE SET
+         index_json = excluded.index_json,
+         storage_backend = 'd1',
+         updated_by_email = excluded.updated_by_email,
+         updated_at = CURRENT_TIMESTAMP`
+    )
+    .bind(indexJson, updatedByEmail)
+    .run();
+}
+
+async function upsertD1OemObject(env: Env, path: string, base64Content: string): Promise<void> {
+  await ensureOemLibraryStorageTables(env);
+  await env.DB
+    .prepare(
+      `INSERT INTO oem_library_objects (path, content_base64, content_type, size_bytes, updated_at)
+       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(path) DO UPDATE SET
+         content_base64 = excluded.content_base64,
+         content_type = excluded.content_type,
+         size_bytes = excluded.size_bytes,
+         updated_at = CURRENT_TIMESTAMP`
+    )
+    .bind(path, base64Content, mimeTypeFromPath(path), base64DecodedLength(base64Content))
+    .run();
+}
+
+async function deleteD1OemObject(env: Env, path: string): Promise<boolean> {
+  await ensureOemLibraryStorageTables(env);
+  const result = await env.DB
+    .prepare('DELETE FROM oem_library_objects WHERE path = ?')
+    .bind(path)
+    .run();
+  return Number(result.meta.changes || 0) > 0;
+}
+
+async function readD1OemObject(env: Env, path: string): Promise<{ content_base64: string; content_type: string } | null> {
+  await ensureOemLibraryStorageTables(env);
+  const row = await env.DB
+    .prepare('SELECT content_base64, content_type FROM oem_library_objects WHERE path = ? LIMIT 1')
+    .bind(path)
+    .first<{ content_base64: string; content_type: string }>();
+  if (!row) return null;
+  return row;
 }
 
 function githubOemConfig(env: Env): GithubOemConfig | null {
@@ -826,17 +971,33 @@ async function githubDeleteFile(config: GithubOemConfig, repoPath: string, messa
   return true;
 }
 
+function withCloudOemModelUrls(index: OemSyncRequestBody['index'], request: Request): OemSyncRequestBody['index'] {
+  if (!index || !Array.isArray(index.companies)) return index;
+  const cloned = JSON.parse(JSON.stringify(index));
+  for (const company of cloned.companies || []) {
+    if (!company || typeof company !== 'object') continue;
+    const folderRaw = String((company as any).folder || (company as any).id || (company as any).name || '').trim();
+    const folder = sanitizeRelativeRepoPath(folderRaw);
+    const models = Array.isArray((company as any).models) ? (company as any).models : [];
+    for (const model of models) {
+      if (!model || typeof model !== 'object') continue;
+      const modelPath = sanitizeRelativeRepoPath(String((model as any).glbPath || ''));
+      if (!modelPath) continue;
+      const relativePath = folder ? `${folder}/${modelPath}` : modelPath;
+      const safeRelativePath = sanitizeRelativeRepoPath(relativePath);
+      if (!safeRelativePath) continue;
+      (model as any).glbUrl = buildCloudOemFileUrl(request, safeRelativePath);
+    }
+  }
+  return cloned;
+}
+
 async function handleOemLibrarySync(request: Request, env: Env): Promise<Response> {
   const user = await readAuthedUser(request, env);
   if (!user) return toJson({ error: 'Authentication required' }, 401);
 
   const allowed = isInternalAdminEmail(user.email, env) || isAdminRole(user.role);
   if (!allowed) return toJson({ error: 'Admin access required' }, 403);
-
-  const config = githubOemConfig(env);
-  if (!config) {
-    return toJson({ error: 'GitHub sync not configured on server' }, 500);
-  }
 
   const body = await readJson<OemSyncRequestBody>(request);
   const index = body?.index;
@@ -852,6 +1013,9 @@ async function handleOemLibrarySync(request: Request, env: Env): Promise<Respons
 
   const uploadedPaths = new Set<string>();
   const deletedPaths = new Set<string>();
+  const storageBackend = preferredOemStorageBackend(env);
+  const githubConfig = githubOemConfig(env);
+  const useGithub = storageBackend === 'github' && !!githubConfig;
 
   try {
     for (const upload of uploads) {
@@ -863,7 +1027,7 @@ async function handleOemLibrarySync(request: Request, env: Env): Promise<Respons
       const folder = sanitizeRelativeRepoPath(folderRaw);
       const modelFile = sanitizeRelativeRepoPath(String(model.glbPath || ''));
       if (!modelFile) {
-        return toJson({ error: `Model "${model.name || model.id || upload.modelId}" is missing glbPath for GitHub sync` }, 400);
+        return toJson({ error: `Model "${model.name || model.id || upload.modelId}" is missing glbPath for sync` }, 400);
       }
 
       const relativePath = folder ? `${folder}/${modelFile}` : modelFile;
@@ -875,20 +1039,22 @@ async function handleOemLibrarySync(request: Request, env: Env): Promise<Respons
       const rawBase64 = String(upload.contentBase64 || '').trim();
       const base64Payload = rawBase64.includes(',') ? rawBase64.split(',').pop() || '' : rawBase64;
       if (!base64Payload) return toJson({ error: 'Invalid upload file payload' }, 400);
-
-      // Validate base64 and enforce a conservative per-file limit.
-      const decoded = atob(base64Payload);
-      if (decoded.length > 15 * 1024 * 1024) {
+      if (base64DecodedLength(base64Payload) > 15 * 1024 * 1024) {
         return toJson({ error: `File "${modelFile}" is too large (limit 15MB)` }, 400);
       }
 
-      const repoPath = `${config.libraryPath}/${safeRelativePath}`;
-      await githubUpsertFile(
-        config,
-        repoPath,
-        base64Payload,
-        `OEM Admin: upload ${safeRelativePath} by ${user.email}`
-      );
+      if (useGithub && githubConfig) {
+        const repoPath = `${githubConfig.libraryPath}/${safeRelativePath}`;
+        await githubUpsertFile(
+          githubConfig,
+          repoPath,
+          base64Payload,
+          `OEM Admin: upload ${safeRelativePath} by ${user.email}`
+        );
+      } else {
+        await upsertD1OemObject(env, safeRelativePath, base64Payload);
+      }
+
       uploadedPaths.add(safeRelativePath);
     }
 
@@ -896,34 +1062,110 @@ async function handleOemLibrarySync(request: Request, env: Env): Promise<Respons
       const safeRelativePath = sanitizeRelativeRepoPath(String(deletion || ''));
       if (!safeRelativePath) continue;
       if (uploadedPaths.has(safeRelativePath)) continue;
-      const repoPath = `${config.libraryPath}/${safeRelativePath}`;
-      const deleted = await githubDeleteFile(
-        config,
-        repoPath,
-        `OEM Admin: delete ${safeRelativePath} by ${user.email}`
-      );
-      if (deleted) deletedPaths.add(safeRelativePath);
+
+      if (useGithub && githubConfig) {
+        const repoPath = `${githubConfig.libraryPath}/${safeRelativePath}`;
+        const deleted = await githubDeleteFile(
+          githubConfig,
+          repoPath,
+          `OEM Admin: delete ${safeRelativePath} by ${user.email}`
+        );
+        if (deleted) deletedPaths.add(safeRelativePath);
+      } else {
+        const deleted = await deleteD1OemObject(env, safeRelativePath);
+        if (deleted) deletedPaths.add(safeRelativePath);
+      }
     }
 
-    const indexJson = JSON.stringify(index, null, 2);
-    const indexBase64 = base64EncodeBytes(textEncoder.encode(indexJson));
-    await githubUpsertFile(
-      config,
-      `${config.libraryPath}/index.json`,
-      indexBase64,
-      `OEM Admin: update OEM index by ${user.email}`
-    );
+    if (useGithub && githubConfig) {
+      const indexJson = JSON.stringify(index, null, 2);
+      const indexBase64 = base64EncodeBytes(textEncoder.encode(indexJson));
+      await githubUpsertFile(
+        githubConfig,
+        `${githubConfig.libraryPath}/index.json`,
+        indexBase64,
+        `OEM Admin: update OEM index by ${user.email}`
+      );
 
+      return toJson({
+        ok: true,
+        backend: 'github',
+        uploadedCount: uploadedPaths.size,
+        deletedCount: deletedPaths.size,
+        indexUpdated: true,
+        branch: githubConfig.branch,
+        repo: `${githubConfig.owner}/${githubConfig.repo}`,
+      });
+    }
+
+    const cloudIndex = withCloudOemModelUrls(index, request);
+    await writeD1OemIndex(env, cloudIndex, user.email);
     return toJson({
       ok: true,
+      backend: 'cloudflare-d1',
       uploadedCount: uploadedPaths.size,
       deletedCount: deletedPaths.size,
       indexUpdated: true,
-      branch: config.branch,
-      repo: `${config.owner}/${config.repo}`,
     });
   } catch (error: any) {
-    return toJson({ error: error?.message || 'GitHub sync failed' }, 500);
+    return toJson({ error: error?.message || 'OEM library sync failed' }, 500);
+  }
+}
+
+async function handleOemLibraryIndex(request: Request, env: Env): Promise<Response> {
+  try {
+    const d1Index = await readD1OemIndex(env);
+    if (d1Index?.index) {
+      return toJson({ index: d1Index.index, source: 'cloudflare-d1', updatedAt: d1Index.updatedAt });
+    }
+
+    const github = githubOemPublicConfig(env);
+    if (!github) return toJson({ index: { companies: [] }, source: 'empty' });
+    const rawUrl = githubRawFileUrl(github, 'index.json');
+    const response = await fetch(rawUrl);
+    if (!response.ok) return toJson({ index: { companies: [] }, source: 'empty' });
+    const data = await response.json();
+    return toJson({ index: data, source: 'github-raw' });
+  } catch (error: any) {
+    return toJson({ error: error?.message || 'Failed to load OEM library index' }, 500);
+  }
+}
+
+async function handleOemLibraryFile(request: Request, env: Env, relativePathRaw: string): Promise<Response> {
+  const decodedPath = decodeURIComponent(relativePathRaw || '');
+  const safeRelativePath = sanitizeRelativeRepoPath(decodedPath);
+  if (!safeRelativePath) return toJson({ error: 'Invalid OEM file path' }, 400);
+
+  try {
+    const d1Object = await readD1OemObject(env, safeRelativePath);
+    if (d1Object?.content_base64) {
+      const binary = atob(d1Object.content_base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new Response(bytes, {
+        status: 200,
+        headers: {
+          'Content-Type': d1Object.content_type || mimeTypeFromPath(safeRelativePath),
+          'Cache-Control': 'public, max-age=600',
+        },
+      });
+    }
+
+    const github = githubOemPublicConfig(env);
+    if (!github) return toJson({ error: 'OEM model file not found' }, 404);
+    const rawUrl = githubRawFileUrl(github, safeRelativePath);
+    const fallbackRes = await fetch(rawUrl);
+    if (!fallbackRes.ok) return toJson({ error: 'OEM model file not found' }, 404);
+    const body = await fallbackRes.arrayBuffer();
+    return new Response(body, {
+      status: 200,
+      headers: {
+        'Content-Type': fallbackRes.headers.get('content-type') || mimeTypeFromPath(safeRelativePath),
+        'Cache-Control': 'public, max-age=600',
+      },
+    });
+  } catch (error: any) {
+    return toJson({ error: error?.message || 'Failed to read OEM model file' }, 500);
   }
 }
 
@@ -1791,6 +2033,18 @@ export default {
 
       if (request.method === 'POST' && (path === '/admin/oem-library/sync' || path === '/api/admin/oem-library/sync')) {
         response = await handleOemLibrarySync(request, env);
+        return withCors(request, response, env);
+      }
+
+      if (request.method === 'GET' && (path === '/oem-library/index' || path === '/api/oem-library/index')) {
+        response = await handleOemLibraryIndex(request, env);
+        return withCors(request, response, env);
+      }
+
+      if (request.method === 'GET' && (path.startsWith('/oem-library/files/') || path.startsWith('/api/oem-library/files/'))) {
+        const prefix = path.startsWith('/api/oem-library/files/') ? '/api/oem-library/files/' : '/oem-library/files/';
+        const relativePath = path.slice(prefix.length);
+        response = await handleOemLibraryFile(request, env, relativePath);
         return withCors(request, response, env);
       }
 
