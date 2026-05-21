@@ -57,6 +57,12 @@ interface PendingUpload {
   sizeBytes: number;
 }
 
+interface DirectGithubSyncResult {
+  uploadedCount: number;
+  deletedCount: number;
+  indexUpdated: boolean;
+}
+
 function modelKey(companyId: string, modelId: string): string {
   return `${companyId}::${modelId}`;
 }
@@ -67,6 +73,62 @@ function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary);
+}
+
+const DIRECT_GITHUB_TOKEN_STORAGE_KEY = 'metamech_oem_github_token_v1';
+const DIRECT_GITHUB_OWNER = (import.meta.env.VITE_OEM_GITHUB_OWNER || 'saviosyl').trim();
+const DIRECT_GITHUB_REPO = (import.meta.env.VITE_OEM_GITHUB_REPO || 'MetaMech-Simulation-Studio').trim();
+const DIRECT_GITHUB_BRANCH = (import.meta.env.VITE_OEM_GITHUB_BRANCH || 'main').trim();
+const DIRECT_GITHUB_LIBRARY_PATH = (import.meta.env.VITE_OEM_GITHUB_PATH || 'oem-library').replace(/^\/+|\/+$/g, '');
+
+function sanitizeRepoRelativePath(rawPath: string): string | null {
+  const normalized = rawPath.replace(/\\/g, '/').trim().replace(/^\/+|\/+$/g, '');
+  if (!normalized || normalized.includes('..')) return null;
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length === 0) return null;
+  for (const segment of segments) {
+    if (!/^[a-zA-Z0-9._\- ]+$/.test(segment)) return null;
+  }
+  return segments.join('/');
+}
+
+function encodeRepoPath(path: string): string {
+  return path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+}
+
+function base64DecodedLength(base64Payload: string): number {
+  try {
+    return atob(base64Payload).length;
+  } catch {
+    return 0;
+  }
+}
+
+async function githubContentsRequest(
+  token: string,
+  method: 'GET' | 'PUT' | 'DELETE',
+  repoPath: string,
+  body?: Record<string, unknown>,
+): Promise<{ status: number; data: any }> {
+  const url = `https://api.github.com/repos/${encodeURIComponent(DIRECT_GITHUB_OWNER)}/${encodeURIComponent(DIRECT_GITHUB_REPO)}/contents/${encodeRepoPath(repoPath)}${method === 'GET' ? `?ref=${encodeURIComponent(DIRECT_GITHUB_BRANCH)}` : ''}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'User-Agent': 'metamech-oem-direct-sync',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let parsed: any = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = null;
+  }
+  return { status: res.status, data: parsed };
 }
 
 const PORT_COLOR: Record<'input' | 'output', string> = {
@@ -532,8 +594,137 @@ const OemAdminPage: React.FC = () => {
         const message = String(lastError?.response?.data?.error || lastError?.message || 'Route not found');
         const routeMissing = status === 404 || status === 405 || /route not found/i.test(message);
         if (routeMissing) {
+          try {
+            const directResult = await (async (): Promise<DirectGithubSyncResult | null> => {
+              if (!DIRECT_GITHUB_OWNER || !DIRECT_GITHUB_REPO || !DIRECT_GITHUB_BRANCH || !DIRECT_GITHUB_LIBRARY_PATH) {
+                return null;
+              }
+              let token = (localStorage.getItem(DIRECT_GITHUB_TOKEN_STORAGE_KEY) || '').trim();
+              if (!token) {
+                const prompted = window.prompt('Enter GitHub token (repo contents write access) to sync OEM library directly:');
+                token = (prompted || '').trim();
+                if (!token) return null;
+                localStorage.setItem(DIRECT_GITHUB_TOKEN_STORAGE_KEY, token);
+              }
+
+              const githubGetFileSha = async (repoPath: string): Promise<string | null> => {
+                const response = await githubContentsRequest(token, 'GET', repoPath);
+                if (response.status === 404) return null;
+                if (response.status === 401 || response.status === 403) {
+                  localStorage.removeItem(DIRECT_GITHUB_TOKEN_STORAGE_KEY);
+                  throw new Error('GitHub token is invalid or missing repository permissions');
+                }
+                if (response.status < 200 || response.status >= 300) {
+                  throw new Error(response.data?.message || `GitHub read failed (${response.status})`);
+                }
+                return String(response.data?.sha || '') || null;
+              };
+
+              const githubUpsertFile = async (repoPath: string, contentBase64: string, commitMessage: string): Promise<void> => {
+                const sha = await githubGetFileSha(repoPath);
+                const response = await githubContentsRequest(token, 'PUT', repoPath, {
+                  message: commitMessage,
+                  content: contentBase64,
+                  branch: DIRECT_GITHUB_BRANCH,
+                  ...(sha ? { sha } : {}),
+                });
+                if (response.status === 401 || response.status === 403) {
+                  localStorage.removeItem(DIRECT_GITHUB_TOKEN_STORAGE_KEY);
+                  throw new Error('GitHub token is invalid or missing repository permissions');
+                }
+                if (response.status < 200 || response.status >= 300) {
+                  throw new Error(response.data?.message || `GitHub upload failed (${response.status})`);
+                }
+              };
+
+              const githubDeleteFile = async (repoPath: string, commitMessage: string): Promise<boolean> => {
+                const sha = await githubGetFileSha(repoPath);
+                if (!sha) return false;
+                const response = await githubContentsRequest(token, 'DELETE', repoPath, {
+                  message: commitMessage,
+                  branch: DIRECT_GITHUB_BRANCH,
+                  sha,
+                });
+                if (response.status === 401 || response.status === 403) {
+                  localStorage.removeItem(DIRECT_GITHUB_TOKEN_STORAGE_KEY);
+                  throw new Error('GitHub token is invalid or missing repository permissions');
+                }
+                if (response.status < 200 || response.status >= 300) {
+                  throw new Error(response.data?.message || `GitHub delete failed (${response.status})`);
+                }
+                return true;
+              };
+
+              const uploadedPaths = new Set<string>();
+              const deletedPaths = new Set<string>();
+
+              for (const upload of payload.uploads) {
+                const company = payload.index.companies.find((entry) => entry.id === upload.companyId);
+                const model = company?.models.find((entry) => entry.id === upload.modelId);
+                if (!company || !model) continue;
+
+                const folderRaw = String(company.folder || company.id || company.name || '').trim();
+                const folder = sanitizeRepoRelativePath(folderRaw);
+                const modelFile = sanitizeRepoRelativePath(String(model.glbPath || ''));
+                if (!modelFile) throw new Error(`Model "${model.name || model.id}" is missing model path`);
+                const relativePath = folder ? `${folder}/${modelFile}` : modelFile;
+                const safeRelativePath = sanitizeRepoRelativePath(relativePath);
+                if (!safeRelativePath) throw new Error(`Invalid model file path for "${model.name || model.id}"`);
+
+                const rawBase64 = String(upload.contentBase64 || '').trim();
+                const base64Payload = rawBase64.includes(',') ? rawBase64.split(',').pop() || '' : rawBase64;
+                if (!base64Payload) throw new Error(`Upload payload is missing for "${model.name || model.id}"`);
+                if (base64DecodedLength(base64Payload) > 15 * 1024 * 1024) {
+                  throw new Error(`File "${modelFile}" exceeds 15MB limit`);
+                }
+
+                await githubUpsertFile(
+                  `${DIRECT_GITHUB_LIBRARY_PATH}/${safeRelativePath}`,
+                  base64Payload,
+                  `OEM Admin: upload ${safeRelativePath}`,
+                );
+                uploadedPaths.add(safeRelativePath);
+              }
+
+              for (const deletion of payload.deletions) {
+                const safeRelativePath = sanitizeRepoRelativePath(String(deletion || ''));
+                if (!safeRelativePath) continue;
+                if (uploadedPaths.has(safeRelativePath)) continue;
+                const deleted = await githubDeleteFile(
+                  `${DIRECT_GITHUB_LIBRARY_PATH}/${safeRelativePath}`,
+                  `OEM Admin: delete ${safeRelativePath}`,
+                );
+                if (deleted) deletedPaths.add(safeRelativePath);
+              }
+
+              const indexJson = JSON.stringify(payload.index, null, 2);
+              const indexBase64 = bytesToBase64(new TextEncoder().encode(indexJson));
+              await githubUpsertFile(
+                `${DIRECT_GITHUB_LIBRARY_PATH}/index.json`,
+                indexBase64,
+                'OEM Admin: update library index',
+              );
+
+              return {
+                uploadedCount: uploadedPaths.size,
+                deletedCount: deletedPaths.size,
+                indexUpdated: true,
+              };
+            })();
+
+            if (directResult) {
+              setPendingUploads([]);
+              setPendingDeletes([]);
+              setNotice(`Library synced (github-direct): index updated, uploads ${directResult.uploadedCount}, deletions ${directResult.deletedCount}.`);
+              return;
+            }
+          } catch (directError: any) {
+            saveLocalOemLibraryDraft(library);
+            setNotice(`Remote sync endpoint missing and direct GitHub sync failed: ${directError?.message || 'Unknown error'}. Draft saved locally.`);
+            return;
+          }
           saveLocalOemLibraryDraft(library);
-          setNotice('Remote sync endpoint is not deployed yet. Draft was saved locally in this browser.');
+          setNotice('Remote sync endpoint is not deployed yet. Enter a GitHub token in the sync prompt to save to server, or keep local draft.');
           return;
         }
         throw lastError || new Error('Route not found');
