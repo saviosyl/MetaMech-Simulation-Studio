@@ -527,7 +527,17 @@ const OemAdminPage: React.FC = () => {
           if (!isEndpointMissing) throw endpointError;
         }
       }
-      if (!res) throw lastError || new Error('Route not found');
+      if (!res) {
+        const status = Number(lastError?.response?.status || 0);
+        const message = String(lastError?.response?.data?.error || lastError?.message || 'Route not found');
+        const routeMissing = status === 404 || status === 405 || /route not found/i.test(message);
+        if (routeMissing) {
+          saveLocalOemLibraryDraft(library);
+          setNotice('Remote sync endpoint is not deployed yet. Draft was saved locally in this browser.');
+          return;
+        }
+        throw lastError || new Error('Route not found');
+      }
       const uploadedCount = Number(res?.data?.uploadedCount || 0);
       const deletedCount = Number(res?.data?.deletedCount || 0);
       const indexUpdated = !!res?.data?.indexUpdated;
