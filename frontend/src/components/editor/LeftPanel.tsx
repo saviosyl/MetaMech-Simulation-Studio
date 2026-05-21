@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
-import { Search, ChevronLeft, ChevronRight, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, ChevronDown, List, LayoutGrid, LayoutList, Package, Building, Users, Cpu, SquareStack, Factory, Shield } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { getModulesByCategory, ModuleDefinition, registerRuntimeModules } from '../../lib/moduleLibrary';
 import { getAssetManifest, registerRuntimeAssetDefs } from '../../lib/assetManifest';
@@ -44,6 +44,7 @@ const LeftPanel: React.FC = () => {
   const [viewMode, setViewMode] = useState<'library' | 'scene'>('library');
   const [searchQuery, setSearchQuery] = useState('');
   const [layout, setLayout] = useState<ViewLayout>('compact');
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +74,23 @@ const LeftPanel: React.FC = () => {
     modules.forEach(m => { const k = getSubcategory(m); if (!g[k]) g[k] = []; g[k].push(m); });
     return g;
   }, [modules]);
+
+  const sortedGroupedModules = useMemo(
+    () => Object.entries(groupedModules).sort(([a], [b]) => a.localeCompare(b)),
+    [groupedModules],
+  );
+
+  const groupKey = useCallback((group: string) => `${activeLibraryTab}:${group}`, [activeLibraryTab]);
+
+  const toggleGroupCollapsed = useCallback((group: string) => {
+    const key = groupKey(group);
+    setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, [groupKey]);
+
+  const isGroupCollapsed = useCallback(
+    (group: string) => !!collapsedGroups[groupKey(group)],
+    [collapsedGroups, groupKey],
+  );
 
   const handleDragStart = (e: React.DragEvent, module: ModuleDefinition) => {
     e.dataTransfer.setData('application/json', JSON.stringify({ type: 'module', moduleId: module.id, category: module.category }));
@@ -229,18 +247,37 @@ const LeftPanel: React.FC = () => {
                   </a>
                 </div>
               )}
-              {Object.entries(groupedModules).map(([group, items]) => (
+              {sortedGroupedModules.map(([group, items]) => (
                 <div key={group} style={{ marginBottom: 12, border: '1px solid var(--mm-border-subtle)', borderRadius: 10, background: 'var(--mm-bg-surface)', overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6, position: 'sticky', top: 0, background: 'var(--mm-bg-panel)', zIndex: 5, padding: '6px 8px', borderBottom: '1px solid var(--mm-border-subtle)' }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Orbitron', monospace" }}>
                       {group}
                     </span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-disabled)', padding: '1px 6px', borderRadius: 999, background: 'var(--mm-bg-panel-hover)' }}>
-                      {items.length}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--mm-text-disabled)', padding: '1px 6px', borderRadius: 999, background: 'var(--mm-bg-panel-hover)' }}>
+                        {items.length}
+                      </span>
+                      <button
+                        onClick={() => toggleGroupCollapsed(group)}
+                        style={{
+                          border: '1px solid var(--mm-border-subtle)',
+                          borderRadius: 6,
+                          background: 'var(--mm-bg-panel)',
+                          color: 'var(--mm-text-tertiary)',
+                          width: 22,
+                          height: 22,
+                          display: 'grid',
+                          placeItems: 'center',
+                          cursor: 'pointer',
+                        }}
+                        title={isGroupCollapsed(group) ? `Expand ${group}` : `Collapse ${group}`}
+                      >
+                        {isGroupCollapsed(group) ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                      </button>
+                    </div>
                   </div>
 
-                  {layout === 'grid' ? (
+                  {!isGroupCollapsed(group) && layout === 'grid' ? (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, padding: '0 8px 8px' }}>
                       {items.map(mod => {
                         const Icon = mod.icon;
@@ -262,7 +299,7 @@ const LeftPanel: React.FC = () => {
                         );
                       })}
                     </div>
-                  ) : (
+                  ) : !isGroupCollapsed(group) ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '0 6px 8px' }}>
                       {items.map(mod => {
                         const Icon = mod.icon;
@@ -281,6 +318,10 @@ const LeftPanel: React.FC = () => {
                           </div>
                         );
                       })}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '8px 10px', fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                      Collapsed
                     </div>
                   )}
                 </div>

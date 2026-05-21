@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
-import { Grid, OrbitControls } from '@react-three/drei';
-import { ArrowLeft, Building2, Download, Plus, Save, Trash2, Upload } from 'lucide-react';
+import { ContactShadows, Environment, Grid, OrbitControls } from '@react-three/drei';
+import { ArrowLeft, Building2, Download, Maximize2, Minimize2, Plus, Receipt, Save, Trash2, Upload, X } from 'lucide-react';
 import * as THREE from 'three';
 import { useAuth } from '../contexts/AuthContext';
 import { isOemAdminUser } from '../lib/adminAccess';
@@ -55,6 +55,15 @@ interface PendingUpload {
   sizeBytes: number;
 }
 
+interface BomRow {
+  key: string;
+  company: string;
+  model: string;
+  qty: number;
+  unitPrice: number;
+  total: number;
+}
+
 function modelKey(companyId: string, modelId: string): string {
   return `${companyId}::${modelId}`;
 }
@@ -65,6 +74,10 @@ function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary);
+}
+
+function toMoney(value: number): string {
+  return `$${value.toFixed(2)}`;
 }
 
 const PORT_COLOR: Record<'input' | 'output', string> = {
@@ -106,6 +119,29 @@ const InteractiveModelPreview: React.FC<{
     instance.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
+        const currentMaterial = mesh.material as THREE.Material | THREE.Material[] | undefined;
+        const boostMaterial = (material: THREE.Material): THREE.Material => {
+          if (material instanceof THREE.MeshStandardMaterial) {
+            material.metalness = Math.min(1, Math.max(0, material.metalness ?? 0.35));
+            material.roughness = Math.min(1, Math.max(0.12, material.roughness ?? 0.4));
+            material.envMapIntensity = 1.1;
+            return material;
+          }
+          const fallback = new THREE.MeshStandardMaterial({
+            color: (material as any)?.color || '#aab6c4',
+            metalness: 0.3,
+            roughness: 0.35,
+            envMapIntensity: 1.1,
+          });
+          return fallback;
+        };
+        if (Array.isArray(currentMaterial)) {
+          mesh.material = currentMaterial.map((material) => boostMaterial(material));
+        } else if (currentMaterial) {
+          mesh.material = boostMaterial(currentMaterial);
+        } else {
+          mesh.material = new THREE.MeshStandardMaterial({ color: '#aab6c4', metalness: 0.3, roughness: 0.35, envMapIntensity: 1.1 });
+        }
         mesh.castShadow = true;
         mesh.receiveShadow = true;
       }
@@ -160,6 +196,8 @@ const OemAdminPage: React.FC = () => {
   const [pendingDeletes, setPendingDeletes] = useState<string[]>([]);
   const [localPreviewUrls, setLocalPreviewUrls] = useState<Record<string, string>>({});
   const [syncingGithub, setSyncingGithub] = useState(false);
+  const [previewFullscreen, setPreviewFullscreen] = useState(false);
+  const [bomOpen, setBomOpen] = useState(false);
   const previewUrlsRef = useRef<Record<string, string>>({});
 
   const isAdmin = isOemAdminUser(user);
@@ -208,6 +246,29 @@ const OemAdminPage: React.FC = () => {
     if (localPreview) return localPreview;
     return resolveOemModelGlbUrl(selectedCompany, selectedModel);
   }, [selectedCompany, selectedModel, localPreviewUrls]);
+
+  const bomRows = useMemo<BomRow[]>(() => {
+    const rows: BomRow[] = [];
+    for (const company of library.companies) {
+      for (const model of company.models) {
+        const unitPrice = Number(model.priceUsd || 0);
+        rows.push({
+          key: `${company.id}:${model.id}`,
+          company: company.name,
+          model: model.name,
+          qty: 1,
+          unitPrice,
+          total: unitPrice,
+        });
+      }
+    }
+    return rows;
+  }, [library.companies]);
+
+  const bomGrandTotal = useMemo(
+    () => bomRows.reduce((sum, row) => sum + row.total, 0),
+    [bomRows],
+  );
 
   const updateCompany = (companyId: string, updater: (company: OemCompanyEntry) => OemCompanyEntry) => {
     setLibrary((prev) => ({
@@ -371,7 +432,7 @@ const OemAdminPage: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'oem-index.json';
+    link.download = 'oem-library-backup.oemlib';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -389,9 +450,9 @@ const OemAdminPage: React.FC = () => {
         setLibrary(parsed as OemLibraryIndex);
         setSelectedCompanyId(parsed.companies[0]?.id || '');
         setSelectedModelId(parsed.companies[0]?.models?.[0]?.id || '');
-        setNotice('Imported OEM index JSON.');
+        setNotice('Imported OEM library backup.');
       } catch {
-        setNotice('Failed to import JSON file.');
+        setNotice('Failed to import library backup file.');
       }
     };
     reader.readAsText(file);
@@ -467,6 +528,56 @@ const OemAdminPage: React.FC = () => {
     }
   };
 
+  const exportBomCsv = () => {
+    const header = ['Company', 'Model', 'Quantity', 'Unit Price USD', 'Total USD'];
+    const lines = bomRows.map((row) => [
+      row.company,
+      row.model,
+      String(row.qty),
+      row.unitPrice.toFixed(2),
+      row.total.toFixed(2),
+    ]);
+    lines.push(['', '', '', 'Grand Total', bomGrandTotal.toFixed(2)]);
+    const csv = [header, ...lines]
+      .map((cols) => cols.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'oem-bom.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const renderPreviewCanvas = () => (
+    <Canvas shadows camera={{ position: [3.4, 2.4, 3.6], fov: 45 }}>
+      <color attach="background" args={['#090d14']} />
+      <fog attach="fog" args={['#090d14', 10, 30]} />
+      <ambientLight intensity={0.3} />
+      <hemisphereLight args={['#d9f0ff', '#1f2937', 0.45]} />
+      <directionalLight position={[5, 8, 5]} intensity={1.5} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+      <directionalLight position={[-4, 4, -3]} intensity={0.55} />
+      <Environment preset="warehouse" />
+      <Grid args={[10, 10]} cellSize={0.5} cellThickness={0.4} sectionSize={2} sectionThickness={0.9} fadeDistance={28} fadeStrength={1} />
+      {selectedModel && previewUrl && (
+        <InteractiveModelPreview
+          modelUrl={previewUrl}
+          modelFormat={selectedModel.modelFormat}
+          defaultScale={selectedModel.defaultScale}
+          ports={selectedModel.connectionPorts || []}
+          addPortByClick={clickPortMode}
+          portTypeForClick={clickPortType}
+          onSurfacePick={addPortFromSurfacePick}
+        />
+      )}
+      <ContactShadows position={[0, -0.001, 0]} opacity={0.45} blur={2.8} far={8} />
+      <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+    </Canvas>
+  );
+
   if (loading || loadingLibrary) {
     return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>Loading OEM admin…</div>;
   }
@@ -497,6 +608,13 @@ const OemAdminPage: React.FC = () => {
           <strong>OEM 3D Model Admin</strong>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => setBomOpen((prev) => !prev)}
+            style={{ padding: '8px 10px', border: '1px solid var(--mm-border)', borderRadius: 8, background: bomOpen ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', color: bomOpen ? 'var(--mm-accent-primary)' : 'var(--mm-text-primary)', cursor: 'pointer' }}
+          >
+            <Receipt size={14} style={{ marginRight: 6 }} />
+            {bomOpen ? 'Hide BOM' : 'Show BOM'}
+          </button>
           <a href={OEM_LIBRARY_MANAGE_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', padding: '8px 10px', border: '1px solid var(--mm-border)', borderRadius: 8, color: 'var(--mm-text-primary)' }}>
             Open GitHub Folder
           </a>
@@ -513,7 +631,7 @@ const OemAdminPage: React.FC = () => {
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 420px', gap: 12, padding: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 460px', gap: 12, padding: 12, alignItems: 'start' }}>
         <aside style={{ border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <strong style={{ fontSize: 13 }}>OEM Companies</strong>
@@ -532,7 +650,7 @@ const OemAdminPage: React.FC = () => {
           ))}
         </aside>
 
-        <section style={{ border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 12 }}>
+        <section style={{ border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 12, maxHeight: 'calc(100vh - 92px)', overflowY: 'auto' }}>
           {!selectedCompany ? (
             <div style={{ color: 'var(--mm-text-tertiary)' }}>Create a company to begin.</div>
           ) : (
@@ -550,7 +668,7 @@ const OemAdminPage: React.FC = () => {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 10 }}>
-                <div style={{ maxHeight: 460, overflow: 'auto', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 6 }}>
+                <div style={{ maxHeight: 620, overflow: 'auto', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 6 }}>
                   {selectedCompany.models.map((model) => (
                     <div key={model.id} style={{ padding: 8, borderRadius: 6, marginBottom: 6, background: selectedModelId === model.id ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', border: '1px solid var(--mm-border-subtle)' }}>
                       <button onClick={() => setSelectedModelId(model.id)} style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
@@ -698,28 +816,19 @@ const OemAdminPage: React.FC = () => {
           )}
         </section>
 
-        <aside style={{ border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 10 }}>
-          <strong style={{ fontSize: 13 }}>3D Model Preview Editor</strong>
-          <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, overflow: 'hidden', height: 280 }}>
-            {previewUrl ? (
-              <Canvas shadows camera={{ position: [3, 2.2, 3], fov: 50 }}>
-                <ambientLight intensity={0.8} />
-                <directionalLight position={[5, 8, 5]} intensity={1.1} castShadow />
-                <Grid args={[8, 8]} cellSize={0.4} cellThickness={0.5} sectionSize={1.6} sectionThickness={1} fadeDistance={20} fadeStrength={1} />
-                {selectedModel && (
-                  <InteractiveModelPreview
-                    modelUrl={previewUrl}
-                    modelFormat={selectedModel.modelFormat}
-                    defaultScale={selectedModel.defaultScale}
-                    ports={selectedModel.connectionPorts || []}
-                    addPortByClick={clickPortMode}
-                    portTypeForClick={clickPortType}
-                    onSurfacePick={addPortFromSurfacePick}
-                  />
-                )}
-                <OrbitControls />
-              </Canvas>
-            ) : (
+        <aside style={{ border: '1px solid var(--mm-border)', borderRadius: 10, background: 'linear-gradient(180deg, rgba(15,23,42,0.85), rgba(2,6,23,0.88))', padding: 10, position: 'sticky', top: 10, maxHeight: 'calc(100vh - 92px)', overflow: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <strong style={{ fontSize: 13 }}>Premium 3D Preview</strong>
+            <button
+              onClick={() => setPreviewFullscreen(true)}
+              style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <Maximize2 size={13} />
+              Fullscreen
+            </button>
+          </div>
+          <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, overflow: 'hidden', height: 420 }}>
+            {previewUrl ? renderPreviewCanvas() : (
               <div style={{ padding: 10, color: 'var(--mm-text-tertiary)', fontSize: 12 }}>
                 Add <code>model path/URL</code> or import a local <code>.OBJ/.STEP/.GLB</code> file.
               </div>
@@ -728,19 +837,19 @@ const OemAdminPage: React.FC = () => {
 
           <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
             <button onClick={downloadIndexJson} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer' }}>
-              <Download size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Export JSON
+              <Download size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Export Library
             </button>
             <label style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer' }}>
-              <Upload size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Import JSON
-              <input type="file" accept=".json" onChange={importIndexJson} style={{ display: 'none' }} />
+              <Upload size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Import Library
+              <input type="file" accept=".json,.oemlib" onChange={importIndexJson} style={{ display: 'none' }} />
             </label>
             <button onClick={resetToGithub} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer' }}>
-              Reset to GitHub
+              Reset from GitHub
             </button>
           </div>
 
           <p style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 10, lineHeight: 1.5 }}>
-            Admin workflow: import OBJ/STEP/GLB, snap-click to place nodes on 3D geometry, save draft, export JSON, then commit updated <code>oem-library/index.json</code> and model files to GitHub.
+            Millimeter workflow active for imported CAD assets. Import OBJ/STEP/GLB, place nodes by clicking geometry, then sync updates directly to GitHub.
           </p>
           <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 6 }}>
             Pending GitHub changes: uploads <strong>{pendingUploads.length}</strong>, deletions <strong>{pendingDeletes.length}</strong>
@@ -748,6 +857,92 @@ const OemAdminPage: React.FC = () => {
           {notice && <div style={{ fontSize: 11, color: 'var(--mm-accent-primary)', marginTop: 8 }}>{notice}</div>}
         </aside>
       </div>
+
+      {bomOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            right: 18,
+            bottom: 18,
+            width: 430,
+            maxHeight: '64vh',
+            overflow: 'hidden',
+            borderRadius: 12,
+            border: '1px solid var(--mm-border)',
+            background: 'rgba(10,15,25,0.96)',
+            boxShadow: '0 18px 48px rgba(0,0,0,0.35)',
+            zIndex: 70,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderBottom: '1px solid var(--mm-border-subtle)' }}>
+            <strong style={{ fontSize: 12 }}>OEM Bill of Materials</strong>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button onClick={exportBomCsv} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', color: 'var(--mm-text-primary)', padding: '4px 8px', cursor: 'pointer', fontSize: 11 }}>
+                Export BOM
+              </button>
+              <button onClick={() => setBomOpen(false)} style={{ border: 'none', background: 'transparent', color: 'var(--mm-text-tertiary)', cursor: 'pointer' }}>
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+          <div style={{ overflow: 'auto', maxHeight: 'calc(64vh - 92px)', padding: '8px 10px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+              <thead>
+                <tr style={{ color: 'var(--mm-text-tertiary)' }}>
+                  <th style={{ textAlign: 'left', padding: '6px 4px' }}>Company</th>
+                  <th style={{ textAlign: 'left', padding: '6px 4px' }}>Model</th>
+                  <th style={{ textAlign: 'right', padding: '6px 4px' }}>Qty</th>
+                  <th style={{ textAlign: 'right', padding: '6px 4px' }}>Unit</th>
+                  <th style={{ textAlign: 'right', padding: '6px 4px' }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bomRows.map((row) => (
+                  <tr key={row.key} style={{ borderTop: '1px solid var(--mm-border-subtle)' }}>
+                    <td style={{ padding: '6px 4px' }}>{row.company}</td>
+                    <td style={{ padding: '6px 4px' }}>{row.model}</td>
+                    <td style={{ padding: '6px 4px', textAlign: 'right' }}>{row.qty}</td>
+                    <td style={{ padding: '6px 4px', textAlign: 'right' }}>{toMoney(row.unitPrice)}</td>
+                    <td style={{ padding: '6px 4px', textAlign: 'right', color: 'var(--mm-accent-primary)' }}>{toMoney(row.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ borderTop: '1px solid var(--mm-border-subtle)', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+            <span style={{ color: 'var(--mm-text-tertiary)' }}>Grand Total</span>
+            <strong style={{ color: 'var(--mm-accent-primary)' }}>{toMoney(bomGrandTotal)}</strong>
+          </div>
+        </div>
+      )}
+
+      {previewFullscreen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(2, 6, 23, 0.94)',
+            zIndex: 80,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid rgba(148,163,184,0.25)' }}>
+            <strong>Fullscreen OEM 3D Preview</strong>
+            <button onClick={() => setPreviewFullscreen(false)} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', color: 'var(--mm-text-primary)', padding: '6px 10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Minimize2 size={14} />
+              Exit Fullscreen
+            </button>
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            {previewUrl ? renderPreviewCanvas() : (
+              <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--mm-text-tertiary)' }}>
+                No model selected for preview.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

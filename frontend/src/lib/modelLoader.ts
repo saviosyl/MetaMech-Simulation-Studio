@@ -95,7 +95,22 @@ async function loadStepObject(url: string): Promise<THREE.Group> {
 export async function loadModelObject(url: string, explicitFormat?: string | null): Promise<THREE.Object3D> {
   const format = inferModelFormat(url, explicitFormat);
   if (format === 'obj') {
-    return await new OBJLoader().loadAsync(url);
+    const obj = await new OBJLoader().loadAsync(url);
+    // OEM OBJ imports are treated as millimeters; scene units are meters.
+    obj.scale.setScalar(0.001);
+    obj.traverse((child) => {
+      if (!(child as THREE.Mesh).isMesh) return;
+      const mesh = child as THREE.Mesh;
+      const baseColor = (mesh.material as any)?.color || new THREE.Color('#a3adb8');
+      mesh.material = new THREE.MeshStandardMaterial({
+        color: baseColor,
+        metalness: 0.28,
+        roughness: 0.45,
+      });
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    });
+    return obj;
   }
   if (format === 'step') {
     return await loadStepObject(url);
