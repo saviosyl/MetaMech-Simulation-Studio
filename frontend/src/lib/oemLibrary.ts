@@ -70,6 +70,10 @@ function githubRawUrl(path: string): string {
   return `https://raw.githubusercontent.com/${encodeURIComponent(OWNER)}/${encodeURIComponent(REPO)}/${encodeURIComponent(BRANCH)}/${encodedPath}`;
 }
 
+function encodePathSegments(path: string): string {
+  return path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+}
+
 function joinUrl(base: string, path: string): string {
   const normalizedBase = base.replace(/\/+$/, '');
   return `${normalizedBase}${path.startsWith('/') ? path : `/${path}`}`;
@@ -85,6 +89,14 @@ function cloudApiCandidates(path: string): string[] {
     candidates.push(`https://api.metamechsolutions.com/api${path.startsWith('/') ? path : `/${path}`}`);
   }
   return Array.from(new Set(candidates));
+}
+
+function cloudFileUrl(relativePath: string): string {
+  const encodedRelativePath = encodePathSegments(relativePath);
+  const path = `/oem-library/files/${encodedRelativePath}`;
+  const candidates = cloudApiCandidates(path);
+  const preferred = candidates.find((entry) => entry.includes('api.metamechsolutions.com'));
+  return preferred || candidates[0];
 }
 
 function toPlacementCategory(value: unknown): PlacementCategory {
@@ -133,6 +145,10 @@ export function resolveOemModelGlbUrl(company: OemCompanyEntry, model: OemModelE
   if (typeof model.glbUrl === 'string' && model.glbUrl.trim()) return model.glbUrl.trim();
   const relativePath = resolveOemModelRepoRelativePath(company, model);
   if (!relativePath) return null;
+  // Cloudflare OEM storage is the primary source for model binaries.
+  // Fall back to GitHub raw only if a cloud file URL cannot be formed.
+  const cloudUrl = cloudFileUrl(relativePath);
+  if (cloudUrl) return cloudUrl;
   const path = `${LIBRARY_PATH}/${relativePath}`;
   return githubRawUrl(path);
 }
@@ -213,10 +229,48 @@ function normalizeLibrary(data: unknown): OemLibraryIndex {
 
 function mergeLibraries(base: OemLibraryIndex, override: OemLibraryIndex | null): OemLibraryIndex {
   if (!override || !Array.isArray(override.companies) || override.companies.length === 0) return base;
-  const byId = new Map<string, OemCompanyEntry>();
-  for (const company of base.companies) byId.set(company.id, company);
-  for (const company of override.companies) byId.set(company.id, company);
-  return { companies: Array.from(byId.values()) };
+  const baseByCompanyId = new Map<string, OemCompanyEntry>();
+  for (const company of base.companies) baseByCompanyId.set(company.id, company);
+
+  const mergedCompanies: OemCompanyEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const overrideCompany of override.companies) {
+    const baseCompany = baseByCompanyId.get(overrideCompany.id);
+    if (!baseCompany) {
+      mergedCompanies.push(overrideCompany);
+      seen.add(overrideCompany.id);
+      continue;
+    }
+
+    const baseModelsById = new Map<string, OemModelEntry>();
+    for (const model of baseCompany.models) baseModelsById.set(model.id, model);
+
+    const mergedModels: OemModelEntry[] = overrideCompany.models.map((overrideModel) => {
+      const baseModel = baseModelsById.get(overrideModel.id);
+      return {
+        ...baseModel,
+        ...overrideModel,
+        // Keep server-resolved URL when local draft omitted one.
+        glbUrl: (overrideModel.glbUrl && overrideModel.glbUrl.trim())
+          ? overrideModel.glbUrl
+          : (baseModel?.glbUrl || overrideModel.glbUrl),
+      };
+    });
+
+    mergedCompanies.push({
+      ...baseCompany,
+      ...overrideCompany,
+      models: mergedModels,
+    });
+    seen.add(overrideCompany.id);
+  }
+
+  for (const baseCompany of base.companies) {
+    if (!seen.has(baseCompany.id)) mergedCompanies.push(baseCompany);
+  }
+
+  return { companies: mergedCompanies };
 }
 
 function toConnectionPortsForAsset(ports: OemConnectionPortInput[] | undefined): ConnectionPortDef[] | undefined {

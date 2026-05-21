@@ -595,6 +595,19 @@ const OemAdminPage: React.FC = () => {
       });
       setPendingUploads([]);
       setPendingDeletes([]);
+      // A successful server sync means remote is source-of-truth.
+      // Clear old local draft so stale URLs/paths do not override main app rendering.
+      clearLocalOemLibraryDraft();
+      const refreshedRemote = await fetchOemLibraryIndex();
+      setRemoteLibrary(refreshedRemote);
+      setLibrary(refreshedRemote);
+      const selectedCompanyAfterSync = refreshedRemote.companies.find((company) => company.id === selectedCompanyId);
+      if (!selectedCompanyAfterSync) {
+        setSelectedCompanyId(refreshedRemote.companies[0]?.id || '');
+        setSelectedModelId(refreshedRemote.companies[0]?.models?.[0]?.id || '');
+      } else if (!selectedCompanyAfterSync.models.find((model) => model.id === selectedModelId)) {
+        setSelectedModelId(selectedCompanyAfterSync.models[0]?.id || '');
+      }
       setNotice(`Library synced (${backend}): index ${indexUpdated ? 'updated' : 'unchanged'}, uploads ${uploadedCount}, deletions ${deletedCount}.`);
     } catch (error: any) {
       const message = error?.response?.data?.error || error?.message || 'Library sync failed';
