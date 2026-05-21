@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Play, Pause, Square, Save, Download, Upload, Video,
   ArrowLeft, Undo2, Redo2, Check, AlertCircle,
-  Loader2, HelpCircle, Sun, Moon, Maximize2, Film, LifeBuoy,
+  Loader2, HelpCircle, Sun, Moon, Maximize2, Film, LifeBuoy, Receipt,
 } from 'lucide-react';
 import * as THREE from 'three';
 import { useEditorStore } from '../../store/editorStore';
@@ -27,6 +27,8 @@ interface TopBarProps {
   saveStatus: SaveStatus;
   onSave: () => void;
   onOpenHelpSupport: () => void;
+  bomOpen: boolean;
+  onToggleBom: () => void;
 }
 
 // ─── Styles ───
@@ -116,7 +118,7 @@ const S = {
   } as React.CSSProperties,
 };
 
-const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus, onSave, onOpenHelpSupport }) => {
+const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus, onSave, onOpenHelpSupport, bomOpen, onToggleBom }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -523,6 +525,7 @@ const TopBar: React.FC<TopBarProps> = ({ projectName, setProjectName, saveStatus
         <div style={S.strip}>
           <button onClick={handleImport} style={S.iconBtn()} title="Import Project"><Upload size={14} /></button>
           <button onClick={handleExport} style={S.iconBtn()} title="Export Project"><Download size={14} /></button>
+          <button onClick={onToggleBom} style={S.iconBtn(bomOpen)} title="Toggle Simulation BOM"><Receipt size={14} /></button>
           <button onClick={() => setShowAIBuilder(true)} style={{ ...S.iconBtn(), width: 38, color: 'var(--mm-accent-primary)', fontWeight: 700, fontSize: 10 }} title="AI Layout Builder">AI</button>
         </div>
 

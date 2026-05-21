@@ -38,6 +38,13 @@ function getSubcategory(module: ModuleDefinition): string {
   return 'Other';
 }
 
+function formatModulePrice(module: ModuleDefinition): string | null {
+  if (typeof module.priceUsd !== 'number' || !Number.isFinite(module.priceUsd)) return null;
+  const currency = module.priceCurrency || 'EUR';
+  const symbol = currency === 'USD' ? '$' : currency === 'INR' ? '₹' : '€';
+  return `${symbol}${module.priceUsd.toFixed(2)} ${currency}`;
+}
+
 const LeftPanel: React.FC = () => {
   const { activeLibraryTab, setActiveLibraryTab, leftPanelWidth, setLeftPanelWidth, leftPanelCollapsed, setLeftPanelCollapsed, setAssetManifest } = useEditorStore();
   const isResizing = useRef(false);
@@ -290,9 +297,9 @@ const LeftPanel: React.FC = () => {
                               <Icon size={14} style={{ color: 'var(--mm-accent-primary)' }} />
                             </div>
                             <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--mm-text-primary)', lineHeight: 1.3 }}>{mod.name}</div>
-                            {typeof mod.priceUsd === 'number' && (
+                            {formatModulePrice(mod) && (
                               <div style={{ marginTop: 4, fontSize: 10, color: 'var(--mm-accent-primary)', fontWeight: 600 }}>
-                                ${mod.priceUsd.toFixed(2)}
+                                {formatModulePrice(mod)}
                               </div>
                             )}
                           </div>
@@ -312,8 +319,8 @@ const LeftPanel: React.FC = () => {
                               <Icon size={13} style={{ color: 'var(--mm-accent-primary)' }} />
                             </div>
                             <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--mm-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mod.name}</span>
-                            {typeof mod.priceUsd === 'number' && (
-                              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-accent-primary)' }}>${mod.priceUsd.toFixed(2)}</span>
+                            {formatModulePrice(mod) && (
+                              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--mm-accent-primary)' }}>{formatModulePrice(mod)}</span>
                             )}
                           </div>
                         );

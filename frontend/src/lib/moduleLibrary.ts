@@ -27,6 +27,7 @@ export interface ModuleDefinition {
   placementCategory?: 'process' | 'environment' | 'actors';
   oemCompany?: string;
   priceUsd?: number;
+  priceCurrency?: 'EUR' | 'USD' | 'INR';
   parameters: {
     [key: string]: {
       type: 'number' | 'string' | 'text' | 'select' | 'boolean' | 'color';

@@ -10,6 +10,7 @@ import Viewport from '../components/editor/Viewport';
 import ContextMenu from '../components/editor/ContextMenu';
 import BottomPanel from '../components/editor/BottomPanel';
 import ShortcutsPanel from '../components/editor/ShortcutsPanel';
+import SimulationBomPanel from '../components/editor/SimulationBomPanel';
 import { takePendingFrameAssemblyExport } from '../lib/frameDesigner/sceneInterop';
 import HelpSupportModal from '../components/editor/HelpSupportModal';
 import OnboardingTour from '../components/editor/OnboardingTour';
@@ -25,6 +26,7 @@ const EditorPage: React.FC = () => {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; objectId: string | null; objectType: 'process' | 'environment' | 'actor' | null } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
+  const [bomOpen, setBomOpen] = useState(false);
   const lastChangeRef = useRef(0);
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -288,6 +290,8 @@ const EditorPage: React.FC = () => {
           saveStatus={saveStatus}
           onSave={handleSave}
           onOpenHelpSupport={() => setHelpOpen(true)}
+          bomOpen={bomOpen}
+          onToggleBom={() => setBomOpen((prev) => !prev)}
         />
       )}
       <div className="flex-1 flex overflow-hidden min-h-0" style={{ borderTop: presentationMode ? 'none' : '1px solid var(--mm-border-subtle)' }}>
@@ -348,6 +352,9 @@ const EditorPage: React.FC = () => {
       )}
 
       {!presentationMode && <ShortcutsPanel />}
+      {!presentationMode && (
+        <SimulationBomPanel open={bomOpen} onClose={() => setBomOpen(false)} />
+      )}
       {!presentationMode && (
         <>
           <HelpSupportModal

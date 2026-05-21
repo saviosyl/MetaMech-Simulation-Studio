@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
-import { ContactShadows, Environment, Grid, OrbitControls } from '@react-three/drei';
-import { ArrowLeft, Building2, Download, Maximize2, Minimize2, Plus, Receipt, Save, Trash2, Upload, X } from 'lucide-react';
+import { Bounds, ContactShadows, Environment, Grid, OrbitControls } from '@react-three/drei';
+import { ArrowLeft, Building2, Download, Maximize2, Minimize2, Plus, Save, Trash2, Upload } from 'lucide-react';
 import * as THREE from 'three';
 import { useAuth } from '../contexts/AuthContext';
 import { isOemAdminUser } from '../lib/adminAccess';
@@ -12,6 +12,7 @@ import {
   getLocalOemLibraryDraft,
   OEM_LIBRARY_MANAGE_URL,
   OemCompanyEntry,
+  OemCurrency,
   OemConnectionPortInput,
   OemLibraryIndex,
   OemModelFormat,
@@ -44,6 +45,7 @@ function defaultModel(_companyId: string, modelName = 'New OEM Model'): OemModel
     thumbnailUrl: '',
     defaultScale: [1, 1, 1],
     priceUsd: 0,
+    priceCurrency: 'EUR',
     connectionPorts: [],
   };
 }
@@ -53,20 +55,6 @@ interface PendingUpload {
   modelId: string;
   contentBase64: string;
   sizeBytes: number;
-}
-
-interface BomRow {
-  key: string;
-  company: string;
-  model: string;
-  qty: number;
-  unitPrice: number;
-  total: number;
-}
-
-interface BomPosition {
-  x: number;
-  y: number;
 }
 
 function modelKey(companyId: string, modelId: string): string {
@@ -79,10 +67,6 @@ function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary);
-}
-
-function toMoney(value: number): string {
-  return `$${value.toFixed(2)}`;
 }
 
 const PORT_COLOR: Record<'input' | 'output', string> = {
@@ -202,11 +186,7 @@ const OemAdminPage: React.FC = () => {
   const [localPreviewUrls, setLocalPreviewUrls] = useState<Record<string, string>>({});
   const [syncingGithub, setSyncingGithub] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
-  const [bomOpen, setBomOpen] = useState(false);
-  const [bomQuantities, setBomQuantities] = useState<Record<string, number>>({});
-  const [bomPosition, setBomPosition] = useState<BomPosition | null>(null);
   const previewUrlsRef = useRef<Record<string, string>>({});
-  const bomDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
 
   const isAdmin = isOemAdminUser(user);
 
@@ -237,26 +217,6 @@ const OemAdminPage: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const validKeys = new Set(
-      library.companies.flatMap((company) => company.models.map((model) => `${company.id}:${model.id}`)),
-    );
-    setBomQuantities((prev) => {
-      const next: Record<string, number> = {};
-      for (const [key, value] of Object.entries(prev)) {
-        if (validKeys.has(key)) next[key] = value;
-      }
-      return next;
-    });
-  }, [library.companies]);
-
-  useEffect(() => {
-    if (!bomOpen || bomPosition) return;
-    const x = Math.max(12, window.innerWidth - 460);
-    const y = Math.max(12, window.innerHeight - 430);
-    setBomPosition({ x, y });
-  }, [bomOpen, bomPosition]);
-
   const selectedCompany = useMemo(
     () => library.companies.find((company) => company.id === selectedCompanyId) || null,
     [library, selectedCompanyId],
@@ -275,65 +235,6 @@ const OemAdminPage: React.FC = () => {
     return resolveOemModelGlbUrl(selectedCompany, selectedModel);
   }, [selectedCompany, selectedModel, localPreviewUrls]);
 
-  const bomRows = useMemo<BomRow[]>(() => {
-    const rows: BomRow[] = [];
-    for (const company of library.companies) {
-      for (const model of company.models) {
-        const unitPrice = Number(model.priceUsd || 0);
-        const key = `${company.id}:${model.id}`;
-        const qtyRaw = bomQuantities[key];
-        const qty = Number.isFinite(qtyRaw) ? Math.max(0, Math.floor(qtyRaw)) : 1;
-        rows.push({
-          key,
-          company: company.name,
-          model: model.name,
-          qty,
-          unitPrice,
-          total: unitPrice * qty,
-        });
-      }
-    }
-    return rows;
-  }, [library.companies, bomQuantities]);
-
-  const bomGrandTotal = useMemo(
-    () => bomRows.reduce((sum, row) => sum + row.total, 0),
-    [bomRows],
-  );
-
-  const setBomQuantity = (rowKey: string, nextQty: number) => {
-    const qty = Number.isFinite(nextQty) ? Math.max(0, Math.floor(nextQty)) : 0;
-    setBomQuantities((prev) => ({ ...prev, [rowKey]: qty }));
-  };
-
-  const beginBomDrag = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!bomPosition) return;
-    bomDragRef.current = {
-      offsetX: event.clientX - bomPosition.x,
-      offsetY: event.clientY - bomPosition.y,
-    };
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      if (!bomDragRef.current) return;
-      const width = 430;
-      const height = 420;
-      const x = Math.min(
-        Math.max(8, moveEvent.clientX - bomDragRef.current.offsetX),
-        Math.max(8, window.innerWidth - width - 8),
-      );
-      const y = Math.min(
-        Math.max(8, moveEvent.clientY - bomDragRef.current.offsetY),
-        Math.max(8, window.innerHeight - height - 8),
-      );
-      setBomPosition({ x, y });
-    };
-    const onMouseUp = () => {
-      bomDragRef.current = null;
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-  };
 
   const updateCompany = (companyId: string, updater: (company: OemCompanyEntry) => OemCompanyEntry) => {
     setLibrary((prev) => ({
@@ -593,30 +494,6 @@ const OemAdminPage: React.FC = () => {
     }
   };
 
-  const exportBomCsv = () => {
-    const header = ['Company', 'Model', 'Quantity', 'Unit Price USD', 'Total USD'];
-    const lines = bomRows.map((row) => [
-      row.company,
-      row.model,
-      String(row.qty),
-      row.unitPrice.toFixed(2),
-      row.total.toFixed(2),
-    ]);
-    lines.push(['', '', '', 'Grand Total', bomGrandTotal.toFixed(2)]);
-    const csv = [header, ...lines]
-      .map((cols) => cols.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'oem-bom.csv';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
   const renderPreviewCanvas = () => (
     <Canvas shadows camera={{ position: [3.4, 2.4, 3.6], fov: 45 }}>
       <color attach="background" args={['#090d14']} />
@@ -628,15 +505,17 @@ const OemAdminPage: React.FC = () => {
       <Environment preset="warehouse" />
       <Grid args={[10, 10]} cellSize={0.5} cellThickness={0.4} sectionSize={2} sectionThickness={0.9} fadeDistance={28} fadeStrength={1} />
       {selectedModel && previewUrl && (
-        <InteractiveModelPreview
-          modelUrl={previewUrl}
-          modelFormat={selectedModel.modelFormat}
-          defaultScale={selectedModel.defaultScale}
-          ports={selectedModel.connectionPorts || []}
-          addPortByClick={clickPortMode}
-          portTypeForClick={clickPortType}
-          onSurfacePick={addPortFromSurfacePick}
-        />
+        <Bounds fit clip observe margin={1.2}>
+          <InteractiveModelPreview
+            modelUrl={previewUrl}
+            modelFormat={selectedModel.modelFormat}
+            defaultScale={selectedModel.defaultScale}
+            ports={selectedModel.connectionPorts || []}
+            addPortByClick={clickPortMode}
+            portTypeForClick={clickPortType}
+            onSurfacePick={addPortFromSurfacePick}
+          />
+        </Bounds>
       )}
       <ContactShadows position={[0, -0.001, 0]} opacity={0.45} blur={2.8} far={8} />
       <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
@@ -673,13 +552,6 @@ const OemAdminPage: React.FC = () => {
           <strong>OEM 3D Model Admin</strong>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => setBomOpen((prev) => !prev)}
-            style={{ padding: '8px 10px', border: '1px solid var(--mm-border)', borderRadius: 8, background: bomOpen ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', color: bomOpen ? 'var(--mm-accent-primary)' : 'var(--mm-text-primary)', cursor: 'pointer' }}
-          >
-            <Receipt size={14} style={{ marginRight: 6 }} />
-            {bomOpen ? 'Hide BOM' : 'Show BOM'}
-          </button>
           <a href={OEM_LIBRARY_MANAGE_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', padding: '8px 10px', border: '1px solid var(--mm-border)', borderRadius: 8, color: 'var(--mm-text-primary)' }}>
             Open GitHub Folder
           </a>
@@ -777,13 +649,21 @@ const OemAdminPage: React.FC = () => {
                     />
                     <input value={selectedModel.name} onChange={(e) => updateSelectedModel((model) => ({ ...model, name: e.target.value }))} placeholder="Model Name" />
                     <textarea value={selectedModel.description || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, description: e.target.value }))} placeholder="Description" rows={2} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 8 }}>
                       <select value={selectedModel.placementCategory || 'environment'} onChange={(e) => updateSelectedModel((model) => ({ ...model, placementCategory: e.target.value as any }))}>
                         <option value="environment">Environment placement</option>
                         <option value="process">Process placement</option>
                         <option value="actors">Actors placement</option>
                       </select>
-                      <input type="number" min={0} step={0.01} value={selectedModel.priceUsd ?? 0} onChange={(e) => updateSelectedModel((model) => ({ ...model, priceUsd: Number(e.target.value) }))} placeholder="Price USD" />
+                      <input type="number" min={0} step={0.01} value={selectedModel.priceUsd ?? 0} onChange={(e) => updateSelectedModel((model) => ({ ...model, priceUsd: Number(e.target.value) }))} placeholder="Unit Price" />
+                      <select
+                        value={(selectedModel.priceCurrency || 'EUR') as OemCurrency}
+                        onChange={(e) => updateSelectedModel((model) => ({ ...model, priceCurrency: e.target.value as OemCurrency }))}
+                      >
+                        <option value="EUR">EUR</option>
+                        <option value="USD">USD</option>
+                        <option value="INR">INR</option>
+                      </select>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <select value={selectedModel.modelFormat || 'glb'} onChange={(e) => updateSelectedModel((model) => ({ ...model, modelFormat: e.target.value as OemModelFormat }))}>
@@ -922,85 +802,6 @@ const OemAdminPage: React.FC = () => {
           {notice && <div style={{ fontSize: 11, color: 'var(--mm-accent-primary)', marginTop: 8 }}>{notice}</div>}
         </aside>
       </div>
-
-      {bomOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            left: bomPosition?.x ?? 18,
-            top: bomPosition?.y ?? 18,
-            width: 430,
-            maxHeight: '64vh',
-            overflow: 'hidden',
-            borderRadius: 12,
-            border: '1px solid var(--mm-border)',
-            background: 'rgba(10,15,25,0.96)',
-            boxShadow: '0 18px 48px rgba(0,0,0,0.35)',
-            zIndex: 70,
-          }}
-        >
-          <div
-            onMouseDown={beginBomDrag}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderBottom: '1px solid var(--mm-border-subtle)', cursor: 'move', userSelect: 'none' }}
-          >
-            <strong style={{ fontSize: 12 }}>OEM Bill of Materials</strong>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <button onMouseDown={(e) => e.stopPropagation()} onClick={exportBomCsv} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', color: 'var(--mm-text-primary)', padding: '4px 8px', cursor: 'pointer', fontSize: 11 }}>
-                Export BOM
-              </button>
-              <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setBomOpen(false)} style={{ border: 'none', background: 'transparent', color: 'var(--mm-text-tertiary)', cursor: 'pointer' }}>
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-          <div style={{ overflow: 'auto', maxHeight: 'calc(64vh - 92px)', padding: '8px 10px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-              <thead>
-                <tr style={{ color: 'var(--mm-text-tertiary)' }}>
-                  <th style={{ textAlign: 'left', padding: '6px 4px' }}>Company</th>
-                  <th style={{ textAlign: 'left', padding: '6px 4px' }}>Model</th>
-                  <th style={{ textAlign: 'right', padding: '6px 4px' }}>Qty</th>
-                  <th style={{ textAlign: 'right', padding: '6px 4px' }}>Unit</th>
-                  <th style={{ textAlign: 'right', padding: '6px 4px' }}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bomRows.map((row) => (
-                  <tr key={row.key} style={{ borderTop: '1px solid var(--mm-border-subtle)' }}>
-                    <td style={{ padding: '6px 4px' }}>{row.company}</td>
-                    <td style={{ padding: '6px 4px' }}>{row.model}</td>
-                    <td style={{ padding: '6px 4px', textAlign: 'right' }}>
-                      <input
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={row.qty}
-                        onChange={(e) => setBomQuantity(row.key, Number(e.target.value))}
-                        style={{
-                          width: 54,
-                          textAlign: 'right',
-                          borderRadius: 6,
-                          border: '1px solid var(--mm-border-subtle)',
-                          background: 'var(--mm-bg-surface)',
-                          color: 'var(--mm-text-primary)',
-                          padding: '2px 6px',
-                          fontSize: 11,
-                        }}
-                      />
-                    </td>
-                    <td style={{ padding: '6px 4px', textAlign: 'right' }}>{toMoney(row.unitPrice)}</td>
-                    <td style={{ padding: '6px 4px', textAlign: 'right', color: 'var(--mm-accent-primary)' }}>{toMoney(row.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ borderTop: '1px solid var(--mm-border-subtle)', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-            <span style={{ color: 'var(--mm-text-tertiary)' }}>Grand Total</span>
-            <strong style={{ color: 'var(--mm-accent-primary)' }}>{toMoney(bomGrandTotal)}</strong>
-          </div>
-        </div>
-      )}
 
       {previewFullscreen && (
         <div

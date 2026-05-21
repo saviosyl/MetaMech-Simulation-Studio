@@ -59,6 +59,7 @@ Worker configuration required:
           "thumbnailUrl": "thumbs/s7-station.png",
           "defaultScale": [1, 1, 1],
           "priceUsd": 1200,
+          "priceCurrency": "EUR",
           "connectionPorts": [
             { "id": "in-1", "type": "input", "localPosition": [-0.8, 0.6, 0] },
             { "id": "out-1", "type": "output", "localPosition": [0.8, 0.6, 0] }
@@ -78,8 +79,15 @@ Worker configuration required:
 
 ### priceUsd
 
-- Optional model price in USD.
-- Shown in the OEM tab card/list in the app.
+- Optional numeric unit price value.
+- Interpreted using `priceCurrency`.
+- Used for BOM costing in the main Simulation tool.
+
+### priceCurrency
+
+- Currency for `priceUsd` value.
+- Supported: `EUR`, `USD`, `INR`.
+- BOM in the Simulation tool can convert currencies using user-entered conversion rates.
 
 ### connectionPorts
 

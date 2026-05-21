@@ -4,6 +4,7 @@ import { ModuleDefinition } from './moduleLibrary';
 
 export type PlacementCategory = 'process' | 'environment' | 'actors';
 export type OemModelFormat = 'glb' | 'gltf' | 'obj' | 'step';
+export type OemCurrency = 'EUR' | 'USD' | 'INR';
 
 export interface OemConnectionPortInput {
   id: string;
@@ -22,6 +23,7 @@ export interface OemModelEntry {
   thumbnailUrl?: string;
   defaultScale?: [number, number, number];
   priceUsd?: number;
+  priceCurrency?: OemCurrency;
   connectionPorts?: OemConnectionPortInput[];
 }
 
@@ -86,6 +88,12 @@ function inferModelFormatFromPath(pathOrUrl: unknown): OemModelFormat {
   if (clean.endsWith('.step') || clean.endsWith('.stp') || clean.endsWith('.iges') || clean.endsWith('.igs')) return 'step';
   if (clean.endsWith('.gltf')) return 'gltf';
   return 'glb';
+}
+
+function toPriceCurrency(value: unknown): OemCurrency {
+  const normalized = typeof value === 'string' ? value.trim().toUpperCase() : '';
+  if (normalized === 'USD' || normalized === 'INR') return normalized;
+  return 'EUR';
 }
 
 function toAssetId(company: OemCompanyEntry, model: OemModelEntry): string {
@@ -166,6 +174,7 @@ function normalizeLibrary(data: unknown): OemLibraryIndex {
         priceUsd: typeof (m as any).priceUsd === 'number' && Number.isFinite((m as any).priceUsd)
           ? Math.max(0, (m as any).priceUsd)
           : undefined,
+        priceCurrency: toPriceCurrency((m as any).priceCurrency),
         connectionPorts: normalizePorts((m as any).connectionPorts),
       });
     }
@@ -225,7 +234,9 @@ function toRuntimeEntities(index: OemLibraryIndex): OemLibraryLoadResult {
       };
       assets.push(asset);
 
-      const priceLabel = typeof model.priceUsd === 'number' ? ` • $${model.priceUsd.toFixed(2)}` : '';
+      const priceLabel = typeof model.priceUsd === 'number'
+        ? ` • ${model.priceCurrency || 'EUR'} ${model.priceUsd.toFixed(2)}`
+        : '';
       modules.push({
         id: assetId,
         name: model.name,
@@ -236,6 +247,7 @@ function toRuntimeEntities(index: OemLibraryIndex): OemLibraryLoadResult {
         placementCategory,
         oemCompany: company.name,
         priceUsd: model.priceUsd,
+        priceCurrency: model.priceCurrency || 'EUR',
         parameters: {},
       });
     }
