@@ -57,6 +57,13 @@ interface PendingUpload {
   sizeBytes: number;
 }
 
+interface SyncHistoryEntry {
+  timestampIso: string;
+  uploadedCount: number;
+  deletedCount: number;
+  backend: string;
+}
+
 function modelKey(companyId: string, modelId: string): string {
   return `${companyId}::${modelId}`;
 }
@@ -67,6 +74,38 @@ function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary);
+}
+
+const OEM_SYNC_HISTORY_KEY = 'metamech_oem_sync_history_v1';
+
+function loadSyncHistory(): SyncHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(OEM_SYNC_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((entry) => entry && typeof entry === 'object')
+      .map((entry) => ({
+        timestampIso: String((entry as any).timestampIso || ''),
+        uploadedCount: Math.max(0, Number((entry as any).uploadedCount || 0)),
+        deletedCount: Math.max(0, Number((entry as any).deletedCount || 0)),
+        backend: String((entry as any).backend || 'remote'),
+      }))
+      .filter((entry) => entry.timestampIso);
+  } catch {
+    return [];
+  }
+}
+
+function saveSyncHistory(entries: SyncHistoryEntry[]): void {
+  localStorage.setItem(OEM_SYNC_HISTORY_KEY, JSON.stringify(entries));
+}
+
+function formatSyncTimestamp(timestampIso: string): string {
+  const date = new Date(timestampIso);
+  if (Number.isNaN(date.getTime())) return timestampIso;
+  return date.toLocaleString();
 }
 
 const PORT_COLOR: Record<'input' | 'output', string> = {
@@ -209,6 +248,7 @@ const OemAdminPage: React.FC = () => {
   const [localPreviewUrls, setLocalPreviewUrls] = useState<Record<string, string>>({});
   const [syncingGithub, setSyncingGithub] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
+  const [syncHistory, setSyncHistory] = useState<SyncHistoryEntry[]>(() => loadSyncHistory());
   const previewUrlsRef = useRef<Record<string, string>>({});
 
   const isAdmin = isOemAdminUser(user);
@@ -542,6 +582,17 @@ const OemAdminPage: React.FC = () => {
       const deletedCount = Number(res?.data?.deletedCount || 0);
       const indexUpdated = !!res?.data?.indexUpdated;
       const backend = String(res?.data?.backend || 'remote');
+      const historyEntry: SyncHistoryEntry = {
+        timestampIso: new Date().toISOString(),
+        uploadedCount,
+        deletedCount,
+        backend,
+      };
+      setSyncHistory((prev) => {
+        const next = [historyEntry, ...prev].slice(0, 12);
+        saveSyncHistory(next);
+        return next;
+      });
       setPendingUploads([]);
       setPendingDeletes([]);
       setNotice(`Library synced (${backend}): index ${indexUpdated ? 'updated' : 'unchanged'}, uploads ${uploadedCount}, deletions ${deletedCount}.`);
@@ -896,6 +947,22 @@ const OemAdminPage: React.FC = () => {
           </p>
           <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 6 }}>
             Pending changes: uploads <strong>{pendingUploads.length}</strong>, deletions <strong>{pendingDeletes.length}</strong>
+          </div>
+          <div style={{ marginTop: 10, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-primary)', marginBottom: 6 }}>Sync History</div>
+            {syncHistory.length === 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>No successful server sync yet.</div>
+            ) : (
+              <div style={{ display: 'grid', gap: 6 }}>
+                {syncHistory.map((entry, idx) => (
+                  <div key={`${entry.timestampIso}-${idx}`} style={{ fontSize: 10, color: 'var(--mm-text-secondary)', border: '1px solid var(--mm-border-subtle)', borderRadius: 6, padding: '5px 6px' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--mm-text-primary)' }}>{formatSyncTimestamp(entry.timestampIso)}</div>
+                    <div>Backend: <strong>{entry.backend}</strong></div>
+                    <div>Uploads: <strong>{entry.uploadedCount}</strong> • Deletions: <strong>{entry.deletedCount}</strong></div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           {notice && <div style={{ fontSize: 11, color: '#0f172a', marginTop: 8, fontWeight: 600 }}>{notice}</div>}
         </aside>
