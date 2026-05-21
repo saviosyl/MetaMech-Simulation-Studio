@@ -3,7 +3,7 @@ import { Search, ChevronLeft, ChevronRight, ChevronDown, List, LayoutGrid, Layou
 import { useEditorStore } from '../../store/editorStore';
 import { getModulesByCategory, ModuleDefinition, registerRuntimeModules } from '../../lib/moduleLibrary';
 import { getAssetManifest, registerRuntimeAssetDefs } from '../../lib/assetManifest';
-import { loadOemLibrary, OEM_LIBRARY_MANAGE_URL } from '../../lib/oemLibrary';
+import { loadOemLibrary } from '../../lib/oemLibrary';
 import SceneHierarchy from './SceneHierarchy';
 import PathPanel from './PathPanel';
 import CameraPathPanel from './CameraPathPanel';
@@ -242,15 +242,13 @@ const LeftPanel: React.FC = () => {
               {activeLibraryTab === 'oem' && (
                 <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--mm-border-subtle)', background: 'var(--mm-bg-surface)' }}>
                   <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)', marginBottom: 4 }}>
-                    OEM models are managed from GitHub folders by company.
+                    OEM models are managed from the in-app OEM Admin library.
                   </div>
                   <a
-                    href={OEM_LIBRARY_MANAGE_URL}
-                    target="_blank"
-                    rel="noreferrer"
+                    href="/oem-admin"
                     style={{ fontSize: 11, color: 'var(--mm-accent-primary)', textDecoration: 'none', fontWeight: 600 }}
                   >
-                    Manage OEM Library in GitHub
+                    Manage OEM Library
                   </a>
                 </div>
               )}
