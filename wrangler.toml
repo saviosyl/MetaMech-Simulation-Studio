@@ -18,13 +18,17 @@ GITHUB_OEM_OWNER = "saviosyl"
 GITHUB_OEM_REPO = "MetaMech-Simulation-Studio"
 GITHUB_OEM_BRANCH = "main"
 GITHUB_OEM_LIBRARY_PATH = "oem-library"
-OEM_LIBRARY_STORAGE_BACKEND = "d1"
+OEM_LIBRARY_STORAGE_BACKEND = "r2"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "metamech-api-db"
 database_id = "aeefbbf8-2f52-4391-be86-65b29c08fb93"
 migrations_dir = "cloudflare-worker/migrations"
+
+[[r2_buckets]]
+binding = "OEM_MODELS_BUCKET"
+bucket_name = "metamech-oem-models"
 
 [[routes]]
 pattern = "api.metamechsolutions.com/*"

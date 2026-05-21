@@ -22,6 +22,7 @@ type SubscriptionEntitlement = {
 
 type Env = {
   DB: D1Database;
+  OEM_MODELS_BUCKET?: R2Bucket;
   JWT_SECRET: string;
   ZEPTO_TOKEN?: string;
   ZEPTO_API_URL?: string;
@@ -739,7 +740,7 @@ type GithubOemPublicConfig = {
   libraryPath: string;
 };
 
-type OemStorageBackend = 'github' | 'd1';
+type OemStorageBackend = 'github' | 'd1' | 'r2';
 
 function sanitizeRelativeRepoPath(rawPath: string): string | null {
   const normalized = rawPath.replace(/\\/g, '/').trim().replace(/^\/+|\/+$/g, '');
@@ -763,7 +764,8 @@ function encodedPathSegments(path: string): string {
 function preferredOemStorageBackend(env: Env): OemStorageBackend {
   const configured = String(env.OEM_LIBRARY_STORAGE_BACKEND || '').trim().toLowerCase();
   if (configured === 'github') return 'github';
-  return 'd1';
+  if (configured === 'd1') return 'd1';
+  return 'r2';
 }
 
 function githubOemPublicConfig(env: Env): GithubOemPublicConfig | null {
@@ -808,16 +810,16 @@ async function ensureOemLibraryStorageTables(env: Env): Promise<void> {
     `CREATE TABLE IF NOT EXISTS oem_library_state (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       index_json TEXT NOT NULL,
-      storage_backend TEXT NOT NULL DEFAULT 'd1',
+      storage_backend TEXT NOT NULL DEFAULT 'r2',
       updated_by_email TEXT,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`
   ).run();
 
   await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS oem_library_objects (
+    `CREATE TABLE IF NOT EXISTS oem_library_file_metadata (
       path TEXT PRIMARY KEY,
-      content_base64 TEXT NOT NULL,
+      r2_key TEXT NOT NULL,
       content_type TEXT NOT NULL DEFAULT 'application/octet-stream',
       size_bytes INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -845,10 +847,10 @@ async function writeD1OemIndex(env: Env, index: unknown, updatedByEmail: string)
   await env.DB
     .prepare(
       `INSERT INTO oem_library_state (id, index_json, storage_backend, updated_by_email, updated_at)
-       VALUES (1, ?, 'd1', ?, CURRENT_TIMESTAMP)
+       VALUES (1, ?, 'r2', ?, CURRENT_TIMESTAMP)
        ON CONFLICT(id) DO UPDATE SET
          index_json = excluded.index_json,
-         storage_backend = 'd1',
+         storage_backend = 'r2',
          updated_by_email = excluded.updated_by_email,
          updated_at = CURRENT_TIMESTAMP`
     )
@@ -856,39 +858,69 @@ async function writeD1OemIndex(env: Env, index: unknown, updatedByEmail: string)
     .run();
 }
 
-async function upsertD1OemObject(env: Env, path: string, base64Content: string): Promise<void> {
+function oemR2KeyFromRelativePath(path: string): string {
+  return `oem/${path}`;
+}
+
+function decodeBase64ToBytes(base64Payload: string): Uint8Array {
+  const binary = atob(base64Payload);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function upsertR2OemObject(env: Env, path: string, base64Content: string): Promise<void> {
+  const bucket = env.OEM_MODELS_BUCKET;
+  if (!bucket) throw new Error('OEM R2 bucket is not configured');
+  const key = oemR2KeyFromRelativePath(path);
+  const bytes = decodeBase64ToBytes(base64Content);
+  await bucket.put(key, bytes, {
+    httpMetadata: { contentType: mimeTypeFromPath(path) },
+  });
+
   await ensureOemLibraryStorageTables(env);
   await env.DB
     .prepare(
-      `INSERT INTO oem_library_objects (path, content_base64, content_type, size_bytes, updated_at)
+      `INSERT INTO oem_library_file_metadata (path, r2_key, content_type, size_bytes, updated_at)
        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(path) DO UPDATE SET
-         content_base64 = excluded.content_base64,
+         r2_key = excluded.r2_key,
          content_type = excluded.content_type,
          size_bytes = excluded.size_bytes,
          updated_at = CURRENT_TIMESTAMP`
     )
-    .bind(path, base64Content, mimeTypeFromPath(path), base64DecodedLength(base64Content))
+    .bind(path, key, mimeTypeFromPath(path), bytes.length)
     .run();
 }
 
-async function deleteD1OemObject(env: Env, path: string): Promise<boolean> {
+async function deleteR2OemObject(env: Env, path: string): Promise<boolean> {
+  const bucket = env.OEM_MODELS_BUCKET;
+  if (!bucket) throw new Error('OEM R2 bucket is not configured');
+  const key = oemR2KeyFromRelativePath(path);
+  await bucket.delete(key);
   await ensureOemLibraryStorageTables(env);
   const result = await env.DB
-    .prepare('DELETE FROM oem_library_objects WHERE path = ?')
+    .prepare('DELETE FROM oem_library_file_metadata WHERE path = ?')
     .bind(path)
     .run();
   return Number(result.meta.changes || 0) > 0;
 }
 
-async function readD1OemObject(env: Env, path: string): Promise<{ content_base64: string; content_type: string } | null> {
+async function readR2OemObject(env: Env, path: string): Promise<{ body: ArrayBuffer; contentType: string } | null> {
+  const bucket = env.OEM_MODELS_BUCKET;
+  if (!bucket) throw new Error('OEM R2 bucket is not configured');
   await ensureOemLibraryStorageTables(env);
   const row = await env.DB
-    .prepare('SELECT content_base64, content_type FROM oem_library_objects WHERE path = ? LIMIT 1')
+    .prepare('SELECT r2_key, content_type FROM oem_library_file_metadata WHERE path = ? LIMIT 1')
     .bind(path)
-    .first<{ content_base64: string; content_type: string }>();
-  if (!row) return null;
-  return row;
+    .first<{ r2_key: string; content_type: string }>();
+  const key = String(row?.r2_key || oemR2KeyFromRelativePath(path));
+  const object = await bucket.get(key);
+  if (!object) return null;
+  return {
+    body: await object.arrayBuffer(),
+    contentType: row?.content_type || object.httpMetadata?.contentType || mimeTypeFromPath(path),
+  };
 }
 
 function githubOemConfig(env: Env): GithubOemConfig | null {
@@ -1052,7 +1084,7 @@ async function handleOemLibrarySync(request: Request, env: Env): Promise<Respons
           `OEM Admin: upload ${safeRelativePath} by ${user.email}`
         );
       } else {
-        await upsertD1OemObject(env, safeRelativePath, base64Payload);
+        await upsertR2OemObject(env, safeRelativePath, base64Payload);
       }
 
       uploadedPaths.add(safeRelativePath);
@@ -1072,7 +1104,7 @@ async function handleOemLibrarySync(request: Request, env: Env): Promise<Respons
         );
         if (deleted) deletedPaths.add(safeRelativePath);
       } else {
-        const deleted = await deleteD1OemObject(env, safeRelativePath);
+        const deleted = await deleteR2OemObject(env, safeRelativePath);
         if (deleted) deletedPaths.add(safeRelativePath);
       }
     }
@@ -1102,7 +1134,7 @@ async function handleOemLibrarySync(request: Request, env: Env): Promise<Respons
     await writeD1OemIndex(env, cloudIndex, user.email);
     return toJson({
       ok: true,
-      backend: 'cloudflare-d1',
+      backend: 'cloudflare-r2-d1',
       uploadedCount: uploadedPaths.size,
       deletedCount: deletedPaths.size,
       indexUpdated: true,
@@ -1116,7 +1148,7 @@ async function handleOemLibraryIndex(request: Request, env: Env): Promise<Respon
   try {
     const d1Index = await readD1OemIndex(env);
     if (d1Index?.index) {
-      return toJson({ index: d1Index.index, source: 'cloudflare-d1', updatedAt: d1Index.updatedAt });
+      return toJson({ index: d1Index.index, source: 'cloudflare-r2-d1', updatedAt: d1Index.updatedAt });
     }
 
     const github = githubOemPublicConfig(env);
@@ -1137,15 +1169,12 @@ async function handleOemLibraryFile(request: Request, env: Env, relativePathRaw:
   if (!safeRelativePath) return toJson({ error: 'Invalid OEM file path' }, 400);
 
   try {
-    const d1Object = await readD1OemObject(env, safeRelativePath);
-    if (d1Object?.content_base64) {
-      const binary = atob(d1Object.content_base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      return new Response(bytes, {
+    const r2Object = await readR2OemObject(env, safeRelativePath);
+    if (r2Object?.body) {
+      return new Response(r2Object.body, {
         status: 200,
         headers: {
-          'Content-Type': d1Object.content_type || mimeTypeFromPath(safeRelativePath),
+          'Content-Type': r2Object.contentType || mimeTypeFromPath(safeRelativePath),
           'Cache-Control': 'public, max-age=600',
         },
       });
