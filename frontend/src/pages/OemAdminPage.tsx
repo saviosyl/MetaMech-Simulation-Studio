@@ -64,6 +64,11 @@ interface BomRow {
   total: number;
 }
 
+interface BomPosition {
+  x: number;
+  y: number;
+}
+
 function modelKey(companyId: string, modelId: string): string {
   return `${companyId}::${modelId}`;
 }
@@ -198,7 +203,10 @@ const OemAdminPage: React.FC = () => {
   const [syncingGithub, setSyncingGithub] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [bomOpen, setBomOpen] = useState(false);
+  const [bomQuantities, setBomQuantities] = useState<Record<string, number>>({});
+  const [bomPosition, setBomPosition] = useState<BomPosition | null>(null);
   const previewUrlsRef = useRef<Record<string, string>>({});
+  const bomDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
 
   const isAdmin = isOemAdminUser(user);
 
@@ -229,6 +237,26 @@ const OemAdminPage: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const validKeys = new Set(
+      library.companies.flatMap((company) => company.models.map((model) => `${company.id}:${model.id}`)),
+    );
+    setBomQuantities((prev) => {
+      const next: Record<string, number> = {};
+      for (const [key, value] of Object.entries(prev)) {
+        if (validKeys.has(key)) next[key] = value;
+      }
+      return next;
+    });
+  }, [library.companies]);
+
+  useEffect(() => {
+    if (!bomOpen || bomPosition) return;
+    const x = Math.max(12, window.innerWidth - 460);
+    const y = Math.max(12, window.innerHeight - 430);
+    setBomPosition({ x, y });
+  }, [bomOpen, bomPosition]);
+
   const selectedCompany = useMemo(
     () => library.companies.find((company) => company.id === selectedCompanyId) || null,
     [library, selectedCompanyId],
@@ -252,23 +280,60 @@ const OemAdminPage: React.FC = () => {
     for (const company of library.companies) {
       for (const model of company.models) {
         const unitPrice = Number(model.priceUsd || 0);
+        const key = `${company.id}:${model.id}`;
+        const qtyRaw = bomQuantities[key];
+        const qty = Number.isFinite(qtyRaw) ? Math.max(0, Math.floor(qtyRaw)) : 1;
         rows.push({
-          key: `${company.id}:${model.id}`,
+          key,
           company: company.name,
           model: model.name,
-          qty: 1,
+          qty,
           unitPrice,
-          total: unitPrice,
+          total: unitPrice * qty,
         });
       }
     }
     return rows;
-  }, [library.companies]);
+  }, [library.companies, bomQuantities]);
 
   const bomGrandTotal = useMemo(
     () => bomRows.reduce((sum, row) => sum + row.total, 0),
     [bomRows],
   );
+
+  const setBomQuantity = (rowKey: string, nextQty: number) => {
+    const qty = Number.isFinite(nextQty) ? Math.max(0, Math.floor(nextQty)) : 0;
+    setBomQuantities((prev) => ({ ...prev, [rowKey]: qty }));
+  };
+
+  const beginBomDrag = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!bomPosition) return;
+    bomDragRef.current = {
+      offsetX: event.clientX - bomPosition.x,
+      offsetY: event.clientY - bomPosition.y,
+    };
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!bomDragRef.current) return;
+      const width = 430;
+      const height = 420;
+      const x = Math.min(
+        Math.max(8, moveEvent.clientX - bomDragRef.current.offsetX),
+        Math.max(8, window.innerWidth - width - 8),
+      );
+      const y = Math.min(
+        Math.max(8, moveEvent.clientY - bomDragRef.current.offsetY),
+        Math.max(8, window.innerHeight - height - 8),
+      );
+      setBomPosition({ x, y });
+    };
+    const onMouseUp = () => {
+      bomDragRef.current = null;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
 
   const updateCompany = (companyId: string, updater: (company: OemCompanyEntry) => OemCompanyEntry) => {
     setLibrary((prev) => ({
@@ -862,8 +927,8 @@ const OemAdminPage: React.FC = () => {
         <div
           style={{
             position: 'fixed',
-            right: 18,
-            bottom: 18,
+            left: bomPosition?.x ?? 18,
+            top: bomPosition?.y ?? 18,
             width: 430,
             maxHeight: '64vh',
             overflow: 'hidden',
@@ -874,13 +939,16 @@ const OemAdminPage: React.FC = () => {
             zIndex: 70,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderBottom: '1px solid var(--mm-border-subtle)' }}>
+          <div
+            onMouseDown={beginBomDrag}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderBottom: '1px solid var(--mm-border-subtle)', cursor: 'move', userSelect: 'none' }}
+          >
             <strong style={{ fontSize: 12 }}>OEM Bill of Materials</strong>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <button onClick={exportBomCsv} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', color: 'var(--mm-text-primary)', padding: '4px 8px', cursor: 'pointer', fontSize: 11 }}>
+              <button onMouseDown={(e) => e.stopPropagation()} onClick={exportBomCsv} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', color: 'var(--mm-text-primary)', padding: '4px 8px', cursor: 'pointer', fontSize: 11 }}>
                 Export BOM
               </button>
-              <button onClick={() => setBomOpen(false)} style={{ border: 'none', background: 'transparent', color: 'var(--mm-text-tertiary)', cursor: 'pointer' }}>
+              <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setBomOpen(false)} style={{ border: 'none', background: 'transparent', color: 'var(--mm-text-tertiary)', cursor: 'pointer' }}>
                 <X size={14} />
               </button>
             </div>
@@ -901,7 +969,25 @@ const OemAdminPage: React.FC = () => {
                   <tr key={row.key} style={{ borderTop: '1px solid var(--mm-border-subtle)' }}>
                     <td style={{ padding: '6px 4px' }}>{row.company}</td>
                     <td style={{ padding: '6px 4px' }}>{row.model}</td>
-                    <td style={{ padding: '6px 4px', textAlign: 'right' }}>{row.qty}</td>
+                    <td style={{ padding: '6px 4px', textAlign: 'right' }}>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={row.qty}
+                        onChange={(e) => setBomQuantity(row.key, Number(e.target.value))}
+                        style={{
+                          width: 54,
+                          textAlign: 'right',
+                          borderRadius: 6,
+                          border: '1px solid var(--mm-border-subtle)',
+                          background: 'var(--mm-bg-surface)',
+                          color: 'var(--mm-text-primary)',
+                          padding: '2px 6px',
+                          fontSize: 11,
+                        }}
+                      />
+                    </td>
                     <td style={{ padding: '6px 4px', textAlign: 'right' }}>{toMoney(row.unitPrice)}</td>
                     <td style={{ padding: '6px 4px', textAlign: 'right', color: 'var(--mm-accent-primary)' }}>{toMoney(row.total)}</td>
                   </tr>
