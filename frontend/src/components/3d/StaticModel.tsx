@@ -40,17 +40,22 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
       const maxDim = Math.max(preSize.x, preSize.y, preSize.z);
       const format = assetDef.sourceFormat || 'glb';
       const looksLikeMillimeters = Number.isFinite(maxDim) && maxDim > 80;
-      const likelyMmGlb = (format === 'glb' || format === 'gltf') && Number.isFinite(maxDim) && maxDim > 8;
+      const likelyMmGlb = (format === 'glb' || format === 'gltf') && Number.isFinite(maxDim) && maxDim > 25;
       if (looksLikeMillimeters || likelyMmGlb) {
         instance.scale.multiplyScalar(0.001);
       }
 
-      // Self-heal older entries that were accidentally downscaled too far.
-      const postBox = new THREE.Box3().setFromObject(instance);
-      const postSize = postBox.getSize(new THREE.Vector3());
-      const postMaxDim = Math.max(postSize.x, postSize.y, postSize.z);
-      if (Number.isFinite(postMaxDim) && postMaxDim > 0 && postMaxDim < 0.05) {
-        instance.scale.multiplyScalar(1000);
+      // Permanent OEM normalization guardrails:
+      // keep model sizes in a sensible visualization range in meters.
+      const normalizedBox = new THREE.Box3().setFromObject(instance);
+      const normalizedSize = normalizedBox.getSize(new THREE.Vector3());
+      const normalizedMaxDim = Math.max(normalizedSize.x, normalizedSize.y, normalizedSize.z);
+      if (Number.isFinite(normalizedMaxDim) && normalizedMaxDim > 0) {
+        if (normalizedMaxDim > 8) {
+          instance.scale.multiplyScalar(8 / normalizedMaxDim);
+        } else if (normalizedMaxDim < 0.02) {
+          instance.scale.multiplyScalar(0.02 / normalizedMaxDim);
+        }
       }
     }
 
