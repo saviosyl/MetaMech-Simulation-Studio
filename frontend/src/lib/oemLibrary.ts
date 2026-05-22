@@ -17,6 +17,7 @@ export interface OemModelEntry {
   name: string;
   description?: string;
   placementCategory?: PlacementCategory;
+  defaultRotationDeg?: [number, number, number];
   modelFormat?: OemModelFormat;
   glbPath?: string;
   glbUrl?: string;
@@ -199,6 +200,9 @@ function normalizeLibrary(data: unknown): OemLibraryIndex {
         name,
         description: typeof (m as any).description === 'string' ? (m as any).description : '',
         placementCategory: toPlacementCategory((m as any).placementCategory),
+        defaultRotationDeg: Array.isArray((m as any).defaultRotationDeg) && (m as any).defaultRotationDeg.length === 3
+          ? [(m as any).defaultRotationDeg[0], (m as any).defaultRotationDeg[1], (m as any).defaultRotationDeg[2]]
+          : undefined,
         modelFormat: (m as any).modelFormat ? toModelFormat((m as any).modelFormat) : inferredFormat,
         glbPath,
         glbUrl,
@@ -303,6 +307,13 @@ function toRuntimeEntities(index: OemLibraryIndex): OemLibraryLoadResult {
         sourceFormat: model.modelFormat,
         thumbnailUrl: model.thumbnailUrl || '',
         defaultScale: model.defaultScale,
+        defaultRotation: Array.isArray(model.defaultRotationDeg) && model.defaultRotationDeg.length === 3
+          ? [
+            (Number(model.defaultRotationDeg[0]) || 0) * Math.PI / 180,
+            (Number(model.defaultRotationDeg[1]) || 0) * Math.PI / 180,
+            (Number(model.defaultRotationDeg[2]) || 0) * Math.PI / 180,
+          ]
+          : undefined,
         connectionPorts: toConnectionPortsForAsset(model.connectionPorts),
       };
       assets.push(asset);

@@ -876,6 +876,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
       : getDefaultParameters(type);
+    const defaultRotation = (matchingAsset?.assetType === 'static' && Array.isArray((matchingAsset as any).defaultRotation))
+      ? [((matchingAsset as any).defaultRotation[0] || 0), ((matchingAsset as any).defaultRotation[1] || 0), ((matchingAsset as any).defaultRotation[2] || 0)] as [number, number, number]
+      : [0, 0, 0];
 
     // Auto-generate unique sensor tag
     if (type === 'sensor' && !defaultParams.sensorTag) {
@@ -899,7 +902,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       id: uuidv4(),
       type,
       position: [position[0], 0, position[2]], // Force Y=0 (on ground)
-      rotation: [0, 0, 0],
+      rotation: defaultRotation,
       scale: [1, 1, 1],
       parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
@@ -923,12 +926,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
       : getDefaultParameters(type);
+    const defaultRotation = (matchingAsset?.assetType === 'static' && Array.isArray((matchingAsset as any).defaultRotation))
+      ? [((matchingAsset as any).defaultRotation[0] || 0), ((matchingAsset as any).defaultRotation[1] || 0), ((matchingAsset as any).defaultRotation[2] || 0)] as [number, number, number]
+      : [0, 0, 0];
 
     const newAsset: EnvironmentAsset = {
       id: uuidv4(),
       type,
       position: [position[0], 0, position[2]], // Force Y=0
-      rotation: [0, 0, 0],
+      rotation: defaultRotation,
       scale: [1, 1, 1],
       parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
@@ -983,12 +989,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const defaultParams = isParametric
       ? { ...getDefaultParameters(type), ...(matchingAsset as ParametricAssetDef).defaults }
       : getDefaultParameters(type);
+    const defaultRotation = (matchingAsset?.assetType === 'static' && Array.isArray((matchingAsset as any).defaultRotation))
+      ? [((matchingAsset as any).defaultRotation[0] || 0), ((matchingAsset as any).defaultRotation[1] || 0), ((matchingAsset as any).defaultRotation[2] || 0)] as [number, number, number]
+      : [0, 0, 0];
 
     const newActor: Actor = {
       id: uuidv4(),
       type,
       position: [position[0], 0, position[2]],
-      rotation: [0, 0, 0],
+      rotation: defaultRotation,
       scale: [1, 1, 1],
       parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,

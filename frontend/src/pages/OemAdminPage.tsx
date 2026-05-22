@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
-import { Bounds, ContactShadows, Environment, Grid, OrbitControls } from '@react-three/drei';
+import { Bounds, ContactShadows, Environment, Grid, OrbitControls, TransformControls } from '@react-three/drei';
 import { ArrowLeft, Building2, Download, Maximize2, Minimize2, Plus, Save, Trash2, Upload } from 'lucide-react';
 import * as THREE from 'three';
 import { useAuth } from '../contexts/AuthContext';
@@ -39,6 +39,7 @@ function defaultModel(_companyId: string, modelName = 'New OEM Model'): OemModel
     name: modelName,
     description: '',
     placementCategory: 'environment',
+    defaultRotationDeg: [0, 0, 0],
     modelFormat: 'glb',
     glbPath: '',
     glbUrl: '',
@@ -117,13 +118,35 @@ const InteractiveModelPreview: React.FC<{
   modelUrl: string;
   modelFormat?: OemModelFormat;
   defaultScale?: [number, number, number];
+  placementRotationDeg?: [number, number, number];
   ports: OemConnectionPortInput[];
+  selectedPortIndex: number;
+  transformPortsEnabled: boolean;
   addPortByClick: boolean;
   portTypeForClick: 'input' | 'output';
+  onSelectPort: (index: number) => void;
+  onPortTransform: (index: number, localPos: [number, number, number]) => void;
+  onPlacementRotationChange: (rotationDeg: [number, number, number]) => void;
   onSurfacePick: (localPos: [number, number, number], type: 'input' | 'output') => void;
-}> = ({ modelUrl, modelFormat, defaultScale, ports, addPortByClick, portTypeForClick, onSurfacePick }) => {
+}> = ({
+  modelUrl,
+  modelFormat,
+  defaultScale,
+  placementRotationDeg,
+  ports,
+  selectedPortIndex,
+  transformPortsEnabled,
+  addPortByClick,
+  portTypeForClick,
+  onSelectPort,
+  onPortTransform,
+  onPlacementRotationChange,
+  onSurfacePick,
+}) => {
   const [loadedModel, setLoadedModel] = useState<THREE.Object3D | null>(null);
   const modelRootRef = useRef<THREE.Group>(null);
+  const portTransformAnchorRef = useRef<THREE.Group>(null);
+  const placementRootRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -204,31 +227,89 @@ const InteractiveModelPreview: React.FC<{
 
   if (!modelClone) return null;
 
+  const placementRotationRad: [number, number, number] = [
+    ((placementRotationDeg?.[0] || 0) * Math.PI) / 180,
+    ((placementRotationDeg?.[1] || 0) * Math.PI) / 180,
+    ((placementRotationDeg?.[2] || 0) * Math.PI) / 180,
+  ];
+
+  const selectedPort = selectedPortIndex >= 0 ? ports[selectedPortIndex] : null;
+
+  const updatePlacementRotationFromObject = () => {
+    if (!placementRootRef.current) return;
+    const euler = placementRootRef.current.rotation;
+    onPlacementRotationChange([
+      Number((THREE.MathUtils.radToDeg(euler.x)).toFixed(2)),
+      Number((THREE.MathUtils.radToDeg(euler.y)).toFixed(2)),
+      Number((THREE.MathUtils.radToDeg(euler.z)).toFixed(2)),
+    ]);
+  };
+
+  const updateSelectedPortFromAnchor = () => {
+    if (!selectedPort || !portTransformAnchorRef.current) return;
+    const p = portTransformAnchorRef.current.position;
+    onPortTransform(selectedPortIndex, [
+      Number(p.x.toFixed(4)),
+      Number(p.y.toFixed(4)),
+      Number(p.z.toFixed(4)),
+    ]);
+  };
+
   return (
     <group scale={[previewScale, previewScale, previewScale]}>
-      <group
-        position={[0, previewGroundLift, 0]}
-        ref={modelRootRef}
-        onPointerDown={(event) => {
-          if (!addPortByClick || !modelRootRef.current) return;
-          event.stopPropagation();
-          const local = modelRootRef.current.worldToLocal(event.point.clone());
-          onSurfacePick([local.x, local.y, local.z], portTypeForClick);
-        }}
-      >
-        <primitive object={modelClone} />
-        {ports.map((port) => (
-          <group key={`port-${port.id}`} position={port.localPosition}>
-            <mesh>
-              <sphereGeometry args={[0.08, 14, 10]} />
-              <meshStandardMaterial color={PORT_COLOR[port.type]} emissive={PORT_COLOR[port.type]} emissiveIntensity={0.45} />
-            </mesh>
-            <mesh rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[0.11, 0.14, 20]} />
-              <meshBasicMaterial color={PORT_COLOR[port.type]} transparent opacity={0.7} side={THREE.DoubleSide} />
-            </mesh>
-          </group>
-        ))}
+      <group ref={placementRootRef} rotation={placementRotationRad}>
+        <group
+          position={[0, previewGroundLift, 0]}
+          ref={modelRootRef}
+          onPointerDown={(event) => {
+            if (!addPortByClick || !modelRootRef.current) return;
+            event.stopPropagation();
+            const local = modelRootRef.current.worldToLocal(event.point.clone());
+            onSurfacePick([local.x, local.y, local.z], portTypeForClick);
+          }}
+        >
+          <primitive object={modelClone} />
+          {ports.map((port, idx) => (
+            <group
+              key={`port-${port.id}`}
+              position={port.localPosition}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                onSelectPort(idx);
+              }}
+            >
+              <mesh>
+                <sphereGeometry args={[selectedPortIndex === idx ? 0.1 : 0.08, 14, 10]} />
+                <meshStandardMaterial color={PORT_COLOR[port.type]} emissive={PORT_COLOR[port.type]} emissiveIntensity={selectedPortIndex === idx ? 0.7 : 0.45} />
+              </mesh>
+              <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.11, 0.14, 20]} />
+                <meshBasicMaterial color={PORT_COLOR[port.type]} transparent opacity={0.7} side={THREE.DoubleSide} />
+              </mesh>
+            </group>
+          ))}
+          {selectedPort && (
+            <group
+              ref={portTransformAnchorRef}
+              position={selectedPort.localPosition}
+            />
+          )}
+        </group>
+        <TransformControls
+          object={placementRootRef.current || undefined}
+          mode="rotate"
+          size={0.85}
+          onObjectChange={updatePlacementRotationFromObject}
+        />
+        {transformPortsEnabled && selectedPort && (
+          <TransformControls
+            object={portTransformAnchorRef.current || undefined}
+            mode="translate"
+            size={0.6}
+            translationSnap={0.01}
+            onObjectChange={updateSelectedPortFromAnchor}
+          />
+        )}
       </group>
     </group>
   );
@@ -245,6 +326,8 @@ const OemAdminPage: React.FC = () => {
   const [loadingLibrary, setLoadingLibrary] = useState(true);
   const [clickPortMode, setClickPortMode] = useState(false);
   const [clickPortType, setClickPortType] = useState<'input' | 'output'>('input');
+  const [selectedPortIndex, setSelectedPortIndex] = useState<number>(-1);
+  const [transformPortsEnabled, setTransformPortsEnabled] = useState(true);
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [pendingDeletes, setPendingDeletes] = useState<string[]>([]);
   const [localPreviewUrls, setLocalPreviewUrls] = useState<Record<string, string>>({});
@@ -291,6 +374,10 @@ const OemAdminPage: React.FC = () => {
     () => selectedCompany?.models.find((model) => model.id === selectedModelId) || null,
     [selectedCompany, selectedModelId],
   );
+
+  useEffect(() => {
+    setSelectedPortIndex(-1);
+  }, [selectedCompanyId, selectedModelId]);
 
   const previewUrl = useMemo(() => {
     if (!selectedCompany || !selectedModel) return null;
@@ -395,6 +482,7 @@ const OemAdminPage: React.FC = () => {
   };
 
   const addPort = () => {
+    const nextIndex = (selectedModel?.connectionPorts?.length || 0);
     updateSelectedModel((model) => ({
       ...model,
       connectionPorts: [
@@ -402,10 +490,12 @@ const OemAdminPage: React.FC = () => {
         { id: `input-${(model.connectionPorts?.length || 0) + 1}`, type: 'input', localPosition: [0, 0, 0] },
       ],
     }));
+    setSelectedPortIndex(nextIndex);
     setNotice('');
   };
 
   const addPortFromSurfacePick = (localPos: [number, number, number], type: 'input' | 'output') => {
+    const nextPortIndex = (selectedModel?.connectionPorts?.length || 0);
     updateSelectedModel((model) => {
       const nextIndex = (model.connectionPorts?.length || 0) + 1;
       const nextPort: OemConnectionPortInput = {
@@ -422,6 +512,7 @@ const OemAdminPage: React.FC = () => {
         connectionPorts: [...(model.connectionPorts || []), nextPort],
       };
     });
+    setSelectedPortIndex(nextPortIndex);
     setNotice(`Added ${type} node snapped on model surface.`);
   };
 
@@ -438,7 +529,21 @@ const OemAdminPage: React.FC = () => {
       ...model,
       connectionPorts: (model.connectionPorts || []).filter((_, idx) => idx !== index),
     }));
+    setSelectedPortIndex((prev) => {
+      if (prev === index) return -1;
+      if (prev > index) return prev - 1;
+      return prev;
+    });
     setNotice('');
+  };
+
+  const setPlacementRotationDeg = (rotationDeg: [number, number, number]) => {
+    updateSelectedModel((model) => ({ ...model, defaultRotationDeg: rotationDeg }));
+    setNotice('');
+  };
+
+  const updatePortFromTransform = (index: number, localPos: [number, number, number]) => {
+    updatePort(index, (p) => ({ ...p, localPosition: localPos }));
   };
 
   const saveDraft = () => {
@@ -661,9 +766,15 @@ const OemAdminPage: React.FC = () => {
             modelUrl={previewUrl}
             modelFormat={selectedModel.modelFormat}
             defaultScale={selectedModel.defaultScale}
+            placementRotationDeg={selectedModel.defaultRotationDeg}
             ports={selectedModel.connectionPorts || []}
+            selectedPortIndex={selectedPortIndex}
+            transformPortsEnabled={transformPortsEnabled}
             addPortByClick={clickPortMode}
             portTypeForClick={clickPortType}
+            onSelectPort={setSelectedPortIndex}
+            onPortTransform={updatePortFromTransform}
+            onPlacementRotationChange={setPlacementRotationDeg}
             onSurfacePick={addPortFromSurfacePick}
           />
         </Bounds>
@@ -885,6 +996,34 @@ const OemAdminPage: React.FC = () => {
                       ))}
                     </div>
 
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+                      {(selectedModel.defaultRotationDeg || [0, 0, 0]).map((value, idx) => (
+                        <input
+                          key={`rot-${idx}`}
+                          type="number"
+                          step={1}
+                          value={value}
+                          onChange={(e) => {
+                            const next: [number, number, number] = [...(selectedModel.defaultRotationDeg || [0, 0, 0])] as [number, number, number];
+                            next[idx] = Number(e.target.value);
+                            updateSelectedModel((model) => ({ ...model, defaultRotationDeg: next }));
+                          }}
+                          placeholder={['Rotate X°', 'Rotate Y°', 'Rotate Z°'][idx]}
+                        />
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
+                      <span style={{ color: 'var(--mm-text-tertiary)' }}>
+                        Placement rotation is saved and used when dropping this OEM part in Main Simulation.
+                      </span>
+                      <button
+                        onClick={() => updateSelectedModel((model) => ({ ...model, defaultRotationDeg: [0, 0, 0] }))}
+                        style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}
+                      >
+                        Reset Rotation
+                      </button>
+                    </div>
+
                     <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                         <strong style={{ fontSize: 12 }}>Model Nodes / Ports (admin only)</strong>
@@ -906,11 +1045,33 @@ const OemAdminPage: React.FC = () => {
                           >
                             {clickPortMode ? 'Click-to-add: ON' : 'Click-to-add: OFF'}
                           </button>
+                          <button
+                            onClick={() => setTransformPortsEnabled((prev) => !prev)}
+                            style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: transformPortsEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}
+                          >
+                            {transformPortsEnabled ? 'Port Gizmo: ON' : 'Port Gizmo: OFF'}
+                          </button>
                           <button onClick={addPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}>+ Manual Port</button>
                         </div>
                       </div>
+                      <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginBottom: 6 }}>
+                        Tip: click a node marker in 3D preview to select it, then drag with gizmo for precise placement.
+                      </div>
                       {(selectedModel.connectionPorts || []).map((port, idx) => (
-                        <div key={`${port.id}-${idx}`} style={{ display: 'grid', gridTemplateColumns: '1fr 90px repeat(3,80px) 34px', gap: 6, marginBottom: 6 }}>
+                        <div
+                          key={`${port.id}-${idx}`}
+                          onClick={() => setSelectedPortIndex(idx)}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 90px repeat(3,80px) 34px',
+                            gap: 6,
+                            marginBottom: 6,
+                            border: selectedPortIndex === idx ? '1px solid var(--mm-accent-primary)' : '1px solid transparent',
+                            borderRadius: 6,
+                            padding: 4,
+                            cursor: 'pointer',
+                          }}
+                        >
                           <input value={port.id} onChange={(e) => updatePort(idx, (p) => ({ ...p, id: e.target.value }))} placeholder="Port ID" />
                           <select value={port.type} onChange={(e) => updatePort(idx, (p) => ({ ...p, type: e.target.value as 'input' | 'output' }))}>
                             <option value="input">Input</option>

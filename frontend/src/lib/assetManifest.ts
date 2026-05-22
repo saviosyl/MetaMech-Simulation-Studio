@@ -14,6 +14,7 @@ export interface StaticAssetDef {
   sourceFormat?: 'glb' | 'gltf' | 'obj' | 'step';
   thumbnailUrl: string;
   defaultScale?: [number, number, number];
+  defaultRotation?: [number, number, number];
   connectionPorts?: ConnectionPortDef[];
 }
 
