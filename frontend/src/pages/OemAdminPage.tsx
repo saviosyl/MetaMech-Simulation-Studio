@@ -476,9 +476,9 @@ const InteractiveModelPreview: React.FC<{
             </lineSegments>
           </group>
         )}
-        {placementGizmoEnabled && placementRootRef.current && (
+        {placementGizmoEnabled && (
           <TransformControls
-            object={placementRootRef.current}
+            object={placementRootRef.current || undefined}
             mode="rotate"
             size={0.85}
             rotationSnap={Math.max(1, placementRotationSnapDeg) * Math.PI / 180}
@@ -488,9 +488,9 @@ const InteractiveModelPreview: React.FC<{
             onObjectChange={updatePlacementRotationFromObject}
           />
         )}
-        {transformPortsEnabled && selectedPort && portTransformAnchorRef.current && (
+        {transformPortsEnabled && selectedPort && (
           <TransformControls
-            object={portTransformAnchorRef.current}
+            object={portTransformAnchorRef.current || undefined}
             mode="translate"
             size={0.6}
             translationSnap={0.01}
