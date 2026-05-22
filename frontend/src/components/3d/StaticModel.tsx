@@ -32,32 +32,32 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
     const instance = model.clone(true);
     if (assetDef.defaultScale) instance.scale.set(...assetDef.defaultScale);
 
-    // OEM uploads may come from mm-authored GLB/GLTF exports.
-    // If dimensions are implausibly large in scene units, normalize to meters.
+    // OEM workflow standard: model dimensions are authored in millimeters.
+    // Normalize to scene meters explicitly for GLB/GLTF at runtime.
     if (assetDef.id.startsWith('oem-')) {
-      const preBox = new THREE.Box3().setFromObject(instance);
-      const preSize = preBox.getSize(new THREE.Vector3());
-      const maxDim = Math.max(preSize.x, preSize.y, preSize.z);
       const format = assetDef.sourceFormat || 'glb';
-      const looksLikeMillimeters = Number.isFinite(maxDim) && maxDim > 80;
-      // Many OEM GLB exports still arrive oversized (units not normalized to meters).
-      // Use a tighter threshold so main simulation does not place oversized models.
-      const likelyMmGlb = (format === 'glb' || format === 'gltf') && Number.isFinite(maxDim) && maxDim > 5;
-      if (looksLikeMillimeters || likelyMmGlb) {
+      if (format === 'glb' || format === 'gltf') {
+        const scaleVector = assetDef.defaultScale || [1, 1, 1];
+        const legacyMmScale =
+          Math.abs(scaleVector[0] - 0.001) < 0.00001 &&
+          Math.abs(scaleVector[1] - 0.001) < 0.00001 &&
+          Math.abs(scaleVector[2] - 0.001) < 0.00001;
+        // Older OEM entries may already have 0.001 in defaultScale.
+        // Neutralize that legacy embed so mm->m conversion is applied exactly once.
+        if (legacyMmScale) instance.scale.multiplyScalar(1000);
         instance.scale.multiplyScalar(0.001);
       }
 
-      // Permanent OEM normalization guardrails:
-      // keep model sizes in a sensible visualization range in meters.
+      // Very loose safety guardrails to avoid broken imports while preserving
+      // real-world dimensions in meters for normal OEM models.
       const normalizedBox = new THREE.Box3().setFromObject(instance);
       const normalizedSize = normalizedBox.getSize(new THREE.Vector3());
       const normalizedMaxDim = Math.max(normalizedSize.x, normalizedSize.y, normalizedSize.z);
       if (Number.isFinite(normalizedMaxDim) && normalizedMaxDim > 0) {
-        // Keep OEM parts within a realistic "machine part" envelope by default.
-        if (normalizedMaxDim > 1.6) {
-          instance.scale.multiplyScalar(1.6 / normalizedMaxDim);
-        } else if (normalizedMaxDim < 0.02) {
-          instance.scale.multiplyScalar(0.03 / normalizedMaxDim);
+        if (normalizedMaxDim > 60) {
+          instance.scale.multiplyScalar(60 / normalizedMaxDim);
+        } else if (normalizedMaxDim < 0.005) {
+          instance.scale.multiplyScalar(0.005 / normalizedMaxDim);
         }
       }
     }

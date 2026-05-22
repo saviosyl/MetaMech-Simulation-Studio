@@ -758,29 +758,12 @@ const OemAdminPage: React.FC = () => {
       const objectUrl = URL.createObjectURL(file);
       const key = modelKey(selectedCompany.id, selectedModel.id);
 
-      let inferredScale: [number, number, number] | undefined;
-      const hasCustomScale = Array.isArray(selectedModel.defaultScale)
-        && selectedModel.defaultScale.some((value) => Math.abs(value - 1) > 0.0001);
-      if ((format === 'glb' || format === 'gltf') && !hasCustomScale) {
-        try {
-          const probe = await loadModelObject(objectUrl, format);
-          const probeBox = new THREE.Box3().setFromObject(probe);
-          const probeSize = probeBox.getSize(new THREE.Vector3());
-          const maxDim = Math.max(probeSize.x, probeSize.y, probeSize.z);
-          if (Number.isFinite(maxDim) && maxDim > 5) {
-            inferredScale = [0.001, 0.001, 0.001];
-          }
-        } catch {
-          // Keep default scale if probing fails.
-        }
-      }
-
       updateSelectedModel((model) => ({
         ...model,
         modelFormat: format as OemModelFormat,
         glbPath: file.name,
         glbUrl: '',
-        defaultScale: inferredScale || model.defaultScale,
+        defaultScale: model.defaultScale || [1, 1, 1],
       }));
 
       setPendingUploads((prev) => {
@@ -799,7 +782,7 @@ const OemAdminPage: React.FC = () => {
         next[key] = objectUrl;
         return next;
       });
-      setNotice(`${file.name} imported (${format.toUpperCase()})${inferredScale ? ' with mm scaling applied' : ''}. It will be uploaded on next sync.`);
+      setNotice(`${file.name} imported (${format.toUpperCase()}). OEM runtime uses millimeter-to-meter normalization in Main Simulation.`);
     };
     reader.readAsArrayBuffer(file);
     event.target.value = '';
