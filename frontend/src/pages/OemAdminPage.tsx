@@ -446,13 +446,13 @@ const OemAdminPage: React.FC = () => {
       if (activeSplitter === 'left') {
         const candidate = event.clientX - rect.left;
         let nextLeft = Math.max(minLeft, Math.min(maxLeft, candidate));
-        const maxAllowed = rect.width - rightPanelWidthPx - minCenter - 16;
+        const maxAllowed = rect.width - rightPanelWidthPx - minCenter - 20;
         nextLeft = Math.min(nextLeft, maxAllowed);
         setLeftPanelWidthPx(Math.max(minLeft, nextLeft));
       } else {
         const candidate = rect.right - event.clientX;
         let nextRight = Math.max(minRight, Math.min(maxRight, candidate));
-        const maxAllowed = rect.width - leftPanelWidthPx - minCenter - 16;
+        const maxAllowed = rect.width - leftPanelWidthPx - minCenter - 20;
         nextRight = Math.min(nextRight, maxAllowed);
         setRightPanelWidthPx(Math.max(minRight, nextRight));
       }
@@ -1006,13 +1006,21 @@ const OemAdminPage: React.FC = () => {
           .oem-panel-left { grid-column: 1; border-right: none; border-radius: 10px 0 0 10px; }
           .oem-panel-center { grid-column: 3; position: sticky; top: 10px; border-left: none; border-right: none; }
           .oem-panel-right { grid-column: 5; border-left: none; border-radius: 0 10px 10px 0; }
+          .oem-panel-right input,
+          .oem-panel-right select,
+          .oem-panel-right textarea {
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+          }
           .oem-panel-splitter {
-            width: 8px;
+            width: 10px;
             cursor: col-resize;
             background: linear-gradient(to right, transparent 0, #e2e8f0 50%, transparent 100%);
             height: calc(100vh - 92px);
             position: sticky;
             top: 10px;
+            z-index: 5;
           }
           .oem-panel-splitter:hover {
             background: linear-gradient(to right, transparent 0, #93c5fd 50%, transparent 100%);
@@ -1052,6 +1060,9 @@ const OemAdminPage: React.FC = () => {
               border-left: 1px solid var(--mm-border-subtle);
               border-right: 1px solid var(--mm-border-subtle);
             }
+            .oem-panel-center { grid-row: 1; }
+            .oem-panel-right { grid-row: 2; }
+            .oem-panel-left { grid-row: 3; }
             .oem-panel-splitter {
               display: none;
             }
@@ -1085,7 +1096,7 @@ const OemAdminPage: React.FC = () => {
       <div
         className="oem-admin-layout"
         ref={layoutRef}
-        style={{ gridTemplateColumns: isNarrowLayout ? '1fr' : `${leftPanelWidthPx}px 8px minmax(380px, 1fr) 8px ${rightPanelWidthPx}px` }}
+        style={{ gridTemplateColumns: isNarrowLayout ? '1fr' : `${leftPanelWidthPx}px 10px minmax(380px, 1fr) 10px ${rightPanelWidthPx}px` }}
       >
         <aside className="oem-panel oem-panel-left">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -1137,6 +1148,219 @@ const OemAdminPage: React.FC = () => {
           <div
             className="oem-panel-splitter oem-panel-splitter-left"
             onMouseDown={() => setActiveSplitter('left')}
+            title="Drag to resize panels"
+          />
+        )}
+
+        <aside className="oem-panel oem-panel-center">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <strong style={{ fontSize: 13 }}>Center Viewport • 3D Model Workspace</strong>
+            <button
+              onClick={() => setPreviewFullscreen(true)}
+              style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <Maximize2 size={13} />
+              Fullscreen
+            </button>
+          </div>
+          <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto' }}>
+            <button onClick={() => setPlacementGizmoEnabled((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: placementGizmoEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap' }}>
+              Tool: Rotate Gizmo
+            </button>
+            <button onClick={() => setTransformPortsEnabled((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: transformPortsEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap' }}>
+              Tool: Node Gizmo
+            </button>
+            <button onClick={() => setShowFlowGuide((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: showFlowGuide ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap' }}>
+              Tool: Flow Guide
+            </button>
+          </div>
+          <div className="oem-preview-frame">
+            {previewUrl ? renderPreviewCanvas() : (
+              <div style={{ padding: 10, color: 'var(--mm-text-tertiary)', fontSize: 12 }}>
+                Add <code>model path/URL</code> or import a local <code>.OBJ/.STEP/.GLB</code> file.
+              </div>
+            )}
+          </div>
+
+          {selectedModel && (
+            <div style={{ marginTop: 10, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: '#f8fafc', display: 'grid', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700 }}>
+                <RotateCw size={13} />
+                3D Transform Tools
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <button onClick={() => nudgePlacementRotation(0, -placementRotationSnapDeg)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>X-</button>
+                <button onClick={() => nudgePlacementRotation(0, placementRotationSnapDeg)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>X+</button>
+                <button onClick={() => nudgePlacementRotation(1, -placementRotationSnapDeg)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>Y-</button>
+                <button onClick={() => nudgePlacementRotation(1, placementRotationSnapDeg)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>Y+</button>
+                <button onClick={() => nudgePlacementRotation(2, -placementRotationSnapDeg)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>Z-</button>
+                <button onClick={() => nudgePlacementRotation(2, placementRotationSnapDeg)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>Z+</button>
+                <button onClick={() => setPlacementRotationDeg([0, 0, 0])} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>Reset</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 }}>
+                {(selectedModel.defaultRotationDeg || [0, 0, 0]).map((value, idx) => (
+                  <input
+                    key={`ws-rot-${idx}`}
+                    type="number"
+                    step={1}
+                    value={value}
+                    onChange={(e) => {
+                      const next: [number, number, number] = [...(selectedModel.defaultRotationDeg || [0, 0, 0])] as [number, number, number];
+                      next[idx] = Number(e.target.value);
+                      setPlacementRotationDeg(next);
+                    }}
+                    placeholder={['Rotate X°', 'Rotate Y°', 'Rotate Z°'][idx]}
+                  />
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 }}>
+                {(selectedModel.defaultScale || [1, 1, 1]).map((value, idx) => (
+                  <input
+                    key={`ws-scale-${idx}`}
+                    type="number"
+                    step={0.1}
+                    value={value}
+                    onChange={(e) => {
+                      const next: [number, number, number] = [...(selectedModel.defaultScale || [1, 1, 1])] as [number, number, number];
+                      next[idx] = Number(e.target.value);
+                      updateSelectedModel((model) => ({ ...model, defaultScale: next }));
+                    }}
+                    placeholder={['Scale X', 'Scale Y', 'Scale Z'][idx]}
+                  />
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 }}>
+                <span>Axis X: red</span>
+                <span>Axis Y: green</span>
+                <span>Axis Z: blue</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)', border: '1px dashed var(--mm-border-subtle)', borderRadius: 6, padding: '6px 8px' }}>
+                XYZ Rotation: {(selectedModel.defaultRotationDeg || [0, 0, 0]).map((v) => Number(v || 0).toFixed(2)).join(' , ')}
+                {selectedPort ? `  |  Selected Node XYZ: ${selectedPort.localPosition.map((v) => Number(v || 0).toFixed(3)).join(' , ')}` : ''}
+              </div>
+            </div>
+          )}
+
+          {selectedModel && (
+            <div style={{ marginTop: 10, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, display: 'grid', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <strong style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Target size={13} />
+                  Node Tools (inside workspace)
+                </strong>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', overflowX: 'auto' }}>
+                  <select value={clickPortType} onChange={(e) => setClickPortType(e.target.value as 'input' | 'output')} style={{ fontSize: 12 }}>
+                    <option value="input">Input node</option>
+                    <option value="output">Output node</option>
+                  </select>
+                  <button onClick={() => setClickPortMode((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: clickPortMode ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', whiteSpace: 'nowrap' }}>
+                    {clickPortMode ? 'Click Add: ON' : 'Click Add: OFF'}
+                  </button>
+                  <button onClick={() => setTransformPortsEnabled((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: transformPortsEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', whiteSpace: 'nowrap' }}>
+                    {transformPortsEnabled ? 'Port Gizmo: ON' : 'Port Gizmo: OFF'}
+                  </button>
+                  <button onClick={addPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', whiteSpace: 'nowrap' }}>+ Port</button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input type="number" min={0.001} step={0.001} value={portNudgeStep} onChange={(e) => setPortNudgeStep(Math.max(0.001, Number(e.target.value) || 0.001))} style={{ width: 88 }} />
+                <button onClick={duplicateSelectedPort} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: selectedPort ? 'pointer' : 'not-allowed', padding: '2px 8px' }}>Duplicate</button>
+                <button onClick={() => nudgeSelectedPort(0, -portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>X-</button>
+                <button onClick={() => nudgeSelectedPort(0, portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>X+</button>
+                <button onClick={() => nudgeSelectedPort(1, -portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Y-</button>
+                <button onClick={() => nudgeSelectedPort(1, portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Y+</button>
+                <button onClick={() => nudgeSelectedPort(2, -portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Z-</button>
+                <button onClick={() => nudgeSelectedPort(2, portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Z+</button>
+              </div>
+              {(selectedModel.connectionPorts || []).map((port, idx) => (
+                <div key={`${port.id}-${idx}`} onClick={() => setSelectedPortIndex(idx)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 90px repeat(3,minmax(0,76px)) 30px', gap: 6, border: selectedPortIndex === idx ? '1px solid var(--mm-accent-primary)' : '1px solid transparent', borderRadius: 6, padding: 4 }}>
+                  <input value={port.id} onChange={(e) => updatePort(idx, (p) => ({ ...p, id: e.target.value }))} placeholder="Port ID" />
+                  <select value={port.type} onChange={(e) => updatePort(idx, (p) => ({ ...p, type: e.target.value as 'input' | 'output' }))}>
+                    <option value="input">Input</option>
+                    <option value="output">Output</option>
+                  </select>
+                  {port.localPosition.map((value, axis) => (
+                    <input key={axis} type="number" step={0.1} value={value} onChange={(e) => updatePort(idx, (p) => {
+                      const local: [number, number, number] = [...p.localPosition];
+                      local[axis] = Number(e.target.value);
+                      return { ...p, localPosition: local };
+                    })} placeholder={['X', 'Y', 'Z'][axis]} />
+                  ))}
+                  <button onClick={() => removePort(idx)} style={{ border: 'none', background: 'transparent', color: 'var(--mm-text-tertiary)', cursor: 'pointer' }}><Trash2 size={12} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {selectedModel && (
+            <div style={{ marginTop: 10, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, display: 'grid', gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Workflow size={13} />
+                Product Flow / Animation
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) auto', gap: 8 }}>
+                <select value={selectedModel.flowInPortId || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, flowInPortId: e.target.value || undefined }))}>
+                  <option value="">Flow Start Node</option>
+                  {(selectedModel.connectionPorts || []).map((port) => <option key={`flow-in-${port.id}`} value={port.id}>{port.id}</option>)}
+                </select>
+                <select value={selectedModel.flowOutPortId || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, flowOutPortId: e.target.value || undefined }))}>
+                  <option value="">Flow End Node</option>
+                  {(selectedModel.connectionPorts || []).map((port) => <option key={`flow-out-${port.id}`} value={port.id}>{port.id}</option>)}
+                </select>
+                <button onClick={autoAssignFlowNodes} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}>Auto Assign</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) auto', gap: 8 }}>
+                <input type="number" min={0} step={0.05} value={selectedModel.flowSpeedMps ?? 0} onChange={(e) => updateSelectedModel((model) => ({ ...model, flowSpeedMps: Math.max(0, Number(e.target.value) || 0) }))} placeholder="Speed (m/s)" />
+                <input type="number" min={0} step={1} value={selectedModel.productSpinRpm ?? 0} onChange={(e) => updateSelectedModel((model) => ({ ...model, productSpinRpm: Math.max(0, Number(e.target.value) || 0) }))} placeholder="Spin (RPM)" />
+                <button onClick={() => setShowFlowGuide((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: showFlowGuide ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}>
+                  {showFlowGuide ? 'Flow Guide ON' : 'Flow Guide OFF'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+            <button onClick={downloadIndexJson} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer' }}>
+              <Download size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Export Library
+            </button>
+            <label style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer' }}>
+              <Upload size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Import Library
+              <input type="file" accept=".json,.oemlib" onChange={importIndexJson} style={{ display: 'none' }} />
+            </label>
+            <button onClick={resetToRemote} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer' }}>
+              Reset from Remote
+            </button>
+          </div>
+
+          <p style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 10, lineHeight: 1.5 }}>
+            Millimeter workflow active for imported CAD assets. Import OBJ/STEP/GLB, place nodes by clicking geometry, then sync updates to Cloudflare storage.
+          </p>
+          <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 6 }}>
+            Pending changes: uploads <strong>{pendingUploads.length}</strong>, deletions <strong>{pendingDeletes.length}</strong>
+          </div>
+          <div style={{ marginTop: 10, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-primary)', marginBottom: 6 }}>Sync History</div>
+            {syncHistory.length === 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>No successful server sync yet.</div>
+            ) : (
+              <div style={{ display: 'grid', gap: 6 }}>
+                {syncHistory.map((entry, idx) => (
+                  <div key={`${entry.timestampIso}-${idx}`} style={{ fontSize: 10, color: 'var(--mm-text-secondary)', border: '1px solid var(--mm-border-subtle)', borderRadius: 6, padding: '5px 6px' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--mm-text-primary)' }}>{formatSyncTimestamp(entry.timestampIso)}</div>
+                    <div>Backend: <strong>{entry.backend}</strong></div>
+                    <div>Uploads: <strong>{entry.uploadedCount}</strong> • Deletions: <strong>{entry.deletedCount}</strong></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {notice && <div style={{ fontSize: 11, color: '#0f172a', marginTop: 8, fontWeight: 600 }}>{notice}</div>}
+        </aside>
+
+        {!isNarrowLayout && (
+          <div
+            className="oem-panel-splitter oem-panel-splitter-right"
+            onMouseDown={() => setActiveSplitter('right')}
             title="Drag to resize panels"
           />
         )}
@@ -1240,218 +1464,6 @@ const OemAdminPage: React.FC = () => {
           )}
         </section>
 
-        {!isNarrowLayout && (
-          <div
-            className="oem-panel-splitter oem-panel-splitter-right"
-            onMouseDown={() => setActiveSplitter('right')}
-            title="Drag to resize panels"
-          />
-        )}
-
-        <aside className="oem-panel oem-panel-center">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <strong style={{ fontSize: 13 }}>Center Viewport • 3D Model Workspace</strong>
-            <button
-              onClick={() => setPreviewFullscreen(true)}
-              style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            >
-              <Maximize2 size={13} />
-              Fullscreen
-            </button>
-          </div>
-          <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button onClick={() => setPlacementGizmoEnabled((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: placementGizmoEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11 }}>
-              Tool: Rotate Gizmo
-            </button>
-            <button onClick={() => setTransformPortsEnabled((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: transformPortsEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11 }}>
-              Tool: Node Gizmo
-            </button>
-            <button onClick={() => setShowFlowGuide((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: showFlowGuide ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11 }}>
-              Tool: Flow Guide
-            </button>
-          </div>
-          <div className="oem-preview-frame">
-            {previewUrl ? renderPreviewCanvas() : (
-              <div style={{ padding: 10, color: 'var(--mm-text-tertiary)', fontSize: 12 }}>
-                Add <code>model path/URL</code> or import a local <code>.OBJ/.STEP/.GLB</code> file.
-              </div>
-            )}
-          </div>
-
-          {selectedModel && (
-            <div style={{ marginTop: 10, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: '#f8fafc', display: 'grid', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700 }}>
-                <RotateCw size={13} />
-                3D Transform Tools
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                <button onClick={() => nudgePlacementRotation(0, -placementRotationSnapDeg)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>X-</button>
-                <button onClick={() => nudgePlacementRotation(0, placementRotationSnapDeg)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>X+</button>
-                <button onClick={() => nudgePlacementRotation(1, -placementRotationSnapDeg)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>Y-</button>
-                <button onClick={() => nudgePlacementRotation(1, placementRotationSnapDeg)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>Y+</button>
-                <button onClick={() => nudgePlacementRotation(2, -placementRotationSnapDeg)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>Z-</button>
-                <button onClick={() => nudgePlacementRotation(2, placementRotationSnapDeg)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>Z+</button>
-                <button onClick={() => setPlacementRotationDeg([0, 0, 0])} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>Reset</button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 }}>
-                {(selectedModel.defaultRotationDeg || [0, 0, 0]).map((value, idx) => (
-                  <input
-                    key={`ws-rot-${idx}`}
-                    type="number"
-                    step={1}
-                    value={value}
-                    onChange={(e) => {
-                      const next: [number, number, number] = [...(selectedModel.defaultRotationDeg || [0, 0, 0])] as [number, number, number];
-                      next[idx] = Number(e.target.value);
-                      setPlacementRotationDeg(next);
-                    }}
-                    placeholder={['Rotate X°', 'Rotate Y°', 'Rotate Z°'][idx]}
-                  />
-                ))}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 }}>
-                {(selectedModel.defaultScale || [1, 1, 1]).map((value, idx) => (
-                  <input
-                    key={`ws-scale-${idx}`}
-                    type="number"
-                    step={0.1}
-                    value={value}
-                    onChange={(e) => {
-                      const next: [number, number, number] = [...(selectedModel.defaultScale || [1, 1, 1])] as [number, number, number];
-                      next[idx] = Number(e.target.value);
-                      updateSelectedModel((model) => ({ ...model, defaultScale: next }));
-                    }}
-                    placeholder={['Scale X', 'Scale Y', 'Scale Z'][idx]}
-                  />
-                ))}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 }}>
-                <span>Axis X: red</span>
-                <span>Axis Y: green</span>
-                <span>Axis Z: blue</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)', border: '1px dashed var(--mm-border-subtle)', borderRadius: 6, padding: '6px 8px' }}>
-                XYZ Rotation: {(selectedModel.defaultRotationDeg || [0, 0, 0]).map((v) => Number(v || 0).toFixed(2)).join(' , ')}
-                {selectedPort ? `  |  Selected Node XYZ: ${selectedPort.localPosition.map((v) => Number(v || 0).toFixed(3)).join(' , ')}` : ''}
-              </div>
-            </div>
-          )}
-
-          {selectedModel && (
-            <div style={{ marginTop: 10, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, display: 'grid', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <strong style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Target size={13} />
-                  Node Tools (inside workspace)
-                </strong>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <select value={clickPortType} onChange={(e) => setClickPortType(e.target.value as 'input' | 'output')} style={{ fontSize: 12 }}>
-                    <option value="input">Input node</option>
-                    <option value="output">Output node</option>
-                  </select>
-                  <button onClick={() => setClickPortMode((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: clickPortMode ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}>
-                    {clickPortMode ? 'Click Add: ON' : 'Click Add: OFF'}
-                  </button>
-                  <button onClick={() => setTransformPortsEnabled((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: transformPortsEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}>
-                    {transformPortsEnabled ? 'Port Gizmo: ON' : 'Port Gizmo: OFF'}
-                  </button>
-                  <button onClick={addPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}>+ Port</button>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <input type="number" min={0.001} step={0.001} value={portNudgeStep} onChange={(e) => setPortNudgeStep(Math.max(0.001, Number(e.target.value) || 0.001))} style={{ width: 88 }} />
-                <button onClick={duplicateSelectedPort} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: selectedPort ? 'pointer' : 'not-allowed', padding: '2px 8px' }}>Duplicate</button>
-                <button onClick={() => nudgeSelectedPort(0, -portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>X-</button>
-                <button onClick={() => nudgeSelectedPort(0, portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>X+</button>
-                <button onClick={() => nudgeSelectedPort(1, -portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Y-</button>
-                <button onClick={() => nudgeSelectedPort(1, portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Y+</button>
-                <button onClick={() => nudgeSelectedPort(2, -portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Z-</button>
-                <button onClick={() => nudgeSelectedPort(2, portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Z+</button>
-              </div>
-              {(selectedModel.connectionPorts || []).map((port, idx) => (
-                <div key={`${port.id}-${idx}`} onClick={() => setSelectedPortIndex(idx)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 90px repeat(3,minmax(0,76px)) 30px', gap: 6, border: selectedPortIndex === idx ? '1px solid var(--mm-accent-primary)' : '1px solid transparent', borderRadius: 6, padding: 4 }}>
-                  <input value={port.id} onChange={(e) => updatePort(idx, (p) => ({ ...p, id: e.target.value }))} placeholder="Port ID" />
-                  <select value={port.type} onChange={(e) => updatePort(idx, (p) => ({ ...p, type: e.target.value as 'input' | 'output' }))}>
-                    <option value="input">Input</option>
-                    <option value="output">Output</option>
-                  </select>
-                  {port.localPosition.map((value, axis) => (
-                    <input key={axis} type="number" step={0.1} value={value} onChange={(e) => updatePort(idx, (p) => {
-                      const local: [number, number, number] = [...p.localPosition];
-                      local[axis] = Number(e.target.value);
-                      return { ...p, localPosition: local };
-                    })} placeholder={['X', 'Y', 'Z'][axis]} />
-                  ))}
-                  <button onClick={() => removePort(idx)} style={{ border: 'none', background: 'transparent', color: 'var(--mm-text-tertiary)', cursor: 'pointer' }}><Trash2 size={12} /></button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {selectedModel && (
-            <div style={{ marginTop: 10, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, display: 'grid', gap: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Workflow size={13} />
-                Product Flow / Animation
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) auto', gap: 8 }}>
-                <select value={selectedModel.flowInPortId || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, flowInPortId: e.target.value || undefined }))}>
-                  <option value="">Flow Start Node</option>
-                  {(selectedModel.connectionPorts || []).map((port) => <option key={`flow-in-${port.id}`} value={port.id}>{port.id}</option>)}
-                </select>
-                <select value={selectedModel.flowOutPortId || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, flowOutPortId: e.target.value || undefined }))}>
-                  <option value="">Flow End Node</option>
-                  {(selectedModel.connectionPorts || []).map((port) => <option key={`flow-out-${port.id}`} value={port.id}>{port.id}</option>)}
-                </select>
-                <button onClick={autoAssignFlowNodes} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}>Auto Assign</button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) auto', gap: 8 }}>
-                <input type="number" min={0} step={0.05} value={selectedModel.flowSpeedMps ?? 0} onChange={(e) => updateSelectedModel((model) => ({ ...model, flowSpeedMps: Math.max(0, Number(e.target.value) || 0) }))} placeholder="Speed (m/s)" />
-                <input type="number" min={0} step={1} value={selectedModel.productSpinRpm ?? 0} onChange={(e) => updateSelectedModel((model) => ({ ...model, productSpinRpm: Math.max(0, Number(e.target.value) || 0) }))} placeholder="Spin (RPM)" />
-                <button onClick={() => setShowFlowGuide((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: showFlowGuide ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}>
-                  {showFlowGuide ? 'Flow Guide ON' : 'Flow Guide OFF'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-            <button onClick={downloadIndexJson} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer' }}>
-              <Download size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Export Library
-            </button>
-            <label style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer' }}>
-              <Upload size={13} style={{ marginRight: 4, verticalAlign: -2 }} />Import Library
-              <input type="file" accept=".json,.oemlib" onChange={importIndexJson} style={{ display: 'none' }} />
-            </label>
-            <button onClick={resetToRemote} style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer' }}>
-              Reset from Remote
-            </button>
-          </div>
-
-          <p style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 10, lineHeight: 1.5 }}>
-            Millimeter workflow active for imported CAD assets. Import OBJ/STEP/GLB, place nodes by clicking geometry, then sync updates to Cloudflare storage.
-          </p>
-          <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 6 }}>
-            Pending changes: uploads <strong>{pendingUploads.length}</strong>, deletions <strong>{pendingDeletes.length}</strong>
-          </div>
-          <div style={{ marginTop: 10, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: 'var(--mm-bg-surface)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-primary)', marginBottom: 6 }}>Sync History</div>
-            {syncHistory.length === 0 ? (
-              <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>No successful server sync yet.</div>
-            ) : (
-              <div style={{ display: 'grid', gap: 6 }}>
-                {syncHistory.map((entry, idx) => (
-                  <div key={`${entry.timestampIso}-${idx}`} style={{ fontSize: 10, color: 'var(--mm-text-secondary)', border: '1px solid var(--mm-border-subtle)', borderRadius: 6, padding: '5px 6px' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--mm-text-primary)' }}>{formatSyncTimestamp(entry.timestampIso)}</div>
-                    <div>Backend: <strong>{entry.backend}</strong></div>
-                    <div>Uploads: <strong>{entry.uploadedCount}</strong> • Deletions: <strong>{entry.deletedCount}</strong></div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          {notice && <div style={{ fontSize: 11, color: '#0f172a', marginTop: 8, fontWeight: 600 }}>{notice}</div>}
-        </aside>
       </div>
 
       {previewFullscreen && (
