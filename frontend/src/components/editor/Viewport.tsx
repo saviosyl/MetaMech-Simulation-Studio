@@ -402,8 +402,9 @@ const SceneContent: React.FC<{
   const majorSectionSize = minorCellSize * 4;
   const gridPalette = themeMode === 'light'
     ? {
-        cell: '#c7d2de',
-        section: '#9fb0c4',
+        // OEM Admin-inspired light grid palette
+        cell: '#cad7e7',
+        section: '#9fb3cb',
       }
     : {
         cell: '#4f5f76',
@@ -476,7 +477,7 @@ const SceneContent: React.FC<{
           position={[0, 0, 0]}
           args={[sceneSettings.grid.size, sceneSettings.grid.divisions]}
           cellSize={minorCellSize}
-          cellThickness={0.34}
+          cellThickness={0.4}
           cellColor={gridPalette.cell}
           sectionSize={majorSectionSize}
           sectionThickness={0.9}
