@@ -143,6 +143,7 @@ import CameraPathPlayer from '../3d/CameraPathPlayer';
 import ViewportToolbar from '../editor/ViewportToolbar';
 import { VIDEO_CAPTURE_PRESETS, VideoQualityPreset } from '../../lib/videoExportPresets';
 import { getModuleDefinition } from '../../lib/moduleLibrary';
+import { getAssetManifest } from '../../lib/assetManifest';
 
 // Wrapper that attaches TransformControls to the selected object
 const DraggableObject: React.FC<{
@@ -333,6 +334,10 @@ const DraggableObject: React.FC<{
 // Inner scene component that has access to Three.js context
 const OVERLAY_HIDDEN_TYPES = new Set(['source', 'sink']);
 
+function normalizeToken(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
 // Detect mobile/iPad Safari for performance optimizations
 const isMobileSafari = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) || 
   (typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
@@ -364,6 +369,26 @@ const SceneContent: React.FC<{
 
   const exportPreset = VIDEO_CAPTURE_PRESETS[captureQualityPreset];
   const keyShadowMapSize = isExportRendering ? exportPreset.shadowMapSize : (isMobileSafari ? 1024 : 4096);
+
+  const legacyOemTypeSuffixes = useMemo(() => {
+    const suffixes = new Set<string>();
+    for (const asset of getAssetManifest()) {
+      if (asset.assetType !== 'static' || !asset.id.startsWith('oem-')) continue;
+      const parts = asset.id.split('-');
+      const suffix = parts[parts.length - 1];
+      if (suffix) suffixes.add(suffix);
+    }
+    return suffixes;
+  }, [processNodes.length, environmentAssets.length]);
+
+  const isOemSceneObject = useCallback((type: string, assetId?: string) => {
+    if ((assetId || '').startsWith('oem-')) return true;
+    if ((type || '').startsWith('oem-')) return true;
+    const moduleDef = getModuleDefinition(type);
+    if (moduleDef?.category === 'oem') return true;
+    const token = normalizeToken(type || '');
+    return token ? legacyOemTypeSuffixes.has(token) : false;
+  }, [legacyOemTypeSuffixes]);
   const contactShadowRes = isExportRendering ? exportPreset.contactShadowResolution : (isMobileSafari ? 256 : 512);
   const contactShadowBlur = isExportRendering ? exportPreset.contactShadowBlur : 2.0;
   const minorCellSize = Math.max(
@@ -535,7 +560,7 @@ const SceneContent: React.FC<{
         {/* Process Nodes */}
         {processNodes.filter(n => !hiddenIds.has(n.id) && !(overlaysHidden && OVERLAY_HIDDEN_TYPES.has(n.type))).map(node => (
           (() => {
-            const isOemNode = node.type.startsWith('oem-') || String(node.assetId || '').startsWith('oem-');
+            const isOemNode = isOemSceneObject(node.type, node.assetId);
             return (
           <DraggableObject
             key={node.id}
@@ -560,7 +585,7 @@ const SceneContent: React.FC<{
         {/* Environment Assets */}
         {environmentAssets.filter(a => !hiddenIds.has(a.id)).map(asset => (
           (() => {
-            const isOemAsset = asset.type.startsWith('oem-') || String(asset.assetId || '').startsWith('oem-');
+            const isOemAsset = isOemSceneObject(asset.type, asset.assetId);
             return (
           <DraggableObject
             key={asset.id}
