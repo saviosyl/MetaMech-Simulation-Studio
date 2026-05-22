@@ -2,7 +2,7 @@ import React, { useRef, Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { EnvironmentAsset } from '../../store/editorStore';
-import { getAssetById, ParametricAssetDef, StaticAssetDef } from '../../lib/assetManifest';
+import { getAssetById, getAssetManifest, ParametricAssetDef, StaticAssetDef } from '../../lib/assetManifest';
 import ParametricModel from './ParametricModel';
 import StaticModel from './StaticModel';
 import GLBModel from './GLBModel';
@@ -11,6 +11,30 @@ interface EnvironmentAssetComponentProps {
   asset: EnvironmentAsset;
   isSelected: boolean;
   onClick: () => void;
+}
+
+function normalizeToken(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function resolveStaticAssetDef(assetId: string | undefined, type: string): StaticAssetDef | undefined {
+  const byAssetId = assetId ? getAssetById(assetId) : undefined;
+  if (byAssetId?.assetType === 'static') return byAssetId as StaticAssetDef;
+
+  const byType = getAssetById(type);
+  if (byType?.assetType === 'static') return byType as StaticAssetDef;
+
+  // Legacy OEM scene nodes may store type as plain model id (e.g. "x45")
+  // instead of canonical runtime id (e.g. "oem-company-model").
+  const token = normalizeToken(type);
+  if (!token) return undefined;
+  const manifest = getAssetManifest();
+  const legacyOem = manifest.find((asset) => (
+    asset.assetType === 'static'
+    && asset.id.startsWith('oem-')
+    && asset.id.endsWith(`-${token}`)
+  ));
+  return legacyOem as StaticAssetDef | undefined;
 }
 
 const EnvironmentAssetComponent: React.FC<EnvironmentAssetComponentProps> = ({ asset, isSelected, onClick }) => {
@@ -22,7 +46,7 @@ const EnvironmentAssetComponent: React.FC<EnvironmentAssetComponentProps> = ({ a
   };
 
   // Check if this asset uses the new asset system
-  const assetDef = (asset.assetId ? getAssetById(asset.assetId) : undefined) || getAssetById(asset.type);
+  const assetDef = resolveStaticAssetDef(asset.assetId, asset.type) || getAssetById(asset.type);
 
   if (assetDef) {
     if (assetDef.assetType === 'parametric') {

@@ -20,7 +20,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useEditorStore } from '../../store/editorStore';
 import { ProcessNode } from '../../store/editorStore';
-import { getAssetById, ParametricAssetDef, StaticAssetDef } from '../../lib/assetManifest';
+import { getAssetById, getAssetManifest, ParametricAssetDef, StaticAssetDef } from '../../lib/assetManifest';
 import ParametricModel from './ParametricModel';
 import StaticModel from './StaticModel';
 import GLBModel from './GLBModel';
@@ -58,6 +58,28 @@ import {
 import FlowDirectionArrow from './overlays/FlowDirectionArrow';
 import SensorZoneOverlay from './overlays/SensorZoneOverlay';
 import StopperZoneOverlay from './overlays/StopperZoneOverlay';
+
+function normalizeToken(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function resolveStaticAssetDef(assetId: string | undefined, type: string): StaticAssetDef | undefined {
+  const byAssetId = assetId ? getAssetById(assetId) : undefined;
+  if (byAssetId?.assetType === 'static') return byAssetId as StaticAssetDef;
+
+  const byType = getAssetById(type);
+  if (byType?.assetType === 'static') return byType as StaticAssetDef;
+
+  const token = normalizeToken(type);
+  if (!token) return undefined;
+  const manifest = getAssetManifest();
+  const legacyOem = manifest.find((asset) => (
+    asset.assetType === 'static'
+    && asset.id.startsWith('oem-')
+    && asset.id.endsWith(`-${token}`)
+  ));
+  return legacyOem as StaticAssetDef | undefined;
+}
 
 /** Animated vertical lift carriage — moves up/down during simulation */
 const VerticalLiftCarriage: React.FC<{
@@ -147,7 +169,7 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
   });
 
   // Check if this node uses the new asset system
-  const assetDef = (node.assetId ? getAssetById(node.assetId) : undefined) || getAssetById(node.type);
+  const assetDef = resolveStaticAssetDef(node.assetId, node.type) || getAssetById(node.type);
 
   // BELT CONVEYOR: always use the real GLB model directly
   if (node.type === 'belt-conveyor') {
