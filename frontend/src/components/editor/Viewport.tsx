@@ -396,20 +396,15 @@ const SceneContent: React.FC<{
   const contactShadowRes = isExportRendering ? exportPreset.contactShadowResolution : (isMobileSafari ? 256 : 512);
   const contactShadowBlur = isExportRendering ? exportPreset.contactShadowBlur : 2.0;
   const minorCellSize = Math.max(
-    0.25,
-    Math.min(1, sceneSettings.grid.size / Math.max(sceneSettings.grid.divisions, 1)),
+    0.05,
+    Math.min(5, sceneSettings.grid.size / Math.max(sceneSettings.grid.divisions, 1)),
   );
   const majorSectionSize = minorCellSize * 4;
-  const gridPalette = themeMode === 'light'
-    ? {
-        // OEM Admin-inspired light grid palette
-        cell: '#cad7e7',
-        section: '#9fb3cb',
-      }
-    : {
-        cell: '#4f5f76',
-        section: '#758aa7',
-      };
+  const gridPalette = {
+    // Match OEM Admin grid palette for a consistent visual language.
+    cell: '#6f6f6f',
+    section: '#9d4b4b',
+  };
 
   // Disable orbit rotation when a 3D object is selected AND a manipulation tool is active
   // Click empty space to deselect → orbit re-enables
@@ -475,15 +470,15 @@ const SceneContent: React.FC<{
       {sceneSettings.grid.visible && (
         <Grid
           position={[0, 0, 0]}
-          args={[sceneSettings.grid.size, sceneSettings.grid.divisions]}
+          args={[sceneSettings.grid.size, sceneSettings.grid.size]}
           cellSize={minorCellSize}
           cellThickness={0.4}
           cellColor={gridPalette.cell}
           sectionSize={majorSectionSize}
           sectionThickness={0.9}
           sectionColor={gridPalette.section}
-          fadeDistance={68}
-          fadeStrength={1.18}
+          fadeDistance={28}
+          fadeStrength={1}
           infiniteGrid
         />
       )}

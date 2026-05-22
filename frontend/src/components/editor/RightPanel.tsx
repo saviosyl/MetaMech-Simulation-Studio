@@ -245,6 +245,18 @@ const RightPanel: React.FC = () => {
     forceUpdate(n => n + 1);
   };
 
+  const setGridSize = (nextSize: number) => {
+    if (!Number.isFinite(nextSize)) return;
+    const clamped = Math.min(500, Math.max(5, nextSize));
+    setSceneSettings({ grid: { ...sceneSettings.grid, size: clamped } });
+  };
+
+  const setGridDivisions = (nextDivisions: number) => {
+    if (!Number.isFinite(nextDivisions)) return;
+    const clamped = Math.min(500, Math.max(4, Math.round(nextDivisions)));
+    setSceneSettings({ grid: { ...sceneSettings.grid, divisions: clamped } });
+  };
+
   const renderInput = (key: string, def: any) => {
     const val = selectedObject?.parameters[key];
 
@@ -615,6 +627,55 @@ const RightPanel: React.FC = () => {
                     <span style={{ fontSize: 12, color: 'var(--mm-text-secondary)' }}>{item.label}</span>
                   </label>
                 ))}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                  <div>
+                    <label style={labelStyle}>Grid Size (m)</label>
+                    <input
+                      type="number"
+                      min={5}
+                      max={500}
+                      step={5}
+                      value={sceneSettings.grid.size}
+                      onChange={(e) => setGridSize(Number(e.target.value))}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Grid Divisions</label>
+                    <input
+                      type="number"
+                      min={4}
+                      max={500}
+                      step={1}
+                      value={sceneSettings.grid.divisions}
+                      onChange={(e) => setGridDivisions(Number(e.target.value))}
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <button
+                    style={{ ...inputStyle, width: 'auto', padding: '5px 10px', cursor: 'pointer' }}
+                    onClick={() => { setGridSize(30); setGridDivisions(24); }}
+                    type="button"
+                  >
+                    Coarse
+                  </button>
+                  <button
+                    style={{ ...inputStyle, width: 'auto', padding: '5px 10px', cursor: 'pointer' }}
+                    onClick={() => { setGridSize(50); setGridDivisions(50); }}
+                    type="button"
+                  >
+                    Medium
+                  </button>
+                  <button
+                    style={{ ...inputStyle, width: 'auto', padding: '5px 10px', cursor: 'pointer' }}
+                    onClick={() => { setGridSize(50); setGridDivisions(100); }}
+                    type="button"
+                  >
+                    Fine
+                  </button>
+                </div>
               </Section>
 
               <Section title="Navigation" icon={Move3D} defaultOpen={false}>
