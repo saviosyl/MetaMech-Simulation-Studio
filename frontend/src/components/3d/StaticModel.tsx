@@ -39,10 +39,18 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
       const preSize = preBox.getSize(new THREE.Vector3());
       const maxDim = Math.max(preSize.x, preSize.y, preSize.z);
       const format = assetDef.sourceFormat || 'glb';
-      const looksLikeMillimeters = Number.isFinite(maxDim) && maxDim > 20;
-      const largeGlbLikeMm = (format === 'glb' || format === 'gltf') && Number.isFinite(maxDim) && maxDim > 5;
-      if (looksLikeMillimeters || largeGlbLikeMm) {
+      const looksLikeMillimeters = Number.isFinite(maxDim) && maxDim > 120;
+      const hugeGlbLikeMm = (format === 'glb' || format === 'gltf') && Number.isFinite(maxDim) && maxDim > 250;
+      if (looksLikeMillimeters || hugeGlbLikeMm) {
         instance.scale.multiplyScalar(0.001);
+      }
+
+      // Self-heal older entries that were accidentally downscaled too far.
+      const postBox = new THREE.Box3().setFromObject(instance);
+      const postSize = postBox.getSize(new THREE.Vector3());
+      const postMaxDim = Math.max(postSize.x, postSize.y, postSize.z);
+      if (Number.isFinite(postMaxDim) && postMaxDim > 0 && postMaxDim < 0.02) {
+        instance.scale.multiplyScalar(1000);
       }
     }
 
@@ -59,6 +67,38 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
     instance.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
+        if (!mesh.geometry.getAttribute('normal')) {
+          mesh.geometry.computeVertexNormals();
+        }
+        if (assetDef.id.startsWith('oem-')) {
+          const tuneMaterial = (material: THREE.Material): THREE.Material => {
+            if (material instanceof THREE.MeshStandardMaterial) {
+              const tuned = material.clone();
+              tuned.color = tuned.color.clone().multiplyScalar(0.78);
+              tuned.metalness = Math.min(0.35, Math.max(0.05, tuned.metalness ?? 0.16));
+              tuned.roughness = Math.min(1, Math.max(0.45, tuned.roughness ?? 0.62));
+              tuned.envMapIntensity = Math.min(0.45, Math.max(0.12, tuned.envMapIntensity ?? 0.24));
+              tuned.side = THREE.DoubleSide;
+              return tuned;
+            }
+            const rawColor = (material as any)?.color;
+            const color = rawColor && rawColor.isColor
+              ? (rawColor as THREE.Color).clone().multiplyScalar(0.78)
+              : new THREE.Color('#8a96a4');
+            return new THREE.MeshStandardMaterial({
+              color,
+              metalness: 0.12,
+              roughness: 0.72,
+              envMapIntensity: 0.22,
+              side: THREE.DoubleSide,
+            });
+          };
+          if (Array.isArray(mesh.material)) {
+            mesh.material = mesh.material.map((material) => tuneMaterial(material));
+          } else if (mesh.material) {
+            mesh.material = tuneMaterial(mesh.material as THREE.Material);
+          }
+        }
         mesh.castShadow = true;
         mesh.receiveShadow = true;
       }

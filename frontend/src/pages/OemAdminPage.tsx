@@ -153,17 +153,19 @@ const InteractiveModelPreview: React.FC<{
             if (material.color && material.color.getHex() === 0x000000) {
               material.color.set('#aab6c4');
             }
-            material.metalness = Math.min(1, Math.max(0, material.metalness ?? 0.18));
-            material.roughness = Math.min(1, Math.max(0.35, material.roughness ?? 0.62));
-            material.envMapIntensity = Math.min(0.65, Math.max(0.2, material.envMapIntensity ?? 0.4));
-            material.side = THREE.DoubleSide;
-            return material;
+            const tuned = material.clone();
+            tuned.color = tuned.color.clone().multiplyScalar(0.8);
+            tuned.metalness = Math.min(1, Math.max(0, tuned.metalness ?? 0.16));
+            tuned.roughness = Math.min(1, Math.max(0.45, tuned.roughness ?? 0.68));
+            tuned.envMapIntensity = Math.min(0.45, Math.max(0.12, tuned.envMapIntensity ?? 0.24));
+            tuned.side = THREE.DoubleSide;
+            return tuned;
           }
           const fallback = new THREE.MeshStandardMaterial({
-            color: (material as any)?.color || '#9aa6b2',
-            metalness: 0.16,
-            roughness: 0.68,
-            envMapIntensity: 0.4,
+            color: (material as any)?.color || '#8793a0',
+            metalness: 0.12,
+            roughness: 0.76,
+            envMapIntensity: 0.2,
             side: THREE.DoubleSide,
           });
           return fallback;
@@ -173,7 +175,7 @@ const InteractiveModelPreview: React.FC<{
         } else if (currentMaterial) {
           mesh.material = boostMaterial(currentMaterial);
         } else {
-          mesh.material = new THREE.MeshStandardMaterial({ color: '#9aa6b2', metalness: 0.16, roughness: 0.68, envMapIntensity: 0.4 });
+          mesh.material = new THREE.MeshStandardMaterial({ color: '#8793a0', metalness: 0.12, roughness: 0.76, envMapIntensity: 0.2 });
         }
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -505,16 +507,29 @@ const OemAdminPage: React.FC = () => {
       const objectUrl = URL.createObjectURL(file);
       const key = modelKey(selectedCompany.id, selectedModel.id);
 
+      let inferredScale: [number, number, number] | undefined;
+      const hasCustomScale = Array.isArray(selectedModel.defaultScale)
+        && selectedModel.defaultScale.some((value) => Math.abs(value - 1) > 0.0001);
+      if ((format === 'glb' || format === 'gltf') && !hasCustomScale) {
+        try {
+          const probe = await loadModelObject(objectUrl, format);
+          const probeBox = new THREE.Box3().setFromObject(probe);
+          const probeSize = probeBox.getSize(new THREE.Vector3());
+          const maxDim = Math.max(probeSize.x, probeSize.y, probeSize.z);
+          if (Number.isFinite(maxDim) && maxDim > 120) {
+            inferredScale = [0.001, 0.001, 0.001];
+          }
+        } catch {
+          // Keep default scale if probing fails.
+        }
+      }
+
       updateSelectedModel((model) => ({
         ...model,
         modelFormat: format as OemModelFormat,
         glbPath: file.name,
         glbUrl: '',
-        defaultScale: (format === 'glb' || format === 'gltf')
-          ? ((model.defaultScale && model.defaultScale.some((value) => Math.abs(value - 1) > 0.0001))
-            ? model.defaultScale
-            : [0.001, 0.001, 0.001])
-          : model.defaultScale,
+        defaultScale: inferredScale || model.defaultScale,
       }));
 
       setPendingUploads((prev) => {
@@ -533,7 +548,7 @@ const OemAdminPage: React.FC = () => {
         next[key] = objectUrl;
         return next;
       });
-      setNotice(`${file.name} imported (${format.toUpperCase()}). It will be uploaded on next sync.`);
+      setNotice(`${file.name} imported (${format.toUpperCase()})${inferredScale ? ' with mm scaling applied' : ''}. It will be uploaded on next sync.`);
     };
     reader.readAsArrayBuffer(file);
     event.target.value = '';
@@ -628,16 +643,16 @@ const OemAdminPage: React.FC = () => {
       camera={{ position: [3.4, 2.4, 3.6], fov: 45 }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1.18;
+        gl.toneMappingExposure = 0.96;
       }}
     >
       <color attach="background" args={['#f3f6fb']} />
       <fog attach="fog" args={['#f3f6fb', 12, 36]} />
-      <ambientLight intensity={0.62} />
-      <hemisphereLight args={['#ffffff', '#dbe4f0', 0.8]} />
-      <directionalLight position={[5, 8, 5]} intensity={1.55} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
-      <directionalLight position={[-4, 4, -3]} intensity={0.75} />
-      <pointLight position={[0, 3.5, 0]} intensity={0.45} />
+      <ambientLight intensity={0.48} />
+      <hemisphereLight args={['#ffffff', '#dbe4f0', 0.58]} />
+      <directionalLight position={[5, 8, 5]} intensity={1.15} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+      <directionalLight position={[-4, 4, -3]} intensity={0.55} />
+      <pointLight position={[0, 3.5, 0]} intensity={0.25} />
       <Environment preset="studio" />
       <Grid args={[10, 10]} cellSize={0.5} cellThickness={0.4} sectionSize={2} sectionThickness={0.9} fadeDistance={28} fadeStrength={1} />
       {selectedModel && previewUrl && (
