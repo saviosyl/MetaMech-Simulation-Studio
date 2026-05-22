@@ -40,7 +40,9 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
       const maxDim = Math.max(preSize.x, preSize.y, preSize.z);
       const format = assetDef.sourceFormat || 'glb';
       const looksLikeMillimeters = Number.isFinite(maxDim) && maxDim > 80;
-      const likelyMmGlb = (format === 'glb' || format === 'gltf') && Number.isFinite(maxDim) && maxDim > 25;
+      // Many OEM GLB exports still arrive oversized (units not normalized to meters).
+      // Use a tighter threshold so main simulation does not place oversized models.
+      const likelyMmGlb = (format === 'glb' || format === 'gltf') && Number.isFinite(maxDim) && maxDim > 5;
       if (looksLikeMillimeters || likelyMmGlb) {
         instance.scale.multiplyScalar(0.001);
       }
@@ -51,8 +53,9 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
       const normalizedSize = normalizedBox.getSize(new THREE.Vector3());
       const normalizedMaxDim = Math.max(normalizedSize.x, normalizedSize.y, normalizedSize.z);
       if (Number.isFinite(normalizedMaxDim) && normalizedMaxDim > 0) {
-        if (normalizedMaxDim > 2.5) {
-          instance.scale.multiplyScalar(2.5 / normalizedMaxDim);
+        // Keep OEM parts within a realistic "machine part" envelope by default.
+        if (normalizedMaxDim > 1.6) {
+          instance.scale.multiplyScalar(1.6 / normalizedMaxDim);
         } else if (normalizedMaxDim < 0.02) {
           instance.scale.multiplyScalar(0.03 / normalizedMaxDim);
         }
