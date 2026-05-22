@@ -51,10 +51,10 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
       const normalizedSize = normalizedBox.getSize(new THREE.Vector3());
       const normalizedMaxDim = Math.max(normalizedSize.x, normalizedSize.y, normalizedSize.z);
       if (Number.isFinite(normalizedMaxDim) && normalizedMaxDim > 0) {
-        if (normalizedMaxDim > 8) {
-          instance.scale.multiplyScalar(8 / normalizedMaxDim);
+        if (normalizedMaxDim > 2.5) {
+          instance.scale.multiplyScalar(2.5 / normalizedMaxDim);
         } else if (normalizedMaxDim < 0.02) {
-          instance.scale.multiplyScalar(0.02 / normalizedMaxDim);
+          instance.scale.multiplyScalar(0.03 / normalizedMaxDim);
         }
       }
     }
