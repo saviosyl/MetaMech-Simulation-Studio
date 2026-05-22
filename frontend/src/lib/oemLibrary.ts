@@ -132,6 +132,25 @@ function toPriceCurrency(value: unknown): OemCurrency {
   return 'EUR';
 }
 
+function sanitizeOemDefaultScale(
+  value: unknown,
+  modelFormat: OemModelFormat,
+): [number, number, number] | undefined {
+  if (!Array.isArray(value) || value.length !== 3) return undefined;
+  const parsed: [number, number, number] = [
+    Number(value[0]) || 1,
+    Number(value[1]) || 1,
+    Number(value[2]) || 1,
+  ];
+  const max = Math.max(parsed[0], parsed[1], parsed[2]);
+  const min = Math.min(parsed[0], parsed[1], parsed[2]);
+  // Ignore obviously corrupted scale values (often from stale local drafts).
+  if (!Number.isFinite(max) || !Number.isFinite(min) || max <= 0 || min <= 0) return [1, 1, 1];
+  if (max > 25 || min < 0.00001) return [1, 1, 1];
+  if ((modelFormat === 'obj' || modelFormat === 'step') && max > 5) return [1, 1, 1];
+  return parsed;
+}
+
 function toAssetId(company: OemCompanyEntry, model: OemModelEntry): string {
   const companyId = slugify(company.id || company.name || 'oem');
   const modelId = slugify(model.id || model.name || 'model');
@@ -198,6 +217,8 @@ function normalizeLibrary(data: unknown): OemLibraryIndex {
       const glbPath = typeof (m as any).glbPath === 'string' ? (m as any).glbPath : undefined;
       const glbUrl = typeof (m as any).glbUrl === 'string' ? (m as any).glbUrl : undefined;
       const inferredFormat = inferModelFormatFromPath(glbPath || glbUrl);
+      const modelFormat = (m as any).modelFormat ? toModelFormat((m as any).modelFormat) : inferredFormat;
+      const safeScale = sanitizeOemDefaultScale((m as any).defaultScale, modelFormat);
 
       models.push({
         id: typeof (m as any).id === 'string' ? (m as any).id : slugify(name),
@@ -215,13 +236,11 @@ function normalizeLibrary(data: unknown): OemLibraryIndex {
         productSpinRpm: typeof (m as any).productSpinRpm === 'number' && Number.isFinite((m as any).productSpinRpm)
           ? Math.max(0, (m as any).productSpinRpm)
           : undefined,
-        modelFormat: (m as any).modelFormat ? toModelFormat((m as any).modelFormat) : inferredFormat,
+        modelFormat,
         glbPath,
         glbUrl,
         thumbnailUrl: typeof (m as any).thumbnailUrl === 'string' ? (m as any).thumbnailUrl : '',
-        defaultScale: Array.isArray((m as any).defaultScale) && (m as any).defaultScale.length === 3
-          ? [(m as any).defaultScale[0], (m as any).defaultScale[1], (m as any).defaultScale[2]]
-          : undefined,
+        defaultScale: safeScale,
         priceUsd: typeof (m as any).priceUsd === 'number' && Number.isFinite((m as any).priceUsd)
           ? Math.max(0, (m as any).priceUsd)
           : undefined,
@@ -416,7 +435,9 @@ export async function loadOemLibrary(): Promise<OemLibraryLoadResult> {
   if (!loadPromise) {
     loadPromise = (async () => {
       const githubLibrary = await fetchOemLibraryIndex();
-      const localDraft = getLocalOemLibraryDraft();
+      // In production, server index is the source of truth for simulation runtime.
+      // This avoids stale local-draft overrides causing wrong OEM scale/paths.
+      const localDraft = import.meta.env.DEV ? getLocalOemLibraryDraft() : null;
       const merged = mergeLibraries(githubLibrary, localDraft);
       return toRuntimeEntities(merged);
     })();
