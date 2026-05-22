@@ -534,13 +534,16 @@ const SceneContent: React.FC<{
       <group>
         {/* Process Nodes */}
         {processNodes.filter(n => !hiddenIds.has(n.id) && !(overlaysHidden && OVERLAY_HIDDEN_TYPES.has(n.type))).map(node => (
+          (() => {
+            const isOemNode = node.type.startsWith('oem-') || String(node.assetId || '').startsWith('oem-');
+            return (
           <DraggableObject
             key={node.id}
             id={node.id}
             objectType="process"
             position={node.position}
             rotation={node.rotation}
-            scale={node.scale}
+            scale={isOemNode ? [1, 1, 1] : node.scale}
             isSelected={selectedObjectId === node.id}
             orbitRef={orbitRef}
           >
@@ -550,17 +553,22 @@ const SceneContent: React.FC<{
               onClick={() => handleObjectClick(node.id, 'process')}
             />
           </DraggableObject>
+            );
+          })()
         ))}
 
         {/* Environment Assets */}
         {environmentAssets.filter(a => !hiddenIds.has(a.id)).map(asset => (
+          (() => {
+            const isOemAsset = asset.type.startsWith('oem-') || String(asset.assetId || '').startsWith('oem-');
+            return (
           <DraggableObject
             key={asset.id}
             id={asset.id}
             objectType="environment"
             position={asset.position}
             rotation={asset.rotation}
-            scale={asset.scale}
+            scale={isOemAsset ? [1, 1, 1] : asset.scale}
             isSelected={selectedObjectId === asset.id}
             orbitRef={orbitRef}
           >
@@ -570,6 +578,8 @@ const SceneContent: React.FC<{
               onClick={() => handleObjectClick(asset.id, 'environment')}
             />
           </DraggableObject>
+            );
+          })()
         ))}
 
         {/* Actors — during simulation with path, render without DraggableObject so path anim controls position directly */}
