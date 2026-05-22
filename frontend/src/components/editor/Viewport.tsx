@@ -377,7 +377,7 @@ const SceneContent: React.FC<{
       const parts = asset.id.split('-');
       // Capture all meaningful model-id tokens so legacy types like "x45"
       // can still be recognized when asset ids are "oem-company-flexlink-x45-50".
-      for (let i = 2; i < parts.length; i += 1) {
+      for (let i = 1; i < parts.length; i += 1) {
         const token = parts[i];
         if (token) tokens.add(token);
       }

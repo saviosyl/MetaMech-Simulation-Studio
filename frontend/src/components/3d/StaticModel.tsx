@@ -30,12 +30,26 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
   const cloned = React.useMemo(() => {
     if (!model) return null;
     const instance = model.clone(true);
-    if (assetDef.defaultScale) instance.scale.set(...assetDef.defaultScale);
+    const format = assetDef.sourceFormat || 'glb';
+    if (assetDef.defaultScale) {
+      // For OEM OBJ/STEP imports, loadModelObject already normalizes native units
+      // (mm -> m) by pre-scaling to 0.001. Preserve that base scale and apply
+      // defaultScale as a multiplier instead of replacing it.
+      const preserveLoaderUnitScale = assetDef.id.startsWith('oem-') && (format === 'obj' || format === 'step');
+      if (preserveLoaderUnitScale) {
+        instance.scale.multiply(new THREE.Vector3(
+          assetDef.defaultScale[0],
+          assetDef.defaultScale[1],
+          assetDef.defaultScale[2],
+        ));
+      } else {
+        instance.scale.set(...assetDef.defaultScale);
+      }
+    }
 
     // OEM workflow standard: model dimensions are authored in millimeters.
     // Normalize to scene meters explicitly for GLB/GLTF at runtime.
     if (assetDef.id.startsWith('oem-')) {
-      const format = assetDef.sourceFormat || 'glb';
       if (format === 'glb' || format === 'gltf') {
         const scaleVector = assetDef.defaultScale || [1, 1, 1];
         const legacyMmScale =
