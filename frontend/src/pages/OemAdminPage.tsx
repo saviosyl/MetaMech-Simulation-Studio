@@ -891,14 +891,14 @@ const OemAdminPage: React.FC = () => {
   const renderPreviewCanvas = () => (
     <Canvas
       shadows
-      camera={{ position: [3.4, 2.4, 3.6], fov: 45 }}
+      camera={{ position: [3.4, 2.4, 3.6], fov: 45, near: 0.05, far: 400 }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = 0.96;
       }}
     >
       <color attach="background" args={['#f3f6fb']} />
-      <fog attach="fog" args={['#f3f6fb', 12, 36]} />
+      <fog attach="fog" args={['#f3f6fb', 24, 130]} />
       <ambientLight intensity={0.48} />
       <hemisphereLight args={['#ffffff', '#dbe4f0', 0.58]} />
       <directionalLight position={[5, 8, 5]} intensity={1.15} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
@@ -932,7 +932,7 @@ const OemAdminPage: React.FC = () => {
         </Bounds>
       )}
       <ContactShadows position={[0, -0.001, 0]} opacity={0.45} blur={2.8} far={8} />
-      <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+      <OrbitControls makeDefault enableDamping dampingFactor={0.08} minDistance={0.8} maxDistance={20} zoomSpeed={0.7} />
     </Canvas>
   );
 
