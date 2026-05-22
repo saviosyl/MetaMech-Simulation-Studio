@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Canvas } from '@react-three/fiber';
-import { Bounds, ContactShadows, Environment, Grid, Line, OrbitControls, TransformControls } from '@react-three/drei';
+import { Canvas, useThree } from '@react-three/fiber';
+import { Bounds, ContactShadows, Environment, GizmoHelper, GizmoViewport, Grid, Line, OrbitControls, TransformControls } from '@react-three/drei';
 import { ArrowLeft, Building2, Download, Maximize2, Minimize2, Plus, RotateCw, Save, Settings2, Target, Trash2, Upload, Workflow } from 'lucide-react';
 import * as THREE from 'three';
 import { useAuth } from '../contexts/AuthContext';
@@ -116,6 +116,60 @@ const PORT_COLOR: Record<'input' | 'output', string> = {
   output: '#10b981',
 };
 
+type PortSnapMode = 'surface' | 'face-center' | 'edge-midpoint';
+type PreviewViewPreset = 'iso' | 'front' | 'right' | 'top' | 'rear';
+
+interface PreviewViewRequest {
+  preset: PreviewViewPreset;
+  nonce: number;
+}
+
+interface PreviewMetrics {
+  sizeMm: [number, number, number];
+}
+
+const PreviewCameraViewController: React.FC<{
+  request: PreviewViewRequest;
+  target: [number, number, number];
+  radius: number;
+  orbitRef: React.RefObject<any>;
+}> = ({ request, target, radius, orbitRef }) => {
+  const { camera } = useThree();
+
+  useEffect(() => {
+    const center = new THREE.Vector3(target[0], target[1], target[2]);
+    const distance = Math.max(1.5, radius * 2.8);
+    const next = new THREE.Vector3();
+    switch (request.preset) {
+      case 'front':
+        next.set(center.x, center.y, center.z + distance);
+        break;
+      case 'right':
+        next.set(center.x + distance, center.y, center.z);
+        break;
+      case 'top':
+        next.set(center.x, center.y + distance, center.z + 0.001);
+        break;
+      case 'rear':
+        next.set(center.x, center.y, center.z - distance);
+        break;
+      case 'iso':
+      default:
+        next.set(center.x + distance, center.y + distance * 0.68, center.z + distance);
+        break;
+    }
+    camera.position.copy(next);
+    camera.lookAt(center);
+    camera.updateProjectionMatrix();
+    if (orbitRef.current) {
+      orbitRef.current.target.copy(center);
+      orbitRef.current.update();
+    }
+  }, [request, target, radius, camera, orbitRef]);
+
+  return null;
+};
+
 const InteractiveModelPreview: React.FC<{
   modelUrl: string;
   modelFormat?: OemModelFormat;
@@ -131,10 +185,15 @@ const InteractiveModelPreview: React.FC<{
   showFlowGuide: boolean;
   flowInPortId?: string;
   flowOutPortId?: string;
+  snapMode: PortSnapMode;
+  showDimensionBox: boolean;
+  viewRequest: PreviewViewRequest;
+  orbitRef: React.RefObject<any>;
   onSelectPort: (index: number) => void;
   onPortTransform: (index: number, localPos: [number, number, number]) => void;
   onPlacementRotationChange: (rotationDeg: [number, number, number]) => void;
   onSurfacePick: (localPos: [number, number, number], type: 'input' | 'output') => void;
+  onMetricsChange: (metrics: PreviewMetrics | null) => void;
 }> = ({
   modelUrl,
   modelFormat,
@@ -150,10 +209,15 @@ const InteractiveModelPreview: React.FC<{
   showFlowGuide,
   flowInPortId,
   flowOutPortId,
+  snapMode,
+  showDimensionBox,
+  viewRequest,
+  orbitRef,
   onSelectPort,
   onPortTransform,
   onPlacementRotationChange,
   onSurfacePick,
+  onMetricsChange,
 }) => {
   const [loadedModel, setLoadedModel] = useState<THREE.Object3D | null>(null);
   const modelRootRef = useRef<THREE.Group>(null);
@@ -238,6 +302,26 @@ const InteractiveModelPreview: React.FC<{
     return box.min.y < 0 ? -box.min.y : 0;
   }, [modelClone]);
 
+  const modelMetrics = useMemo(() => {
+    if (!modelClone) return null;
+    const temp = modelClone.clone(true);
+    temp.position.set(0, previewGroundLift, 0);
+    const box = new THREE.Box3().setFromObject(temp);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const radius = Math.max(size.x, size.y, size.z) * 0.5 || 1;
+    const sizeMm: [number, number, number] = [
+      Number((size.x * 1000).toFixed(1)),
+      Number((size.y * 1000).toFixed(1)),
+      Number((size.z * 1000).toFixed(1)),
+    ];
+    return { box, size, center, radius, sizeMm };
+  }, [modelClone, previewGroundLift]);
+
+  useEffect(() => {
+    onMetricsChange(modelMetrics ? { sizeMm: modelMetrics.sizeMm } : null);
+  }, [modelMetrics, onMetricsChange]);
+
   if (!modelClone) return null;
 
   const placementRotationRad: [number, number, number] = [
@@ -273,8 +357,61 @@ const InteractiveModelPreview: React.FC<{
     ]);
   };
 
+  const setOrbitEnabled = (enabled: boolean) => {
+    if (orbitRef.current) {
+      orbitRef.current.enabled = enabled;
+      if (enabled) orbitRef.current.update?.();
+    }
+  };
+
+  const snapLocalPoint = (event: any): THREE.Vector3 => {
+    if (!modelRootRef.current) return new THREE.Vector3();
+    const fallbackLocal = modelRootRef.current.worldToLocal(event.point.clone());
+    if (snapMode === 'surface') return fallbackLocal;
+
+    const mesh = event.object as THREE.Mesh | undefined;
+    const face = event.face as { a: number; b: number; c: number } | undefined;
+    if (!mesh || !mesh.isMesh || !face) return fallbackLocal;
+    const geometry = mesh.geometry as THREE.BufferGeometry;
+    const positionAttr = geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!positionAttr) return fallbackLocal;
+
+    const indices = [face.a, face.b, face.c];
+    const vertsInRoot = indices.map((index) => {
+      const local = new THREE.Vector3().fromBufferAttribute(positionAttr, index);
+      const world = mesh.localToWorld(local);
+      return modelRootRef.current!.worldToLocal(world);
+    });
+
+    if (snapMode === 'face-center') {
+      return vertsInRoot[0].clone().add(vertsInRoot[1]).add(vertsInRoot[2]).multiplyScalar(1 / 3);
+    }
+
+    const mids = [
+      vertsInRoot[0].clone().add(vertsInRoot[1]).multiplyScalar(0.5),
+      vertsInRoot[1].clone().add(vertsInRoot[2]).multiplyScalar(0.5),
+      vertsInRoot[2].clone().add(vertsInRoot[0]).multiplyScalar(0.5),
+    ];
+    let nearest = mids[0];
+    let nearestDist = mids[0].distanceToSquared(fallbackLocal);
+    for (let i = 1; i < mids.length; i += 1) {
+      const dist = mids[i].distanceToSquared(fallbackLocal);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = mids[i];
+      }
+    }
+    return nearest;
+  };
+
   return (
     <group scale={[previewScale, previewScale, previewScale]}>
+      <PreviewCameraViewController
+        request={viewRequest}
+        target={modelMetrics ? [modelMetrics.center.x, modelMetrics.center.y, modelMetrics.center.z] : [0, 0.5, 0]}
+        radius={modelMetrics?.radius || 1}
+        orbitRef={orbitRef}
+      />
       <group ref={placementRootRef} rotation={placementRotationRad}>
         <group
           position={[0, previewGroundLift, 0]}
@@ -282,7 +419,7 @@ const InteractiveModelPreview: React.FC<{
           onPointerDown={(event) => {
             if (!addPortByClick || !modelRootRef.current) return;
             event.stopPropagation();
-            const local = modelRootRef.current.worldToLocal(event.point.clone());
+            const local = snapLocalPoint(event);
             onSurfacePick([local.x, local.y, local.z], portTypeForClick);
           }}
         >
@@ -313,12 +450,27 @@ const InteractiveModelPreview: React.FC<{
             />
           )}
         </group>
+        {showDimensionBox && modelMetrics && (
+          <group>
+            <mesh position={[modelMetrics.center.x, modelMetrics.center.y, modelMetrics.center.z]}>
+              <boxGeometry args={[modelMetrics.size.x, modelMetrics.size.y, modelMetrics.size.z]} />
+              <meshBasicMaterial color="#0ea5e9" transparent opacity={0.06} depthWrite={false} />
+            </mesh>
+            <lineSegments position={[modelMetrics.center.x, modelMetrics.center.y, modelMetrics.center.z]}>
+              <edgesGeometry args={[new THREE.BoxGeometry(modelMetrics.size.x, modelMetrics.size.y, modelMetrics.size.z)]} />
+              <lineBasicMaterial color="#0ea5e9" transparent opacity={0.75} />
+            </lineSegments>
+          </group>
+        )}
         {placementGizmoEnabled && (
           <TransformControls
             object={placementRootRef.current || undefined}
             mode="rotate"
             size={0.85}
             rotationSnap={Math.max(1, placementRotationSnapDeg) * Math.PI / 180}
+            onMouseDown={() => setOrbitEnabled(false)}
+            onMouseUp={() => setOrbitEnabled(true)}
+            onDraggingChanged={(event: any) => setOrbitEnabled(!event.value)}
             onObjectChange={updatePlacementRotationFromObject}
           />
         )}
@@ -328,6 +480,9 @@ const InteractiveModelPreview: React.FC<{
             mode="translate"
             size={0.6}
             translationSnap={0.01}
+            onMouseDown={() => setOrbitEnabled(false)}
+            onMouseUp={() => setOrbitEnabled(true)}
+            onDraggingChanged={(event: any) => setOrbitEnabled(!event.value)}
             onObjectChange={updateSelectedPortFromAnchor}
           />
         )}
@@ -366,6 +521,10 @@ const OemAdminPage: React.FC = () => {
   const [transformPortsEnabled, setTransformPortsEnabled] = useState(true);
   const [portNudgeStep, setPortNudgeStep] = useState(0.01);
   const [showFlowGuide, setShowFlowGuide] = useState(true);
+  const [portSnapMode, setPortSnapMode] = useState<PortSnapMode>('face-center');
+  const [showDimensionBox, setShowDimensionBox] = useState(true);
+  const [previewViewRequest, setPreviewViewRequest] = useState<PreviewViewRequest>({ preset: 'iso', nonce: Date.now() });
+  const [previewMetrics, setPreviewMetrics] = useState<PreviewMetrics | null>(null);
   const [leftPanelWidthPx, setLeftPanelWidthPx] = useState(280);
   const [rightPanelWidthPx, setRightPanelWidthPx] = useState(420);
   const [activeSplitter, setActiveSplitter] = useState<'left' | 'right' | null>(null);
@@ -377,6 +536,7 @@ const OemAdminPage: React.FC = () => {
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [syncHistory, setSyncHistory] = useState<SyncHistoryEntry[]>(() => loadSyncHistory());
   const previewUrlsRef = useRef<Record<string, string>>({});
+  const previewOrbitRef = useRef<any>(null);
   const layoutRef = useRef<HTMLDivElement | null>(null);
 
   const isAdmin = isOemAdminUser(user);
@@ -432,6 +592,10 @@ const OemAdminPage: React.FC = () => {
       setSelectedPortIndex(portCount > 0 ? portCount - 1 : -1);
     }
   }, [selectedModel, selectedPortIndex]);
+
+  useEffect(() => {
+    setPreviewViewRequest({ preset: 'iso', nonce: Date.now() });
+  }, [selectedCompanyId, selectedModelId]);
 
   useEffect(() => {
     if (!activeSplitter) return;
@@ -607,7 +771,8 @@ const OemAdminPage: React.FC = () => {
       };
     });
     setSelectedPortIndex(nextPortIndex);
-    setNotice(`Added ${type} node snapped on model surface.`);
+    const modeLabel = snapMode === 'face-center' ? 'face center' : snapMode === 'edge-midpoint' ? 'edge midpoint' : 'surface point';
+    setNotice(`Added ${type} node snapped to ${modeLabel}.`);
   };
 
   const updatePort = (index: number, updater: (port: OemConnectionPortInput) => OemConnectionPortInput) => {
@@ -674,6 +839,10 @@ const OemAdminPage: React.FC = () => {
 
   const updatePortFromTransform = (index: number, localPos: [number, number, number]) => {
     updatePort(index, (p) => ({ ...p, localPosition: localPos }));
+  };
+
+  const setPreviewView = (preset: PreviewViewPreset) => {
+    setPreviewViewRequest({ preset, nonce: Date.now() });
   };
 
   const autoAssignFlowNodes = () => {
@@ -889,7 +1058,14 @@ const OemAdminPage: React.FC = () => {
       <pointLight position={[0, 3.5, 0]} intensity={0.25} />
       <Environment preset="studio" />
       <Grid args={[10, 10]} cellSize={0.5} cellThickness={0.4} sectionSize={2} sectionThickness={0.9} fadeDistance={28} fadeStrength={1} />
-      <axesHelper args={[1.35]} position={[0, 0.001, 0]} />
+      <axesHelper args={[2.1]} position={[0, 0.001, 0]} />
+      <GizmoHelper alignment="bottom-right" margin={[74, 74]}>
+        <GizmoViewport
+          axisColors={['#ef4444', '#22c55e', '#3b82f6']}
+          labelColor="#0f172a"
+          hideNegativeAxes={false}
+        />
+      </GizmoHelper>
       {selectedModel && previewUrl && (
         <Bounds fit margin={1.2}>
           <InteractiveModelPreview
@@ -907,15 +1083,20 @@ const OemAdminPage: React.FC = () => {
             showFlowGuide={showFlowGuide}
             flowInPortId={selectedModel.flowInPortId}
             flowOutPortId={selectedModel.flowOutPortId}
+            snapMode={portSnapMode}
+            showDimensionBox={showDimensionBox}
+            viewRequest={previewViewRequest}
+            orbitRef={previewOrbitRef}
             onSelectPort={setSelectedPortIndex}
             onPortTransform={updatePortFromTransform}
             onPlacementRotationChange={setPlacementRotationDeg}
             onSurfacePick={addPortFromSurfacePick}
+            onMetricsChange={setPreviewMetrics}
           />
         </Bounds>
       )}
       <ContactShadows position={[0, -0.001, 0]} opacity={0.45} blur={2.8} far={8} />
-      <OrbitControls makeDefault enableDamping dampingFactor={0.08} minDistance={0.4} maxDistance={12} zoomSpeed={0.55} />
+      <OrbitControls ref={previewOrbitRef} makeDefault enableDamping dampingFactor={0.08} minDistance={0.4} maxDistance={12} zoomSpeed={0.55} />
     </Canvas>
   );
 
@@ -1156,6 +1337,29 @@ const OemAdminPage: React.FC = () => {
             <button onClick={() => setShowFlowGuide((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: showFlowGuide ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap' }}>
               Tool: Flow Guide
             </button>
+            <button onClick={() => setShowDimensionBox((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: showDimensionBox ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap' }}>
+              Tool: Dimension Box
+            </button>
+          </div>
+          <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', whiteSpace: 'nowrap' }}>UCS Views:</span>
+            <button onClick={() => setPreviewView('front')} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11 }}>Front</button>
+            <button onClick={() => setPreviewView('right')} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11 }}>Right</button>
+            <button onClick={() => setPreviewView('top')} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11 }}>Top</button>
+            <button onClick={() => setPreviewView('rear')} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11 }}>Rear</button>
+            <button onClick={() => setPreviewView('iso')} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11 }}>ISO</button>
+          </div>
+          <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Node snap:</label>
+            <select value={portSnapMode} onChange={(e) => setPortSnapMode(e.target.value as PortSnapMode)} style={{ fontSize: 11, padding: '2px 8px' }}>
+              <option value="surface">Surface point</option>
+              <option value="face-center">Face center</option>
+              <option value="edge-midpoint">Edge midpoint</option>
+            </select>
+            <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Axis colors: X red • Y green • Z blue</div>
+          </div>
+          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+            Model size (mm): {previewMetrics ? `X ${previewMetrics.sizeMm[0]} • Y ${previewMetrics.sizeMm[1]} • Z ${previewMetrics.sizeMm[2]}` : '—'}
           </div>
           <div className="oem-preview-frame">
             {previewUrl ? renderPreviewCanvas() : (
