@@ -401,9 +401,9 @@ const SceneContent: React.FC<{
   );
   const majorSectionSize = minorCellSize * 4;
   const gridPalette = {
-    // Match OEM Admin grid palette for a consistent visual language.
-    cell: '#6f6f6f',
-    section: '#9d4b4b',
+    // User-customizable, persisted grid colors.
+    cell: sceneSettings.grid.cellColor || '#6f6f6f',
+    section: sceneSettings.grid.sectionColor || '#9d4b4b',
   };
 
   // Disable orbit rotation when a 3D object is selected AND a manipulation tool is active

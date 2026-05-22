@@ -173,6 +173,8 @@ export interface SceneSettings {
     visible: boolean;
     size: number;
     divisions: number;
+    cellColor: string;
+    sectionColor: string;
   };
   axes: {
     visible: boolean;
@@ -741,6 +743,56 @@ interface EditorState {
   getSceneData: () => any;
 }
 
+const GRID_COLOR_PREFS_KEY = 'metamech-grid-color-prefs-v1';
+const DEFAULT_GRID_CELL_COLOR = '#6f6f6f';
+const DEFAULT_GRID_SECTION_COLOR = '#9d4b4b';
+
+function normalizeHexColor(value: unknown, fallback: string): string {
+  if (typeof value !== 'string') return fallback;
+  const raw = value.trim();
+  if (/^#([0-9a-fA-F]{6})$/.test(raw)) return raw.toLowerCase();
+  if (/^#([0-9a-fA-F]{3})$/.test(raw)) {
+    const [, short] = /^#([0-9a-fA-F]{3})$/.exec(raw) || [];
+    if (!short) return fallback;
+    return `#${short[0]}${short[0]}${short[1]}${short[1]}${short[2]}${short[2]}`.toLowerCase();
+  }
+  return fallback;
+}
+
+function loadGridColorPreferences(): { cellColor: string; sectionColor: string } {
+  if (typeof localStorage === 'undefined') {
+    return { cellColor: DEFAULT_GRID_CELL_COLOR, sectionColor: DEFAULT_GRID_SECTION_COLOR };
+  }
+  try {
+    const raw = localStorage.getItem(GRID_COLOR_PREFS_KEY);
+    if (!raw) return { cellColor: DEFAULT_GRID_CELL_COLOR, sectionColor: DEFAULT_GRID_SECTION_COLOR };
+    const parsed = JSON.parse(raw);
+    return {
+      cellColor: normalizeHexColor(parsed?.cellColor, DEFAULT_GRID_CELL_COLOR),
+      sectionColor: normalizeHexColor(parsed?.sectionColor, DEFAULT_GRID_SECTION_COLOR),
+    };
+  } catch {
+    return { cellColor: DEFAULT_GRID_CELL_COLOR, sectionColor: DEFAULT_GRID_SECTION_COLOR };
+  }
+}
+
+function saveGridColorPreferences(grid: SceneSettings['grid']): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(
+      GRID_COLOR_PREFS_KEY,
+      JSON.stringify({
+        cellColor: normalizeHexColor(grid.cellColor, DEFAULT_GRID_CELL_COLOR),
+        sectionColor: normalizeHexColor(grid.sectionColor, DEFAULT_GRID_SECTION_COLOR),
+      }),
+    );
+  } catch {
+    // ignore storage write errors
+  }
+}
+
+const storedGridColors = loadGridColorPreferences();
+
 const defaultSceneSettings: SceneSettings = {
   environment: 'factory',
   lighting: {
@@ -751,6 +803,8 @@ const defaultSceneSettings: SceneSettings = {
     visible: true,
     size: 50,
     divisions: 200,
+    cellColor: storedGridColors.cellColor,
+    sectionColor: storedGridColors.sectionColor,
   },
   axes: {
     visible: true,
@@ -1155,9 +1209,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPathsVisible: (visible) => set({ pathsVisible: visible }),
   
   setSceneSettings: (settings) => {
-    set(state => ({
-      sceneSettings: { ...state.sceneSettings, ...settings },
-    }));
+    set((state) => {
+      const nextSceneSettings: SceneSettings = {
+        ...state.sceneSettings,
+        ...settings,
+        lighting: {
+          ...state.sceneSettings.lighting,
+          ...(settings.lighting || {}),
+        },
+        grid: {
+          ...state.sceneSettings.grid,
+          ...(settings.grid || {}),
+        },
+        axes: {
+          ...state.sceneSettings.axes,
+          ...(settings.axes || {}),
+        },
+      };
+      saveGridColorPreferences(nextSceneSettings.grid);
+      return { sceneSettings: nextSceneSettings };
+    });
   },
   
   setActiveLibraryTab: (tab) => {
@@ -1413,7 +1484,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       actors: data.actors || [],
       edges: data.edges || [],
       underlay: data.underlay || null,
-      sceneSettings: { ...defaultSceneSettings, ...(data.sceneSettings || {}) },
+      sceneSettings: {
+        ...defaultSceneSettings,
+        ...(data.sceneSettings || {}),
+        lighting: {
+          ...defaultSceneSettings.lighting,
+          ...(data.sceneSettings?.lighting || {}),
+        },
+        grid: {
+          ...defaultSceneSettings.grid,
+          ...(data.sceneSettings?.grid || {}),
+          // Always apply remembered user preference on login/session restore.
+          ...loadGridColorPreferences(),
+        },
+        axes: {
+          ...defaultSceneSettings.axes,
+          ...(data.sceneSettings?.axes || {}),
+        },
+      },
       customProducts: data.customProducts || [],
       customModels: data.customModels || [],
       paths: data.paths || [],

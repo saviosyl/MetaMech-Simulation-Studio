@@ -641,6 +641,26 @@ const RightPanel: React.FC = () => {
                 ))}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
                   <div>
+                    <label style={labelStyle}>Grid Line Color</label>
+                    <input
+                      type="color"
+                      value={sceneSettings.grid.cellColor}
+                      onChange={(e) => setSceneSettings({ grid: { ...sceneSettings.grid, cellColor: e.target.value } })}
+                      style={{ ...inputStyle, padding: 2, height: 34, cursor: 'pointer' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Major Line Color</label>
+                    <input
+                      type="color"
+                      value={sceneSettings.grid.sectionColor}
+                      onChange={(e) => setSceneSettings({ grid: { ...sceneSettings.grid, sectionColor: e.target.value } })}
+                      style={{ ...inputStyle, padding: 2, height: 34, cursor: 'pointer' }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                  <div>
                     <label style={labelStyle}>Grid Size (m)</label>
                     <input
                       type="number"
