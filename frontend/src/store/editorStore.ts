@@ -1392,7 +1392,46 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   loadScene: (data) => {
     // Migrate old spiral-conveyor params to new format
-    const nodes = data.processNodes || [];
+    const sanitizeScale = (rawScale: unknown, forceNeutral: boolean): [number, number, number] => {
+      const fallback: [number, number, number] = [1, 1, 1];
+      if (!Array.isArray(rawScale) || rawScale.length !== 3) return fallback;
+      const sx = Number(rawScale[0]);
+      const sy = Number(rawScale[1]);
+      const sz = Number(rawScale[2]);
+      if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(sz)) return fallback;
+      if (forceNeutral) return fallback;
+      const absX = Math.abs(sx);
+      const absY = Math.abs(sy);
+      const absZ = Math.abs(sz);
+      const max = Math.max(absX, absY, absZ);
+      const min = Math.min(absX, absY, absZ);
+      // Protect against legacy saved transforms that make imported models massive.
+      if (max > 4 || min < 0.01) return fallback;
+      return [sx, sy, sz];
+    };
+
+    const isLikelyOemObject = (item: any): boolean => {
+      const assetId = typeof item?.assetId === 'string' ? item.assetId.toLowerCase() : '';
+      const type = typeof item?.type === 'string' ? item.type.toLowerCase() : '';
+      if (assetId.startsWith('oem-') || type.startsWith('oem-')) return true;
+      if (/^x\d+/.test(type) || type.includes('flexlink')) return true;
+      const moduleDef = getModuleDefinition(item?.type || '');
+      return moduleDef?.category === 'oem';
+    };
+
+    const nodes = (data.processNodes || []).map((node: any) => ({
+      ...node,
+      scale: sanitizeScale(node?.scale, isLikelyOemObject(node)),
+    }));
+    const environmentAssets = (data.environmentAssets || []).map((asset: any) => ({
+      ...asset,
+      scale: sanitizeScale(asset?.scale, isLikelyOemObject(asset)),
+    }));
+    const actors = (data.actors || []).map((actor: any) => ({
+      ...actor,
+      scale: sanitizeScale(actor?.scale, false),
+    }));
+
     for (const n of nodes) {
       if (n.type === 'spiral-conveyor' && n.parameters) {
         const p = n.parameters;
@@ -1409,8 +1448,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     set({
       processNodes: nodes,
-      environmentAssets: data.environmentAssets || [],
-      actors: data.actors || [],
+      environmentAssets,
+      actors,
       edges: data.edges || [],
       underlay: data.underlay || null,
       sceneSettings: { ...defaultSceneSettings, ...(data.sceneSettings || {}) },

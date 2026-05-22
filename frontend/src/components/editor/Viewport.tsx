@@ -338,6 +338,22 @@ function normalizeToken(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
+function sanitizeWrapperScale(scale: [number, number, number], forceNeutral: boolean): [number, number, number] {
+  if (forceNeutral) return [1, 1, 1];
+  const sx = Number(scale?.[0]);
+  const sy = Number(scale?.[1]);
+  const sz = Number(scale?.[2]);
+  if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(sz)) return [1, 1, 1];
+  const absX = Math.abs(sx);
+  const absY = Math.abs(sy);
+  const absZ = Math.abs(sz);
+  const max = Math.max(absX, absY, absZ);
+  const min = Math.min(absX, absY, absZ);
+  // Guard against stale scene transforms that can make models enormous.
+  if (max > 4 || min < 0.01) return [1, 1, 1];
+  return [sx, sy, sz];
+}
+
 // Detect mobile/iPad Safari for performance optimizations
 const isMobileSafari = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) || 
   (typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
@@ -561,6 +577,7 @@ const SceneContent: React.FC<{
         {processNodes.filter(n => !hiddenIds.has(n.id) && !(overlaysHidden && OVERLAY_HIDDEN_TYPES.has(n.type))).map(node => (
           (() => {
             const isOemNode = isOemSceneObject(node.type, node.assetId);
+            const wrapperScale = sanitizeWrapperScale(node.scale, isOemNode);
             return (
           <DraggableObject
             key={node.id}
@@ -568,7 +585,7 @@ const SceneContent: React.FC<{
             objectType="process"
             position={node.position}
             rotation={node.rotation}
-            scale={isOemNode ? [1, 1, 1] : node.scale}
+            scale={wrapperScale}
             isSelected={selectedObjectId === node.id}
             orbitRef={orbitRef}
           >
@@ -586,6 +603,7 @@ const SceneContent: React.FC<{
         {environmentAssets.filter(a => !hiddenIds.has(a.id)).map(asset => (
           (() => {
             const isOemAsset = isOemSceneObject(asset.type, asset.assetId);
+            const wrapperScale = sanitizeWrapperScale(asset.scale, isOemAsset);
             return (
           <DraggableObject
             key={asset.id}
@@ -593,7 +611,7 @@ const SceneContent: React.FC<{
             objectType="environment"
             position={asset.position}
             rotation={asset.rotation}
-            scale={isOemAsset ? [1, 1, 1] : asset.scale}
+            scale={wrapperScale}
             isSelected={selectedObjectId === asset.id}
             orbitRef={orbitRef}
           >
