@@ -750,7 +750,7 @@ const defaultSceneSettings: SceneSettings = {
   grid: {
     visible: true,
     size: 50,
-    divisions: 50,
+    divisions: 200,
   },
   axes: {
     visible: true,

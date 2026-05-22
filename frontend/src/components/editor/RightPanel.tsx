@@ -257,6 +257,18 @@ const RightPanel: React.FC = () => {
     setSceneSettings({ grid: { ...sceneSettings.grid, divisions: clamped } });
   };
 
+  const setGridPitchPresetMm = (pitchMm: number) => {
+    if (!Number.isFinite(pitchMm) || pitchMm <= 0) return;
+    const sizeMm = sceneSettings.grid.size * 1000;
+    const nextDivisions = Math.round(sizeMm / pitchMm);
+    setGridDivisions(nextDivisions);
+  };
+
+  const currentGridPitchMm = React.useMemo(() => {
+    const divisions = Math.max(sceneSettings.grid.divisions, 1);
+    return Math.round((sceneSettings.grid.size * 1000) / divisions);
+  }, [sceneSettings.grid.size, sceneSettings.grid.divisions]);
+
   const renderInput = (key: string, def: any) => {
     const val = selectedObject?.parameters[key];
 
@@ -653,28 +665,49 @@ const RightPanel: React.FC = () => {
                     />
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                   <button
-                    style={{ ...inputStyle, width: 'auto', padding: '5px 10px', cursor: 'pointer' }}
-                    onClick={() => { setGridSize(30); setGridDivisions(24); }}
+                    style={{
+                      ...inputStyle,
+                      width: 'auto',
+                      padding: '5px 10px',
+                      cursor: 'pointer',
+                      background: currentGridPitchMm === 500 ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-input)',
+                    }}
+                    onClick={() => setGridPitchPresetMm(500)}
                     type="button"
                   >
-                    Coarse
+                    Layout · 500 mm
                   </button>
                   <button
-                    style={{ ...inputStyle, width: 'auto', padding: '5px 10px', cursor: 'pointer' }}
-                    onClick={() => { setGridSize(50); setGridDivisions(50); }}
+                    style={{
+                      ...inputStyle,
+                      width: 'auto',
+                      padding: '5px 10px',
+                      cursor: 'pointer',
+                      background: currentGridPitchMm === 250 ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-input)',
+                    }}
+                    onClick={() => setGridPitchPresetMm(250)}
                     type="button"
                   >
-                    Medium
+                    Standard · 250 mm
                   </button>
                   <button
-                    style={{ ...inputStyle, width: 'auto', padding: '5px 10px', cursor: 'pointer' }}
-                    onClick={() => { setGridSize(50); setGridDivisions(100); }}
+                    style={{
+                      ...inputStyle,
+                      width: 'auto',
+                      padding: '5px 10px',
+                      cursor: 'pointer',
+                      background: currentGridPitchMm === 100 ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-input)',
+                    }}
+                    onClick={() => setGridPitchPresetMm(100)}
                     type="button"
                   >
-                    Fine
+                    Precision · 100 mm
                   </button>
+                </div>
+                <div style={{ marginTop: 6, fontSize: 10, color: 'var(--mm-text-tertiary)' }}>
+                  Active pitch: {currentGridPitchMm} mm (you can still enter custom size/divisions above).
                 </div>
               </Section>
 
