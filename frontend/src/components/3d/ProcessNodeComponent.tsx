@@ -147,7 +147,7 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
   });
 
   // Check if this node uses the new asset system
-  const assetDef = node.assetId ? getAssetById(node.assetId) : undefined;
+  const assetDef = (node.assetId ? getAssetById(node.assetId) : undefined) || getAssetById(node.type);
 
   // BELT CONVEYOR: always use the real GLB model directly
   if (node.type === 'belt-conveyor') {

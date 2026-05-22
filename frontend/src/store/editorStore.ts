@@ -906,7 +906,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       scale: [1, 1, 1],
       parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
-      assetId: matchingAsset?.id,
+      assetId: matchingAsset?.id || preferredAssetId,
       assetDefType: matchingAsset?.assetType,
     };
     
@@ -938,7 +938,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       scale: [1, 1, 1],
       parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
-      assetId: matchingAsset?.id,
+      assetId: matchingAsset?.id || preferredAssetId,
       assetDefType: matchingAsset?.assetType,
     };
     
@@ -967,7 +967,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       scale: [1, 1, 1],
       parameters: params,
       name: payload.assembly.name || 'Frame Assembly',
-      assetId: matchingAsset?.id,
+      assetId: matchingAsset?.id || 'frame-assembly',
       assetDefType: matchingAsset?.assetType,
     };
 
@@ -1001,7 +1001,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       scale: [1, 1, 1],
       parameters: defaultParams,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)}_${Date.now()}`,
-      assetId: matchingAsset?.id,
+      assetId: matchingAsset?.id || preferredAssetId,
       assetDefType: matchingAsset?.assetType,
     };
     

@@ -22,7 +22,7 @@ const EnvironmentAssetComponent: React.FC<EnvironmentAssetComponentProps> = ({ a
   };
 
   // Check if this asset uses the new asset system
-  const assetDef = asset.assetId ? getAssetById(asset.assetId) : undefined;
+  const assetDef = (asset.assetId ? getAssetById(asset.assetId) : undefined) || getAssetById(asset.type);
 
   if (assetDef) {
     if (assetDef.assetType === 'parametric') {

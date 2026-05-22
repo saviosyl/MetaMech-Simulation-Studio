@@ -891,7 +891,7 @@ const OemAdminPage: React.FC = () => {
       <Grid args={[10, 10]} cellSize={0.5} cellThickness={0.4} sectionSize={2} sectionThickness={0.9} fadeDistance={28} fadeStrength={1} />
       <axesHelper args={[1.35]} position={[0, 0.001, 0]} />
       {selectedModel && previewUrl && (
-        <Bounds fit observe margin={1.2}>
+        <Bounds fit margin={1.2}>
           <InteractiveModelPreview
             modelUrl={previewUrl}
             modelFormat={selectedModel.modelFormat}
