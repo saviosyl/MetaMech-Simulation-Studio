@@ -476,27 +476,27 @@ const InteractiveModelPreview: React.FC<{
             </lineSegments>
           </group>
         )}
-        {placementGizmoEnabled && (
+        {placementGizmoEnabled && placementRootRef.current && (
           <TransformControls
-            object={placementRootRef.current || undefined}
+            object={placementRootRef.current}
             mode="rotate"
             size={0.85}
             rotationSnap={Math.max(1, placementRotationSnapDeg) * Math.PI / 180}
             onMouseDown={() => setOrbitEnabled(false)}
             onMouseUp={() => setOrbitEnabled(true)}
-            onDraggingChanged={(event: any) => setOrbitEnabled(!event.value)}
+            onDraggingChanged={(event: any) => setOrbitEnabled(!(event?.value ?? false))}
             onObjectChange={updatePlacementRotationFromObject}
           />
         )}
-        {transformPortsEnabled && selectedPort && (
+        {transformPortsEnabled && selectedPort && portTransformAnchorRef.current && (
           <TransformControls
-            object={portTransformAnchorRef.current || undefined}
+            object={portTransformAnchorRef.current}
             mode="translate"
             size={0.6}
             translationSnap={0.01}
             onMouseDown={() => setOrbitEnabled(false)}
             onMouseUp={() => setOrbitEnabled(true)}
-            onDraggingChanged={(event: any) => setOrbitEnabled(!event.value)}
+            onDraggingChanged={(event: any) => setOrbitEnabled(!(event?.value ?? false))}
             onObjectChange={updateSelectedPortFromAnchor}
           />
         )}
