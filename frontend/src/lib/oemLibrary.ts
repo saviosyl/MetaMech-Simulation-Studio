@@ -18,6 +18,10 @@ export interface OemModelEntry {
   description?: string;
   placementCategory?: PlacementCategory;
   defaultRotationDeg?: [number, number, number];
+  flowInPortId?: string;
+  flowOutPortId?: string;
+  flowSpeedMps?: number;
+  productSpinRpm?: number;
   modelFormat?: OemModelFormat;
   glbPath?: string;
   glbUrl?: string;
@@ -202,6 +206,14 @@ function normalizeLibrary(data: unknown): OemLibraryIndex {
         placementCategory: toPlacementCategory((m as any).placementCategory),
         defaultRotationDeg: Array.isArray((m as any).defaultRotationDeg) && (m as any).defaultRotationDeg.length === 3
           ? [(m as any).defaultRotationDeg[0], (m as any).defaultRotationDeg[1], (m as any).defaultRotationDeg[2]]
+          : undefined,
+        flowInPortId: typeof (m as any).flowInPortId === 'string' ? (m as any).flowInPortId : undefined,
+        flowOutPortId: typeof (m as any).flowOutPortId === 'string' ? (m as any).flowOutPortId : undefined,
+        flowSpeedMps: typeof (m as any).flowSpeedMps === 'number' && Number.isFinite((m as any).flowSpeedMps)
+          ? Math.max(0, (m as any).flowSpeedMps)
+          : undefined,
+        productSpinRpm: typeof (m as any).productSpinRpm === 'number' && Number.isFinite((m as any).productSpinRpm)
+          ? Math.max(0, (m as any).productSpinRpm)
           : undefined,
         modelFormat: (m as any).modelFormat ? toModelFormat((m as any).modelFormat) : inferredFormat,
         glbPath,

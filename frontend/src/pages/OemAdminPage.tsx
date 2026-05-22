@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
-import { Bounds, ContactShadows, Environment, Grid, OrbitControls, TransformControls } from '@react-three/drei';
-import { ArrowLeft, Building2, Download, Maximize2, Minimize2, Plus, Save, Trash2, Upload } from 'lucide-react';
+import { Bounds, ContactShadows, Environment, Grid, Line, OrbitControls, TransformControls } from '@react-three/drei';
+import { ArrowLeft, Building2, Download, Maximize2, Minimize2, Plus, RotateCw, Save, Settings2, Target, Trash2, Upload, Workflow } from 'lucide-react';
 import * as THREE from 'three';
 import { useAuth } from '../contexts/AuthContext';
 import { isOemAdminUser } from '../lib/adminAccess';
@@ -40,6 +40,8 @@ function defaultModel(_companyId: string, modelName = 'New OEM Model'): OemModel
     description: '',
     placementCategory: 'environment',
     defaultRotationDeg: [0, 0, 0],
+    flowSpeedMps: 0.25,
+    productSpinRpm: 0,
     modelFormat: 'glb',
     glbPath: '',
     glbUrl: '',
@@ -120,10 +122,15 @@ const InteractiveModelPreview: React.FC<{
   defaultScale?: [number, number, number];
   placementRotationDeg?: [number, number, number];
   ports: OemConnectionPortInput[];
+  placementGizmoEnabled: boolean;
+  placementRotationSnapDeg: number;
   selectedPortIndex: number;
   transformPortsEnabled: boolean;
   addPortByClick: boolean;
   portTypeForClick: 'input' | 'output';
+  showFlowGuide: boolean;
+  flowInPortId?: string;
+  flowOutPortId?: string;
   onSelectPort: (index: number) => void;
   onPortTransform: (index: number, localPos: [number, number, number]) => void;
   onPlacementRotationChange: (rotationDeg: [number, number, number]) => void;
@@ -134,10 +141,15 @@ const InteractiveModelPreview: React.FC<{
   defaultScale,
   placementRotationDeg,
   ports,
+  placementGizmoEnabled,
+  placementRotationSnapDeg,
   selectedPortIndex,
   transformPortsEnabled,
   addPortByClick,
   portTypeForClick,
+  showFlowGuide,
+  flowInPortId,
+  flowOutPortId,
   onSelectPort,
   onPortTransform,
   onPlacementRotationChange,
@@ -234,6 +246,11 @@ const InteractiveModelPreview: React.FC<{
   ];
 
   const selectedPort = selectedPortIndex >= 0 ? ports[selectedPortIndex] : null;
+  const flowInPort = ports.find((port) => port.id === flowInPortId);
+  const flowOutPort = ports.find((port) => port.id === flowOutPortId);
+  const flowGuidePoints = (flowInPort && flowOutPort)
+    ? [flowInPort.localPosition, flowOutPort.localPosition]
+    : null;
 
   const updatePlacementRotationFromObject = () => {
     if (!placementRootRef.current) return;
@@ -295,12 +312,15 @@ const InteractiveModelPreview: React.FC<{
             />
           )}
         </group>
-        <TransformControls
-          object={placementRootRef.current || undefined}
-          mode="rotate"
-          size={0.85}
-          onObjectChange={updatePlacementRotationFromObject}
-        />
+        {placementGizmoEnabled && (
+          <TransformControls
+            object={placementRootRef.current || undefined}
+            mode="rotate"
+            size={0.85}
+            rotationSnap={Math.max(1, placementRotationSnapDeg) * Math.PI / 180}
+            onObjectChange={updatePlacementRotationFromObject}
+          />
+        )}
         {transformPortsEnabled && selectedPort && (
           <TransformControls
             object={portTransformAnchorRef.current || undefined}
@@ -309,6 +329,19 @@ const InteractiveModelPreview: React.FC<{
             translationSnap={0.01}
             onObjectChange={updateSelectedPortFromAnchor}
           />
+        )}
+        {showFlowGuide && flowGuidePoints && (
+          <group position={[0, previewGroundLift, 0]}>
+            <Line points={flowGuidePoints} color="#f59e0b" lineWidth={2.2} dashed dashSize={0.08} gapSize={0.05} />
+            <mesh position={flowGuidePoints[0]}>
+              <sphereGeometry args={[0.09, 12, 12]} />
+              <meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={0.5} />
+            </mesh>
+            <mesh position={flowGuidePoints[1]}>
+              <sphereGeometry args={[0.09, 12, 12]} />
+              <meshStandardMaterial color="#f97316" emissive="#ea580c" emissiveIntensity={0.55} />
+            </mesh>
+          </group>
         )}
       </group>
     </group>
@@ -326,8 +359,12 @@ const OemAdminPage: React.FC = () => {
   const [loadingLibrary, setLoadingLibrary] = useState(true);
   const [clickPortMode, setClickPortMode] = useState(false);
   const [clickPortType, setClickPortType] = useState<'input' | 'output'>('input');
+  const [placementGizmoEnabled, setPlacementGizmoEnabled] = useState(true);
+  const [placementRotationSnapDeg, setPlacementRotationSnapDeg] = useState(15);
   const [selectedPortIndex, setSelectedPortIndex] = useState<number>(-1);
   const [transformPortsEnabled, setTransformPortsEnabled] = useState(true);
+  const [portNudgeStep, setPortNudgeStep] = useState(0.01);
+  const [showFlowGuide, setShowFlowGuide] = useState(true);
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [pendingDeletes, setPendingDeletes] = useState<string[]>([]);
   const [localPreviewUrls, setLocalPreviewUrls] = useState<Record<string, string>>({});
@@ -374,10 +411,21 @@ const OemAdminPage: React.FC = () => {
     () => selectedCompany?.models.find((model) => model.id === selectedModelId) || null,
     [selectedCompany, selectedModelId],
   );
+  const selectedPort = useMemo(
+    () => (selectedModel && selectedPortIndex >= 0 ? (selectedModel.connectionPorts || [])[selectedPortIndex] || null : null),
+    [selectedModel, selectedPortIndex],
+  );
 
   useEffect(() => {
     setSelectedPortIndex(-1);
   }, [selectedCompanyId, selectedModelId]);
+
+  useEffect(() => {
+    const portCount = selectedModel?.connectionPorts?.length || 0;
+    if (selectedPortIndex >= portCount) {
+      setSelectedPortIndex(portCount > 0 ? portCount - 1 : -1);
+    }
+  }, [selectedModel, selectedPortIndex]);
 
   const previewUrl = useMemo(() => {
     if (!selectedCompany || !selectedModel) return null;
@@ -537,6 +585,36 @@ const OemAdminPage: React.FC = () => {
     setNotice('');
   };
 
+  const duplicateSelectedPort = () => {
+    if (!selectedPort) return;
+    const nextIndex = (selectedModel?.connectionPorts?.length || 0);
+    const baseId = selectedPort.id || 'port';
+    const duplicated: OemConnectionPortInput = {
+      ...selectedPort,
+      id: `${baseId}-copy`,
+      localPosition: [
+        Number((selectedPort.localPosition[0] + 0.03).toFixed(4)),
+        Number((selectedPort.localPosition[1] + 0.03).toFixed(4)),
+        Number((selectedPort.localPosition[2] + 0.03).toFixed(4)),
+      ],
+    };
+    updateSelectedModel((model) => ({
+      ...model,
+      connectionPorts: [...(model.connectionPorts || []), duplicated],
+    }));
+    setSelectedPortIndex(nextIndex);
+    setNotice('Selected node duplicated.');
+  };
+
+  const nudgeSelectedPort = (axis: 0 | 1 | 2, delta: number) => {
+    if (selectedPortIndex < 0) return;
+    updatePort(selectedPortIndex, (p) => {
+      const next: [number, number, number] = [...p.localPosition];
+      next[axis] = Number((next[axis] + delta).toFixed(4));
+      return { ...p, localPosition: next };
+    });
+  };
+
   const setPlacementRotationDeg = (rotationDeg: [number, number, number]) => {
     updateSelectedModel((model) => ({ ...model, defaultRotationDeg: rotationDeg }));
     setNotice('');
@@ -544,6 +622,23 @@ const OemAdminPage: React.FC = () => {
 
   const updatePortFromTransform = (index: number, localPos: [number, number, number]) => {
     updatePort(index, (p) => ({ ...p, localPosition: localPos }));
+  };
+
+  const autoAssignFlowNodes = () => {
+    if (!selectedModel) return;
+    const ports = selectedModel.connectionPorts || [];
+    const inPort = ports.find((port) => port.type === 'input');
+    const outPort = ports.find((port) => port.type === 'output');
+    if (!inPort || !outPort) {
+      setNotice('Need at least one input and one output node for flow.');
+      return;
+    }
+    updateSelectedModel((model) => ({
+      ...model,
+      flowInPortId: inPort.id,
+      flowOutPortId: outPort.id,
+    }));
+    setNotice('Flow nodes auto-assigned from input/output ports.');
   };
 
   const saveDraft = () => {
@@ -768,10 +863,15 @@ const OemAdminPage: React.FC = () => {
             defaultScale={selectedModel.defaultScale}
             placementRotationDeg={selectedModel.defaultRotationDeg}
             ports={selectedModel.connectionPorts || []}
+            placementGizmoEnabled={placementGizmoEnabled}
+            placementRotationSnapDeg={placementRotationSnapDeg}
             selectedPortIndex={selectedPortIndex}
             transformPortsEnabled={transformPortsEnabled}
             addPortByClick={clickPortMode}
             portTypeForClick={clickPortType}
+            showFlowGuide={showFlowGuide}
+            flowInPortId={selectedModel.flowInPortId}
+            flowOutPortId={selectedModel.flowOutPortId}
             onSelectPort={setSelectedPortIndex}
             onPortTransform={updatePortFromTransform}
             onPlacementRotationChange={setPlacementRotationDeg}
@@ -861,11 +961,14 @@ const OemAdminPage: React.FC = () => {
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 460px', gap: 12, padding: 12, alignItems: 'start' }}>
-        <aside style={{ border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '320px minmax(560px, 1fr) 520px', gap: 12, padding: 12, alignItems: 'start' }}>
+        <aside style={{ border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 10, maxHeight: 'calc(100vh - 92px)', overflow: 'auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <strong style={{ fontSize: 13 }}>OEM Companies</strong>
+            <strong style={{ fontSize: 13 }}>Left Panel • Library Tools</strong>
             <button onClick={addCompany} style={{ border: '1px solid var(--mm-border)', background: 'var(--mm-bg-surface)', borderRadius: 8, padding: 6, cursor: 'pointer' }}><Plus size={14} /></button>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginBottom: 8 }}>
+            Tool: <strong>Company Manager</strong> — create/select OEM brands.
           </div>
           {library.companies.map((company) => (
             <div key={company.id} style={{ marginBottom: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: selectedCompanyId === company.id ? 'var(--mm-accent-primary-muted)' : 'transparent' }}>
@@ -878,13 +981,42 @@ const OemAdminPage: React.FC = () => {
               </div>
             </div>
           ))}
+          <div style={{ borderTop: '1px solid var(--mm-border-subtle)', marginTop: 8, paddingTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <strong style={{ fontSize: 13 }}>Tool: Model List</strong>
+              <button onClick={addModel} disabled={!selectedCompany} style={{ border: '1px solid var(--mm-border)', background: 'var(--mm-bg-surface)', borderRadius: 8, padding: '4px 8px', cursor: selectedCompany ? 'pointer' : 'not-allowed' }}>
+                + Model
+              </button>
+            </div>
+            {!selectedCompany ? (
+              <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 8 }}>Select a company to manage its models.</div>
+            ) : (
+              <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+                {selectedCompany.models.map((model) => (
+                  <div key={model.id} style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 7, background: selectedModelId === model.id ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)' }}>
+                    <button onClick={() => setSelectedModelId(model.id)} style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{model.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>{model.id}</div>
+                    </button>
+                    <button onClick={() => removeModel(model.id)} style={{ marginTop: 4, border: 'none', background: 'transparent', color: 'var(--mm-text-tertiary)', cursor: 'pointer' }} title="Delete model">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </aside>
 
-        <section style={{ border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 12, maxHeight: 'calc(100vh - 92px)', overflowY: 'auto' }}>
+        <section style={{ gridColumn: 3, border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 12, maxHeight: 'calc(100vh - 92px)', overflowY: 'auto' }}>
           {!selectedCompany ? (
             <div style={{ color: 'var(--mm-text-tertiary)' }}>Create a company to begin.</div>
           ) : (
             <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <Settings2 size={15} />
+                <strong style={{ fontSize: 13 }}>Right Panel • Model Authoring Tools</strong>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
                 <input value={selectedCompany.name} onChange={(e) => updateCompany(selectedCompany.id, (company) => ({ ...company, name: e.target.value }))} placeholder="Company name" />
                 <input value={selectedCompany.folder || ''} onChange={(e) => updateCompany(selectedCompany.id, (company) => ({ ...company, folder: e.target.value }))} placeholder="Library folder name" />
@@ -1023,10 +1155,39 @@ const OemAdminPage: React.FC = () => {
                         Reset Rotation
                       </button>
                     </div>
+                    <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, display: 'grid', gridTemplateColumns: '1fr 120px', gap: 8, alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <RotateCw size={13} />
+                          Tool: Placement Rotate Gizmo
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginTop: 3 }}>
+                          Rotate model in center viewport; this becomes default orientation in Main Simulation.
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setPlacementGizmoEnabled((prev) => !prev)}
+                        style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: placementGizmoEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '4px 8px' }}
+                      >
+                        {placementGizmoEnabled ? 'Gizmo ON' : 'Gizmo OFF'}
+                      </button>
+                      <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Tool: Rotation Snap (degrees)</div>
+                      <input
+                        type="number"
+                        min={1}
+                        max={90}
+                        step={1}
+                        value={placementRotationSnapDeg}
+                        onChange={(e) => setPlacementRotationSnapDeg(Math.max(1, Math.min(90, Number(e.target.value) || 1)))}
+                      />
+                    </div>
 
                     <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <strong style={{ fontSize: 12 }}>Model Nodes / Ports (admin only)</strong>
+                        <strong style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Target size={13} />
+                          Tool Group: Node Authoring (admin only)
+                        </strong>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                           <select value={clickPortType} onChange={(e) => setClickPortType(e.target.value as 'input' | 'output')} style={{ fontSize: 12 }}>
                             <option value="input">Input node</option>
@@ -1055,7 +1216,37 @@ const OemAdminPage: React.FC = () => {
                         </div>
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginBottom: 6 }}>
-                        Tip: click a node marker in 3D preview to select it, then drag with gizmo for precise placement.
+                        Tools: <strong>Click-to-add</strong> (surface node pick), <strong>Port Gizmo</strong> (drag selected node), <strong>Manual Port</strong> (typed entry).
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, marginBottom: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: '#f8fafc' }}>
+                        <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>
+                          Tool: <strong>Node Fine-Tune</strong> — select a node then use nudge and duplicate for precision alignment.
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input
+                            type="number"
+                            min={0.001}
+                            step={0.001}
+                            value={portNudgeStep}
+                            onChange={(e) => setPortNudgeStep(Math.max(0.001, Number(e.target.value) || 0.001))}
+                            style={{ width: 88 }}
+                            title="Nudge step size"
+                          />
+                          <button onClick={duplicateSelectedPort} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: selectedPort ? 'pointer' : 'not-allowed', padding: '2px 8px' }}>
+                            Duplicate Node
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <button onClick={() => nudgeSelectedPort(0, -portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>X-</button>
+                          <button onClick={() => nudgeSelectedPort(0, portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>X+</button>
+                          <button onClick={() => nudgeSelectedPort(1, -portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Y-</button>
+                          <button onClick={() => nudgeSelectedPort(1, portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Y+</button>
+                          <button onClick={() => nudgeSelectedPort(2, -portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Z-</button>
+                          <button onClick={() => nudgeSelectedPort(2, portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Z+</button>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                          {selectedPort ? `Selected Node: ${selectedPort.id}` : 'Selected Node: none'}
+                        </div>
                       </div>
                       {(selectedModel.connectionPorts || []).map((port, idx) => (
                         <div
@@ -1095,6 +1286,65 @@ const OemAdminPage: React.FC = () => {
                         </div>
                       ))}
                     </div>
+                    <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                        <Workflow size={13} />
+                        Tool Group: Product Flow & Animation
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginBottom: 8 }}>
+                        Define flow start/end nodes for product path preview and future animation behavior.
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, marginBottom: 8 }}>
+                        <select
+                          value={selectedModel.flowInPortId || ''}
+                          onChange={(e) => updateSelectedModel((model) => ({ ...model, flowInPortId: e.target.value || undefined }))}
+                        >
+                          <option value="">Flow Start Node (Infeed)</option>
+                          {(selectedModel.connectionPorts || []).map((port) => (
+                            <option key={`flow-in-${port.id}`} value={port.id}>{port.id}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={selectedModel.flowOutPortId || ''}
+                          onChange={(e) => updateSelectedModel((model) => ({ ...model, flowOutPortId: e.target.value || undefined }))}
+                        >
+                          <option value="">Flow End Node (Outfeed)</option>
+                          {(selectedModel.connectionPorts || []).map((port) => (
+                            <option key={`flow-out-${port.id}`} value={port.id}>{port.id}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={autoAssignFlowNodes}
+                          style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}
+                        >
+                          Auto Assign
+                        </button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.05}
+                          value={selectedModel.flowSpeedMps ?? 0}
+                          onChange={(e) => updateSelectedModel((model) => ({ ...model, flowSpeedMps: Math.max(0, Number(e.target.value) || 0) }))}
+                          placeholder="Tool: Product Speed (m/s)"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={selectedModel.productSpinRpm ?? 0}
+                          onChange={(e) => updateSelectedModel((model) => ({ ...model, productSpinRpm: Math.max(0, Number(e.target.value) || 0) }))}
+                          placeholder="Tool: Product Spin (RPM)"
+                        />
+                        <button
+                          onClick={() => setShowFlowGuide((prev) => !prev)}
+                          style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: showFlowGuide ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}
+                        >
+                          {showFlowGuide ? 'Flow Guide ON' : 'Flow Guide OFF'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div style={{ color: 'var(--mm-text-tertiary)' }}>Select or create a model.</div>
@@ -1104,9 +1354,9 @@ const OemAdminPage: React.FC = () => {
           )}
         </section>
 
-        <aside style={{ border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 10, position: 'sticky', top: 10, maxHeight: 'calc(100vh - 92px)', overflow: 'auto' }}>
+        <aside style={{ gridColumn: 2, border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 10, position: 'sticky', top: 10, maxHeight: 'calc(100vh - 92px)', overflow: 'auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <strong style={{ fontSize: 13 }}>Premium 3D Preview</strong>
+            <strong style={{ fontSize: 13 }}>Center Viewport • 3D Model Workspace</strong>
             <button
               onClick={() => setPreviewFullscreen(true)}
               style={{ border: '1px solid var(--mm-border)', borderRadius: 8, background: 'var(--mm-bg-surface)', padding: '6px 10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
@@ -1115,7 +1365,18 @@ const OemAdminPage: React.FC = () => {
               Fullscreen
             </button>
           </div>
-          <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, overflow: 'hidden', height: 420 }}>
+          <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button onClick={() => setPlacementGizmoEnabled((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: placementGizmoEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11 }}>
+              Tool: Rotate Gizmo
+            </button>
+            <button onClick={() => setTransformPortsEnabled((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: transformPortsEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11 }}>
+              Tool: Node Gizmo
+            </button>
+            <button onClick={() => setShowFlowGuide((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: showFlowGuide ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11 }}>
+              Tool: Flow Guide
+            </button>
+          </div>
+          <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, overflow: 'hidden', height: 560 }}>
             {previewUrl ? renderPreviewCanvas() : (
               <div style={{ padding: 10, color: 'var(--mm-text-tertiary)', fontSize: 12 }}>
                 Add <code>model path/URL</code> or import a local <code>.OBJ/.STEP/.GLB</code> file.
