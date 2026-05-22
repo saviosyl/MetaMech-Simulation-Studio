@@ -31,6 +31,21 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
     if (!model) return null;
     const instance = model.clone(true);
     if (assetDef.defaultScale) instance.scale.set(...assetDef.defaultScale);
+
+    // OEM uploads may come from mm-authored GLB/GLTF exports.
+    // If dimensions are implausibly large in scene units, normalize to meters.
+    if (assetDef.id.startsWith('oem-')) {
+      const preBox = new THREE.Box3().setFromObject(instance);
+      const preSize = preBox.getSize(new THREE.Vector3());
+      const maxDim = Math.max(preSize.x, preSize.y, preSize.z);
+      const format = assetDef.sourceFormat || 'glb';
+      const looksLikeMillimeters = Number.isFinite(maxDim) && maxDim > 20;
+      const largeGlbLikeMm = (format === 'glb' || format === 'gltf') && Number.isFinite(maxDim) && maxDim > 5;
+      if (looksLikeMillimeters || largeGlbLikeMm) {
+        instance.scale.multiplyScalar(0.001);
+      }
+    }
+
     const shouldGroundToPlane = assetDef.category === 'environment'
       || assetDef.category === 'actors'
       || !assetDef.connectionPorts
