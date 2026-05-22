@@ -935,6 +935,53 @@ const OemAdminPage: React.FC = () => {
           .oem-admin-page textarea::placeholder {
             color: #64748b;
           }
+          .oem-admin-layout {
+            display: grid;
+            grid-template-columns: minmax(220px, 0.9fr) minmax(420px, 1.5fr) minmax(340px, 1.15fr);
+            grid-template-areas: "left center right";
+            gap: 12px;
+            padding: 12px;
+            align-items: start;
+          }
+          .oem-panel {
+            border: 1px solid var(--mm-border);
+            border-radius: 10px;
+            background: var(--mm-bg-panel);
+            padding: 10px;
+            max-height: calc(100vh - 92px);
+            overflow: auto;
+          }
+          .oem-panel-left { grid-area: left; }
+          .oem-panel-center { grid-area: center; position: sticky; top: 10px; }
+          .oem-panel-right { grid-area: right; }
+          .oem-preview-frame {
+            margin-top: 8px;
+            border: 1px solid var(--mm-border-subtle);
+            border-radius: 8px;
+            overflow: hidden;
+            height: clamp(320px, 50vh, 500px);
+          }
+          @media (max-width: 1220px) {
+            .oem-admin-layout {
+              grid-template-columns: minmax(210px, 0.9fr) minmax(360px, 1.4fr) minmax(300px, 1fr);
+            }
+          }
+          @media (max-width: 1060px) {
+            .oem-admin-layout {
+              grid-template-columns: 1fr;
+              grid-template-areas:
+                "center"
+                "right"
+                "left";
+            }
+            .oem-panel {
+              max-height: none;
+            }
+            .oem-panel-center {
+              position: relative;
+              top: auto;
+            }
+          }
         `}
       </style>
       <header style={{ padding: '12px 20px', borderBottom: '1px solid var(--mm-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -961,8 +1008,8 @@ const OemAdminPage: React.FC = () => {
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px minmax(560px, 1fr) 520px', gap: 12, padding: 12, alignItems: 'start' }}>
-        <aside style={{ border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 10, maxHeight: 'calc(100vh - 92px)', overflow: 'auto' }}>
+      <div className="oem-admin-layout">
+        <aside className="oem-panel oem-panel-left">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <strong style={{ fontSize: 13 }}>Left Panel • Library Tools</strong>
             <button onClick={addCompany} style={{ border: '1px solid var(--mm-border)', background: 'var(--mm-bg-surface)', borderRadius: 8, padding: 6, cursor: 'pointer' }}><Plus size={14} /></button>
@@ -1008,7 +1055,7 @@ const OemAdminPage: React.FC = () => {
           </div>
         </aside>
 
-        <section style={{ gridColumn: 3, border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 12, maxHeight: 'calc(100vh - 92px)', overflowY: 'auto' }}>
+        <section className="oem-panel oem-panel-right" style={{ padding: 12 }}>
           {!selectedCompany ? (
             <div style={{ color: 'var(--mm-text-tertiary)' }}>Create a company to begin.</div>
           ) : (
@@ -1029,7 +1076,7 @@ const OemAdminPage: React.FC = () => {
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(170px, 0.8fr) minmax(0, 1.2fr)', gap: 10 }}>
                 <div style={{ maxHeight: 620, overflow: 'auto', border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 6 }}>
                   {selectedCompany.models.map((model) => (
                     <div key={model.id} style={{ padding: 8, borderRadius: 6, marginBottom: 6, background: selectedModelId === model.id ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', border: '1px solid var(--mm-border-subtle)' }}>
@@ -1254,7 +1301,7 @@ const OemAdminPage: React.FC = () => {
                           onClick={() => setSelectedPortIndex(idx)}
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: '1fr 90px repeat(3,80px) 34px',
+                            gridTemplateColumns: 'minmax(0,1fr) 90px repeat(3,minmax(0,78px)) 30px',
                             gap: 6,
                             marginBottom: 6,
                             border: selectedPortIndex === idx ? '1px solid var(--mm-accent-primary)' : '1px solid transparent',
@@ -1294,7 +1341,7 @@ const OemAdminPage: React.FC = () => {
                       <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)', marginBottom: 8 }}>
                         Define flow start/end nodes for product path preview and future animation behavior.
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, marginBottom: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) auto', gap: 8, marginBottom: 8 }}>
                         <select
                           value={selectedModel.flowInPortId || ''}
                           onChange={(e) => updateSelectedModel((model) => ({ ...model, flowInPortId: e.target.value || undefined }))}
@@ -1320,7 +1367,7 @@ const OemAdminPage: React.FC = () => {
                           Auto Assign
                         </button>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'center' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
                         <input
                           type="number"
                           min={0}
@@ -1354,7 +1401,7 @@ const OemAdminPage: React.FC = () => {
           )}
         </section>
 
-        <aside style={{ gridColumn: 2, border: '1px solid var(--mm-border)', borderRadius: 10, background: 'var(--mm-bg-panel)', padding: 10, position: 'sticky', top: 10, maxHeight: 'calc(100vh - 92px)', overflow: 'auto' }}>
+        <aside className="oem-panel oem-panel-center">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             <strong style={{ fontSize: 13 }}>Center Viewport • 3D Model Workspace</strong>
             <button
@@ -1376,7 +1423,7 @@ const OemAdminPage: React.FC = () => {
               Tool: Flow Guide
             </button>
           </div>
-          <div style={{ marginTop: 8, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, overflow: 'hidden', height: 560 }}>
+          <div className="oem-preview-frame">
             {previewUrl ? renderPreviewCanvas() : (
               <div style={{ padding: 10, color: 'var(--mm-text-tertiary)', fontSize: 12 }}>
                 Add <code>model path/URL</code> or import a local <code>.OBJ/.STEP/.GLB</code> file.
