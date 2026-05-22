@@ -76,7 +76,7 @@ function resolveStaticAssetDef(assetId: string | undefined, type: string): Stati
   const legacyOem = manifest.find((asset) => (
     asset.assetType === 'static'
     && asset.id.startsWith('oem-')
-    && asset.id.endsWith(`-${token}`)
+    && (asset.id.endsWith(`-${token}`) || asset.id.includes(`-${token}-`))
   ));
   return legacyOem as StaticAssetDef | undefined;
 }

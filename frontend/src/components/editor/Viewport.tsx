@@ -371,14 +371,18 @@ const SceneContent: React.FC<{
   const keyShadowMapSize = isExportRendering ? exportPreset.shadowMapSize : (isMobileSafari ? 1024 : 4096);
 
   const legacyOemTypeSuffixes = useMemo(() => {
-    const suffixes = new Set<string>();
+    const tokens = new Set<string>();
     for (const asset of getAssetManifest()) {
       if (asset.assetType !== 'static' || !asset.id.startsWith('oem-')) continue;
       const parts = asset.id.split('-');
-      const suffix = parts[parts.length - 1];
-      if (suffix) suffixes.add(suffix);
+      // Capture all meaningful model-id tokens so legacy types like "x45"
+      // can still be recognized when asset ids are "oem-company-flexlink-x45-50".
+      for (let i = 2; i < parts.length; i += 1) {
+        const token = parts[i];
+        if (token) tokens.add(token);
+      }
     }
-    return suffixes;
+    return tokens;
   }, [processNodes.length, environmentAssets.length]);
 
   const isOemSceneObject = useCallback((type: string, assetId?: string) => {
