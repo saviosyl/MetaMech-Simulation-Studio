@@ -354,15 +354,17 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
       );
     }
     if (assetDef.assetType === 'static') {
+      const staticDef = assetDef as StaticAssetDef;
+      const isOemStatic = staticDef.id.startsWith('oem-');
       return (
         <group
           ref={groupRef}
           position={node.position}
           rotation={node.rotation}
-          scale={node.scale}
+          scale={isOemStatic ? [1, 1, 1] : node.scale}
         >
           <StaticModel
-            assetDef={assetDef as StaticAssetDef}
+            assetDef={staticDef}
             isSelected={isSelected}
             onClick={onClick}
           />

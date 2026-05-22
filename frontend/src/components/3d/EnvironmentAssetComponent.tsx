@@ -38,10 +38,16 @@ const EnvironmentAssetComponent: React.FC<EnvironmentAssetComponentProps> = ({ a
       );
     }
     if (assetDef.assetType === 'static') {
+      const staticDef = assetDef as StaticAssetDef;
+      const isOemStatic = staticDef.id.startsWith('oem-');
       return (
-        <group position={asset.position} rotation={asset.rotation} scale={asset.scale}>
+        <group
+          position={asset.position}
+          rotation={asset.rotation}
+          scale={isOemStatic ? [1, 1, 1] : asset.scale}
+        >
           <StaticModel
-            assetDef={assetDef as StaticAssetDef}
+            assetDef={staticDef}
             isSelected={isSelected}
             onClick={onClick}
           />

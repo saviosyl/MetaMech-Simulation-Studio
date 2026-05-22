@@ -212,6 +212,7 @@ const InteractiveModelPreview: React.FC<{
         } else {
           mesh.material = new THREE.MeshStandardMaterial({ color: '#8793a0', metalness: 0.12, roughness: 0.76, envMapIntensity: 0.2 });
         }
+        mesh.frustumCulled = false;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
       }

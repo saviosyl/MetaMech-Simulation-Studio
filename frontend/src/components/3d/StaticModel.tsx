@@ -107,6 +107,7 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
             mesh.material = tuneMaterial(mesh.material as THREE.Material);
           }
         }
+        mesh.frustumCulled = false;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
       }
