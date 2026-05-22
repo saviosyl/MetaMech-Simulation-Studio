@@ -516,7 +516,7 @@ const OemAdminPage: React.FC = () => {
           const probeBox = new THREE.Box3().setFromObject(probe);
           const probeSize = probeBox.getSize(new THREE.Vector3());
           const maxDim = Math.max(probeSize.x, probeSize.y, probeSize.z);
-          if (Number.isFinite(maxDim) && maxDim > 120) {
+          if (Number.isFinite(maxDim) && maxDim > 8) {
             inferredScale = [0.001, 0.001, 0.001];
           }
         } catch {
