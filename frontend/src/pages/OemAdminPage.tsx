@@ -242,7 +242,21 @@ const InteractiveModelPreview: React.FC<{
   const modelClone = useMemo(() => {
     if (!loadedModel) return null;
     const instance = loadedModel.clone(true);
-    if (defaultScale) instance.scale.set(...defaultScale);
+    const format = modelFormat || inferModelFormat(modelUrl);
+    if (defaultScale) {
+      const preserveLoaderUnitScale = format === 'obj' || format === 'step';
+      if (preserveLoaderUnitScale) {
+        const legacyMmScale =
+          Math.abs(defaultScale[0] - 0.001) < 0.00001 &&
+          Math.abs(defaultScale[1] - 0.001) < 0.00001 &&
+          Math.abs(defaultScale[2] - 0.001) < 0.00001;
+        // OBJ/STEP loader already normalizes mm -> m. Neutralize legacy 0.001 defaults.
+        const scaleVector = legacyMmScale ? [1, 1, 1] : defaultScale;
+        instance.scale.multiply(new THREE.Vector3(scaleVector[0], scaleVector[1], scaleVector[2]));
+      } else {
+        instance.scale.set(...defaultScale);
+      }
+    }
     instance.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
@@ -282,7 +296,7 @@ const InteractiveModelPreview: React.FC<{
       }
     });
     return instance;
-  }, [loadedModel, defaultScale]);
+  }, [loadedModel, defaultScale, modelFormat, modelUrl]);
 
   const previewScale = useMemo(() => {
     if (!modelClone) return 1;
