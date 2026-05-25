@@ -17,12 +17,14 @@ import * as THREE from 'three';
 
 // Module-level camera ref for drop raycast (accessible outside Canvas)
 let _threeCamera: THREE.Camera | null = null;
+let _threeScene: THREE.Scene | null = null;
 let _canvasSize: { width: number; height: number } = { width: 1, height: 1 };
 
 /** Tiny component inside Canvas that captures the camera */
 const CameraCapture: React.FC = () => {
-  const { camera, size } = useThree();
+  const { camera, scene, size } = useThree();
   _threeCamera = camera;
+  _threeScene = scene;
   _canvasSize = size;
   return null;
 };
@@ -315,6 +317,7 @@ const DraggableObject: React.FC<{
         position={position}
         rotation={rotation}
         scale={scale}
+        userData={{ editorObjectId: id, editorObjectType: objectType }}
       >
         {children}
       </group>
@@ -731,24 +734,84 @@ const Viewport: React.FC = () => {
   const dynamicDprMax = isExportRendering ? Math.max(2, Math.min(3, exportPreset.targetDpr)) : 2;
   const isNavigating = isOrbitNavigating || isSpaceMouseNavigating;
 
-  const autoFitFirstDroppedPart = useCallback((position: [number, number, number]) => {
+  const autoFitFirstDroppedPart = useCallback((
+    position: [number, number, number],
+    droppedRef: { id: string; objectType: 'process' | 'environment' | 'actor' } | null,
+    attempt = 0,
+  ) => {
     if (firstDropAutoFitDoneRef.current) return;
     const controls = orbitRef.current;
     const camera = (controls?.object as THREE.Camera | undefined) || _threeCamera;
     if (!camera || !controls) return;
 
     const target = new THREE.Vector3(position[0], position[1], position[2]);
+    let radius = 0.35;
+    let hasMeasuredBounds = false;
+
+    if (droppedRef && _threeScene) {
+      let droppedObject: THREE.Object3D | null = null;
+      _threeScene.traverse((obj) => {
+        if (droppedObject) return;
+        if (obj.userData?.editorObjectId === droppedRef.id && obj.userData?.editorObjectType === droppedRef.objectType) {
+          droppedObject = obj;
+        }
+      });
+
+      if (droppedObject) {
+        const box = new THREE.Box3().setFromObject(droppedObject);
+        const size = box.getSize(new THREE.Vector3());
+        const hasFiniteBounds =
+          Number.isFinite(box.min.x)
+          && Number.isFinite(box.min.y)
+          && Number.isFinite(box.min.z)
+          && Number.isFinite(box.max.x)
+          && Number.isFinite(box.max.y)
+          && Number.isFinite(box.max.z)
+          && size.lengthSq() > 1e-10;
+        if (hasFiniteBounds) {
+          target.copy(box.getCenter(new THREE.Vector3()));
+          const sphere = box.getBoundingSphere(new THREE.Sphere());
+          radius = Math.max(0.015, sphere.radius);
+          hasMeasuredBounds = true;
+        }
+      }
+    }
+
+    // Wait briefly for async 3D model loaders so we can fit real geometry,
+    // not just fallback placement coordinates.
+    if (!hasMeasuredBounds && droppedRef && attempt < 24) {
+      requestAnimationFrame(() => autoFitFirstDroppedPart(position, droppedRef, attempt + 1));
+      return;
+    }
+
+    const fitRadius = radius * 1.45;
     if ((camera as any).isPerspectiveCamera) {
       const perspective = camera as THREE.PerspectiveCamera;
-      const distance = 4.2;
-      perspective.position.copy(target.clone().add(new THREE.Vector3(distance, distance * 0.72, distance)));
-      perspective.near = Math.min(perspective.near, 0.05);
-      perspective.far = Math.max(perspective.far, 2000);
+      const currentOffset = perspective.position.clone().sub(controls.target);
+      if (currentOffset.lengthSq() < 1e-8) currentOffset.set(1, 0.72, 1);
+      const viewDirection = currentOffset.normalize();
+      const aspect = perspective.aspect || (_canvasSize.width / Math.max(_canvasSize.height, 1)) || 1;
+      const verticalFov = THREE.MathUtils.degToRad(perspective.fov);
+      const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
+      const fitHalfFov = Math.max(THREE.MathUtils.degToRad(8), Math.min(verticalFov, horizontalFov) / 2);
+      let distance = fitRadius / Math.tan(fitHalfFov);
+      if (!Number.isFinite(distance) || distance <= 0) distance = 3.5;
+      distance = THREE.MathUtils.clamp(distance, 0.2, 150);
+
+      perspective.position.copy(target.clone().add(viewDirection.multiplyScalar(distance)));
+      perspective.near = Math.max(0.001, Math.min(0.05, distance / 250));
+      perspective.far = Math.max(350, distance * 140);
       perspective.updateProjectionMatrix();
     } else if ((camera as any).isOrthographicCamera) {
       const ortho = camera as THREE.OrthographicCamera;
-      ortho.position.copy(target.clone().add(new THREE.Vector3(4.4, 4.4, 4.4)));
-      ortho.zoom = Math.max(ortho.zoom, 72);
+      const currentOffset = ortho.position.clone().sub(controls.target);
+      if (currentOffset.lengthSq() < 1e-8) currentOffset.set(1, 1, 1);
+      const viewDirection = currentOffset.normalize();
+      const frustumHeight = Math.abs(ortho.top - ortho.bottom) || 2;
+      const targetZoom = THREE.MathUtils.clamp(frustumHeight / (fitRadius * 2), 4, 240);
+      const distance = Math.max(1.2, fitRadius * 4);
+      ortho.position.copy(target.clone().add(viewDirection.multiplyScalar(distance)));
+      ortho.zoom = targetZoom;
       ortho.updateProjectionMatrix();
     }
     controls.target.copy(target);
@@ -766,6 +829,9 @@ const Viewport: React.FC = () => {
         const stateBefore = useEditorStore.getState();
         const sceneObjectCountBefore = stateBefore.processNodes.length + stateBefore.environmentAssets.length + stateBefore.actors.length;
         const shouldAutoFitFirstDrop = sceneObjectCountBefore === 0 && !firstDropAutoFitDoneRef.current;
+        const processIdsBefore = new Set(stateBefore.processNodes.map((n) => n.id));
+        const environmentIdsBefore = new Set(stateBefore.environmentAssets.map((a) => a.id));
+        const actorIdsBefore = new Set(stateBefore.actors.map((a) => a.id));
 
         // Proper raycast from mouse to ground plane (y=0) using Three.js camera
         const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -809,7 +875,19 @@ const Viewport: React.FC = () => {
         if (addedModule) {
           setHasPlacedModule(true);
           if (shouldAutoFitFirstDrop) {
-            requestAnimationFrame(() => autoFitFirstDroppedPart(position));
+            const stateAfter = useEditorStore.getState();
+            const addedProcess = stateAfter.processNodes.find((n) => !processIdsBefore.has(n.id));
+            const addedEnvironment = stateAfter.environmentAssets.find((a) => !environmentIdsBefore.has(a.id));
+            const addedActor = stateAfter.actors.find((a) => !actorIdsBefore.has(a.id));
+            const droppedRef =
+              addedProcess
+                ? { id: addedProcess.id, objectType: 'process' as const }
+                : addedEnvironment
+                  ? { id: addedEnvironment.id, objectType: 'environment' as const }
+                  : addedActor
+                    ? { id: addedActor.id, objectType: 'actor' as const }
+                    : null;
+            requestAnimationFrame(() => autoFitFirstDroppedPart(position, droppedRef));
           }
         }
       }
@@ -840,9 +918,6 @@ const Viewport: React.FC = () => {
   useEffect(() => {
     if (!hasPlacedModule && !isSceneEmpty) {
       setHasPlacedModule(true);
-    }
-    if (!isSceneEmpty) {
-      firstDropAutoFitDoneRef.current = true;
     }
   }, [hasPlacedModule, isSceneEmpty]);
 
