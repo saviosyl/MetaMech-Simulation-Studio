@@ -707,6 +707,7 @@ const SceneContent: React.FC<{
 
 const Viewport: React.FC = () => {
   const orbitRef = useRef<any>(null);
+  const firstDropAutoFitDoneRef = useRef(false);
   const [isOrbitNavigating, setIsOrbitNavigating] = useState(false);
   const [isSpaceMouseNavigating, setIsSpaceMouseNavigating] = useState(false);
   const [hasPlacedModule, setHasPlacedModule] = useState(false);
@@ -730,6 +731,31 @@ const Viewport: React.FC = () => {
   const dynamicDprMax = isExportRendering ? Math.max(2, Math.min(3, exportPreset.targetDpr)) : 2;
   const isNavigating = isOrbitNavigating || isSpaceMouseNavigating;
 
+  const autoFitFirstDroppedPart = useCallback((position: [number, number, number]) => {
+    if (firstDropAutoFitDoneRef.current) return;
+    const controls = orbitRef.current;
+    const camera = (controls?.object as THREE.Camera | undefined) || _threeCamera;
+    if (!camera || !controls) return;
+
+    const target = new THREE.Vector3(position[0], position[1], position[2]);
+    if ((camera as any).isPerspectiveCamera) {
+      const perspective = camera as THREE.PerspectiveCamera;
+      const distance = 4.2;
+      perspective.position.copy(target.clone().add(new THREE.Vector3(distance, distance * 0.72, distance)));
+      perspective.near = Math.min(perspective.near, 0.05);
+      perspective.far = Math.max(perspective.far, 2000);
+      perspective.updateProjectionMatrix();
+    } else if ((camera as any).isOrthographicCamera) {
+      const ortho = camera as THREE.OrthographicCamera;
+      ortho.position.copy(target.clone().add(new THREE.Vector3(4.4, 4.4, 4.4)));
+      ortho.zoom = Math.max(ortho.zoom, 72);
+      ortho.updateProjectionMatrix();
+    }
+    controls.target.copy(target);
+    controls.update?.();
+    firstDropAutoFitDoneRef.current = true;
+  }, []);
+
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     
@@ -737,6 +763,10 @@ const Viewport: React.FC = () => {
       const data = JSON.parse(event.dataTransfer.getData('application/json'));
       
       if (data.type === 'module') {
+        const stateBefore = useEditorStore.getState();
+        const sceneObjectCountBefore = stateBefore.processNodes.length + stateBefore.environmentAssets.length + stateBefore.actors.length;
+        const shouldAutoFitFirstDrop = sceneObjectCountBefore === 0 && !firstDropAutoFitDoneRef.current;
+
         // Proper raycast from mouse to ground plane (y=0) using Three.js camera
         const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
         const rayHit = raycastToGround(event.clientX, event.clientY, rect);
@@ -778,12 +808,15 @@ const Viewport: React.FC = () => {
         }
         if (addedModule) {
           setHasPlacedModule(true);
+          if (shouldAutoFitFirstDrop) {
+            requestAnimationFrame(() => autoFitFirstDroppedPart(position));
+          }
         }
       }
     } catch (error) {
       console.error('Failed to handle drop:', error);
     }
-  }, [addProcessNode, addEnvironmentAsset, addActor]);
+  }, [addProcessNode, addEnvironmentAsset, addActor, autoFitFirstDroppedPart]);
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -807,6 +840,9 @@ const Viewport: React.FC = () => {
   useEffect(() => {
     if (!hasPlacedModule && !isSceneEmpty) {
       setHasPlacedModule(true);
+    }
+    if (!isSceneEmpty) {
+      firstDropAutoFitDoneRef.current = true;
     }
   }, [hasPlacedModule, isSceneEmpty]);
 
