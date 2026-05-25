@@ -116,7 +116,7 @@ const PORT_COLOR: Record<'input' | 'output', string> = {
   output: '#10b981',
 };
 
-type PortSnapMode = 'surface' | 'face-center' | 'edge-midpoint';
+type PortSnapMode = 'surface' | 'face-center' | 'edge-midpoint' | 'vertex';
 type PreviewViewPreset = 'iso' | 'front' | 'right' | 'top' | 'rear';
 
 interface PreviewViewRequest {
@@ -198,11 +198,13 @@ const InteractiveModelPreview: React.FC<{
   showDimensionBox: boolean;
   viewRequest: PreviewViewRequest;
   orbitRef: React.RefObject<any>;
+  autoDetectRequest: number;
   onSelectPort: (index: number) => void;
   onPortTransform: (index: number, localPos: [number, number, number]) => void;
   onPlacementRotationChange: (rotationDeg: [number, number, number]) => void;
   onSurfacePick: (localPos: [number, number, number], type: 'input' | 'output') => void;
   onMetricsChange: (metrics: PreviewMetrics | null) => void;
+  onAutoDetectPorts: (ports: OemConnectionPortInput[], message: string) => void;
 }> = ({
   modelUrl,
   modelFormat,
@@ -222,16 +224,24 @@ const InteractiveModelPreview: React.FC<{
   showDimensionBox,
   viewRequest,
   orbitRef,
+  autoDetectRequest,
   onSelectPort,
   onPortTransform,
   onPlacementRotationChange,
   onSurfacePick,
   onMetricsChange,
+  onAutoDetectPorts,
 }) => {
   const [loadedModel, setLoadedModel] = useState<THREE.Object3D | null>(null);
+  const [snapPreviewLocal, setSnapPreviewLocal] = useState<[number, number, number] | null>(null);
   const modelRootRef = useRef<THREE.Group>(null);
   const portTransformAnchorRef = useRef<THREE.Group>(null);
   const placementRootRef = useRef<THREE.Group>(null);
+  const autoDetectCallbackRef = useRef(onAutoDetectPorts);
+
+  useEffect(() => {
+    autoDetectCallbackRef.current = onAutoDetectPorts;
+  }, [onAutoDetectPorts]);
 
   useEffect(() => {
     let mounted = true;
@@ -420,6 +430,52 @@ const InteractiveModelPreview: React.FC<{
     }
   };
 
+  useEffect(() => {
+    if (!autoDetectRequest || !modelRootRef.current) return;
+    const root = modelRootRef.current;
+    const detected: OemConnectionPortInput[] = [];
+    const seenKeys = new Set<string>();
+    const markerRegex = /(^|[^a-z])(port|node|snap)([^a-z]|$)/i;
+    root.traverse((object) => {
+      const rawName = (object.name || '').trim();
+      if (!rawName || !markerRegex.test(rawName)) return;
+      const normalized = rawName.toLowerCase();
+      const type: 'input' | 'output' = /(^|[_\-\s])(out|output|exit|egress)([_\-\s]|$)/i.test(normalized)
+        ? 'output'
+        : 'input';
+
+      let localPos = root.worldToLocal(object.getWorldPosition(new THREE.Vector3()));
+      const bounds = new THREE.Box3().setFromObject(object);
+      if (
+        Number.isFinite(bounds.min.x)
+        && Number.isFinite(bounds.max.x)
+        && bounds.getSize(new THREE.Vector3()).lengthSq() > 1e-10
+      ) {
+        localPos = root.worldToLocal(bounds.getCenter(new THREE.Vector3()));
+      }
+      const rounded: [number, number, number] = [
+        Number(localPos.x.toFixed(4)),
+        Number(localPos.y.toFixed(4)),
+        Number(localPos.z.toFixed(4)),
+      ];
+      const dedupeKey = `${rounded[0]}|${rounded[1]}|${rounded[2]}`;
+      if (seenKeys.has(dedupeKey)) return;
+      seenKeys.add(dedupeKey);
+      const idBase = slugify(rawName) || `${type}-marker`;
+      detected.push({
+        id: `${idBase}-${detected.length + 1}`,
+        type,
+        localPosition: rounded,
+      });
+    });
+
+    if (detected.length === 0) {
+      autoDetectCallbackRef.current([], 'No CAD node markers found. Name helper points like PORT_IN_1 / PORT_OUT_1 in SolidWorks before OBJ export.');
+      return;
+    }
+    autoDetectCallbackRef.current(detected, `Detected ${detected.length} node marker(s) from model names.`);
+  }, [autoDetectRequest, modelClone]);
+
   const snapLocalPoint = (event: any): THREE.Vector3 => {
     if (!modelRootRef.current) return new THREE.Vector3();
     const fallbackLocal = modelRootRef.current.worldToLocal(event.point.clone());
@@ -438,6 +494,19 @@ const InteractiveModelPreview: React.FC<{
       const world = mesh.localToWorld(local);
       return modelRootRef.current!.worldToLocal(world);
     });
+
+    if (snapMode === 'vertex') {
+      let nearestVertex = vertsInRoot[0];
+      let nearestVertexDist = vertsInRoot[0].distanceToSquared(fallbackLocal);
+      for (let i = 1; i < vertsInRoot.length; i += 1) {
+        const dist = vertsInRoot[i].distanceToSquared(fallbackLocal);
+        if (dist < nearestVertexDist) {
+          nearestVertexDist = dist;
+          nearestVertex = vertsInRoot[i];
+        }
+      }
+      return nearestVertex;
+    }
 
     if (snapMode === 'face-center') {
       return vertsInRoot[0].clone().add(vertsInRoot[1]).add(vertsInRoot[2]).multiplyScalar(1 / 3);
@@ -472,10 +541,20 @@ const InteractiveModelPreview: React.FC<{
         <group
           position={[0, previewGroundLift, 0]}
           ref={modelRootRef}
+          onPointerMove={(event) => {
+            if (!addPortByClick) return;
+            event.stopPropagation();
+            const local = snapLocalPoint(event);
+            setSnapPreviewLocal([local.x, local.y, local.z]);
+          }}
+          onPointerOut={() => {
+            setSnapPreviewLocal(null);
+          }}
           onPointerDown={(event) => {
             if (!addPortByClick || !modelRootRef.current) return;
             event.stopPropagation();
             const local = snapLocalPoint(event);
+            setSnapPreviewLocal([local.x, local.y, local.z]);
             onSurfacePick([local.x, local.y, local.z], portTypeForClick);
           }}
         >
@@ -504,6 +583,18 @@ const InteractiveModelPreview: React.FC<{
               ref={portTransformAnchorRef}
               position={selectedPort.localPosition}
             />
+          )}
+          {addPortByClick && snapPreviewLocal && (
+            <group position={snapPreviewLocal}>
+              <mesh>
+                <sphereGeometry args={[portMarker.normalRadius * 0.75, 12, 10]} />
+                <meshStandardMaterial color={portTypeForClick === 'input' ? '#60a5fa' : '#34d399'} emissive={portTypeForClick === 'input' ? '#2563eb' : '#059669'} emissiveIntensity={0.55} />
+              </mesh>
+              <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[portMarker.ringInner * 0.85, portMarker.ringOuter * 0.95, 20]} />
+                <meshBasicMaterial color={portTypeForClick === 'input' ? '#2563eb' : '#059669'} transparent opacity={0.85} side={THREE.DoubleSide} />
+              </mesh>
+            </group>
           )}
         </group>
         {showDimensionBox && modelMetrics && (
@@ -588,6 +679,7 @@ const OemAdminPage: React.FC = () => {
   const [showDimensionBox, setShowDimensionBox] = useState(true);
   const [previewViewRequest, setPreviewViewRequest] = useState<PreviewViewRequest>({ preset: 'iso', nonce: Date.now() });
   const [previewMetrics, setPreviewMetrics] = useState<PreviewMetrics | null>(null);
+  const [autoDetectRequest, setAutoDetectRequest] = useState(0);
   const [leftPanelWidthPx, setLeftPanelWidthPx] = useState(280);
   const [rightPanelWidthPx, setRightPanelWidthPx] = useState(420);
   const [activeSplitter, setActiveSplitter] = useState<'left' | 'right' | null>(null);
@@ -908,6 +1000,31 @@ const OemAdminPage: React.FC = () => {
     setPreviewViewRequest({ preset, nonce: Date.now() });
   };
 
+  const applyAutoDetectedPorts = (ports: OemConnectionPortInput[], message: string) => {
+    if (!selectedModel) return;
+    if (!ports || ports.length === 0) {
+      setNotice(message);
+      return;
+    }
+    updateSelectedModel((model) => {
+      const existing = model.connectionPorts || [];
+      const existingById = new Set(existing.map((p) => p.id));
+      const next = [...existing];
+      for (const detected of ports) {
+        let nextId = detected.id;
+        let counter = 2;
+        while (existingById.has(nextId)) {
+          nextId = `${detected.id}-${counter}`;
+          counter += 1;
+        }
+        existingById.add(nextId);
+        next.push({ ...detected, id: nextId });
+      }
+      return { ...model, connectionPorts: next };
+    });
+    setNotice(message);
+  };
+
   const autoAssignFlowNodes = () => {
     if (!selectedModel) return;
     const ports = selectedModel.connectionPorts || [];
@@ -1150,11 +1267,13 @@ const OemAdminPage: React.FC = () => {
             showDimensionBox={showDimensionBox}
             viewRequest={previewViewRequest}
             orbitRef={previewOrbitRef}
+            autoDetectRequest={autoDetectRequest}
             onSelectPort={setSelectedPortIndex}
             onPortTransform={updatePortFromTransform}
             onPlacementRotationChange={setPlacementRotationDeg}
             onSurfacePick={addPortFromSurfacePick}
             onMetricsChange={setPreviewMetrics}
+            onAutoDetectPorts={applyAutoDetectedPorts}
           />
         </Bounds>
       )}
@@ -1436,6 +1555,7 @@ const OemAdminPage: React.FC = () => {
               <option value="surface">Surface point</option>
               <option value="face-center">Face center</option>
               <option value="edge-midpoint">Edge midpoint</option>
+              <option value="vertex">Vertex</option>
             </select>
             <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Axis colors: X red • Y green • Z blue</div>
           </div>
@@ -1531,7 +1651,17 @@ const OemAdminPage: React.FC = () => {
                     {transformPortsEnabled ? 'Port Gizmo: ON' : 'Port Gizmo: OFF'}
                   </button>
                   <button onClick={addPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', whiteSpace: 'nowrap' }}>+ Port</button>
+                  <button
+                    onClick={() => setAutoDetectRequest(Date.now())}
+                    style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', whiteSpace: 'nowrap' }}
+                    title="Auto-detect marker names like PORT_IN_1 / PORT_OUT_1 from model"
+                  >
+                    Auto Detect CAD Nodes
+                  </button>
                 </div>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--mm-text-tertiary)' }}>
+                Tip: for highest precision, add helper points in CAD named <code>PORT_IN_1</code>, <code>PORT_OUT_1</code> before OBJ export, then click Auto Detect CAD Nodes.
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                 <input type="number" min={0.001} step={0.001} value={portNudgeStep} onChange={(e) => setPortNudgeStep(Math.max(0.001, Number(e.target.value) || 0.001))} style={{ width: 88 }} />
