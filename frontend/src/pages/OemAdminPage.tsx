@@ -490,9 +490,9 @@ const InteractiveModelPreview: React.FC<{
           </group>
         )}
       </group>
-      {placementGizmoEnabled && (
+      {placementGizmoEnabled && placementRootRef.current && (
         <TransformControls
-          object={placementRootRef.current || undefined}
+          object={placementRootRef.current}
           mode="rotate"
           size={0.85}
           rotationSnap={Math.max(1, placementRotationSnapDeg) * Math.PI / 180}
@@ -502,9 +502,9 @@ const InteractiveModelPreview: React.FC<{
           onObjectChange={updatePlacementRotationFromObject}
         />
       )}
-      {transformPortsEnabled && selectedPort && (
+      {!placementGizmoEnabled && transformPortsEnabled && selectedPort && portTransformAnchorRef.current && (
         <TransformControls
-          object={portTransformAnchorRef.current || undefined}
+          object={portTransformAnchorRef.current}
           mode="translate"
           size={0.6}
           translationSnap={0.01}
@@ -1342,10 +1342,28 @@ const OemAdminPage: React.FC = () => {
             </button>
           </div>
           <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto' }}>
-            <button onClick={() => setPlacementGizmoEnabled((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: placementGizmoEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap' }}>
+            <button
+              onClick={() => {
+                setPlacementGizmoEnabled((prev) => {
+                  const next = !prev;
+                  if (next) setTransformPortsEnabled(false);
+                  return next;
+                });
+              }}
+              style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: placementGizmoEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap' }}
+            >
               Tool: Rotate Gizmo
             </button>
-            <button onClick={() => setTransformPortsEnabled((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: transformPortsEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap' }}>
+            <button
+              onClick={() => {
+                setTransformPortsEnabled((prev) => {
+                  const next = !prev;
+                  if (next) setPlacementGizmoEnabled(false);
+                  return next;
+                });
+              }}
+              style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: transformPortsEnabled ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap' }}
+            >
               Tool: Node Gizmo
             </button>
             <button onClick={() => setShowFlowGuide((prev) => !prev)} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: showFlowGuide ? 'var(--mm-accent-primary-muted)' : 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px', fontSize: 11, whiteSpace: 'nowrap' }}>
