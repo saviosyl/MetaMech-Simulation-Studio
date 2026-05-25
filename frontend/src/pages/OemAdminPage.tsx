@@ -138,25 +138,34 @@ const PreviewCameraViewController: React.FC<{
 
   useEffect(() => {
     const center = new THREE.Vector3(target[0], target[1], target[2]);
-    const distance = Math.max(1.5, radius * 2.8);
+    const distance = Math.max(1.5, radius * 3.4);
     const next = new THREE.Vector3();
     switch (request.preset) {
       case 'front':
         next.set(center.x, center.y, center.z + distance);
+        camera.up.set(0, 1, 0);
         break;
       case 'right':
         next.set(center.x + distance, center.y, center.z);
+        camera.up.set(0, 1, 0);
         break;
       case 'top':
-        next.set(center.x, center.y + distance, center.z + 0.001);
+        next.set(center.x, center.y + distance, center.z);
+        camera.up.set(0, 0, -1);
         break;
       case 'rear':
         next.set(center.x, center.y, center.z - distance);
+        camera.up.set(0, 1, 0);
         break;
       case 'iso':
       default:
         next.set(center.x + distance, center.y + distance * 0.68, center.z + distance);
+        camera.up.set(0, 1, 0);
         break;
+    }
+    if ((camera as any).isPerspectiveCamera) {
+      const perspective = camera as THREE.PerspectiveCamera;
+      perspective.fov = request.preset === 'iso' ? 45 : 12;
     }
     camera.position.copy(next);
     camera.lookAt(center);
@@ -332,6 +341,39 @@ const InteractiveModelPreview: React.FC<{
     return { box, size, center, radius, sizeMm };
   }, [modelClone, previewGroundLift]);
 
+  const portMarker = useMemo(() => {
+    const maxDim = modelMetrics ? Math.max(modelMetrics.size.x, modelMetrics.size.y, modelMetrics.size.z) : 1;
+    const baseRadius = Math.min(0.045, Math.max(0.012, maxDim * 0.01));
+    return {
+      normalRadius: baseRadius,
+      selectedRadius: baseRadius * 1.25,
+      ringInner: baseRadius * 1.35,
+      ringOuter: baseRadius * 1.75,
+    };
+  }, [modelMetrics]);
+
+  const dimensionGuides = useMemo(() => {
+    if (!modelMetrics) return null;
+    const min = modelMetrics.box.min.clone();
+    const max = modelMetrics.box.max.clone();
+    const maxDim = Math.max(modelMetrics.size.x, modelMetrics.size.y, modelMetrics.size.z);
+    const guideOffset = Math.max(0.03, Math.min(0.45, maxDim * 0.08));
+    return {
+      x: [
+        new THREE.Vector3(min.x, min.y - guideOffset, min.z - guideOffset),
+        new THREE.Vector3(max.x, min.y - guideOffset, min.z - guideOffset),
+      ],
+      y: [
+        new THREE.Vector3(max.x + guideOffset, min.y, min.z - guideOffset),
+        new THREE.Vector3(max.x + guideOffset, max.y, min.z - guideOffset),
+      ],
+      z: [
+        new THREE.Vector3(min.x - guideOffset, min.y - guideOffset, min.z),
+        new THREE.Vector3(min.x - guideOffset, min.y - guideOffset, max.z),
+      ],
+    };
+  }, [modelMetrics]);
+
   useEffect(() => {
     onMetricsChange(modelMetrics ? { sizeMm: modelMetrics.sizeMm } : null);
   }, [modelMetrics, onMetricsChange]);
@@ -448,11 +490,11 @@ const InteractiveModelPreview: React.FC<{
               }}
             >
               <mesh>
-                <sphereGeometry args={[selectedPortIndex === idx ? 0.1 : 0.08, 14, 10]} />
+                <sphereGeometry args={[selectedPortIndex === idx ? portMarker.selectedRadius : portMarker.normalRadius, 14, 10]} />
                 <meshStandardMaterial color={PORT_COLOR[port.type]} emissive={PORT_COLOR[port.type]} emissiveIntensity={selectedPortIndex === idx ? 0.7 : 0.45} />
               </mesh>
               <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[0.11, 0.14, 20]} />
+                <ringGeometry args={[portMarker.ringInner, portMarker.ringOuter, 20]} />
                 <meshBasicMaterial color={PORT_COLOR[port.type]} transparent opacity={0.7} side={THREE.DoubleSide} />
               </mesh>
             </group>
@@ -466,14 +508,21 @@ const InteractiveModelPreview: React.FC<{
         </group>
         {showDimensionBox && modelMetrics && (
           <group>
-            <mesh position={[modelMetrics.center.x, modelMetrics.center.y, modelMetrics.center.z]}>
+            <mesh position={[modelMetrics.center.x, modelMetrics.center.y, modelMetrics.center.z]} renderOrder={31}>
               <boxGeometry args={[modelMetrics.size.x, modelMetrics.size.y, modelMetrics.size.z]} />
-              <meshBasicMaterial color="#0ea5e9" transparent opacity={0.06} depthWrite={false} />
+              <meshBasicMaterial color="#0ea5e9" transparent opacity={0.045} depthWrite={false} depthTest={false} />
             </mesh>
-            <lineSegments position={[modelMetrics.center.x, modelMetrics.center.y, modelMetrics.center.z]}>
+            <lineSegments position={[modelMetrics.center.x, modelMetrics.center.y, modelMetrics.center.z]} renderOrder={32}>
               <edgesGeometry args={[new THREE.BoxGeometry(modelMetrics.size.x, modelMetrics.size.y, modelMetrics.size.z)]} />
-              <lineBasicMaterial color="#0ea5e9" transparent opacity={0.75} />
+              <lineBasicMaterial color="#0284c7" transparent opacity={1} depthTest={false} />
             </lineSegments>
+            {dimensionGuides && (
+              <>
+                <Line points={dimensionGuides.x} color="#ef4444" lineWidth={2.2} />
+                <Line points={dimensionGuides.y} color="#22c55e" lineWidth={2.2} />
+                <Line points={dimensionGuides.z} color="#3b82f6" lineWidth={2.2} />
+              </>
+            )}
           </group>
         )}
         {showFlowGuide && flowGuidePoints && (
@@ -1390,8 +1439,11 @@ const OemAdminPage: React.FC = () => {
             </select>
             <div style={{ fontSize: 11, color: 'var(--mm-text-tertiary)' }}>Axis colors: X red • Y green • Z blue</div>
           </div>
-          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
-            Model size (mm): {previewMetrics ? `X ${previewMetrics.sizeMm[0]} • Y ${previewMetrics.sizeMm[1]} • Z ${previewMetrics.sizeMm[2]}` : '—'}
+          <div style={{ marginTop: 6, border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: '6px 8px', background: '#f8fafc' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)' }}>Overall Dimensions (mm)</div>
+            <div style={{ marginTop: 2, fontSize: 12, color: 'var(--mm-text-primary)' }}>
+              {previewMetrics ? `X ${previewMetrics.sizeMm[0]} • Y ${previewMetrics.sizeMm[1]} • Z ${previewMetrics.sizeMm[2]}` : '—'}
+            </div>
           </div>
           <div className="oem-preview-frame">
             {previewUrl ? renderPreviewCanvas() : (
