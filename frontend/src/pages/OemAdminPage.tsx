@@ -476,30 +476,6 @@ const InteractiveModelPreview: React.FC<{
             </lineSegments>
           </group>
         )}
-        {placementGizmoEnabled && (
-          <TransformControls
-            object={placementRootRef.current || undefined}
-            mode="rotate"
-            size={0.85}
-            rotationSnap={Math.max(1, placementRotationSnapDeg) * Math.PI / 180}
-            onMouseDown={() => setOrbitEnabled(false)}
-            onMouseUp={() => setOrbitEnabled(true)}
-            onDraggingChanged={(event: any) => setOrbitEnabled(!(event?.value ?? false))}
-            onObjectChange={updatePlacementRotationFromObject}
-          />
-        )}
-        {transformPortsEnabled && selectedPort && (
-          <TransformControls
-            object={portTransformAnchorRef.current || undefined}
-            mode="translate"
-            size={0.6}
-            translationSnap={0.01}
-            onMouseDown={() => setOrbitEnabled(false)}
-            onMouseUp={() => setOrbitEnabled(true)}
-            onDraggingChanged={(event: any) => setOrbitEnabled(!(event?.value ?? false))}
-            onObjectChange={updateSelectedPortFromAnchor}
-          />
-        )}
         {showFlowGuide && flowGuidePoints && (
           <group position={[0, previewGroundLift, 0]}>
             <Line points={flowGuidePoints} color="#f59e0b" lineWidth={2.2} dashed dashSize={0.08} gapSize={0.05} />
@@ -514,6 +490,30 @@ const InteractiveModelPreview: React.FC<{
           </group>
         )}
       </group>
+      {placementGizmoEnabled && (
+        <TransformControls
+          object={placementRootRef.current || undefined}
+          mode="rotate"
+          size={0.85}
+          rotationSnap={Math.max(1, placementRotationSnapDeg) * Math.PI / 180}
+          onMouseDown={() => setOrbitEnabled(false)}
+          onMouseUp={() => setOrbitEnabled(true)}
+          onDraggingChanged={(event: any) => setOrbitEnabled(!(event?.value ?? false))}
+          onObjectChange={updatePlacementRotationFromObject}
+        />
+      )}
+      {transformPortsEnabled && selectedPort && (
+        <TransformControls
+          object={portTransformAnchorRef.current || undefined}
+          mode="translate"
+          size={0.6}
+          translationSnap={0.01}
+          onMouseDown={() => setOrbitEnabled(false)}
+          onMouseUp={() => setOrbitEnabled(true)}
+          onDraggingChanged={(event: any) => setOrbitEnabled(!(event?.value ?? false))}
+          onObjectChange={updateSelectedPortFromAnchor}
+        />
+      )}
     </group>
   );
 };
