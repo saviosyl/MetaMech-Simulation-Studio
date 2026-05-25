@@ -450,48 +450,6 @@ const InteractiveModelPreview: React.FC<{
     onMetricsChange(modelMetrics ? { sizeMm: modelMetrics.sizeMm } : null);
   }, [modelMetrics, onMetricsChange]);
 
-  if (!modelClone) return null;
-
-  const placementRotationRad: [number, number, number] = [
-    ((placementRotationDeg?.[0] || 0) * Math.PI) / 180,
-    ((placementRotationDeg?.[1] || 0) * Math.PI) / 180,
-    ((placementRotationDeg?.[2] || 0) * Math.PI) / 180,
-  ];
-
-  const selectedPort = selectedPortIndex >= 0 ? ports[selectedPortIndex] : null;
-  const flowInPort = ports.find((port) => port.id === flowInPortId);
-  const flowOutPort = ports.find((port) => port.id === flowOutPortId);
-  const flowGuidePoints = (flowInPort && flowOutPort)
-    ? [flowInPort.localPosition, flowOutPort.localPosition]
-    : null;
-
-  const updatePlacementRotationFromObject = () => {
-    if (!placementRootRef.current) return;
-    const euler = placementRootRef.current.rotation;
-    onPlacementRotationChange([
-      Number((THREE.MathUtils.radToDeg(euler.x)).toFixed(2)),
-      Number((THREE.MathUtils.radToDeg(euler.y)).toFixed(2)),
-      Number((THREE.MathUtils.radToDeg(euler.z)).toFixed(2)),
-    ]);
-  };
-
-  const updateSelectedPortFromAnchor = () => {
-    if (!selectedPort || !portTransformAnchorRef.current) return;
-    const p = portTransformAnchorRef.current.position;
-    onPortTransform(selectedPortIndex, [
-      Number(p.x.toFixed(4)),
-      Number(p.y.toFixed(4)),
-      Number(p.z.toFixed(4)),
-    ]);
-  };
-
-  const setOrbitEnabled = (enabled: boolean) => {
-    if (orbitRef.current) {
-      orbitRef.current.enabled = enabled;
-      if (enabled) orbitRef.current.update?.();
-    }
-  };
-
   useEffect(() => {
     if (!autoDetectRequest || !modelRootRef.current) return;
     const root = modelRootRef.current;
@@ -537,6 +495,48 @@ const InteractiveModelPreview: React.FC<{
     }
     autoDetectCallbackRef.current(detected, `Detected ${detected.length} node marker(s) from model names.`);
   }, [autoDetectRequest, modelClone]);
+
+  if (!modelClone) return null;
+
+  const placementRotationRad: [number, number, number] = [
+    ((placementRotationDeg?.[0] || 0) * Math.PI) / 180,
+    ((placementRotationDeg?.[1] || 0) * Math.PI) / 180,
+    ((placementRotationDeg?.[2] || 0) * Math.PI) / 180,
+  ];
+
+  const selectedPort = selectedPortIndex >= 0 ? ports[selectedPortIndex] : null;
+  const flowInPort = ports.find((port) => port.id === flowInPortId);
+  const flowOutPort = ports.find((port) => port.id === flowOutPortId);
+  const flowGuidePoints = (flowInPort && flowOutPort)
+    ? [flowInPort.localPosition, flowOutPort.localPosition]
+    : null;
+
+  const updatePlacementRotationFromObject = () => {
+    if (!placementRootRef.current) return;
+    const euler = placementRootRef.current.rotation;
+    onPlacementRotationChange([
+      Number((THREE.MathUtils.radToDeg(euler.x)).toFixed(2)),
+      Number((THREE.MathUtils.radToDeg(euler.y)).toFixed(2)),
+      Number((THREE.MathUtils.radToDeg(euler.z)).toFixed(2)),
+    ]);
+  };
+
+  const updateSelectedPortFromAnchor = () => {
+    if (!selectedPort || !portTransformAnchorRef.current) return;
+    const p = portTransformAnchorRef.current.position;
+    onPortTransform(selectedPortIndex, [
+      Number(p.x.toFixed(4)),
+      Number(p.y.toFixed(4)),
+      Number(p.z.toFixed(4)),
+    ]);
+  };
+
+  const setOrbitEnabled = (enabled: boolean) => {
+    if (orbitRef.current) {
+      orbitRef.current.enabled = enabled;
+      if (enabled) orbitRef.current.update?.();
+    }
+  };
 
   const snapLocalPoint = (event: any): THREE.Vector3 => {
     if (!modelRootRef.current) return new THREE.Vector3();
