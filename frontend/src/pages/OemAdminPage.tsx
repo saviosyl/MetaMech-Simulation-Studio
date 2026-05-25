@@ -19,6 +19,7 @@ import {
   OemModelEntry,
   resolveOemModelGlbUrl,
   resolveOemModelRepoRelativePath,
+  sanitizeOemLibraryIndex,
   saveLocalOemLibraryDraft,
 } from '../lib/oemLibrary';
 import { inferModelFormat, loadModelObject } from '../lib/modelLoader';
@@ -109,6 +110,67 @@ function formatSyncTimestamp(timestampIso: string): string {
   const date = new Date(timestampIso);
   if (Number.isNaN(date.getTime())) return timestampIso;
   return date.toLocaleString();
+}
+
+function sanitizeVec3(value: unknown, fallback: [number, number, number]): [number, number, number] {
+  if (!Array.isArray(value) || value.length !== 3) return fallback;
+  return [
+    Number.isFinite(Number(value[0])) ? Number(value[0]) : fallback[0],
+    Number.isFinite(Number(value[1])) ? Number(value[1]) : fallback[1],
+    Number.isFinite(Number(value[2])) ? Number(value[2]) : fallback[2],
+  ];
+}
+
+function sanitizePortsForUi(value: unknown): OemConnectionPortInput[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((port) => port && typeof port === 'object')
+    .map((port, index) => {
+      const raw = port as any;
+      const local = sanitizeVec3(raw.localPosition, [0, 0, 0]);
+      return {
+        id: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `port-${index + 1}`,
+        type: raw.type === 'output' ? 'output' : 'input',
+        localPosition: local,
+      };
+    });
+}
+
+class OemAdminErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error): void {
+    console.error('OEM admin render failure', error);
+  }
+
+  render(): React.ReactNode {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: '#f8fafc', color: '#0f172a' }}>
+          <div style={{ maxWidth: 680, border: '1px solid #cbd5e1', borderRadius: 12, padding: 20, background: '#ffffff' }}>
+            <h2 style={{ marginTop: 0, marginBottom: 10 }}>OEM Admin recovered from a runtime error</h2>
+            <p style={{ marginTop: 0, color: '#334155' }}>
+              Reload this page to continue. If this repeats, the model/library payload likely contains malformed fields and will be auto-sanitized in the latest build.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#eff6ff', color: '#0f172a', cursor: 'pointer' }}
+            >
+              Reload OEM Admin
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 const PORT_COLOR: Record<'input' | 'output', string> = {
@@ -658,7 +720,7 @@ const InteractiveModelPreview: React.FC<{
   );
 };
 
-const OemAdminPage: React.FC = () => {
+const OemAdminPageContent: React.FC = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [remoteLibrary, setRemoteLibrary] = useState<OemLibraryIndex>({ companies: [] });
@@ -732,9 +794,21 @@ const OemAdminPage: React.FC = () => {
     () => selectedCompany?.models.find((model) => model.id === selectedModelId) || null,
     [selectedCompany, selectedModelId],
   );
+  const selectedModelRotation = useMemo<[number, number, number]>(
+    () => sanitizeVec3(selectedModel?.defaultRotationDeg, [0, 0, 0]),
+    [selectedModel],
+  );
+  const selectedModelScale = useMemo<[number, number, number]>(
+    () => sanitizeVec3(selectedModel?.defaultScale, [1, 1, 1]),
+    [selectedModel],
+  );
+  const selectedModelPorts = useMemo(
+    () => sanitizePortsForUi(selectedModel?.connectionPorts),
+    [selectedModel],
+  );
   const selectedPort = useMemo(
-    () => (selectedModel && selectedPortIndex >= 0 ? (selectedModel.connectionPorts || [])[selectedPortIndex] || null : null),
-    [selectedModel, selectedPortIndex],
+    () => (selectedPortIndex >= 0 ? selectedModelPorts[selectedPortIndex] || null : null),
+    [selectedModelPorts, selectedPortIndex],
   );
 
   useEffect(() => {
@@ -742,11 +816,11 @@ const OemAdminPage: React.FC = () => {
   }, [selectedCompanyId, selectedModelId]);
 
   useEffect(() => {
-    const portCount = selectedModel?.connectionPorts?.length || 0;
+    const portCount = selectedModelPorts.length;
     if (selectedPortIndex >= portCount) {
       setSelectedPortIndex(portCount > 0 ? portCount - 1 : -1);
     }
-  }, [selectedModel, selectedPortIndex]);
+  }, [selectedModelPorts, selectedPortIndex]);
 
   useEffect(() => {
     setPreviewViewRequest({ preset: 'iso', nonce: Date.now() });
@@ -895,22 +969,26 @@ const OemAdminPage: React.FC = () => {
   };
 
   const addPort = () => {
-    const nextIndex = (selectedModel?.connectionPorts?.length || 0);
-    updateSelectedModel((model) => ({
-      ...model,
-      connectionPorts: [
-        ...(model.connectionPorts || []),
-        { id: `input-${(model.connectionPorts?.length || 0) + 1}`, type: 'input', localPosition: [0, 0, 0] },
-      ],
-    }));
+    const nextIndex = selectedModelPorts.length;
+    updateSelectedModel((model) => {
+      const currentPorts = sanitizePortsForUi(model.connectionPorts);
+      return {
+        ...model,
+        connectionPorts: [
+          ...currentPorts,
+          { id: `input-${currentPorts.length + 1}`, type: 'input', localPosition: [0, 0, 0] },
+        ],
+      };
+    });
     setSelectedPortIndex(nextIndex);
     setNotice('');
   };
 
   const addPortFromSurfacePick = (localPos: [number, number, number], type: 'input' | 'output') => {
-    const nextPortIndex = (selectedModel?.connectionPorts?.length || 0);
+    const nextPortIndex = selectedModelPorts.length;
     updateSelectedModel((model) => {
-      const nextIndex = (model.connectionPorts?.length || 0) + 1;
+      const currentPorts = sanitizePortsForUi(model.connectionPorts);
+      const nextIndex = currentPorts.length + 1;
       const nextPort: OemConnectionPortInput = {
         id: `${type === 'input' ? 'in' : 'out'}-${nextIndex}`,
         type,
@@ -922,7 +1000,7 @@ const OemAdminPage: React.FC = () => {
       };
       return {
         ...model,
-        connectionPorts: [...(model.connectionPorts || []), nextPort],
+        connectionPorts: [...currentPorts, nextPort],
       };
     });
     setSelectedPortIndex(nextPortIndex);
@@ -939,7 +1017,7 @@ const OemAdminPage: React.FC = () => {
   const updatePort = (index: number, updater: (port: OemConnectionPortInput) => OemConnectionPortInput) => {
     updateSelectedModel((model) => ({
       ...model,
-      connectionPorts: (model.connectionPorts || []).map((port, idx) => (idx === index ? updater(port) : port)),
+      connectionPorts: sanitizePortsForUi(model.connectionPorts).map((port, idx) => (idx === index ? updater(port) : port)),
     }));
     setNotice('');
   };
@@ -947,7 +1025,7 @@ const OemAdminPage: React.FC = () => {
   const removePort = (index: number) => {
     updateSelectedModel((model) => ({
       ...model,
-      connectionPorts: (model.connectionPorts || []).filter((_, idx) => idx !== index),
+      connectionPorts: sanitizePortsForUi(model.connectionPorts).filter((_, idx) => idx !== index),
     }));
     setSelectedPortIndex((prev) => {
       if (prev === index) return -1;
@@ -959,7 +1037,7 @@ const OemAdminPage: React.FC = () => {
 
   const duplicateSelectedPort = () => {
     if (!selectedPort) return;
-    const nextIndex = (selectedModel?.connectionPorts?.length || 0);
+    const nextIndex = selectedModelPorts.length;
     const baseId = selectedPort.id || 'port';
     const duplicated: OemConnectionPortInput = {
       ...selectedPort,
@@ -972,7 +1050,7 @@ const OemAdminPage: React.FC = () => {
     };
     updateSelectedModel((model) => ({
       ...model,
-      connectionPorts: [...(model.connectionPorts || []), duplicated],
+      connectionPorts: [...sanitizePortsForUi(model.connectionPorts), duplicated],
     }));
     setSelectedPortIndex(nextIndex);
     setNotice('Selected node duplicated.');
@@ -993,7 +1071,7 @@ const OemAdminPage: React.FC = () => {
   };
 
   const nudgePlacementRotation = (axis: 0 | 1 | 2, deltaDeg: number) => {
-    const current: [number, number, number] = [...(selectedModel?.defaultRotationDeg || [0, 0, 0])] as [number, number, number];
+    const current: [number, number, number] = [...selectedModelRotation];
     current[axis] = Number((current[axis] + deltaDeg).toFixed(2));
     setPlacementRotationDeg(current);
   };
@@ -1013,7 +1091,7 @@ const OemAdminPage: React.FC = () => {
       return;
     }
     updateSelectedModel((model) => {
-      const existing = model.connectionPorts || [];
+      const existing = sanitizePortsForUi(model.connectionPorts);
       const existingById = new Set(existing.map((p) => p.id));
       const next = [...existing];
       for (const detected of ports) {
@@ -1033,7 +1111,7 @@ const OemAdminPage: React.FC = () => {
 
   const autoAssignFlowNodes = () => {
     if (!selectedModel) return;
-    const ports = selectedModel.connectionPorts || [];
+    const ports = selectedModelPorts;
     const inPort = ports.find((port) => port.type === 'input');
     const outPort = ports.find((port) => port.type === 'output');
     if (!inPort || !outPort) {
@@ -1084,10 +1162,11 @@ const OemAdminPage: React.FC = () => {
     reader.onload = (e) => {
       try {
         const parsed = JSON.parse(String(e.target?.result || '{}'));
-        if (!Array.isArray(parsed?.companies)) throw new Error('Invalid format');
-        setLibrary(parsed as OemLibraryIndex);
-        setSelectedCompanyId(parsed.companies[0]?.id || '');
-        setSelectedModelId(parsed.companies[0]?.models?.[0]?.id || '');
+        const sanitized = sanitizeOemLibraryIndex(parsed);
+        if (!Array.isArray(sanitized?.companies)) throw new Error('Invalid format');
+        setLibrary(sanitized);
+        setSelectedCompanyId(sanitized.companies[0]?.id || '');
+        setSelectedModelId(sanitized.companies[0]?.models?.[0]?.id || '');
         setNotice('Imported OEM library backup.');
       } catch {
         setNotice('Failed to import library backup file.');
@@ -1257,9 +1336,9 @@ const OemAdminPage: React.FC = () => {
           <InteractiveModelPreview
             modelUrl={previewUrl}
             modelFormat={selectedModel.modelFormat}
-            defaultScale={selectedModel.defaultScale}
-            placementRotationDeg={selectedModel.defaultRotationDeg}
-            ports={selectedModel.connectionPorts || []}
+            defaultScale={selectedModelScale}
+            placementRotationDeg={selectedModelRotation}
+            ports={selectedModelPorts}
             placementGizmoEnabled={placementGizmoEnabled}
             placementRotationSnapDeg={placementRotationSnapDeg}
             selectedPortIndex={selectedPortIndex}
@@ -1595,14 +1674,14 @@ const OemAdminPage: React.FC = () => {
                 <button onClick={() => setPlacementRotationDeg([0, 0, 0])} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: 'pointer' }}>Reset</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 }}>
-                {(selectedModel.defaultRotationDeg || [0, 0, 0]).map((value, idx) => (
+                {selectedModelRotation.map((value, idx) => (
                   <input
                     key={`ws-rot-${idx}`}
                     type="number"
                     step={1}
                     value={value}
                     onChange={(e) => {
-                      const next: [number, number, number] = [...(selectedModel.defaultRotationDeg || [0, 0, 0])] as [number, number, number];
+                      const next: [number, number, number] = [...selectedModelRotation];
                       next[idx] = Number(e.target.value);
                       setPlacementRotationDeg(next);
                     }}
@@ -1611,14 +1690,14 @@ const OemAdminPage: React.FC = () => {
                 ))}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 }}>
-                {(selectedModel.defaultScale || [1, 1, 1]).map((value, idx) => (
+                {selectedModelScale.map((value, idx) => (
                   <input
                     key={`ws-scale-${idx}`}
                     type="number"
                     step={0.1}
                     value={value}
                     onChange={(e) => {
-                      const next: [number, number, number] = [...(selectedModel.defaultScale || [1, 1, 1])] as [number, number, number];
+                      const next: [number, number, number] = [...selectedModelScale];
                       next[idx] = Number(e.target.value);
                       updateSelectedModel((model) => ({ ...model, defaultScale: next }));
                     }}
@@ -1632,7 +1711,7 @@ const OemAdminPage: React.FC = () => {
                 <span>Axis Z: blue</span>
               </div>
               <div style={{ fontSize: 11, color: 'var(--mm-text-secondary)', border: '1px dashed var(--mm-border-subtle)', borderRadius: 6, padding: '6px 8px' }}>
-                XYZ Rotation: {(selectedModel.defaultRotationDeg || [0, 0, 0]).map((v) => Number(v || 0).toFixed(2)).join(' , ')}
+                XYZ Rotation: {selectedModelRotation.map((v) => Number(v || 0).toFixed(2)).join(' , ')}
                 {selectedPort ? `  |  Selected Node XYZ: ${selectedPort.localPosition.map((v) => Number(v || 0).toFixed(3)).join(' , ')}` : ''}
               </div>
             </div>
@@ -1679,7 +1758,7 @@ const OemAdminPage: React.FC = () => {
                 <button onClick={() => nudgeSelectedPort(2, -portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Z-</button>
                 <button onClick={() => nudgeSelectedPort(2, portNudgeStep)} disabled={!selectedPort} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', padding: '2px 8px', cursor: selectedPort ? 'pointer' : 'not-allowed' }}>Z+</button>
               </div>
-              {(selectedModel.connectionPorts || []).map((port, idx) => (
+              {selectedModelPorts.map((port, idx) => (
                 <div key={`${port.id}-${idx}`} onClick={() => setSelectedPortIndex(idx)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 90px repeat(3,minmax(0,76px)) 30px', gap: 6, border: selectedPortIndex === idx ? '1px solid var(--mm-accent-primary)' : '1px solid transparent', borderRadius: 6, padding: 4 }}>
                   <input value={port.id} onChange={(e) => updatePort(idx, (p) => ({ ...p, id: e.target.value }))} placeholder="Port ID" />
                   <select value={port.type} onChange={(e) => updatePort(idx, (p) => ({ ...p, type: e.target.value as 'input' | 'output' }))}>
@@ -1708,11 +1787,11 @@ const OemAdminPage: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) auto', gap: 8 }}>
                 <select value={selectedModel.flowInPortId || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, flowInPortId: e.target.value || undefined }))}>
                   <option value="">Flow Start Node</option>
-                  {(selectedModel.connectionPorts || []).map((port) => <option key={`flow-in-${port.id}`} value={port.id}>{port.id}</option>)}
+                  {selectedModelPorts.map((port) => <option key={`flow-in-${port.id}`} value={port.id}>{port.id}</option>)}
                 </select>
                 <select value={selectedModel.flowOutPortId || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, flowOutPortId: e.target.value || undefined }))}>
                   <option value="">Flow End Node</option>
-                  {(selectedModel.connectionPorts || []).map((port) => <option key={`flow-out-${port.id}`} value={port.id}>{port.id}</option>)}
+                  {selectedModelPorts.map((port) => <option key={`flow-out-${port.id}`} value={port.id}>{port.id}</option>)}
                 </select>
                 <button onClick={autoAssignFlowNodes} style={{ border: '1px solid var(--mm-border)', borderRadius: 6, background: 'var(--mm-bg-surface)', cursor: 'pointer', padding: '2px 8px' }}>Auto Assign</button>
               </div>
@@ -1903,6 +1982,12 @@ const OemAdminPage: React.FC = () => {
     </div>
   );
 };
+
+const OemAdminPage: React.FC = () => (
+  <OemAdminErrorBoundary>
+    <OemAdminPageContent />
+  </OemAdminErrorBoundary>
+);
 
 export default OemAdminPage;
 

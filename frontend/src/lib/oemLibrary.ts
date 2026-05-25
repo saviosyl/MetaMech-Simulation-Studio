@@ -262,6 +262,10 @@ function normalizeLibrary(data: unknown): OemLibraryIndex {
   return { companies };
 }
 
+export function sanitizeOemLibraryIndex(data: unknown): OemLibraryIndex {
+  return normalizeLibrary(data);
+}
+
 function mergeLibraries(base: OemLibraryIndex, override: OemLibraryIndex | null): OemLibraryIndex {
   if (!override || !Array.isArray(override.companies) || override.companies.length === 0) return base;
   const baseByCompanyId = new Map<string, OemCompanyEntry>();
