@@ -926,7 +926,13 @@ const OemAdminPage: React.FC = () => {
       };
     });
     setSelectedPortIndex(nextPortIndex);
-    const modeLabel = snapMode === 'face-center' ? 'face center' : snapMode === 'edge-midpoint' ? 'edge midpoint' : 'surface point';
+    const modeLabel = portSnapMode === 'face-center'
+      ? 'face center'
+      : portSnapMode === 'edge-midpoint'
+        ? 'edge midpoint'
+        : portSnapMode === 'vertex'
+          ? 'vertex'
+          : 'surface point';
     setNotice(`Added ${type} node snapped to ${modeLabel}.`);
   };
 
