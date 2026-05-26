@@ -17,6 +17,8 @@ interface BomRow {
   model: string;
   currency: Currency;
   unitPrice: number;
+  pricingMode: 'per_unit' | 'per_meter';
+  bomQuantity: number;
   sceneCount: number;
 }
 
@@ -58,6 +60,23 @@ function resolveModuleForObject(
   return undefined;
 }
 
+function isLengthPricedOemModule(module: ModuleDefinition): boolean {
+  if (module.category !== 'oem') return false;
+  return Boolean(module.parameters && Object.prototype.hasOwnProperty.call(module.parameters, 'oemLengthMm'));
+}
+
+function resolveLengthMetersForObject(
+  module: ModuleDefinition,
+  objectParameters: Record<string, any> | undefined,
+): number {
+  const objectLengthMm = Number(objectParameters?.oemLengthMm);
+  const defaultLengthMm = Number((module.parameters as any)?.oemLengthMm?.default);
+  const lengthMm = Number.isFinite(objectLengthMm) && objectLengthMm > 0
+    ? objectLengthMm
+    : (Number.isFinite(defaultLengthMm) && defaultLengthMm > 0 ? defaultLengthMm : 0);
+  return Math.max(0, lengthMm / 1000);
+}
+
 const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }) => {
   const [outputCurrency, setOutputCurrency] = useState<Currency>('EUR');
   const [rates, setRates] = useState<Record<Currency, number>>(() => defaultRates('EUR'));
@@ -80,15 +99,28 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
       }
     }
 
-    const counter = new Map<string, { module: ModuleDefinition; count: number }>();
+    const counter = new Map<string, {
+      module: ModuleDefinition;
+      count: number;
+      pricingMode: 'per_unit' | 'per_meter';
+      quantity: number;
+    }>();
     const allObjects = [...processNodes, ...environmentAssets, ...actors];
     for (const object of allObjects) {
       const module = resolveModuleForObject(object.type, object.assetId, modulesById, modulesByAssetId);
       if (!module || typeof module.priceUsd !== 'number' || !Number.isFinite(module.priceUsd) || module.priceUsd <= 0) continue;
+      const pricingMode: 'per_unit' | 'per_meter' = isLengthPricedOemModule(module) ? 'per_meter' : 'per_unit';
+      const quantityContribution = pricingMode === 'per_meter'
+        ? resolveLengthMetersForObject(module, object.parameters)
+        : 1;
       const key = module.id;
       const existing = counter.get(key);
-      if (existing) existing.count += 1;
-      else counter.set(key, { module, count: 1 });
+      if (existing) {
+        existing.count += 1;
+        existing.quantity += quantityContribution;
+      } else {
+        counter.set(key, { module, count: 1, pricingMode, quantity: quantityContribution });
+      }
     }
 
     return Array.from(counter.entries())
@@ -99,6 +131,8 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
         model: entry.module.name,
         currency: asCurrency(entry.module.priceCurrency),
         unitPrice: entry.module.priceUsd || 0,
+        pricingMode: entry.pricingMode,
+        bomQuantity: entry.quantity,
         sceneCount: entry.count,
       }))
       .sort((a, b) => a.company.localeCompare(b.company) || a.model.localeCompare(b.model));
@@ -108,6 +142,7 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
     setQtyByKey((prev) => {
       const next: Record<string, number> = {};
       for (const row of rows) {
+        if (row.pricingMode === 'per_meter') continue;
         const prior = prev[row.key];
         next[row.key] = Number.isFinite(prior) ? Math.max(0, Math.floor(prior)) : row.sceneCount;
       }
@@ -158,21 +193,32 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
 
   const grandTotal = useMemo(() => {
     return rows.reduce((sum, row) => {
-      const qty = Math.max(0, Math.floor(qtyByKey[row.key] ?? row.sceneCount));
+      const qty = row.pricingMode === 'per_meter'
+        ? row.bomQuantity
+        : Math.max(0, Math.floor(qtyByKey[row.key] ?? row.sceneCount));
       const rate = Number(rates[row.currency] || 0);
       return sum + row.unitPrice * qty * Math.max(0, rate);
     }, 0);
   }, [rows, qtyByKey, rates]);
 
   const exportCsv = () => {
-    const header = ['Company', 'Model', 'Qty', `Unit (${outputCurrency})`, `Total (${outputCurrency})`];
+    const header = ['Company', 'Model', 'Pricing Basis', 'Qty', `Unit (${outputCurrency})`, `Total (${outputCurrency})`];
     const lines = rows.map((row) => {
-      const qty = Math.max(0, Math.floor(qtyByKey[row.key] ?? row.sceneCount));
+      const qty = row.pricingMode === 'per_meter'
+        ? row.bomQuantity
+        : Math.max(0, Math.floor(qtyByKey[row.key] ?? row.sceneCount));
       const rate = Number(rates[row.currency] || 0);
       const unitConverted = row.unitPrice * Math.max(0, rate);
-      return [row.company, row.model, String(qty), unitConverted.toFixed(2), (unitConverted * qty).toFixed(2)];
+      return [
+        row.company,
+        row.model,
+        row.pricingMode === 'per_meter' ? 'Cost per meter' : 'Unit cost',
+        row.pricingMode === 'per_meter' ? qty.toFixed(3) : String(qty),
+        unitConverted.toFixed(2),
+        (unitConverted * qty).toFixed(2),
+      ];
     });
-    lines.push(['', '', '', 'Grand Total', grandTotal.toFixed(2)]);
+    lines.push(['', '', '', '', 'Grand Total', grandTotal.toFixed(2)]);
     const csv = [header, ...lines]
       .map((cols) => cols.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
       .join('\n');
@@ -308,7 +354,9 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
             </thead>
             <tbody>
               {rows.map((row) => {
-                const qty = Math.max(0, Math.floor(qtyByKey[row.key] ?? row.sceneCount));
+                const qty = row.pricingMode === 'per_meter'
+                  ? row.bomQuantity
+                  : Math.max(0, Math.floor(qtyByKey[row.key] ?? row.sceneCount));
                 const rate = Number(rates[row.currency] || 0);
                 const unitConverted = row.unitPrice * Math.max(0, rate);
                 const lineTotal = unitConverted * qty;
@@ -317,16 +365,24 @@ const SimulationBomPanel: React.FC<SimulationBomPanelProps> = ({ open, onClose }
                     <td style={{ padding: '6px 4px' }}>{row.company}</td>
                     <td style={{ padding: '6px 4px' }}>{row.model}</td>
                     <td style={{ padding: '6px 4px', textAlign: 'right' }}>
-                      <input
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={qty}
-                        onChange={(e) => setQtyByKey((prev) => ({ ...prev, [row.key]: Math.max(0, Math.floor(Number(e.target.value) || 0)) }))}
-                        style={{ width: 56, textAlign: 'right', borderRadius: 6, border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', padding: '2px 6px', fontSize: 11 }}
-                      />
+                      {row.pricingMode === 'per_meter' ? (
+                        <span title="Auto-calculated from parametric lengths in scene">
+                          {qty.toFixed(3)} m
+                        </span>
+                      ) : (
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={qty}
+                          onChange={(e) => setQtyByKey((prev) => ({ ...prev, [row.key]: Math.max(0, Math.floor(Number(e.target.value) || 0)) }))}
+                          style={{ width: 56, textAlign: 'right', borderRadius: 6, border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', padding: '2px 6px', fontSize: 11 }}
+                        />
+                      )}
                     </td>
-                    <td style={{ padding: '6px 4px', textAlign: 'right' }}>{toMoney(unitConverted, outputCurrency)}</td>
+                    <td style={{ padding: '6px 4px', textAlign: 'right' }}>
+                      {toMoney(unitConverted, outputCurrency)}{row.pricingMode === 'per_meter' ? ' /m' : ''}
+                    </td>
                     <td style={{ padding: '6px 4px', textAlign: 'right', color: '#0f172a' }}>{toMoney(lineTotal, outputCurrency)}</td>
                   </tr>
                 );

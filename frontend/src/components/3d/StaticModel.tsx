@@ -89,18 +89,16 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef; parameters?: Record<str
           const configured = Number(configuredBase[axis]);
           const hasMeasured = Number.isFinite(measured) && measured > 0;
           const hasConfigured = Number.isFinite(configured) && configured > 0;
-          let base = hasMeasured ? measured : configured;
-          if (hasMeasured && hasConfigured && !configuredIsPlaceholder) {
-            const mismatchRatio = Math.max(configured / measured, measured / configured);
-            // Self-heal legacy misconfigured bases (often off by 1000x).
-            base = mismatchRatio > 10 ? measured : configured;
-          } else if (hasMeasured && (configuredIsPlaceholder || !hasConfigured)) {
+          // Trust explicit Admin-configured parametric base sizes.
+          // Use measured geometry only for unset/placeholder bases.
+          let base = hasConfigured ? configured : measured;
+          if (hasMeasured && (configuredIsPlaceholder || !hasConfigured)) {
             base = measured;
           }
           const requested = requestedSizeMm[axis];
           if (!Number.isFinite(base) || base <= 0) continue;
           if (!Number.isFinite(requested) || requested <= 0) continue;
-          axisScale[axis] = THREE.MathUtils.clamp(requested / base, 0.01, 200);
+          axisScale[axis] = THREE.MathUtils.clamp(requested / base, 0.01, 5000);
         }
         instance.scale.multiply(new THREE.Vector3(axisScale[0], axisScale[1], axisScale[2]));
       }
@@ -172,7 +170,7 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef; parameters?: Record<str
     const pickBounds = new THREE.Box3().setFromObject(instance);
     const pickSize = pickBounds.getSize(new THREE.Vector3());
     const pickCenter = pickBounds.getCenter(new THREE.Vector3());
-    const minPickAxis = 0.08; // Easier selection for tiny OEM parts.
+    const minPickAxis = assetDef.id.startsWith('oem-') ? 0.16 : 0.08; // Easier selection for tiny OEM parts.
     const pickSizeWithMinimum: [number, number, number] = [
       Math.max(minPickAxis, pickSize.x || 0),
       Math.max(minPickAxis, pickSize.y || 0),
@@ -208,6 +206,7 @@ const FallbackBox: React.FC = () => (
 const StaticModel: React.FC<StaticModelProps> = ({ assetDef, parameters, isSelected, onClick }) => {
   return (
     <group
+      onPointerDown={(e) => { e.stopPropagation(); onClick(); }}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
       onPointerOut={() => { document.body.style.cursor = 'auto'; }}
