@@ -128,6 +128,7 @@ const SnapSystem: React.FC = () => {
   const { processNodes, environmentAssets, edges, selectedObjectId, isDragging, mateMode, activeTool, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
   const wasDragging = useRef(false);
   const [successPortKeys, setSuccessPortKeys] = useState<Set<string>>(new Set());
+  const [hoveredPortKey, setHoveredPortKey] = useState<string | null>(null);
   const previousEdgeCountRef = useRef(edges.length);
 
   // Merged list of all nodes that can have ports (process + environment)
@@ -154,6 +155,13 @@ const SnapSystem: React.FC = () => {
     }
     previousEdgeCountRef.current = edges.length;
   }, [edges]);
+
+  useEffect(() => {
+    if (!mateMode.active) {
+      setHoveredPortKey(null);
+      document.body.style.cursor = 'auto';
+    }
+  }, [mateMode.active]);
 
   const dragMatePreview = useMemo(() => {
     if (!isDragging || !selectedObjectId) return null;
@@ -514,6 +522,8 @@ const SnapSystem: React.FC = () => {
     <group>
       {portVisuals.map((pv) => {
         const selected = isMateSelected(pv.nodeId, pv.portId);
+        const portKey = `${pv.nodeId}-${pv.portId}`;
+        const hovered = hoveredPortKey === portKey;
         const portSize = pv.state === 'preview'
           ? pv.markerSize * 1.2
           : pv.state === 'invalid'
@@ -530,6 +540,8 @@ const SnapSystem: React.FC = () => {
             ? '#f59e0b'
             : pv.state === 'invalid'
               ? '#ef4444'
+              : hovered
+                ? '#22d3ee'
               : baseColor;
         const emissiveIntensity = selected
           ? 1.0
@@ -539,14 +551,19 @@ const SnapSystem: React.FC = () => {
               ? 0.9
               : pv.state === 'invalid'
                 ? 0.85
+                : hovered
+                  ? 0.92
                 : pv.connected
                   ? 0.1
                   : 0.5;
+        const hitRadius = mateMode.active
+          ? Math.max(portSize * 2.4, 0.03)
+          : Math.max(portSize * 1.9, 0.02);
         return (
           <group key={`${pv.nodeId}-${pv.portId}`} position={pv.position}>
-            {/* Port sphere */}
+            {/* Larger invisible hit area keeps selection easy even with small premium icons */}
             <mesh
-              onClick={(e) => {
+              onPointerDown={(e) => {
                 if (mateMode.active) {
                   e.stopPropagation();
                   handlePortClick(pv);
@@ -556,13 +573,27 @@ const SnapSystem: React.FC = () => {
                 if (mateMode.active) {
                   e.stopPropagation();
                   document.body.style.cursor = 'pointer';
+                  setHoveredPortKey(portKey);
                 }
               }}
               onPointerOut={() => {
-                if (mateMode.active) document.body.style.cursor = 'auto';
+                if (mateMode.active) {
+                  document.body.style.cursor = 'auto';
+                  setHoveredPortKey((prev) => (prev === portKey ? null : prev));
+                }
               }}
             >
-              <sphereGeometry args={[portSize, 12, 8]} />
+              <sphereGeometry args={[hitRadius, 10, 8]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+
+            {/* Visible premium icon */}
+            <mesh>
+              {pv.type === 'input' ? (
+                <sphereGeometry args={[portSize * 0.92, 12, 10]} />
+              ) : (
+                <octahedronGeometry args={[portSize * 0.95, 0]} />
+              )}
               <meshStandardMaterial
                 color={selected ? '#ffffff' : stateColor}
                 emissive={selected ? '#06b6d4' : stateColor}
@@ -578,7 +609,7 @@ const SnapSystem: React.FC = () => {
                 <meshBasicMaterial
                   color={selected ? '#06b6d4' : stateColor}
                   transparent
-                  opacity={selected ? 0.85 : pv.state === 'preview' ? 0.75 : pv.state === 'invalid' ? 0.8 : pv.state === 'success' ? 0.78 : 0.42}
+                  opacity={selected ? 0.85 : pv.state === 'preview' ? 0.75 : pv.state === 'invalid' ? 0.8 : pv.state === 'success' ? 0.78 : hovered ? 0.72 : 0.42}
                   side={THREE.DoubleSide}
                 />
               </mesh>
