@@ -15,6 +15,7 @@ import {
   OemCurrency,
   OemConnectionPortInput,
   OemLibraryIndex,
+  OemParametricSizing,
   OemModelFormat,
   OemModelEntry,
   resolveOemModelGlbUrl,
@@ -48,6 +49,12 @@ function defaultModel(_companyId: string, modelName = 'New OEM Model'): OemModel
     glbUrl: '',
     thumbnailUrl: '',
     defaultScale: [1, 1, 1],
+    parametricSizing: {
+      enabled: false,
+      baseSizeMm: [1000, 300, 120],
+      editableAxes: [true, true, true],
+      axisLabels: ['Length', 'Width', 'Height'],
+    },
     priceUsd: 0,
     priceCurrency: 'EUR',
     connectionPorts: [],
@@ -134,6 +141,20 @@ function sanitizePortsForUi(value: unknown): OemConnectionPortInput[] {
         localPosition: local,
       };
     });
+}
+
+function sanitizeBoolVec3(value: unknown, fallback: [boolean, boolean, boolean]): [boolean, boolean, boolean] {
+  if (!Array.isArray(value) || value.length !== 3) return fallback;
+  return [Boolean(value[0]), Boolean(value[1]), Boolean(value[2])];
+}
+
+function sanitizeLabelVec3(value: unknown, fallback: [string, string, string]): [string, string, string] {
+  if (!Array.isArray(value) || value.length !== 3) return fallback;
+  return [
+    String(value[0] || fallback[0]).trim() || fallback[0],
+    String(value[1] || fallback[1]).trim() || fallback[1],
+    String(value[2] || fallback[2]).trim() || fallback[2],
+  ];
 }
 
 class OemAdminErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -800,6 +821,18 @@ const OemAdminPageContent: React.FC = () => {
   );
   const selectedModelScale = useMemo<[number, number, number]>(
     () => sanitizeVec3(selectedModel?.defaultScale, [1, 1, 1]),
+    [selectedModel],
+  );
+  const selectedModelParametric = useMemo<OemParametricSizing>(
+    () => {
+      const raw = selectedModel?.parametricSizing;
+      return {
+        enabled: raw?.enabled === true,
+        baseSizeMm: sanitizeVec3(raw?.baseSizeMm, [1000, 300, 120]),
+        editableAxes: sanitizeBoolVec3(raw?.editableAxes, [true, true, true]),
+        axisLabels: sanitizeLabelVec3(raw?.axisLabels, ['Length', 'Width', 'Height']),
+      };
+    },
     [selectedModel],
   );
   const selectedModelPorts = useMemo(
@@ -1934,6 +1967,102 @@ const OemAdminPageContent: React.FC = () => {
                           style={{ display: 'none' }}
                         />
                       </label>
+                    </div>
+                    <div style={{ border: '1px solid var(--mm-border-subtle)', borderRadius: 8, padding: 8, background: '#f8fafc', display: 'grid', gap: 8 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--mm-text-primary)' }}>
+                        Parametric Profile (Main Simulation)
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedModelParametric.enabled === true}
+                          onChange={(e) => updateSelectedModel((model) => ({
+                            ...model,
+                            parametricSizing: {
+                              enabled: e.target.checked,
+                              baseSizeMm: sanitizeVec3(model.parametricSizing?.baseSizeMm, [1000, 300, 120]),
+                              editableAxes: sanitizeBoolVec3(model.parametricSizing?.editableAxes, [true, true, true]),
+                              axisLabels: sanitizeLabelVec3(model.parametricSizing?.axisLabels, ['Length', 'Width', 'Height']),
+                            },
+                          }))}
+                        />
+                        Enable editable dimensions for this OEM model
+                      </label>
+                      {selectedModelParametric.enabled && (
+                        <>
+                          <div style={{ fontSize: 10, color: 'var(--mm-text-tertiary)' }}>
+                            Base size defines the original OBJ/STEP dimensions in mm. Main Simulation values scale from this baseline.
+                          </div>
+                          {(['X', 'Y', 'Z'] as const).map((axis, idx) => (
+                            <div key={`param-axis-${axis}`} style={{ display: 'grid', gridTemplateColumns: '76px 1fr 96px', gap: 8, alignItems: 'center' }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--mm-text-secondary)' }}>{axis} Axis</div>
+                              <input
+                                type="text"
+                                value={selectedModelParametric.axisLabels?.[idx] || ['Length', 'Width', 'Height'][idx]}
+                                onChange={(e) => updateSelectedModel((model) => {
+                                  const labels = sanitizeLabelVec3(model.parametricSizing?.axisLabels, ['Length', 'Width', 'Height']);
+                                  labels[idx] = e.target.value;
+                                  return {
+                                    ...model,
+                                    parametricSizing: {
+                                      enabled: true,
+                                      baseSizeMm: sanitizeVec3(model.parametricSizing?.baseSizeMm, [1000, 300, 120]),
+                                      editableAxes: sanitizeBoolVec3(model.parametricSizing?.editableAxes, [true, true, true]),
+                                      axisLabels: labels,
+                                    },
+                                  };
+                                })}
+                                placeholder={`${axis} label`}
+                              />
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--mm-text-secondary)' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedModelParametric.editableAxes?.[idx] !== false}
+                                  onChange={(e) => updateSelectedModel((model) => {
+                                    const editableAxes = sanitizeBoolVec3(model.parametricSizing?.editableAxes, [true, true, true]);
+                                    editableAxes[idx] = e.target.checked;
+                                    return {
+                                      ...model,
+                                      parametricSizing: {
+                                        enabled: true,
+                                        baseSizeMm: sanitizeVec3(model.parametricSizing?.baseSizeMm, [1000, 300, 120]),
+                                        editableAxes,
+                                        axisLabels: sanitizeLabelVec3(model.parametricSizing?.axisLabels, ['Length', 'Width', 'Height']),
+                                      },
+                                    };
+                                  })}
+                                />
+                                Editable
+                              </label>
+                            </div>
+                          ))}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+                            {(selectedModelParametric.baseSizeMm || [1000, 300, 120]).map((value, idx) => (
+                              <input
+                                key={`param-base-${idx}`}
+                                type="number"
+                                min={1}
+                                step={1}
+                                value={value}
+                                onChange={(e) => updateSelectedModel((model) => {
+                                  const base = sanitizeVec3(model.parametricSizing?.baseSizeMm, [1000, 300, 120]);
+                                  base[idx] = Math.max(1, Number(e.target.value) || 1);
+                                  return {
+                                    ...model,
+                                    parametricSizing: {
+                                      enabled: true,
+                                      baseSizeMm: base,
+                                      editableAxes: sanitizeBoolVec3(model.parametricSizing?.editableAxes, [true, true, true]),
+                                      axisLabels: sanitizeLabelVec3(model.parametricSizing?.axisLabels, ['Length', 'Width', 'Height']),
+                                    },
+                                  };
+                                })}
+                                placeholder={`${['X', 'Y', 'Z'][idx]} base (mm)`}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
                     <input value={selectedModel.glbPath || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, glbPath: e.target.value }))} placeholder="model path in company folder (e.g. robot.obj / machine.step)" />
                     <input value={selectedModel.glbUrl || ''} onChange={(e) => updateSelectedModel((model) => ({ ...model, glbUrl: e.target.value }))} placeholder="model URL or imported data URL" />

@@ -72,6 +72,7 @@ const EnvironmentAssetComponent: React.FC<EnvironmentAssetComponentProps> = ({ a
         >
           <StaticModel
             assetDef={staticDef}
+            parameters={asset.parameters}
             isSelected={isSelected}
             onClick={onClick}
           />

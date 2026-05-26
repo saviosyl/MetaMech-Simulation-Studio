@@ -5,11 +5,12 @@ import { loadModelObject } from '../../lib/modelLoader';
 
 interface StaticModelProps {
   assetDef: StaticAssetDef;
+  parameters?: Record<string, any>;
   isSelected: boolean;
   onClick: () => void;
 }
 
-const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
+const RuntimeModel: React.FC<{ assetDef: StaticAssetDef; parameters?: Record<string, any> }> = ({ assetDef, parameters }) => {
   const [model, setModel] = React.useState<THREE.Object3D | null>(null);
 
   React.useEffect(() => {
@@ -60,6 +61,26 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
         // Neutralize that legacy embed so mm->m conversion is applied exactly once.
         if (legacyMmScale) instance.scale.multiplyScalar(1000);
         instance.scale.multiplyScalar(0.001);
+      }
+
+      if (assetDef.oemParametric?.enabled) {
+        const baseSizeMm = assetDef.oemParametric.baseSizeMm || [1000, 300, 120];
+        const editableAxes = assetDef.oemParametric.editableAxes || [true, true, true];
+        const requestedSizeMm: [number, number, number] = [
+          Number(parameters?.oemLengthMm),
+          Number(parameters?.oemWidthMm),
+          Number(parameters?.oemHeightMm),
+        ];
+        const axisScale: [number, number, number] = [1, 1, 1];
+        for (let axis = 0; axis < 3; axis += 1) {
+          if (!editableAxes[axis]) continue;
+          const base = Number(baseSizeMm[axis]);
+          const requested = requestedSizeMm[axis];
+          if (!Number.isFinite(base) || base <= 0) continue;
+          if (!Number.isFinite(requested) || requested <= 0) continue;
+          axisScale[axis] = THREE.MathUtils.clamp(requested / base, 0.01, 200);
+        }
+        instance.scale.multiply(new THREE.Vector3(axisScale[0], axisScale[1], axisScale[2]));
       }
 
       // Very loose safety guardrails to avoid broken imports while preserving
@@ -127,7 +148,7 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef }> = ({ assetDef }) => {
       }
     });
     return instance;
-  }, [model, assetDef.defaultScale]);
+  }, [model, assetDef, parameters]);
 
   if (!cloned) return <FallbackBox />;
   return <primitive object={cloned} />;
@@ -140,14 +161,14 @@ const FallbackBox: React.FC = () => (
   </mesh>
 );
 
-const StaticModel: React.FC<StaticModelProps> = ({ assetDef, isSelected, onClick }) => {
+const StaticModel: React.FC<StaticModelProps> = ({ assetDef, parameters, isSelected, onClick }) => {
   return (
     <group
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
       onPointerOut={() => { document.body.style.cursor = 'auto'; }}
     >
-      <RuntimeModel assetDef={assetDef} />
+      <RuntimeModel assetDef={assetDef} parameters={parameters} />
       {isSelected && (
         <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[1.5, 1.7, 32]} />

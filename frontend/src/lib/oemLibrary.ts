@@ -12,6 +12,13 @@ export interface OemConnectionPortInput {
   localPosition: [number, number, number];
 }
 
+export interface OemParametricSizing {
+  enabled?: boolean;
+  baseSizeMm?: [number, number, number];
+  editableAxes?: [boolean, boolean, boolean];
+  axisLabels?: [string, string, string];
+}
+
 export interface OemModelEntry {
   id: string;
   name: string;
@@ -27,6 +34,7 @@ export interface OemModelEntry {
   glbUrl?: string;
   thumbnailUrl?: string;
   defaultScale?: [number, number, number];
+  parametricSizing?: OemParametricSizing;
   priceUsd?: number;
   priceCurrency?: OemCurrency;
   connectionPorts?: OemConnectionPortInput[];
@@ -151,6 +159,36 @@ function sanitizeOemDefaultScale(
   return parsed;
 }
 
+function toFinitePositiveSizeMm(value: unknown, fallback: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(1_000_000, Math.max(1, n));
+}
+
+function normalizeParametricSizing(value: unknown): OemParametricSizing | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const raw = value as any;
+  const enabled = raw.enabled === true;
+  const baseSizeMm: [number, number, number] = Array.isArray(raw.baseSizeMm) && raw.baseSizeMm.length === 3
+    ? [
+      toFinitePositiveSizeMm(raw.baseSizeMm[0], 1000),
+      toFinitePositiveSizeMm(raw.baseSizeMm[1], 300),
+      toFinitePositiveSizeMm(raw.baseSizeMm[2], 120),
+    ]
+    : [1000, 300, 120];
+  const editableAxes: [boolean, boolean, boolean] = Array.isArray(raw.editableAxes) && raw.editableAxes.length === 3
+    ? [Boolean(raw.editableAxes[0]), Boolean(raw.editableAxes[1]), Boolean(raw.editableAxes[2])]
+    : [true, true, true];
+  const axisLabels: [string, string, string] = Array.isArray(raw.axisLabels) && raw.axisLabels.length === 3
+    ? [
+      String(raw.axisLabels[0] || 'Length').trim() || 'Length',
+      String(raw.axisLabels[1] || 'Width').trim() || 'Width',
+      String(raw.axisLabels[2] || 'Height').trim() || 'Height',
+    ]
+    : ['Length', 'Width', 'Height'];
+  return { enabled, baseSizeMm, editableAxes, axisLabels };
+}
+
 function toAssetId(company: OemCompanyEntry, model: OemModelEntry): string {
   const companyId = slugify(company.id || company.name || 'oem');
   const modelId = slugify(model.id || model.name || 'model');
@@ -219,6 +257,7 @@ function normalizeLibrary(data: unknown): OemLibraryIndex {
       const inferredFormat = inferModelFormatFromPath(glbPath || glbUrl);
       const modelFormat = (m as any).modelFormat ? toModelFormat((m as any).modelFormat) : inferredFormat;
       const safeScale = sanitizeOemDefaultScale((m as any).defaultScale, modelFormat);
+      const parametricSizing = normalizeParametricSizing((m as any).parametricSizing);
 
       models.push({
         id: typeof (m as any).id === 'string' ? (m as any).id : slugify(name),
@@ -241,6 +280,7 @@ function normalizeLibrary(data: unknown): OemLibraryIndex {
         glbUrl,
         thumbnailUrl: typeof (m as any).thumbnailUrl === 'string' ? (m as any).thumbnailUrl : '',
         defaultScale: safeScale,
+        parametricSizing,
         priceUsd: typeof (m as any).priceUsd === 'number' && Number.isFinite((m as any).priceUsd)
           ? Math.max(0, (m as any).priceUsd)
           : undefined,
@@ -350,12 +390,40 @@ function toRuntimeEntities(index: OemLibraryIndex): OemLibraryLoadResult {
           ]
           : undefined,
         connectionPorts: toConnectionPortsForAsset(model.connectionPorts),
+        oemParametric: model.parametricSizing?.enabled
+          ? {
+            enabled: true,
+            baseSizeMm: model.parametricSizing.baseSizeMm || [1000, 300, 120],
+            editableAxes: model.parametricSizing.editableAxes || [true, true, true],
+            axisLabels: model.parametricSizing.axisLabels || ['Length', 'Width', 'Height'],
+          }
+          : undefined,
       };
       assets.push(asset);
 
       const priceLabel = typeof model.priceUsd === 'number'
         ? ` • ${model.priceCurrency || 'EUR'} ${model.priceUsd.toFixed(2)}`
         : '';
+      const moduleParameters: ModuleDefinition['parameters'] = {};
+      if (model.parametricSizing?.enabled) {
+        const base = model.parametricSizing.baseSizeMm || [1000, 300, 120];
+        const editable = model.parametricSizing.editableAxes || [true, true, true];
+        const labels = model.parametricSizing.axisLabels || ['Length', 'Width', 'Height'];
+        const keys = ['oemLengthMm', 'oemWidthMm', 'oemHeightMm'] as const;
+        for (let axis = 0; axis < 3; axis += 1) {
+          if (!editable[axis]) continue;
+          const sizeDefault = toFinitePositiveSizeMm(base[axis], axis === 0 ? 1000 : axis === 1 ? 300 : 120);
+          moduleParameters[keys[axis]] = {
+            type: 'number',
+            label: `${labels[axis]} (mm)`,
+            default: sizeDefault,
+            min: 1,
+            max: 100000,
+            step: 1,
+          };
+        }
+      }
+
       modules.push({
         id: assetId,
         name: model.name,
@@ -367,7 +435,7 @@ function toRuntimeEntities(index: OemLibraryIndex): OemLibraryLoadResult {
         oemCompany: company.name,
         priceUsd: model.priceUsd,
         priceCurrency: model.priceCurrency || 'EUR',
-        parameters: {},
+        parameters: moduleParameters,
       });
     }
   }

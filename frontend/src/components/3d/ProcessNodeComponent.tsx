@@ -387,6 +387,7 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         >
           <StaticModel
             assetDef={staticDef}
+            parameters={node.parameters}
             isSelected={isSelected}
             onClick={onClick}
           />

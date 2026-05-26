@@ -16,6 +16,12 @@ export interface StaticAssetDef {
   defaultScale?: [number, number, number];
   defaultRotation?: [number, number, number];
   connectionPorts?: ConnectionPortDef[];
+  oemParametric?: {
+    enabled: boolean;
+    baseSizeMm: [number, number, number];
+    editableAxes: [boolean, boolean, boolean];
+    axisLabels: [string, string, string];
+  };
 }
 
 export interface ParametricPartUrls {
