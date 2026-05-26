@@ -12,8 +12,8 @@ const ConnectionLines: React.FC = () => {
       const toNode = processNodes.find(n => n.id === edge.to);
       if (!fromNode || !toNode) return null;
 
-      const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters);
-      const toPorts = getConnectionPorts(toNode.type, toNode.parameters);
+      const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters, (fromNode as any).assetId);
+      const toPorts = getConnectionPorts(toNode.type, toNode.parameters, (toNode as any).assetId);
       const fromPort = fromPorts.find(p => p.id === edge.fromPort);
       const toPort = toPorts.find(p => p.id === edge.toPort);
       if (!fromPort || !toPort) return null;

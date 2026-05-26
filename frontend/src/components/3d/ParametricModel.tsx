@@ -40,6 +40,24 @@ const ParametricModel: React.FC<ParametricModelProps> = ({ assetDef, parameters,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assetDef.builder, JSON.stringify(mergedParams), buildVersion]);
 
+  const selectionBounds = useMemo(() => {
+    if (!builderResult) return null;
+    const min = builderResult.bounds.min;
+    const max = builderResult.bounds.max;
+    const padding = 0.03;
+    const size: [number, number, number] = [
+      Math.max(0.03, (max.x - min.x) + padding),
+      Math.max(0.03, (max.y - min.y) + padding),
+      Math.max(0.03, (max.z - min.z) + padding),
+    ];
+    const center: [number, number, number] = [
+      (min.x + max.x) / 2,
+      (min.y + max.y) / 2,
+      (min.z + max.z) / 2,
+    ];
+    return { size, center };
+  }, [builderResult]);
+
   // Safely detach old children (without disposing shared GLB geometries)
   const clearGroup = useCallback((parent: THREE.Group) => {
     while (parent.children.length > 0) {
@@ -76,20 +94,23 @@ const ParametricModel: React.FC<ParametricModelProps> = ({ assetDef, parameters,
 
   return (
     <group
+      onPointerDown={(e) => { e.stopPropagation(); onClick(); }}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
       onPointerOut={() => { document.body.style.cursor = 'auto'; }}
     >
       <group ref={groupRef} />
-      {isSelected && (
-        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[
-            Math.max(1.5, (builderResult.bounds.max.x - builderResult.bounds.min.x) / 2 + 0.2),
-            Math.max(1.7, (builderResult.bounds.max.x - builderResult.bounds.min.x) / 2 + 0.4),
-            32
-          ]} />
-          <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
-        </mesh>
+      {isSelected && selectionBounds && (
+        <group position={selectionBounds.center}>
+          <lineSegments>
+            <edgesGeometry args={[new THREE.BoxGeometry(...selectionBounds.size)]} />
+            <lineBasicMaterial color="#38bdf8" transparent opacity={0.95} />
+          </lineSegments>
+          <mesh>
+            <boxGeometry args={selectionBounds.size} />
+            <meshBasicMaterial color="#38bdf8" transparent opacity={0.04} depthWrite={false} side={THREE.DoubleSide} />
+          </mesh>
+        </group>
       )}
     </group>
   );

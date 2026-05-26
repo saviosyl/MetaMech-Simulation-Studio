@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useEditorStore, getConnectionPorts, ProcessNode, EnvironmentAsset, ConnectionPort } from '../../store/editorStore';
 import { getPortWorldPosition, alignNodeToPort, solveMateTransform, localDirToWorld } from '../../lib/nodeTransform';
@@ -127,12 +127,79 @@ function nodeCategory(id: string, processNodesList: ProcessNode[], _environmentA
 const SnapSystem: React.FC = () => {
   const { processNodes, environmentAssets, edges, selectedObjectId, isDragging, mateMode, activeTool, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
   const wasDragging = useRef(false);
+  const [successPortKeys, setSuccessPortKeys] = useState<Set<string>>(new Set());
+  const previousEdgeCountRef = useRef(edges.length);
 
   // Merged list of all nodes that can have ports (process + environment)
   const allNodes: AnyNode[] = useMemo(
     () => [...processNodes, ...environmentAssets],
     [processNodes, environmentAssets],
   );
+
+  useEffect(() => {
+    if (edges.length > previousEdgeCountRef.current) {
+      const lastEdge = edges[edges.length - 1];
+      if (lastEdge) {
+        const next = new Set<string>([
+          `${lastEdge.from}-${lastEdge.fromPort}`,
+          `${lastEdge.to}-${lastEdge.toPort}`,
+        ]);
+        setSuccessPortKeys(next);
+        const timeoutId = setTimeout(() => setSuccessPortKeys(new Set()), 900);
+        previousEdgeCountRef.current = edges.length;
+        return () => {
+          clearTimeout(timeoutId);
+        };
+      }
+    }
+    previousEdgeCountRef.current = edges.length;
+  }, [edges]);
+
+  const dragMatePreview = useMemo(() => {
+    if (!isDragging || !selectedObjectId) return null;
+    const moving = allNodes.find((entry) => entry.id === selectedObjectId);
+    if (!moving) return null;
+
+    const movingPorts = getConnectionPorts(moving.type, moving.parameters, (moving as any).assetId);
+    if (movingPorts.length === 0) return null;
+
+    const threshold = activeTool === 'snap-move' ? 0.22 : 0.14;
+    let bestCompatible: { key: string; dist: number } | null = null;
+    let bestInvalid: { key: string; dist: number } | null = null;
+
+    for (const other of allNodes) {
+      if (other.id === moving.id) continue;
+      const otherPorts = getConnectionPorts(other.type, other.parameters, (other as any).assetId);
+      for (const mp of movingPorts) {
+        const mpWorld = getPortWorldPosition(mp.localPosition, moving as any);
+        for (const op of otherPorts) {
+          const opWorld = getPortWorldPosition(op.localPosition, other as any);
+          const dx = mpWorld[0] - opWorld[0];
+          const dy = mpWorld[1] - opWorld[1];
+          const dz = mpWorld[2] - opWorld[2];
+          const planarDist = Math.sqrt(dx * dx + dz * dz);
+          const dist3d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          const spiralPair = moving.type === 'spiral-conveyor' || other.type === 'spiral-conveyor';
+          const usePlanarDist =
+            spiralPair &&
+            (isHeightAdjustableForSpiralMate(moving.type) || isHeightAdjustableForSpiralMate(other.type));
+          const dist = usePlanarDist ? planarDist : dist3d;
+          if (dist > threshold) continue;
+          const key = `${other.id}-${op.id}`;
+          if (mp.type !== op.type) {
+            if (!bestCompatible || dist < bestCompatible.dist) bestCompatible = { key, dist };
+          } else if (!bestInvalid || dist < bestInvalid.dist) {
+            bestInvalid = { key, dist };
+          }
+        }
+      }
+    }
+
+    return {
+      previewPortKey: bestCompatible?.key || null,
+      invalidPortKey: bestCompatible ? null : (bestInvalid?.key || null),
+    };
+  }, [isDragging, selectedObjectId, allNodes, activeTool]);
 
   // Auto-snap on drag end: accessory snap + snap-move port proximity snap
   useEffect(() => {
@@ -267,6 +334,7 @@ const SnapSystem: React.FC = () => {
       connected: boolean;
       category: 'process' | 'environment';
       markerSize: number;
+      state: 'available' | 'preview' | 'invalid' | 'success';
     }[] = [];
 
     // Process nodes
@@ -279,6 +347,15 @@ const SnapSystem: React.FC = () => {
           (e.from === node.id && e.fromPort === port.id) ||
           (e.to === node.id && e.toPort === port.id)
         );
+        const key = `${node.id}-${port.id}`;
+        const state: 'available' | 'preview' | 'invalid' | 'success' =
+          successPortKeys.has(key)
+            ? 'success'
+            : dragMatePreview?.previewPortKey === key
+              ? 'preview'
+              : dragMatePreview?.invalidPortKey === key
+                ? 'invalid'
+                : 'available';
         visuals.push({
           position: worldPos,
           type: port.type,
@@ -287,6 +364,7 @@ const SnapSystem: React.FC = () => {
           connected,
           category: 'process',
           markerSize,
+          state,
         });
       });
     });
@@ -297,6 +375,15 @@ const SnapSystem: React.FC = () => {
       const markerSize = getAdaptivePortSize(ports, mateMode.active);
       ports.forEach((port: ConnectionPort) => {
         const worldPos = getPortWorldPosition(port.localPosition, asset as any);
+        const key = `${asset.id}-${port.id}`;
+        const state: 'available' | 'preview' | 'invalid' | 'success' =
+          successPortKeys.has(key)
+            ? 'success'
+            : dragMatePreview?.previewPortKey === key
+              ? 'preview'
+              : dragMatePreview?.invalidPortKey === key
+                ? 'invalid'
+                : 'available';
         visuals.push({
           position: worldPos,
           type: port.type,
@@ -305,12 +392,13 @@ const SnapSystem: React.FC = () => {
           connected: false,
           category: 'environment',
           markerSize,
+          state,
         });
       });
     });
 
     return visuals;
-  }, [processNodes, environmentAssets, edges, showPorts]);
+  }, [processNodes, environmentAssets, edges, showPorts, successPortKeys, dragMatePreview, mateMode.active]);
 
   if (!showPorts) return null;
 
@@ -426,7 +514,36 @@ const SnapSystem: React.FC = () => {
     <group>
       {portVisuals.map((pv) => {
         const selected = isMateSelected(pv.nodeId, pv.portId);
-        const portSize = pv.markerSize;
+        const portSize = pv.state === 'preview'
+          ? pv.markerSize * 1.2
+          : pv.state === 'invalid'
+            ? pv.markerSize * 1.1
+            : pv.markerSize;
+        const baseColor = pv.connected
+          ? '#6b7280'
+          : pv.category === 'environment'
+            ? '#f59e0b'
+            : pv.type === 'input'
+              ? '#3b82f6'
+              : '#10b981';
+        const stateColor = pv.state === 'success'
+          ? '#22c55e'
+          : pv.state === 'preview'
+            ? '#f59e0b'
+            : pv.state === 'invalid'
+              ? '#ef4444'
+              : baseColor;
+        const emissiveIntensity = selected
+          ? 1.0
+          : pv.state === 'success'
+            ? 0.95
+            : pv.state === 'preview'
+              ? 0.9
+              : pv.state === 'invalid'
+                ? 0.85
+                : pv.connected
+                  ? 0.1
+                  : 0.5;
         return (
           <group key={`${pv.nodeId}-${pv.portId}`} position={pv.position}>
             {/* Port sphere */}
@@ -449,11 +566,11 @@ const SnapSystem: React.FC = () => {
             >
               <sphereGeometry args={[portSize, 12, 8]} />
               <meshStandardMaterial
-                color={selected ? '#ffffff' : pv.connected ? '#6b7280' : pv.category === 'environment' ? '#f59e0b' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
-                emissive={selected ? '#06b6d4' : pv.connected ? '#333333' : pv.category === 'environment' ? '#f59e0b' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
-                emissiveIntensity={selected ? 1.0 : pv.connected ? 0.1 : 0.5}
+                color={selected ? '#ffffff' : stateColor}
+                emissive={selected ? '#06b6d4' : stateColor}
+                emissiveIntensity={emissiveIntensity}
                 transparent
-                opacity={pv.connected ? 0.4 : 0.9}
+                opacity={pv.connected ? 0.45 : 0.92}
               />
             </mesh>
             {/* Outer ring indicator */}
@@ -461,9 +578,9 @@ const SnapSystem: React.FC = () => {
               <mesh rotation={[-Math.PI / 2, 0, 0]}>
                 <ringGeometry args={[portSize + 0.02, portSize + 0.07, 16]} />
                 <meshBasicMaterial
-                  color={selected ? '#06b6d4' : pv.category === 'environment' ? '#f59e0b' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
+                  color={selected ? '#06b6d4' : stateColor}
                   transparent
-                  opacity={selected ? 0.8 : 0.4}
+                  opacity={selected ? 0.85 : pv.state === 'preview' ? 0.75 : pv.state === 'invalid' ? 0.8 : pv.state === 'success' ? 0.78 : 0.42}
                   side={THREE.DoubleSide}
                 />
               </mesh>
@@ -490,9 +607,9 @@ export function checkSnap(
 } | null {
   for (const otherNode of allNodes) {
     if (otherNode.id === draggedNode.id) continue;
-    const otherPorts = getConnectionPorts(otherNode.type, otherNode.parameters);
+    const otherPorts = getConnectionPorts(otherNode.type, otherNode.parameters, (otherNode as any).assetId);
 
-    for (const dp of getConnectionPorts(draggedNode.type, draggedNode.parameters)) {
+    for (const dp of getConnectionPorts(draggedNode.type, draggedNode.parameters, (draggedNode as any).assetId)) {
       const dpWorld = getPortWorldPosition(dp.localPosition, draggedNode);
 
       for (const op of otherPorts) {
@@ -543,6 +660,7 @@ export function checkSnap(
               const updatedPorts = getConnectionPorts(
                 draggedNode.type,
                 { ...draggedNode.parameters, ...spiralAdjust.movingParams },
+                (draggedNode as any).assetId,
               );
               adjustedDp = updatedPorts.find(p => p.id === dp.id) || dp;
             }

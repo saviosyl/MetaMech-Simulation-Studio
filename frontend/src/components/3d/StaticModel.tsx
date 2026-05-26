@@ -10,7 +10,7 @@ interface StaticModelProps {
   onClick: () => void;
 }
 
-const RuntimeModel: React.FC<{ assetDef: StaticAssetDef; parameters?: Record<string, any> }> = ({ assetDef, parameters }) => {
+const RuntimeModel: React.FC<{ assetDef: StaticAssetDef; parameters?: Record<string, any>; isSelected: boolean }> = ({ assetDef, parameters, isSelected }) => {
   const [model, setModel] = React.useState<THREE.Object3D | null>(null);
 
   React.useEffect(() => {
@@ -176,11 +176,17 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef; parameters?: Record<str
       Math.max(minPickAxis, pickSize.y || 0),
       Math.max(minPickAxis, pickSize.z || 0),
     ];
+    const selectionSize: [number, number, number] = [
+      pickSizeWithMinimum[0] + 0.03,
+      pickSizeWithMinimum[1] + 0.03,
+      pickSizeWithMinimum[2] + 0.03,
+    ];
 
     return {
       instance,
       pickCenter: [pickCenter.x, pickCenter.y, pickCenter.z] as [number, number, number],
       pickSize: pickSizeWithMinimum,
+      selectionSize,
     };
   }, [model, assetDef, parameters]);
 
@@ -192,6 +198,18 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef; parameters?: Record<str
         <boxGeometry args={runtimeObject.pickSize} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
+      {isSelected && (
+        <group position={runtimeObject.pickCenter}>
+          <lineSegments>
+            <edgesGeometry args={[new THREE.BoxGeometry(...runtimeObject.selectionSize)]} />
+            <lineBasicMaterial color="#38bdf8" transparent opacity={0.95} />
+          </lineSegments>
+          <mesh>
+            <boxGeometry args={runtimeObject.selectionSize} />
+            <meshBasicMaterial color="#38bdf8" transparent opacity={0.035} depthWrite={false} side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+      )}
     </group>
   );
 };
@@ -211,13 +229,7 @@ const StaticModel: React.FC<StaticModelProps> = ({ assetDef, parameters, isSelec
       onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
       onPointerOut={() => { document.body.style.cursor = 'auto'; }}
     >
-      <RuntimeModel assetDef={assetDef} parameters={parameters} />
-      {isSelected && (
-        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[1.5, 1.7, 32]} />
-          <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
-        </mesh>
-      )}
+      <RuntimeModel assetDef={assetDef} parameters={parameters} isSelected={isSelected} />
     </group>
   );
 };

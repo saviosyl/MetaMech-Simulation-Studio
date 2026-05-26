@@ -278,8 +278,12 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
   }
 
   // Check asset manifest first
-  if (assetId) {
-    const assetDef = getAssetById(assetId);
+  {
+    // Many call-sites only pass `type` (legacy path), while OEM/asset-based nodes
+    // require manifest lookup by asset id. Fall back to type-as-asset-id so
+    // parametric/static OEM ports stay accurate as parameters change.
+    const resolvedAssetId = assetId || type;
+    const assetDef = getAssetById(resolvedAssetId);
     if (assetDef) {
       if (assetDef.assetType === 'static') {
         const staticPorts = assetDef.connectionPorts || [];
@@ -709,7 +713,7 @@ interface EditorState {
   // Snap state
   isDragging: boolean;
   dragNodeId: string | null;
-  snapTarget: { nodeId: string; portId: string; position: [number, number, number] } | null;
+  snapTarget: { nodeId: string; portId: string; position: [number, number, number]; status?: 'preview' | 'success' | 'invalid' } | null;
   
   // Actions
   addProcessNode: (type: ProcessNode['type'], position: [number, number, number]) => void;
@@ -758,7 +762,7 @@ interface EditorState {
   // Snap actions
   setIsDragging: (dragging: boolean) => void;
   setDragNodeId: (id: string | null) => void;
-  setSnapTarget: (target: { nodeId: string; portId: string; position: [number, number, number] } | null) => void;
+  setSnapTarget: (target: { nodeId: string; portId: string; position: [number, number, number]; status?: 'preview' | 'success' | 'invalid' } | null) => void;
   
   // Simulation controls
   play: () => void;

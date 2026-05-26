@@ -186,6 +186,7 @@ const DraggableObject: React.FC<{
         setIsDragging(true);
         setDragNodeId(id);
       } else {
+        let showSuccessSnap = false;
         // Stopped dragging - check snap
         if (objectType === 'process') {
           const node = processNodes.find(n => n.id === id);
@@ -216,7 +217,7 @@ const DraggableObject: React.FC<{
               }
 
               // Create edge - figure out direction
-              const dragPorts = getConnectionPorts(node.type, nextParameters);
+              const dragPorts = getConnectionPorts(node.type, nextParameters, (node as any).assetId);
               // Use the stored snap info to create connection
               if (snap) {
                 const dragPort = dragPorts.find(p => p.id === snap.dragPortId);
@@ -226,6 +227,19 @@ const DraggableObject: React.FC<{
                   } else {
                     addEdge(snap.targetNodeId, snap.targetPortId, id, snap.dragPortId);
                   }
+                  setSnapTarget({
+                    nodeId: snap.targetNodeId,
+                    portId: snap.targetPortId,
+                    position: snap.snapPosition,
+                    status: 'success',
+                  });
+                  showSuccessSnap = true;
+                  setTimeout(() => {
+                    const activeSnap = useEditorStore.getState().snapTarget;
+                    if (activeSnap?.status === 'success') {
+                      useEditorStore.getState().setSnapTarget(null);
+                    }
+                  }, 850);
                 }
               }
             }
@@ -233,7 +247,7 @@ const DraggableObject: React.FC<{
         }
         setIsDragging(false);
         setDragNodeId(null);
-        setSnapTarget(null);
+        if (!showSuccessSnap) setSnapTarget(null);
       }
     };
 
@@ -302,13 +316,28 @@ const DraggableObject: React.FC<{
           useEditorStore.getState().edges
         );
         if (snap) {
-          setSnapTarget({ nodeId: snap.targetNodeId, portId: snap.targetPortId, position: snap.snapPosition });
+          setSnapTarget({ nodeId: snap.targetNodeId, portId: snap.targetPortId, position: snap.snapPosition, status: 'preview' });
+          if (activeTool === 'snap-move') {
+            if (groupRef.current) {
+              groupRef.current.position.set(...snap.snapPosition);
+              if (snap.snapRotation) groupRef.current.rotation.set(...snap.snapRotation);
+            }
+            const nextRotation: [number, number, number] = snap.snapRotation || [rot.x, rot.y, rot.z];
+            const nextUpdates: Record<string, any> = {
+              position: snap.snapPosition,
+              rotation: nextRotation,
+            };
+            if (snap.snapParameters) {
+              nextUpdates.parameters = { ...node.parameters, ...snap.snapParameters };
+            }
+            updateObject(id, 'process', nextUpdates);
+          }
         } else {
           setSnapTarget(null);
         }
       }
     }
-  }, [id, objectType, updateObject, setSnapTarget]);
+  }, [id, objectType, updateObject, setSnapTarget, activeTool]);
 
   return (
     <>
@@ -654,7 +683,11 @@ const SceneContent: React.FC<{
       {!overlaysHidden && snapTarget && (
         <mesh position={snapTarget.position}>
           <sphereGeometry args={[0.2, 16, 16]} />
-          <meshBasicMaterial color="#06b6d4" transparent opacity={0.6} />
+          <meshBasicMaterial
+            color={snapTarget.status === 'success' ? '#22c55e' : snapTarget.status === 'invalid' ? '#ef4444' : '#f59e0b'}
+            transparent
+            opacity={0.68}
+          />
         </mesh>
       )}
 

@@ -563,7 +563,7 @@ export class SimulationEngine {
         product.currentTangent = tn;
         product.currentRotationY = Math.atan2(tn[0], tn[2]);
       } else {
-        const ports = getConnectionPorts(node.type, node.parameters);
+        const ports = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
         const inputPort = ports.find(p => p.type === 'input');
         const outputPort = ports.find(p => p.type === 'output');
         if (inputPort && outputPort) {
@@ -613,7 +613,7 @@ export class SimulationEngine {
     const processingTime = node.parameters.processingTime || node.parameters.cycleTime || 2;
 
     // Compute infeed/outfeed world positions for internal transport
-    const ports = getConnectionPorts(node.type, node.parameters);
+    const ports = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
     const inPort = ports.find(p => p.type === 'input');
     const outPort = ports.find(p => p.type === 'output');
     const infeedPos = inPort ? getPortWorldPosition(inPort.localPosition, node) : [node.position[0], node.position[1] + 0.85, node.position[2]] as [number,number,number];
@@ -789,8 +789,8 @@ export class SimulationEngine {
         speedMps = (fromNode.parameters.beltSpeed || fromNode.parameters.speed || 20) / 60;
       }
 
-      const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters);
-      const toPorts = getConnectionPorts(toNode.type, toNode.parameters);
+      const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters, (fromNode as any).assetId);
+      const toPorts = getConnectionPorts(toNode.type, toNode.parameters, (toNode as any).assetId);
       // Only accept type-correct endpoints so stale/mismatched port ids don't break transfer.
       const fp = fromPorts.find(p => p.id === edge.fromPort && p.type === 'output')
         || fromPorts.find(p => p.type === 'output');
@@ -858,7 +858,7 @@ export class SimulationEngine {
     }
 
     // Animate products on the lift platform
-    const ports = getConnectionPorts(node.type, node.parameters);
+    const ports = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
     const inputPort = ports.find(p => p.type === 'input');
     const outputPort = ports.find(p => p.type === 'output');
     const infeedY = inputPort ? inputPort.localPosition[1] : 0.15;
@@ -1044,7 +1044,7 @@ export class SimulationEngine {
     placePosition: [number, number, number];
     preferredOutEdge: ProcessEdge | null;
   } {
-    const ports = getConnectionPorts(node.type, node.parameters);
+    const ports = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
     const inEdges = this.edges.filter(e => e.to === node.id);
     const outEdges = this.edges.filter(e => e.from === node.id);
 
@@ -1084,7 +1084,7 @@ export class SimulationEngine {
       const edge = inEdges[0];
       const fromNode = this.nodes.find(n => n.id === edge.from);
       if (fromNode) {
-        const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters);
+        const fromPorts = getConnectionPorts(fromNode.type, fromNode.parameters, (fromNode as any).assetId);
         const fromPort = fromPorts.find(p => p.id === edge.fromPort) || fromPorts.find(p => p.type === 'output');
         if (fromPort) {
           pickPosition = getPortWorldPosition(fromPort.localPosition, fromNode);
@@ -1099,7 +1099,7 @@ export class SimulationEngine {
       const edge = preferredOutEdge;
       const toNode = this.nodes.find(n => n.id === edge.to);
       if (toNode) {
-        const toPorts = getConnectionPorts(toNode.type, toNode.parameters);
+        const toPorts = getConnectionPorts(toNode.type, toNode.parameters, (toNode as any).assetId);
         const toPort = toPorts.find(p => p.id === edge.toPort) || toPorts.find(p => p.type === 'input');
         if (toPort) {
           placePosition = getPortWorldPosition(toPort.localPosition, toNode);
@@ -1374,7 +1374,7 @@ export class SimulationEngine {
       stats.queue.push(product.id);
     }
 
-    const ports = getConnectionPorts(node.type, node.parameters);
+    const ports = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
     const inputPort = ports.find(p => p.type === 'input');
     const outputPort = ports.find(p => p.type === 'output');
 
@@ -1744,7 +1744,7 @@ export class SimulationEngine {
     const outEdges = this.getOutEdges(node.id);
     if (outEdges.length <= 1) return outEdges;
 
-    const ports = getConnectionPorts(node.type, node.parameters);
+    const ports = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
     const portTypeById = new Map(ports.map(p => [p.id, p.type] as const));
     const preferred = outEdges.filter(edge => {
       if (!edge.fromPort) return true;
