@@ -238,7 +238,18 @@ export class SimulationEngine {
         case 'pusher': this.tickPusher(node, stats, elapsed); break;
         case 'vertical-lifter': this.tickLift(node, stats, elapsed); break;
         default: {
-          // Unknown node type: pass products through to output
+          // OEM modules should animate infeed→outfeed like standard process nodes.
+          const isOemAsset = typeof (node as any).assetId === 'string' && String((node as any).assetId).startsWith('oem-');
+          if (isOemAsset) {
+            const ports = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
+            const hasInput = ports.some((p) => p.type === 'input');
+            const hasOutput = ports.some((p) => p.type === 'output');
+            if (hasInput && hasOutput) {
+              this.tickConveyor(node, stats, elapsed);
+              break;
+            }
+          }
+          // Unknown non-OEM node type: pass products through to output.
           const defArrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
           const defOut = this.getOutEdges(node.id);
           for (const p of defArrived) {
@@ -421,7 +432,24 @@ export class SimulationEngine {
     const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
     const path = createTransportPath(node.type, node.parameters);
     const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
-    const pathLen = path ? path.length : ((node.parameters.length || 3000) / 1000);
+    let pathLen = path ? path.length : ((node.parameters.length || node.parameters.oemLengthMm || 3000) / 1000);
+    if (!path) {
+      const ports = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
+      const inputPort = ports.find((p) => p.type === 'input');
+      const outputPort = ports.find((p) => p.type === 'output');
+      if (inputPort && outputPort) {
+        const inWorld = getPortWorldPosition(inputPort.localPosition, node);
+        const outWorld = getPortWorldPosition(outputPort.localPosition, node);
+        const dx = outWorld[0] - inWorld[0];
+        const dy = outWorld[1] - inWorld[1];
+        const dz = outWorld[2] - inWorld[2];
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (Number.isFinite(dist) && dist > 0.01) {
+          pathLen = dist;
+        }
+      }
+    }
+    pathLen = Math.max(0.05, pathLen);
     const MIN_GAP_M = 0.001; // ~1mm gap — products touch each other when accumulated
 
     // Accept new arrivals at path start

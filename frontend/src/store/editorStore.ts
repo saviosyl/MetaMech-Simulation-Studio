@@ -220,6 +220,7 @@ function buildOemParametricAutoPorts(
 ): Partial<ConnectionPort>[] {
   const labels = oemParametric.axisLabels || ['Length', 'Width', 'Height'];
   const base = oemParametric.baseSizeMm || [1000, 300, 120];
+  const editableAxes = oemParametric.editableAxes || [true, true, true];
   const keys = ['oemLengthMm', 'oemWidthMm', 'oemHeightMm'] as const;
 
   const dimsMm: [number, number, number] = [0, 0, 0];
@@ -236,22 +237,40 @@ function buildOemParametricAutoPorts(
     Math.max(0.001, dimsMm[2] / 1000),
   ];
 
-  const flowAxisFromLabel = labels.findIndex((label) => /(len|length|flow|run|x)/i.test(String(label || '')));
-  const firstEditableAxis = (oemParametric.editableAxes || [true, true, true]).findIndex(Boolean);
-  const largestAxis = dimsMm.reduce((bestIdx, value, idx, arr) => (value > arr[bestIdx] ? idx : bestIdx), 0);
-  const flowAxis = flowAxisFromLabel >= 0
-    ? flowAxisFromLabel
-    : (firstEditableAxis >= 0 ? firstEditableAxis : largestAxis);
+  // Keep flow on horizontal axes (X/Z) so mate + product transport behaves
+  // the same as standard models, while still honoring admin labels when possible.
+  const horizontalAxes: [0, 2] = [0, 2];
+  const flowAxisFromLabel = labels.findIndex((label) => /(len|length|flow|run|feed)/i.test(String(label || '')));
+  const preferredHorizontalByLabel = horizontalAxes.includes(flowAxisFromLabel as 0 | 2)
+    ? (flowAxisFromLabel as 0 | 2)
+    : null;
+  const editableHorizontal = horizontalAxes.filter((axis) => editableAxes[axis]);
+  const largestHorizontal = (dimsMm[0] >= dimsMm[2] ? 0 : 2) as 0 | 2;
+  const flowAxis = preferredHorizontalByLabel
+    ?? (editableHorizontal.length > 0
+      ? ((dimsMm[editableHorizontal[0]] >= dimsMm[editableHorizontal[editableHorizontal.length - 1]]
+        ? editableHorizontal[0]
+        : editableHorizontal[editableHorizontal.length - 1]) as 0 | 2)
+      : largestHorizontal);
+
+  const heightAxisFromLabel = labels.findIndex((label) => /(height|elev|vertical|up|y)/i.test(String(label || '')));
+  const verticalAxis = heightAxisFromLabel >= 0 && heightAxisFromLabel !== flowAxis
+    ? heightAxisFromLabel
+    : 1;
 
   const half = Math.max(0.005, dimsM[flowAxis] / 2);
   const inset = Math.min(0.02, half * 0.3);
   const flowOffset = Math.max(0.001, half - inset);
-  const y = Math.max(0.02, Math.min(0.6, dimsM[1] * 0.5));
+  const verticalHalf = Math.max(0.01, dimsM[verticalAxis] / 2);
+  const verticalInset = Math.min(0.03, verticalHalf * 0.45);
+  const verticalOffset = Math.max(0.005, verticalHalf - verticalInset);
 
-  const inputPos: [number, number, number] = [0, y, 0];
-  const outputPos: [number, number, number] = [0, y, 0];
+  const inputPos: [number, number, number] = [0, 0, 0];
+  const outputPos: [number, number, number] = [0, 0, 0];
   const inputDir: [number, number, number] = [0, 0, 0];
   const outputDir: [number, number, number] = [0, 0, 0];
+  inputPos[verticalAxis] = verticalOffset;
+  outputPos[verticalAxis] = verticalOffset;
   inputPos[flowAxis] = -flowOffset;
   outputPos[flowAxis] = flowOffset;
   inputDir[flowAxis] = -1;

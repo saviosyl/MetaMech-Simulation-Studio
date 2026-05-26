@@ -157,6 +157,56 @@ function sanitizeLabelVec3(value: unknown, fallback: [string, string, string]): 
   ];
 }
 
+function buildAutoPortsForParametricSizing(parametric: OemParametricSizing | undefined | null): OemConnectionPortInput[] {
+  if (!parametric?.enabled) return [];
+  const base = sanitizeVec3(parametric.baseSizeMm, [1000, 300, 120]);
+  const editable = sanitizeBoolVec3(parametric.editableAxes, [true, true, true]);
+  const labels = sanitizeLabelVec3(parametric.axisLabels, ['Length', 'Width', 'Height']);
+  const dimsM: [number, number, number] = [
+    Math.max(0.001, base[0] / 1000),
+    Math.max(0.001, base[1] / 1000),
+    Math.max(0.001, base[2] / 1000),
+  ];
+
+  const horizontalAxes: [0, 2] = [0, 2];
+  const flowAxisFromLabel = labels.findIndex((label) => /(len|length|flow|run|feed)/i.test(String(label || '')));
+  const preferredHorizontalByLabel = horizontalAxes.includes(flowAxisFromLabel as 0 | 2)
+    ? (flowAxisFromLabel as 0 | 2)
+    : null;
+  const editableHorizontal = horizontalAxes.filter((axis) => editable[axis]);
+  const largestHorizontal = (dimsM[0] >= dimsM[2] ? 0 : 2) as 0 | 2;
+  const flowAxis = preferredHorizontalByLabel
+    ?? (editableHorizontal.length > 0
+      ? ((dimsM[editableHorizontal[0]] >= dimsM[editableHorizontal[editableHorizontal.length - 1]]
+        ? editableHorizontal[0]
+        : editableHorizontal[editableHorizontal.length - 1]) as 0 | 2)
+      : largestHorizontal);
+
+  const heightAxisFromLabel = labels.findIndex((label) => /(height|elev|vertical|up|y)/i.test(String(label || '')));
+  const verticalAxis = heightAxisFromLabel >= 0 && heightAxisFromLabel !== flowAxis
+    ? heightAxisFromLabel
+    : 1;
+
+  const half = Math.max(0.005, dimsM[flowAxis] / 2);
+  const inset = Math.min(0.02, half * 0.3);
+  const flowOffset = Math.max(0.001, half - inset);
+  const verticalHalf = Math.max(0.01, dimsM[verticalAxis] / 2);
+  const verticalInset = Math.min(0.03, verticalHalf * 0.45);
+  const verticalOffset = Math.max(0.005, verticalHalf - verticalInset);
+
+  const inputPos: [number, number, number] = [0, 0, 0];
+  const outputPos: [number, number, number] = [0, 0, 0];
+  inputPos[verticalAxis] = verticalOffset;
+  outputPos[verticalAxis] = verticalOffset;
+  inputPos[flowAxis] = -flowOffset;
+  outputPos[flowAxis] = flowOffset;
+
+  return [
+    { id: 'input', type: 'input', localPosition: inputPos },
+    { id: 'output', type: 'output', localPosition: outputPos },
+  ];
+}
+
 class OemAdminErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
@@ -831,6 +881,24 @@ const OemAdminPageContent: React.FC = () => {
     () => sanitizePortsForUi(selectedModel?.connectionPorts),
     [selectedModel],
   );
+  const selectedModelPreviewPorts = useMemo(() => {
+    if (!selectedModelParametric.enabled) return selectedModelPorts;
+    const hasInput = selectedModelPorts.some((port) => port.type === 'input');
+    const hasOutput = selectedModelPorts.some((port) => port.type === 'output');
+    if (hasInput && hasOutput) return selectedModelPorts;
+    const auto = buildAutoPortsForParametricSizing(selectedModelParametric);
+    if (auto.length === 0) return selectedModelPorts;
+    const merged = [...selectedModelPorts];
+    if (!hasInput) {
+      const input = auto.find((port) => port.type === 'input');
+      if (input) merged.push(input);
+    }
+    if (!hasOutput) {
+      const output = auto.find((port) => port.type === 'output');
+      if (output) merged.push(output);
+    }
+    return merged;
+  }, [selectedModelPorts, selectedModelParametric]);
   const selectedPort = useMemo(
     () => (selectedPortIndex >= 0 ? selectedModelPorts[selectedPortIndex] || null : null),
     [selectedModelPorts, selectedPortIndex],
@@ -1365,7 +1433,7 @@ const OemAdminPageContent: React.FC = () => {
             modelFormat={selectedModel.modelFormat}
             defaultScale={selectedModelScale}
             placementRotationDeg={selectedModelRotation}
-            ports={selectedModelPorts}
+            ports={selectedModelPreviewPorts}
             placementGizmoEnabled={placementGizmoEnabled}
             placementRotationSnapDeg={placementRotationSnapDeg}
             selectedPortIndex={selectedPortIndex}
