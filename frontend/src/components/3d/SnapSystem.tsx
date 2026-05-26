@@ -6,6 +6,24 @@ import { findNearestConveyorSnap, isAccessoryType, isConveyorType, applyAccessor
 
 const SNAP_THRESHOLD = 0.5;
 
+function getAdaptivePortSize(ports: ConnectionPort[], mateModeActive: boolean): number {
+  if (!ports.length) return mateModeActive ? 0.02 : 0.012;
+  const box = new THREE.Box3();
+  for (const port of ports) {
+    const p = new THREE.Vector3(
+      port.localPosition[0],
+      port.localPosition[1],
+      port.localPosition[2],
+    );
+    box.expandByPoint(p);
+  }
+  const size = box.getSize(new THREE.Vector3());
+  const span = Math.max(size.x, size.y, size.z);
+  const base = Number.isFinite(span) && span > 0 ? span * 0.12 : 0.012;
+  const clamped = THREE.MathUtils.clamp(base, 0.006, 0.05);
+  return mateModeActive ? clamped * 1.35 : clamped;
+}
+
 /** Types that should auto-match conveyor belt top height */
 const MACHINE_TYPES = new Set([
   'machine', 'checkweigher', 'metal-detector', 'labeler', 'carton-erector',
@@ -241,27 +259,53 @@ const SnapSystem: React.FC = () => {
   const portVisuals = useMemo(() => {
     if (!showPorts) return [];
 
-    const visuals: { position: [number, number, number]; type: 'input' | 'output'; nodeId: string; portId: string; connected: boolean; category: 'process' | 'environment' }[] = [];
+    const visuals: {
+      position: [number, number, number];
+      type: 'input' | 'output';
+      nodeId: string;
+      portId: string;
+      connected: boolean;
+      category: 'process' | 'environment';
+      markerSize: number;
+    }[] = [];
 
     // Process nodes
     processNodes.forEach((node: ProcessNode) => {
       const ports = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
+      const markerSize = getAdaptivePortSize(ports, mateMode.active);
       ports.forEach((port: ConnectionPort) => {
         const worldPos = getPortWorldPosition(port.localPosition, node);
         const connected = edges.some(e =>
           (e.from === node.id && e.fromPort === port.id) ||
           (e.to === node.id && e.toPort === port.id)
         );
-        visuals.push({ position: worldPos, type: port.type, nodeId: node.id, portId: port.id, connected, category: 'process' });
+        visuals.push({
+          position: worldPos,
+          type: port.type,
+          nodeId: node.id,
+          portId: port.id,
+          connected,
+          category: 'process',
+          markerSize,
+        });
       });
     });
 
     // Environment assets (edge mate ports for walls, fences, etc.)
     environmentAssets.forEach((asset: EnvironmentAsset) => {
       const ports = getConnectionPorts(asset.type, asset.parameters, (asset as any).assetId);
+      const markerSize = getAdaptivePortSize(ports, mateMode.active);
       ports.forEach((port: ConnectionPort) => {
         const worldPos = getPortWorldPosition(port.localPosition, asset as any);
-        visuals.push({ position: worldPos, type: port.type, nodeId: asset.id, portId: port.id, connected: false, category: 'environment' });
+        visuals.push({
+          position: worldPos,
+          type: port.type,
+          nodeId: asset.id,
+          portId: port.id,
+          connected: false,
+          category: 'environment',
+          markerSize,
+        });
       });
     });
 
@@ -382,7 +426,7 @@ const SnapSystem: React.FC = () => {
     <group>
       {portVisuals.map((pv) => {
         const selected = isMateSelected(pv.nodeId, pv.portId);
-        const portSize = mateMode.active ? 0.15 : 0.08;
+        const portSize = pv.markerSize;
         return (
           <group key={`${pv.nodeId}-${pv.portId}`} position={pv.position}>
             {/* Port sphere */}

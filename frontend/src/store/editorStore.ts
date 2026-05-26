@@ -1611,6 +1611,17 @@ function getDefaultParameters(type: string): Record<string, any> {
     agv: { speed: 150, capacity: 500, batteryLevel: 100, pathId: '', loopPath: true },
     'pallet-truck': { speed: 120, pathId: '', loopPath: true },
   };
-  
-  return defaults[type] || {};
+
+  const moduleDefaults: Record<string, any> = {};
+  const moduleDef = getModuleDefinition(type);
+  if (moduleDef?.parameters) {
+    for (const [key, paramDef] of Object.entries(moduleDef.parameters)) {
+      if (paramDef && Object.prototype.hasOwnProperty.call(paramDef, 'default')) {
+        moduleDefaults[key] = (paramDef as any).default;
+      }
+    }
+  }
+
+  const builtinDefaults = defaults[type] || {};
+  return { ...moduleDefaults, ...builtinDefaults };
 }

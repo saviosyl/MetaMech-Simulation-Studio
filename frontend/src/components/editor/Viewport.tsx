@@ -692,7 +692,7 @@ const SceneContent: React.FC<{
         rotateSpeed={0.9}
         zoomSpeed={0.95}
         panSpeed={0.9}
-        minDistance={2}
+        minDistance={0.03}
         maxDistance={100}
         minPolarAngle={0}
         maxPolarAngle={Math.PI - 0.001}
@@ -942,9 +942,9 @@ const Viewport: React.FC = () => {
         frameloop="always"
       >
         {cameraMode === 'orthographic' ? (
-          <OrthographicCamera makeDefault position={[10, 10, 10]} zoom={42} near={0.1} far={1000} />
+          <OrthographicCamera makeDefault position={[10, 10, 10]} zoom={42} near={0.01} far={1000} />
         ) : (
-          <PerspectiveCamera makeDefault position={[10, 10, 10]} fov={50} near={0.1} far={1000} />
+          <PerspectiveCamera makeDefault position={[10, 10, 10]} fov={50} near={0.01} far={1000} />
         )}
         <CameraCapture />
         <ExportRendererTuner active={isExportRendering} preset={captureQualityPreset} />

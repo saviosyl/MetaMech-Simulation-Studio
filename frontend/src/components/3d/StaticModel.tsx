@@ -28,7 +28,7 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef; parameters?: Record<str
     return () => { mounted = false; };
   }, [assetDef.id, assetDef.glbUrl, assetDef.sourceFormat]);
 
-  const cloned = React.useMemo(() => {
+  const runtimeObject = React.useMemo(() => {
     if (!model) return null;
     const instance = model.clone(true);
     const format = assetDef.sourceFormat || 'glb';
@@ -64,17 +64,39 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef; parameters?: Record<str
       }
 
       if (assetDef.oemParametric?.enabled) {
-        const baseSizeMm = assetDef.oemParametric.baseSizeMm || [1000, 300, 120];
+        const measuredBaseBox = new THREE.Box3().setFromObject(instance);
+        const measuredBaseSize = measuredBaseBox.getSize(new THREE.Vector3());
+        const measuredBaseSizeMm: [number, number, number] = [
+          Math.max(1, measuredBaseSize.x * 1000),
+          Math.max(1, measuredBaseSize.y * 1000),
+          Math.max(1, measuredBaseSize.z * 1000),
+        ];
+        const configuredBase = assetDef.oemParametric.baseSizeMm || [1000, 300, 120];
         const editableAxes = assetDef.oemParametric.editableAxes || [true, true, true];
         const requestedSizeMm: [number, number, number] = [
           Number(parameters?.oemLengthMm),
           Number(parameters?.oemWidthMm),
           Number(parameters?.oemHeightMm),
         ];
+        const configuredIsPlaceholder =
+          Math.abs((configuredBase[0] || 0) - 1000) < 0.001
+          && Math.abs((configuredBase[1] || 0) - 300) < 0.001
+          && Math.abs((configuredBase[2] || 0) - 120) < 0.001;
         const axisScale: [number, number, number] = [1, 1, 1];
         for (let axis = 0; axis < 3; axis += 1) {
           if (!editableAxes[axis]) continue;
-          const base = Number(baseSizeMm[axis]);
+          const measured = Number(measuredBaseSizeMm[axis]);
+          const configured = Number(configuredBase[axis]);
+          const hasMeasured = Number.isFinite(measured) && measured > 0;
+          const hasConfigured = Number.isFinite(configured) && configured > 0;
+          let base = hasMeasured ? measured : configured;
+          if (hasMeasured && hasConfigured && !configuredIsPlaceholder) {
+            const mismatchRatio = Math.max(configured / measured, measured / configured);
+            // Self-heal legacy misconfigured bases (often off by 1000x).
+            base = mismatchRatio > 10 ? measured : configured;
+          } else if (hasMeasured && (configuredIsPlaceholder || !hasConfigured)) {
+            base = measured;
+          }
           const requested = requestedSizeMm[axis];
           if (!Number.isFinite(base) || base <= 0) continue;
           if (!Number.isFinite(requested) || requested <= 0) continue;
@@ -147,11 +169,33 @@ const RuntimeModel: React.FC<{ assetDef: StaticAssetDef; parameters?: Record<str
         mesh.receiveShadow = true;
       }
     });
-    return instance;
+    const pickBounds = new THREE.Box3().setFromObject(instance);
+    const pickSize = pickBounds.getSize(new THREE.Vector3());
+    const pickCenter = pickBounds.getCenter(new THREE.Vector3());
+    const minPickAxis = 0.08; // Easier selection for tiny OEM parts.
+    const pickSizeWithMinimum: [number, number, number] = [
+      Math.max(minPickAxis, pickSize.x || 0),
+      Math.max(minPickAxis, pickSize.y || 0),
+      Math.max(minPickAxis, pickSize.z || 0),
+    ];
+
+    return {
+      instance,
+      pickCenter: [pickCenter.x, pickCenter.y, pickCenter.z] as [number, number, number],
+      pickSize: pickSizeWithMinimum,
+    };
   }, [model, assetDef, parameters]);
 
-  if (!cloned) return <FallbackBox />;
-  return <primitive object={cloned} />;
+  if (!runtimeObject) return <FallbackBox />;
+  return (
+    <group>
+      <primitive object={runtimeObject.instance} />
+      <mesh position={runtimeObject.pickCenter}>
+        <boxGeometry args={runtimeObject.pickSize} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+    </group>
+  );
 };
 
 const FallbackBox: React.FC = () => (
