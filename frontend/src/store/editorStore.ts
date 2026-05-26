@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { AssetDef, getAssetManifest, getAssetById, ParametricAssetDef } from '../lib/assetManifest';
+import { AssetDef, getAssetManifest, getAssetById, ParametricAssetDef, StaticAssetDef } from '../lib/assetManifest';
 import { runBuilder } from '../lib/parametricBuilders';
 import { getPortWorldPosition, getWorldPorts as computeWorldPorts } from '../lib/nodeTransform';
 import { computeSpiralTransferGeometry } from '../lib/spiralTransfer';
@@ -214,6 +214,52 @@ function ensureDirections(ports: Partial<ConnectionPort>[]): ConnectionPort[] {
   });
 }
 
+function buildOemParametricAutoPorts(
+  oemParametric: NonNullable<StaticAssetDef['oemParametric']>,
+  params?: Record<string, any>,
+): Partial<ConnectionPort>[] {
+  const labels = oemParametric.axisLabels || ['Length', 'Width', 'Height'];
+  const base = oemParametric.baseSizeMm || [1000, 300, 120];
+  const keys = ['oemLengthMm', 'oemWidthMm', 'oemHeightMm'] as const;
+
+  const dimsMm: [number, number, number] = [0, 0, 0];
+  for (let i = 0; i < 3; i += 1) {
+    const requested = Number(params?.[keys[i]]);
+    const fallback = Number(base[i]);
+    dimsMm[i] = Number.isFinite(requested) && requested > 0
+      ? requested
+      : (Number.isFinite(fallback) && fallback > 0 ? fallback : 1000);
+  }
+  const dimsM: [number, number, number] = [
+    Math.max(0.001, dimsMm[0] / 1000),
+    Math.max(0.001, dimsMm[1] / 1000),
+    Math.max(0.001, dimsMm[2] / 1000),
+  ];
+
+  const flowAxisFromLabel = labels.findIndex((label) => /\b(len|length|flow|x)\b/i.test(String(label || '')));
+  const firstEditableAxis = (oemParametric.editableAxes || [true, true, true]).findIndex(Boolean);
+  const flowAxis = flowAxisFromLabel >= 0 ? flowAxisFromLabel : (firstEditableAxis >= 0 ? firstEditableAxis : 0);
+
+  const half = Math.max(0.005, dimsM[flowAxis] / 2);
+  const inset = Math.min(0.02, half * 0.3);
+  const flowOffset = Math.max(0.001, half - inset);
+  const y = Math.max(0.02, Math.min(0.6, dimsM[1] * 0.5));
+
+  const inputPos: [number, number, number] = [0, y, 0];
+  const outputPos: [number, number, number] = [0, y, 0];
+  const inputDir: [number, number, number] = [0, 0, 0];
+  const outputDir: [number, number, number] = [0, 0, 0];
+  inputPos[flowAxis] = -flowOffset;
+  outputPos[flowAxis] = flowOffset;
+  inputDir[flowAxis] = -1;
+  outputDir[flowAxis] = 1;
+
+  return [
+    { id: 'input', type: 'input', localPosition: inputPos, direction: inputDir },
+    { id: 'output', type: 'output', localPosition: outputPos, direction: outputDir },
+  ];
+}
+
 // Connection port definitions per object type
 export function getConnectionPorts(type: string, params?: Record<string, any>, assetId?: string): ConnectionPort[] {
   return ensureDirections(_getConnectionPortsRaw(type, params, assetId));
@@ -235,8 +281,26 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
   if (assetId) {
     const assetDef = getAssetById(assetId);
     if (assetDef) {
-      if (assetDef.assetType === 'static' && assetDef.connectionPorts) {
-        return assetDef.connectionPorts;
+      if (assetDef.assetType === 'static') {
+        const staticPorts = assetDef.connectionPorts || [];
+        const hasInput = staticPorts.some((port) => port.type === 'input');
+        const hasOutput = staticPorts.some((port) => port.type === 'output');
+        if (staticPorts.length > 0 && (hasInput && hasOutput)) {
+          return staticPorts;
+        }
+        // OEM parametric fallback: auto-generate usable infeed/outfeed ports
+        // when no ports (or only one side) are authored in OEM Admin.
+        if (assetDef.id.startsWith('oem-') && assetDef.oemParametric?.enabled) {
+          const autoPorts = buildOemParametricAutoPorts(assetDef.oemParametric, params);
+          if (staticPorts.length === 0) return autoPorts;
+          const merged: Partial<ConnectionPort>[] = [...staticPorts];
+          if (!hasInput) merged.push(autoPorts[0]);
+          if (!hasOutput) merged.push(autoPorts[1]);
+          return merged;
+        }
+        if (staticPorts.length > 0) {
+          return staticPorts;
+        }
       }
       if (assetDef.assetType === 'parametric') {
         const mergedParams = { ...assetDef.defaults, ...params };
