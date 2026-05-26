@@ -236,9 +236,12 @@ function buildOemParametricAutoPorts(
     Math.max(0.001, dimsMm[2] / 1000),
   ];
 
-  const flowAxisFromLabel = labels.findIndex((label) => /\b(len|length|flow|x)\b/i.test(String(label || '')));
+  const flowAxisFromLabel = labels.findIndex((label) => /(len|length|flow|run|x)/i.test(String(label || '')));
   const firstEditableAxis = (oemParametric.editableAxes || [true, true, true]).findIndex(Boolean);
-  const flowAxis = flowAxisFromLabel >= 0 ? flowAxisFromLabel : (firstEditableAxis >= 0 ? firstEditableAxis : 0);
+  const largestAxis = dimsMm.reduce((bestIdx, value, idx, arr) => (value > arr[bestIdx] ? idx : bestIdx), 0);
+  const flowAxis = flowAxisFromLabel >= 0
+    ? flowAxisFromLabel
+    : (firstEditableAxis >= 0 ? firstEditableAxis : largestAxis);
 
   const half = Math.max(0.005, dimsM[flowAxis] / 2);
   const inset = Math.min(0.02, half * 0.3);
@@ -289,18 +292,16 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
         const staticPorts = assetDef.connectionPorts || [];
         const hasInput = staticPorts.some((port) => port.type === 'input');
         const hasOutput = staticPorts.some((port) => port.type === 'output');
-        if (staticPorts.length > 0 && (hasInput && hasOutput)) {
-          return staticPorts;
-        }
         // OEM parametric fallback: auto-generate usable infeed/outfeed ports
-        // when no ports (or only one side) are authored in OEM Admin.
+        // and always keep input/output tied to live parametric dimensions.
         if (assetDef.id.startsWith('oem-') && assetDef.oemParametric?.enabled) {
           const autoPorts = buildOemParametricAutoPorts(assetDef.oemParametric, params);
-          if (staticPorts.length === 0) return autoPorts;
-          const merged: Partial<ConnectionPort>[] = [...staticPorts];
-          if (!hasInput) merged.push(autoPorts[0]);
-          if (!hasOutput) merged.push(autoPorts[1]);
+          const customPorts = staticPorts.filter((port) => port.type !== 'input' && port.type !== 'output');
+          const merged: Partial<ConnectionPort>[] = [...customPorts, autoPorts[0], autoPorts[1]];
           return merged;
+        }
+        if (staticPorts.length > 0 && (hasInput && hasOutput)) {
+          return staticPorts;
         }
         if (staticPorts.length > 0) {
           return staticPorts;

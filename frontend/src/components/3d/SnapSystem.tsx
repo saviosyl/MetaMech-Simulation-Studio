@@ -7,7 +7,7 @@ import { findNearestConveyorSnap, isAccessoryType, isConveyorType, applyAccessor
 const SNAP_THRESHOLD = 0.5;
 
 function getAdaptivePortSize(ports: ConnectionPort[], mateModeActive: boolean): number {
-  if (!ports.length) return mateModeActive ? 0.02 : 0.012;
+  if (!ports.length) return mateModeActive ? 0.014 : 0.009;
   const box = new THREE.Box3();
   for (const port of ports) {
     const p = new THREE.Vector3(
@@ -19,9 +19,9 @@ function getAdaptivePortSize(ports: ConnectionPort[], mateModeActive: boolean): 
   }
   const size = box.getSize(new THREE.Vector3());
   const span = Math.max(size.x, size.y, size.z);
-  const base = Number.isFinite(span) && span > 0 ? span * 0.12 : 0.012;
-  const clamped = THREE.MathUtils.clamp(base, 0.006, 0.05);
-  return mateModeActive ? clamped * 1.35 : clamped;
+  const base = Number.isFinite(span) && span > 0 ? span * 0.08 : 0.009;
+  const clamped = THREE.MathUtils.clamp(base, 0.004, 0.03);
+  return mateModeActive ? clamped * 1.2 : clamped;
 }
 
 /** Types that should auto-match conveyor belt top height */
@@ -521,11 +521,9 @@ const SnapSystem: React.FC = () => {
             : pv.markerSize;
         const baseColor = pv.connected
           ? '#6b7280'
-          : pv.category === 'environment'
-            ? '#f59e0b'
-            : pv.type === 'input'
-              ? '#3b82f6'
-              : '#10b981';
+          : pv.type === 'input'
+            ? '#2563eb'
+            : '#16a34a';
         const stateColor = pv.state === 'success'
           ? '#22c55e'
           : pv.state === 'preview'
@@ -576,7 +574,7 @@ const SnapSystem: React.FC = () => {
             {/* Outer ring indicator */}
             {!pv.connected && (
               <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[portSize + 0.02, portSize + 0.07, 16]} />
+                <ringGeometry args={[portSize + 0.012, portSize + 0.038, 16]} />
                 <meshBasicMaterial
                   color={selected ? '#06b6d4' : stateColor}
                   transparent

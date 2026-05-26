@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Canvas, useThree } from '@react-three/fiber';
-import { Bounds, ContactShadows, Environment, GizmoHelper, GizmoViewport, Grid, Line, OrbitControls, TransformControls } from '@react-three/drei';
+import { Bounds, Environment, GizmoHelper, GizmoViewport, Grid, Line, OrbitControls, TransformControls } from '@react-three/drei';
 import { ArrowLeft, Building2, Download, Maximize2, Minimize2, Plus, RotateCw, Save, Settings2, Target, Trash2, Upload, Workflow } from 'lucide-react';
 import * as THREE from 'three';
 import { useAuth } from '../contexts/AuthContext';
@@ -393,8 +393,8 @@ const InteractiveModelPreview: React.FC<{
           mesh.material = new THREE.MeshStandardMaterial({ color: '#8793a0', metalness: 0.12, roughness: 0.76, envMapIntensity: 0.2 });
         }
         mesh.frustumCulled = false;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
       }
     });
     return instance;
@@ -655,10 +655,6 @@ const InteractiveModelPreview: React.FC<{
                 <sphereGeometry args={[selectedPortIndex === idx ? portMarker.selectedRadius : portMarker.normalRadius, 14, 10]} />
                 <meshStandardMaterial color={PORT_COLOR[port.type]} emissive={PORT_COLOR[port.type]} emissiveIntensity={selectedPortIndex === idx ? 0.7 : 0.45} />
               </mesh>
-              <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[portMarker.ringInner, portMarker.ringOuter, 20]} />
-                <meshBasicMaterial color={PORT_COLOR[port.type]} transparent opacity={0.7} side={THREE.DoubleSide} />
-              </mesh>
             </group>
           ))}
           {selectedPort && (
@@ -672,10 +668,6 @@ const InteractiveModelPreview: React.FC<{
               <mesh>
                 <sphereGeometry args={[portMarker.normalRadius * 0.75, 12, 10]} />
                 <meshStandardMaterial color={portTypeForClick === 'input' ? '#60a5fa' : '#34d399'} emissive={portTypeForClick === 'input' ? '#2563eb' : '#059669'} emissiveIntensity={0.55} />
-              </mesh>
-              <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[portMarker.ringInner * 0.85, portMarker.ringOuter * 0.95, 20]} />
-                <meshBasicMaterial color={portTypeForClick === 'input' ? '#2563eb' : '#059669'} transparent opacity={0.85} side={THREE.DoubleSide} />
               </mesh>
             </group>
           )}
@@ -752,7 +744,7 @@ const OemAdminPageContent: React.FC = () => {
   const [loadingLibrary, setLoadingLibrary] = useState(true);
   const [clickPortMode, setClickPortMode] = useState(false);
   const [clickPortType, setClickPortType] = useState<'input' | 'output'>('input');
-  const [placementGizmoEnabled, setPlacementGizmoEnabled] = useState(true);
+  const [placementGizmoEnabled, setPlacementGizmoEnabled] = useState(false);
   const [placementRotationSnapDeg, setPlacementRotationSnapDeg] = useState(15);
   const [selectedPortIndex, setSelectedPortIndex] = useState<number>(-1);
   const [transformPortsEnabled, setTransformPortsEnabled] = useState(true);
@@ -1341,17 +1333,19 @@ const OemAdminPageContent: React.FC = () => {
 
   const renderPreviewCanvas = () => (
     <Canvas
+      dpr={[1, 1.6]}
       shadows
-      camera={{ position: [3.4, 2.4, 3.6], fov: 45, near: 0.001, far: 400 }}
+      camera={{ position: [3.4, 2.4, 3.6], fov: 45, near: 0.02, far: 280 }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = 0.96;
+        gl.shadowMap.enabled = false;
       }}
     >
       <color attach="background" args={['#f3f6fb']} />
       <ambientLight intensity={0.48} />
       <hemisphereLight args={['#ffffff', '#dbe4f0', 0.58]} />
-      <directionalLight position={[5, 8, 5]} intensity={1.15} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+      <directionalLight position={[5, 8, 5]} intensity={1.15} />
       <directionalLight position={[-4, 4, -3]} intensity={0.55} />
       <pointLight position={[0, 3.5, 0]} intensity={0.25} />
       <Environment preset="studio" />
@@ -1395,8 +1389,17 @@ const OemAdminPageContent: React.FC = () => {
           />
         </Bounds>
       )}
-      <ContactShadows position={[0, -0.001, 0]} opacity={0.45} blur={2.8} far={8} />
-      <OrbitControls ref={previewOrbitRef} makeDefault enableDamping dampingFactor={0.08} minDistance={0.4} maxDistance={12} zoomSpeed={0.55} />
+      <OrbitControls
+        ref={previewOrbitRef}
+        makeDefault
+        enableDamping
+        dampingFactor={0.1}
+        rotateSpeed={0.9}
+        panSpeed={0.9}
+        minDistance={0.24}
+        maxDistance={12}
+        zoomSpeed={0.62}
+      />
     </Canvas>
   );
 
