@@ -55,13 +55,18 @@ export class SimulationEngine {
   private colorIndex = 0;
 
   private getEffectiveProductLength(product: Product): number {
+    // Product meshes are oriented with conveyor motion along local Z.
+    // For the current product renderers, this corresponds to size[1] (pW).
+    const forwardExtent = Array.isArray(product.size) ? Number(product.size[1]) : NaN;
+    if (Number.isFinite(forwardExtent) && forwardExtent > 0) {
+      return Math.max(0.01, forwardExtent);
+    }
     const fromPath = Number(product.productLength);
-    const fromSize = Array.isArray(product.size) ? Number(product.size[0]) : NaN;
-    const effective = Math.max(
-      Number.isFinite(fromPath) ? fromPath : 0,
-      Number.isFinite(fromSize) ? fromSize : 0,
-    );
-    return Math.max(0.01, effective);
+    if (Number.isFinite(fromPath) && fromPath > 0) {
+      return Math.max(0.01, fromPath);
+    }
+    const fallback = Array.isArray(product.size) ? Number(product.size[0]) : NaN;
+    return Math.max(0.01, Number.isFinite(fallback) && fallback > 0 ? fallback : 0.2);
   }
 
   init(nodes: ProcessNode[], edges: ProcessEdge[]) {
@@ -460,7 +465,7 @@ export class SimulationEngine {
       }
     }
     pathLen = Math.max(0.05, pathLen);
-    const MIN_GAP_M = 0.001; // ~1mm gap — products touch each other when accumulated
+    const MIN_GAP_M = 0; // Physical contact accumulation (no artificial queue gap)
 
     // Accept new arrivals at path start
     for (const product of arrived) {
@@ -497,8 +502,22 @@ export class SimulationEngine {
         const nextStats = this.nodeStats.get(nextNodeId);
         if (nextStats && nextStats.queue.length > 0) {
           const nextProds = nextStats.queue.map(id => this.products.find(p => p.id === id)).filter(Boolean) as Product[];
-          const nearestToInput = nextProds.reduce((min, p) => p.pathPosition < min ? p.pathPosition : min, 1);
-          if (nearestToInput < 0.05) exitBlocked = true;
+          const nearestProduct = nextProds.reduce<Product | null>(
+            (minProd, p) => (!minProd || p.pathPosition < minProd.pathPosition ? p : minProd),
+            null,
+          );
+          if (nearestProduct) {
+            const nextPath = createTransportPath(nextNode.type, nextNode.parameters);
+            const nextPathLen = Math.max(
+              0.05,
+              nextPath?.length || ((nextNode.parameters.length || nextNode.parameters.oemLengthMm || 3000) / 1000),
+            );
+            const halfNearestT = (this.getEffectiveProductLength(nearestProduct) / 2) / nextPathLen;
+            const contactBufferT = 0.002 / nextPathLen; // 2mm numerical buffer only
+            if (nearestProduct.pathPosition < halfNearestT + contactBufferT) {
+              exitBlocked = true;
+            }
+          }
         }
       }
     }
@@ -1659,7 +1678,7 @@ export class SimulationEngine {
       blockedSince: null,
       stoppedBy: null,
       pathPosition: 0,
-      productLength: pL,
+      productLength: pW,
       textureUrl: node.parameters.productTextureUrl || undefined,
       label: node.parameters.productLabel || undefined,
       labelColor: node.parameters.labelColor || '#ffffff',
