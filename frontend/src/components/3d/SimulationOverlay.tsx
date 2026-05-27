@@ -47,6 +47,19 @@ const ProductLabel: React.FC<{ label: string; color: string; pL: number; pW: num
   );
 };
 
+/** Subtle edge outline to keep touching products visually distinct */
+const ProductOutline: React.FC<{ pL: number; pW: number; pH: number }> = ({ pL, pW, pH }) => (
+  <lineSegments renderOrder={12}>
+    <edgesGeometry args={[new THREE.BoxGeometry(pL, pH, pW)]} />
+    <lineBasicMaterial
+      color="#e5e7eb"
+      transparent
+      opacity={0.32}
+      depthTest={true}
+    />
+  </lineSegments>
+);
+
 /** Render a single animated product using refs for smooth motion */
 const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
   const groupRef = useRef<THREE.Group>(null);
@@ -141,6 +154,7 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
             <boxGeometry args={[pL * 0.9, pH * 0.6, pW * 0.9]} />
             <meshStandardMaterial color={product.color} metalness={0.2} roughness={0.6} />
           </mesh>
+          <ProductOutline pL={pL} pW={pW} pH={pH} />
         </group>
       );
 
@@ -160,6 +174,7 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
             <boxGeometry args={[pL * 1.02, pH * 0.08, pW * 1.02]} />
             <meshStandardMaterial color={product.color} metalness={0.5} roughness={0.4} />
           </mesh>
+          <ProductOutline pL={pL} pW={pW} pH={pH} />
           {product.label && (
             <ProductLabel label={product.label} color={product.labelColor || '#fff'} pL={pL} pW={pW} pH={pH} />
           )}
@@ -186,6 +201,7 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
               <meshStandardMaterial color="#d4a574" />
             </mesh>
           )}
+          <ProductOutline pL={pL} pW={pW} pH={pH} />
           {product.label && (
             <ProductLabel label={product.label} color={product.labelColor || '#fff'} pL={pL} pW={pW} pH={pH} />
           )}
