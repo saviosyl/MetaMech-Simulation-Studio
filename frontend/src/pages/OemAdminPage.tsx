@@ -186,20 +186,26 @@ function buildAutoPortsForParametricSizing(parametric: OemParametricSizing | und
   const verticalAxis = heightAxisFromLabel >= 0 && heightAxisFromLabel !== flowAxis
     ? heightAxisFromLabel
     : 1;
-
-  const half = Math.max(0.005, dimsM[flowAxis] / 2);
-  const inset = Math.min(0.02, half * 0.3);
-  const flowOffset = Math.max(0.001, half - inset);
-  const verticalHalf = Math.max(0.01, dimsM[verticalAxis] / 2);
-  const verticalInset = Math.min(0.03, verticalHalf * 0.45);
-  const verticalOffset = Math.max(0.005, verticalHalf - verticalInset);
+  const editableAxisCount = editable.filter(Boolean).length;
+  const isProfileStyle = editableAxisCount === 1 && editable[flowAxis];
 
   const inputPos: [number, number, number] = [0, 0, 0];
   const outputPos: [number, number, number] = [0, 0, 0];
-  inputPos[verticalAxis] = verticalOffset;
-  outputPos[verticalAxis] = verticalOffset;
-  inputPos[flowAxis] = -flowOffset;
-  outputPos[flowAxis] = flowOffset;
+  if (isProfileStyle) {
+    inputPos[flowAxis] = 0;
+    outputPos[flowAxis] = Math.max(0.001, dimsM[flowAxis]);
+  } else {
+    const half = Math.max(0.005, dimsM[flowAxis] / 2);
+    const inset = Math.min(0.02, half * 0.3);
+    const flowOffset = Math.max(0.001, half - inset);
+    const verticalHalf = Math.max(0.01, dimsM[verticalAxis] / 2);
+    const verticalInset = Math.min(0.03, verticalHalf * 0.45);
+    const verticalOffset = Math.max(0.005, verticalHalf - verticalInset);
+    inputPos[verticalAxis] = verticalOffset;
+    outputPos[verticalAxis] = verticalOffset;
+    inputPos[flowAxis] = -flowOffset;
+    outputPos[flowAxis] = flowOffset;
+  }
 
   return [
     { id: 'input', type: 'input', localPosition: inputPos },
@@ -883,20 +889,14 @@ const OemAdminPageContent: React.FC = () => {
   );
   const selectedModelPreviewPorts = useMemo(() => {
     if (!selectedModelParametric.enabled) return selectedModelPorts;
-    const hasInput = selectedModelPorts.some((port) => port.type === 'input');
-    const hasOutput = selectedModelPorts.some((port) => port.type === 'output');
-    if (hasInput && hasOutput) return selectedModelPorts;
     const auto = buildAutoPortsForParametricSizing(selectedModelParametric);
     if (auto.length === 0) return selectedModelPorts;
-    const merged = [...selectedModelPorts];
-    if (!hasInput) {
-      const input = auto.find((port) => port.type === 'input');
-      if (input) merged.push(input);
-    }
-    if (!hasOutput) {
-      const output = auto.find((port) => port.type === 'output');
-      if (output) merged.push(output);
-    }
+    const customPorts = selectedModelPorts.filter((port) => port.type !== 'input' && port.type !== 'output');
+    const input = auto.find((port) => port.type === 'input');
+    const output = auto.find((port) => port.type === 'output');
+    const merged = [...customPorts];
+    if (input) merged.push(input);
+    if (output) merged.push(output);
     return merged;
   }, [selectedModelPorts, selectedModelParametric]);
   const selectedPort = useMemo(

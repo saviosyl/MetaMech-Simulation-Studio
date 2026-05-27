@@ -266,11 +266,36 @@ function buildOemParametricAutoPorts(
   const verticalHalf = Math.max(0.01, dimsM[verticalAxis] / 2);
   const verticalInset = Math.min(0.03, verticalHalf * 0.45);
   const verticalOffset = Math.max(0.005, verticalHalf - verticalInset);
+  const editableAxisCount = editableAxes.filter(Boolean).length;
+  const isProfileStyle = editableAxisCount === 1 && editableAxes[flowAxis];
 
   const authoredInputPos = authoredInput?.localPosition;
   const authoredOutputPos = authoredOutput?.localPosition;
   const hasAuthoredPair = Array.isArray(authoredInputPos) && authoredInputPos.length === 3
     && Array.isArray(authoredOutputPos) && authoredOutputPos.length === 3;
+
+  if (isProfileStyle) {
+    const authoredStart = Array.isArray(authoredInputPos) ? Number(authoredInputPos[flowAxis]) : NaN;
+    const startFlow = Number.isFinite(authoredStart) ? authoredStart : 0;
+    const authoredEnd = Array.isArray(authoredOutputPos) ? Number(authoredOutputPos[flowAxis]) : NaN;
+    const directionSign = Number.isFinite(authoredEnd) && Math.abs(authoredEnd - startFlow) > 1e-6
+      ? Math.sign(authoredEnd - startFlow)
+      : 1;
+    const runDirection = (directionSign === 0 ? 1 : directionSign) as 1 | -1;
+    const span = Math.max(0.001, dimsM[flowAxis]);
+    const inputPos: [number, number, number] = [0, 0, 0];
+    const outputPos: [number, number, number] = [0, 0, 0];
+    const inputDir: [number, number, number] = [0, 0, 0];
+    const outputDir: [number, number, number] = [0, 0, 0];
+    inputPos[flowAxis] = startFlow;
+    outputPos[flowAxis] = startFlow + (runDirection * span);
+    inputDir[flowAxis] = -runDirection;
+    outputDir[flowAxis] = runDirection;
+    return [
+      { id: authoredInput?.id || 'input', type: 'input', localPosition: inputPos, direction: authoredInput?.direction || inputDir },
+      { id: authoredOutput?.id || 'output', type: 'output', localPosition: outputPos, direction: authoredOutput?.direction || outputDir },
+    ];
+  }
 
   if (hasAuthoredPair) {
     const inPos: [number, number, number] = [
@@ -313,31 +338,6 @@ function buildOemParametricAutoPorts(
         localPosition: outPos,
         direction: authoredOutput?.direction,
       },
-    ];
-  }
-
-  // Single-axis editable profile parts should keep infeed fixed and extend outfeed.
-  const editableAxisCount = editableAxes.filter(Boolean).length;
-  const shouldAnchorInput = editableAxisCount === 1 && editableAxes[flowAxis];
-  if (shouldAnchorInput) {
-    const baseFlowM = Math.max(0.001, Number(base[flowAxis] || dimsMm[flowAxis] || 1000) / 1000);
-    const baseHalf = baseFlowM / 2;
-    const baseInset = Math.min(0.02, baseHalf * 0.3);
-    const anchorStart = -Math.max(0.001, baseHalf - baseInset);
-    const requestedSpan = Math.max(0.002, dimsM[flowAxis] - baseInset * 2);
-    const inputPos: [number, number, number] = [0, 0, 0];
-    const outputPos: [number, number, number] = [0, 0, 0];
-    const inputDir: [number, number, number] = [0, 0, 0];
-    const outputDir: [number, number, number] = [0, 0, 0];
-    inputPos[verticalAxis] = verticalOffset;
-    outputPos[verticalAxis] = verticalOffset;
-    inputPos[flowAxis] = anchorStart;
-    outputPos[flowAxis] = anchorStart + requestedSpan;
-    inputDir[flowAxis] = -1;
-    outputDir[flowAxis] = 1;
-    return [
-      { id: authoredInput?.id || 'input', type: 'input', localPosition: inputPos, direction: authoredInput?.direction || inputDir },
-      { id: authoredOutput?.id || 'output', type: 'output', localPosition: outputPos, direction: authoredOutput?.direction || outputDir },
     ];
   }
 
