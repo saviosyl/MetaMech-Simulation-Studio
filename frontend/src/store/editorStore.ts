@@ -426,10 +426,23 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     case 'sink':
       return [{ id: 'input', type: 'input', localPosition: [-0.02, 0.05, 0] }];  // 20mm from center
     case 'conveyor':
-      return [
-        { id: 'input', type: 'input', localPosition: [-length / 2, 0.1, 0] },
-        { id: 'output', type: 'output', localPosition: [length / 2, 0.1, 0] },
-      ];
+      {
+        const rawLength = Number(params?.length || 5);
+        const cL = rawLength > 20 ? (rawLength / 1000) : rawLength; // support legacy m + modern mm
+        const cBaseH = Number(params?.height || 800);
+        const inRaw = Number(params?.infeedHeight);
+        const outRaw = Number(params?.outfeedHeight);
+        const hasIn = Number.isFinite(inRaw);
+        const hasOut = Number.isFinite(outRaw);
+        const followBaseHeight =
+          hasIn && hasOut && inRaw === 850 && outRaw === 850 && cBaseH !== 800;
+        const cInH = (followBaseHeight ? cBaseH : (hasIn ? inRaw : cBaseH)) / 1000;
+        const cOutH = (followBaseHeight ? cBaseH : (hasOut ? outRaw : cBaseH)) / 1000;
+        return [
+          { id: 'input', type: 'input', localPosition: [-cL / 2, cInH, 0] },
+          { id: 'output', type: 'output', localPosition: [cL / 2, cOutH, 0] },
+        ];
+      }
     case 'belt-conveyor':
     case 'roller-conveyor':
     case 'modular-conveyor-straight': {
