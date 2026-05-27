@@ -54,6 +54,16 @@ export class SimulationEngine {
   edges: ProcessEdge[] = [];
   private colorIndex = 0;
 
+  private getEffectiveProductLength(product: Product): number {
+    const fromPath = Number(product.productLength);
+    const fromSize = Array.isArray(product.size) ? Number(product.size[0]) : NaN;
+    const effective = Math.max(
+      Number.isFinite(fromPath) ? fromPath : 0,
+      Number.isFinite(fromSize) ? fromSize : 0,
+    );
+    return Math.max(0.01, effective);
+  }
+
   init(nodes: ProcessNode[], edges: ProcessEdge[]) {
     this.nodes = nodes;
     this.edges = edges;
@@ -545,7 +555,7 @@ export class SimulationEngine {
       let targetPos = product.pathPosition + advanceT;
 
       // Product extents in normalized path coordinates
-      const halfLenT = (product.productLength / 2) / pathLen;
+      const halfLenT = (this.getEffectiveProductLength(product) / 2) / pathLen;
       const gapT = MIN_GAP_M / pathLen;
 
       // Clamp: can't advance past the rear edge of the product ahead minus gap
@@ -1387,103 +1397,8 @@ export class SimulationEngine {
 
   // ─── Accumulation Conveyor: zone-based buffering on belt ─────
   private tickAccumulationConveyor(node: ProcessNode, stats: NodeStats, dt: number) {
-    // Accumulation mode: products queue up on the conveyor surface with spacing
-    // instead of jamming at the output. Products stop in zones, then release in order.
-    const lengthM = (node.parameters.length || 3000) / 1000;
-    const speedMps = (node.parameters.beltSpeed || node.parameters.speed || 20) / 60;
-    const zoneCount = node.parameters.accumulationZones || Math.max(2, Math.floor(lengthM / 0.5));
-    const zoneLength = lengthM / zoneCount;
-
-    // Accept arriving products
-    const arrived = this.products.filter(p => p.state === 'at-node' && p.currentNodeId === node.id);
-    for (const product of arrived) {
-      product.state = 'queued';
-      product.conveyorEntryTime = this.simTime;
-      stats.queue.push(product.id);
-    }
-
-    const ports = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
-    const inputPort = ports.find(p => p.type === 'input');
-    const outputPort = ports.find(p => p.type === 'output');
-
-    // Check if output is blocked
-    const outEdges = this.getOutEdges(node.id);
-    let outputBlocked = false;
-    if (outEdges.length > 0) {
-      for (const edge of outEdges) {
-        const ds = this.nodeStats.get(edge.to);
-        const dn = this.nodes.find(n => n.id === edge.to);
-        if (ds && dn) {
-          if (dn.type === 'stopper' && (dn.parameters.engaged ?? true)) outputBlocked = true;
-          if (ds.flowState === 'blocked' || ds.flowState === 'stopped') outputBlocked = true;
-          if (dn.type === 'machine' && ds.processing) outputBlocked = true;
-          if (dn.type === 'buffer' && ds.queue.length >= (dn.parameters.capacity || 10)) outputBlocked = true;
-        }
-      }
-    } else {
-      outputBlocked = true; // dead end
-    }
-
-    // Zone logic: each product occupies a zone, products accumulate from output end
-    const toRelease: string[] = [];
-    for (let qi = 0; qi < stats.queue.length; qi++) {
-      const pid = stats.queue[qi];
-      const product = this.products.find(p => p.id === pid);
-      if (!product || !product.conveyorEntryTime) continue;
-
-      const timeOnBelt = this.simTime - product.conveyorEntryTime;
-      const travelTime = lengthM / speedMps;
-      const naturalT = Math.min(1, timeOnBelt / travelTime);
-
-      // Target zone position: front-most product goes to last zone (output end)
-      // Products behind it stack up in preceding zones
-      const reverseIndex = stats.queue.length - 1 - qi; // 0 = closest to output
-      let targetT: number;
-
-      if (outputBlocked) {
-        // Accumulate: stack from output end backwards
-        const zoneIndex = Math.min(reverseIndex, zoneCount - 1);
-        targetT = 1.0 - (zoneIndex * zoneLength + zoneLength / 2) / lengthM;
-        targetT = Math.max(0.05, targetT);
-      } else {
-        // Release: all products move toward output
-        targetT = 1.0;
-      }
-
-      // Clamp to target (can't go past target, smooth approach)
-      const t = Math.min(naturalT, targetT);
-
-      // Position using transport path
-      const accPath = createTransportPath(node.type, node.parameters);
-      if (accPath) {
-        product.currentPosition = accPath.getWorldPosition(t, node.position, node.rotation, node.scale);
-      } else if (inputPort && outputPort) {
-        const inWorld = getPortWorldPosition(inputPort.localPosition, node);
-        const outWorld = getPortWorldPosition(outputPort.localPosition, node);
-        product.currentPosition = [
-          inWorld[0] + (outWorld[0] - inWorld[0]) * t,
-          inWorld[1] + (outWorld[1] - inWorld[1]) * t,
-          inWorld[2] + (outWorld[2] - inWorld[2]) * t,
-        ];
-      }
-
-      if (t >= 0.99 && !outputBlocked) toRelease.push(pid);
-    }
-
-    for (const pid of toRelease) {
-      stats.queue = stats.queue.filter(id => id !== pid);
-      const product = this.products.find(p => p.id === pid);
-      if (product) {
-        const oe = this.getOutEdges(node.id);
-        if (oe.length > 0) {
-          this.sendProductAlongEdge(product, oe[0]);
-        }
-        stats.throughput++;
-      }
-    }
-
-    if (stats.queue.length > 0) stats.busyTime += dt;
-    this.evaluateConveyorFlowState(node, stats, dt);
+    // Use physical contact accumulation (no artificial zone spacing).
+    this.tickConveyor(node, stats, dt);
   }
 
   // ─── Sensor: DETECTION ONLY — publishes signals, never stops products ───
@@ -1522,7 +1437,7 @@ export class SimulationEngine {
         if (convNode) {
           const pathLen = createTransportPath(convNode.type, convNode.parameters)?.length
             || ((convNode.parameters.length || 3000) / 1000);
-          const halfProductT = ((p.productLength || 0.3) / 2) / pathLen;
+          const halfProductT = (this.getEffectiveProductLength(p) / 2) / pathLen;
           const sensorT = mountPosition;
           // Product front edge is pathPosition + halfProductT, rear is pathPosition - halfProductT
           // Sensor detects if product overlaps the sensor's path position
