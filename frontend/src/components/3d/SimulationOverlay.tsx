@@ -87,15 +87,16 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
       }
       math.forward.normalize();
 
-      // Build a stable orientation basis: Z-forward along path, Y-up constrained to world-up as much as possible.
-      math.right.crossVectors(math.worldUp, math.forward);
+      // Build a stable orientation basis: X-forward along path (matches box geometry length axis),
+      // Y-up constrained to world-up as much as possible.
+      math.right.crossVectors(math.forward, math.worldUp);
       if (math.right.lengthSq() < 1e-8) {
-        math.right.set(1, 0, 0).cross(math.forward);
+        math.right.set(0, 0, 1).cross(math.forward);
       }
       math.right.normalize();
-      math.up.crossVectors(math.forward, math.right).normalize();
+      math.up.crossVectors(math.right, math.forward).normalize();
 
-      math.basis.makeBasis(math.right, math.up, math.forward);
+      math.basis.makeBasis(math.forward, math.up, math.right);
       math.targetQ.setFromRotationMatrix(math.basis);
 
       // Smooth transition across straight↔incline segment boundaries.

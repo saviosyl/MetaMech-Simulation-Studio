@@ -434,10 +434,16 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     case 'roller-conveyor':
     case 'modular-conveyor-straight': {
       const pL = ((params?.length || 3000) / 1000);
-      const pH = ((params?.height || 800) / 1000);
+      const pH = Number(params?.height || 800);
       const portInset = 0.02;
-      const pInH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : pH;
-      const pOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : pH;
+      const inRaw = Number(params?.infeedHeight);
+      const outRaw = Number(params?.outfeedHeight);
+      const hasIn = Number.isFinite(inRaw);
+      const hasOut = Number.isFinite(outRaw);
+      const followBaseHeight =
+        hasIn && hasOut && inRaw === 850 && outRaw === 850 && pH !== 800;
+      const pInH = (followBaseHeight ? pH : (hasIn ? inRaw : pH)) / 1000;
+      const pOutH = (followBaseHeight ? pH : (hasOut ? outRaw : pH)) / 1000;
       return [
         { id: 'input', type: 'input', localPosition: [-pL / 2 + portInset, pInH, 0] },
         { id: 'output', type: 'output', localPosition: [pL / 2 - portInset, pOutH, 0] },
@@ -469,9 +475,15 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
     case 'modular-conveyor-90-curve':
     case 'modular-conveyor-45-curve':
     case 'bend-conveyor': {
-      const bendDefH = ((params?.height || 800) / 1000);
-      const pH = params?.infeedHeight != null ? (params.infeedHeight / 1000) : bendDefH;
-      const pOutH = params?.outfeedHeight != null ? (params.outfeedHeight / 1000) : bendDefH;
+      const bendBaseHeight = Number(params?.height || 800);
+      const inRaw = Number(params?.infeedHeight);
+      const outRaw = Number(params?.outfeedHeight);
+      const hasIn = Number.isFinite(inRaw);
+      const hasOut = Number.isFinite(outRaw);
+      const followBaseHeight =
+        hasIn && hasOut && inRaw === 850 && outRaw === 850 && bendBaseHeight !== 800;
+      const pH = (followBaseHeight ? bendBaseHeight : (hasIn ? inRaw : bendBaseHeight)) / 1000;
+      const pOutH = (followBaseHeight ? bendBaseHeight : (hasOut ? outRaw : bendBaseHeight)) / 1000;
       const cAngle = (params?.bendAngle || params?.curveAngle || 90) * Math.PI / 180;
       const cRadius = (params?.radius || params?.curveRadius || 1000) / 1000;
       const dir = params?.bendDirection || 'right';

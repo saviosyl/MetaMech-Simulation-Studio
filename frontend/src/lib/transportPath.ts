@@ -387,21 +387,36 @@ export function createTransportPath(type: string, params: Record<string, any>): 
     case 'belt-conveyor':
     case 'roller-conveyor': {
       const length = params.length || 3000;
-      const baseHeight = params.height ?? 800;
+      const baseHeight = Number(params.height ?? 800);
       const angleDeg = params.inclineAngle ?? params.angleDeg ?? params.angle ?? 0;
       const angleRad = (angleDeg * Math.PI) / 180;
       const inferredOutfeed = baseHeight + Math.tan(angleRad) * (length / 1000) * 1000;
-      const infeedHeight = params.infeedHeight ?? baseHeight;
-      const outfeedHeight = params.outfeedHeight ?? inferredOutfeed;
+      const inRaw = Number(params.infeedHeight);
+      const outRaw = Number(params.outfeedHeight);
+      const hasIn = Number.isFinite(inRaw);
+      const hasOut = Number.isFinite(outRaw);
+      // Legacy conveyor presets initialize in/out at 850 mm.
+      // If user changes "height" but leaves those untouched, keep ports/path coupled to height.
+      const followBaseHeight =
+        hasIn && hasOut && inRaw === 850 && outRaw === 850 && baseHeight !== 800;
+      const infeedHeight = followBaseHeight ? baseHeight : (hasIn ? inRaw : baseHeight);
+      const outfeedHeight = followBaseHeight ? inferredOutfeed : (hasOut ? outRaw : inferredOutfeed);
       return new StraightPath(length, infeedHeight, outfeedHeight);
     }
 
     case 'bend-conveyor': {
       const radius = params.radius || params.radiusMm || 1000;
       const angle = parseInt(params.bendAngle || params.bendAngleDeg || '90', 10);
-      const height = params.height || params.heightMm || 800;
+      const height = Number(params.height || params.heightMm || 800);
+      const inRaw = Number(params.infeedHeight);
+      const outRaw = Number(params.outfeedHeight);
+      const hasIn = Number.isFinite(inRaw);
+      const hasOut = Number.isFinite(outRaw);
+      const followBaseHeight =
+        hasIn && hasOut && inRaw === 850 && outRaw === 850 && height !== 800;
+      const pathHeight = followBaseHeight ? height : (hasIn ? inRaw : height);
       const direction = params.bendDirection || 'right';
-      return new CurvedPath(radius, angle, height, direction);
+      return new CurvedPath(radius, angle, pathHeight, direction);
     }
 
     case 'spiral-conveyor': {
