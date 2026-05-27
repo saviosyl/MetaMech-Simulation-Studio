@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { AssetDef, getAssetManifest, getAssetById, ParametricAssetDef, StaticAssetDef } from '../lib/assetManifest';
 import { runBuilder } from '../lib/parametricBuilders';
-import { getPortWorldPosition, getWorldPorts as computeWorldPorts } from '../lib/nodeTransform';
+import { getPortWorldPosition, getWorldPorts as computeWorldPorts, localDirToWorld, solveMateTransform } from '../lib/nodeTransform';
 import { computeSpiralTransferGeometry } from '../lib/spiralTransfer';
 import { FrameAssemblyExportContract } from '../lib/frameDesigner/model';
 import { toFrameAssemblyParameters } from '../lib/frameDesigner/sceneInterop';
@@ -728,6 +728,98 @@ export function getWorldConnectionPorts(node: ProcessNode | EnvironmentAsset | A
 /** Re-export for external use */
 export { getPortWorldPosition };
 
+const MATE_RECOMPUTE_KEYS = new Set(['position', 'rotation', 'scale', 'parameters']);
+
+function shouldRecomputeMates(updates: Record<string, any>): boolean {
+  return Object.keys(updates || {}).some((key) => MATE_RECOMPUTE_KEYS.has(key));
+}
+
+function resolveEdgePort(
+  node: ProcessNode,
+  edgePortId: string,
+  expectedType: 'input' | 'output',
+): ConnectionPort | null {
+  const ports = getConnectionPorts(node.type, node.parameters, node.assetId);
+  return (
+    ports.find((p) => p.id === edgePortId && p.type === expectedType)
+    || ports.find((p) => p.id === edgePortId)
+    || ports.find((p) => p.type === expectedType)
+    || null
+  );
+}
+
+function applyMateConstraintsFromAnchor(
+  processNodes: ProcessNode[],
+  edges: ProcessEdge[],
+  anchorNodeId: string,
+): ProcessNode[] {
+  if (!edges.length) return processNodes;
+  if (!processNodes.some((node) => node.id === anchorNodeId)) return processNodes;
+
+  const byId = new Map<string, ProcessNode>(processNodes.map((node) => [node.id, { ...node }]));
+  const locked = new Set<string>([anchorNodeId]);
+  const queue: string[] = [anchorNodeId];
+
+  while (queue.length > 0) {
+    const fixedNodeId = queue.shift()!;
+    const fixedNode = byId.get(fixedNodeId);
+    if (!fixedNode) continue;
+
+    for (const edge of edges) {
+      let movingNodeId: string | null = null;
+      let fixedPortId = '';
+      let movingPortId = '';
+      let fixedPortType: 'input' | 'output' = 'output';
+      let movingPortType: 'input' | 'output' = 'input';
+
+      if (edge.from === fixedNodeId) {
+        movingNodeId = edge.to;
+        fixedPortId = edge.fromPort;
+        movingPortId = edge.toPort;
+        fixedPortType = 'output';
+        movingPortType = 'input';
+      } else if (edge.to === fixedNodeId) {
+        movingNodeId = edge.from;
+        fixedPortId = edge.toPort;
+        movingPortId = edge.fromPort;
+        fixedPortType = 'input';
+        movingPortType = 'output';
+      } else {
+        continue;
+      }
+
+      if (!movingNodeId || locked.has(movingNodeId)) continue;
+
+      const movingNode = byId.get(movingNodeId);
+      if (!movingNode) continue;
+
+      const fixedPort = resolveEdgePort(fixedNode, fixedPortId, fixedPortType);
+      const movingPort = resolveEdgePort(movingNode, movingPortId, movingPortType);
+      if (!fixedPort || !movingPort) continue;
+
+      const targetWorldPos = getPortWorldPosition(fixedPort.localPosition, fixedNode);
+      const targetWorldDir = localDirToWorld(fixedPort.direction, fixedNode.rotation);
+      const mate = solveMateTransform(
+        targetWorldPos,
+        targetWorldDir,
+        movingPort.localPosition,
+        movingPort.direction,
+        movingNode.scale,
+      );
+
+      byId.set(movingNodeId, {
+        ...movingNode,
+        position: mate.position,
+        rotation: mate.rotation,
+      });
+      locked.add(movingNodeId);
+      queue.push(movingNodeId);
+    }
+  }
+
+  return processNodes.map((node) => byId.get(node.id) || node);
+}
+
 interface EditorState {
   // Asset manifest
   assetManifest: AssetDef[];
@@ -1241,10 +1333,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   updateObject: (id, type, updates) => {
     set(state => {
       if (type === 'process') {
+        const nextProcessNodes = state.processNodes.map(node =>
+          node.id === id ? { ...node, ...updates } : node,
+        );
+        if (!shouldRecomputeMates(updates)) {
+          return { processNodes: nextProcessNodes };
+        }
         return {
-          processNodes: state.processNodes.map(node =>
-            node.id === id ? { ...node, ...updates } : node
-          ),
+          processNodes: applyMateConstraintsFromAnchor(nextProcessNodes, state.edges, id),
         };
       } else if (type === 'environment') {
         return {
