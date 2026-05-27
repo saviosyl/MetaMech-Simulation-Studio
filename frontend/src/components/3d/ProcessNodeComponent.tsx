@@ -31,6 +31,7 @@ import PusherModel from './models/PusherModel';
 import BendConveyorModel from './models/BendConveyorModel';
 import SensorModel from './models/SensorModel';
 import SourceModel from './models/SourceModel';
+import DigitalTimerModel from './models/DigitalTimerModel';
 import CeilingHangerModel from './models/CeilingHangerModel';
 import SinkModel from './models/SinkModel';
 import BufferModel from './models/BufferModel';
@@ -383,6 +384,8 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         return <SourceModel isSelected={isSelected} />;
       case 'sink':
         return <SinkModel isSelected={isSelected} />;
+      case 'digital-timer':
+        return <DigitalTimerModel isSelected={isSelected} />;
       case 'buffer':
         return <BufferModel isSelected={isSelected} />;
       case 'machine':
@@ -727,6 +730,7 @@ function getNodeColor(type: string): string {
   const colorMap: Record<string, string> = {
     'source': '#10b981',
     'sink': '#ef4444',
+    'digital-timer': '#111827',
     'conveyor': '#6b7280',
     'buffer': '#f59e0b',
     'machine': '#3b82f6',

@@ -12,7 +12,7 @@ import { getModuleDefinition } from '../lib/moduleLibrary';
 // Types
 export interface ProcessNode {
   id: string;
-  type: 'source' | 'sink' | 'conveyor' | 'buffer' | 'machine' | 'router' | 
+  type: 'source' | 'sink' | 'digital-timer' | 'conveyor' | 'buffer' | 'machine' | 'router' | 
         'transfer-bridge' | 'popup-transfer' | 'pusher-transfer' | 'merge-divert' |
         'spiral-conveyor' | 'vertical-lifter' | 'pick-and-place' | 'palletizer' |
         'belt-conveyor' | 'roller-conveyor' | 'industrial-robot' | 'machine-static' |
@@ -697,6 +697,7 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
       ];
     }
     case 'forklift':
+    case 'digital-timer':
       return []; // No connection ports — layout/decoration only
     default:
       return [
@@ -1710,6 +1711,7 @@ function getDefaultParameters(type: string): Record<string, any> {
     // Process nodes
     source: { spawnRate: 1.0, productType: 'default' },
     sink: { capacity: 100 },
+    'digital-timer': {},
     conveyor: { length: 5000, width: 1000, speed: 20 },
     'belt-conveyor': { width: 600, length: 3000, height: 800, angle: 0, beltSpeed: 20, sideGuides: true, driveEnd: 'right', supportSpacing: 1500, showLegs: true, adjustableFeetEnabled: true },
     'incline-conveyor': {

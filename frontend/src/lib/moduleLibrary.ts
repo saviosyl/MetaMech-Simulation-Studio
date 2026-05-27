@@ -15,6 +15,7 @@ import {
   MoveHorizontal,
   RotateCw,
   Eye,
+  Clock3,
 } from 'lucide-react';
 
 export interface ModuleDefinition {
@@ -152,6 +153,14 @@ export const moduleLibrary: ModuleDefinition[] = [
         default: true,
       },
     },
+  },
+  {
+    id: 'digital-timer',
+    name: 'Digital Stopwatch',
+    category: 'process',
+    icon: Clock3,
+    description: 'Placeable 3D digital stopwatch showing live simulation elapsed time',
+    parameters: {},
   },
   {
     id: 'belt-conveyor',

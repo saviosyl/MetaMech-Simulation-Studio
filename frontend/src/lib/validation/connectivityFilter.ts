@@ -22,6 +22,7 @@ const NON_PROCESS_FALLBACK_TYPES = new Set([
  */
 export function shouldValidateFlowConnectivity(nodeType: string): boolean {
   if (isAccessoryType(nodeType)) return false;
+  if (nodeType === 'digital-timer') return false;
 
   const moduleDef = getModuleDefinition(nodeType);
   if (moduleDef) return moduleDef.category === 'process';

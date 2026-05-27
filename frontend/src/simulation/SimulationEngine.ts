@@ -252,6 +252,7 @@ export class SimulationEngine {
         case 'stopper': this.tickStopper(node, stats, elapsed); break;
         case 'pusher': this.tickPusher(node, stats, elapsed); break;
         case 'vertical-lifter': this.tickLift(node, stats, elapsed); break;
+        case 'digital-timer': break;
         default: {
           // OEM modules should animate infeed→outfeed like standard process nodes.
           const isOemAsset = typeof (node as any).assetId === 'string' && String((node as any).assetId).startsWith('oem-');
