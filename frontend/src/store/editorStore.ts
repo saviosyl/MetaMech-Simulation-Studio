@@ -217,6 +217,8 @@ function ensureDirections(ports: Partial<ConnectionPort>[]): ConnectionPort[] {
 function buildOemParametricAutoPorts(
   oemParametric: NonNullable<StaticAssetDef['oemParametric']>,
   params?: Record<string, any>,
+  authoredInput?: Partial<ConnectionPort>,
+  authoredOutput?: Partial<ConnectionPort>,
 ): Partial<ConnectionPort>[] {
   const labels = oemParametric.axisLabels || ['Length', 'Width', 'Height'];
   const base = oemParametric.baseSizeMm || [1000, 300, 120];
@@ -246,7 +248,7 @@ function buildOemParametricAutoPorts(
     : null;
   const editableHorizontal = horizontalAxes.filter((axis) => editableAxes[axis]);
   const largestHorizontal = (dimsMm[0] >= dimsMm[2] ? 0 : 2) as 0 | 2;
-  const flowAxis = preferredHorizontalByLabel
+  let flowAxis = preferredHorizontalByLabel
     ?? (editableHorizontal.length > 0
       ? ((dimsMm[editableHorizontal[0]] >= dimsMm[editableHorizontal[editableHorizontal.length - 1]]
         ? editableHorizontal[0]
@@ -264,6 +266,80 @@ function buildOemParametricAutoPorts(
   const verticalHalf = Math.max(0.01, dimsM[verticalAxis] / 2);
   const verticalInset = Math.min(0.03, verticalHalf * 0.45);
   const verticalOffset = Math.max(0.005, verticalHalf - verticalInset);
+
+  const authoredInputPos = authoredInput?.localPosition;
+  const authoredOutputPos = authoredOutput?.localPosition;
+  const hasAuthoredPair = Array.isArray(authoredInputPos) && authoredInputPos.length === 3
+    && Array.isArray(authoredOutputPos) && authoredOutputPos.length === 3;
+
+  if (hasAuthoredPair) {
+    const inPos: [number, number, number] = [
+      Number(authoredInputPos![0]) || 0,
+      Number(authoredInputPos![1]) || 0,
+      Number(authoredInputPos![2]) || 0,
+    ];
+    const outPosAuthored: [number, number, number] = [
+      Number(authoredOutputPos![0]) || 0,
+      Number(authoredOutputPos![1]) || 0,
+      Number(authoredOutputPos![2]) || 0,
+    ];
+    const authoredDelta: [number, number, number] = [
+      outPosAuthored[0] - inPos[0],
+      outPosAuthored[1] - inPos[1],
+      outPosAuthored[2] - inPos[2],
+    ];
+    const authoredFlowAxis = Math.abs(authoredDelta[2]) > Math.abs(authoredDelta[0]) ? 2 : 0;
+    flowAxis = authoredFlowAxis as 0 | 2;
+    const authoredFlowMagnitude = Math.abs(authoredDelta[flowAxis]);
+    const baseFlowM = Math.max(
+      0.001,
+      (Number.isFinite(Number(base[flowAxis])) && Number(base[flowAxis]) > 0
+        ? Number(base[flowAxis]) / 1000
+        : authoredFlowMagnitude),
+    );
+    const flowScale = Math.max(0.01, dimsM[flowAxis] / baseFlowM);
+    const outPos: [number, number, number] = [...outPosAuthored];
+    outPos[flowAxis] = inPos[flowAxis] + authoredDelta[flowAxis] * flowScale;
+    return [
+      {
+        id: authoredInput?.id || 'input',
+        type: 'input',
+        localPosition: inPos,
+        direction: authoredInput?.direction,
+      },
+      {
+        id: authoredOutput?.id || 'output',
+        type: 'output',
+        localPosition: outPos,
+        direction: authoredOutput?.direction,
+      },
+    ];
+  }
+
+  // Single-axis editable profile parts should keep infeed fixed and extend outfeed.
+  const editableAxisCount = editableAxes.filter(Boolean).length;
+  const shouldAnchorInput = editableAxisCount === 1 && editableAxes[flowAxis];
+  if (shouldAnchorInput) {
+    const baseFlowM = Math.max(0.001, Number(base[flowAxis] || dimsMm[flowAxis] || 1000) / 1000);
+    const baseHalf = baseFlowM / 2;
+    const baseInset = Math.min(0.02, baseHalf * 0.3);
+    const anchorStart = -Math.max(0.001, baseHalf - baseInset);
+    const requestedSpan = Math.max(0.002, dimsM[flowAxis] - baseInset * 2);
+    const inputPos: [number, number, number] = [0, 0, 0];
+    const outputPos: [number, number, number] = [0, 0, 0];
+    const inputDir: [number, number, number] = [0, 0, 0];
+    const outputDir: [number, number, number] = [0, 0, 0];
+    inputPos[verticalAxis] = verticalOffset;
+    outputPos[verticalAxis] = verticalOffset;
+    inputPos[flowAxis] = anchorStart;
+    outputPos[flowAxis] = anchorStart + requestedSpan;
+    inputDir[flowAxis] = -1;
+    outputDir[flowAxis] = 1;
+    return [
+      { id: authoredInput?.id || 'input', type: 'input', localPosition: inputPos, direction: authoredInput?.direction || inputDir },
+      { id: authoredOutput?.id || 'output', type: 'output', localPosition: outputPos, direction: authoredOutput?.direction || outputDir },
+    ];
+  }
 
   const inputPos: [number, number, number] = [0, 0, 0];
   const outputPos: [number, number, number] = [0, 0, 0];
@@ -314,7 +390,14 @@ function _getConnectionPortsRaw(type: string, params?: Record<string, any>, asse
         // OEM parametric fallback: auto-generate usable infeed/outfeed ports
         // and always keep input/output tied to live parametric dimensions.
         if (assetDef.id.startsWith('oem-') && assetDef.oemParametric?.enabled) {
-          const autoPorts = buildOemParametricAutoPorts(assetDef.oemParametric, params);
+          const authoredInput = staticPorts.find((port) => port.type === 'input');
+          const authoredOutput = staticPorts.find((port) => port.type === 'output');
+          const autoPorts = buildOemParametricAutoPorts(
+            assetDef.oemParametric,
+            params,
+            authoredInput,
+            authoredOutput,
+          );
           const customPorts = staticPorts.filter((port) => port.type !== 'input' && port.type !== 'output');
           const merged: Partial<ConnectionPort>[] = [...customPorts, autoPorts[0], autoPorts[1]];
           return merged;

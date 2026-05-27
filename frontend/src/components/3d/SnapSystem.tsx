@@ -19,9 +19,9 @@ function getAdaptivePortSize(ports: ConnectionPort[], mateModeActive: boolean): 
   }
   const size = box.getSize(new THREE.Vector3());
   const span = Math.max(size.x, size.y, size.z);
-  const base = Number.isFinite(span) && span > 0 ? span * 0.08 : 0.009;
-  const clamped = THREE.MathUtils.clamp(base, 0.004, 0.03);
-  return mateModeActive ? clamped * 1.2 : clamped;
+  const base = Number.isFinite(span) && span > 0 ? span * 0.06 : 0.008;
+  const clamped = THREE.MathUtils.clamp(base, 0.0035, 0.02);
+  return mateModeActive ? clamped * 1.12 : clamped;
 }
 
 /** Types that should auto-match conveyor belt top height */
@@ -557,8 +557,8 @@ const SnapSystem: React.FC = () => {
                   ? 0.1
                   : 0.5;
         const hitRadius = mateMode.active
-          ? Math.max(portSize * 2.4, 0.03)
-          : Math.max(portSize * 1.9, 0.02);
+          ? Math.max(portSize * 3.1, 0.04)
+          : Math.max(portSize * 2.4, 0.028);
         return (
           <group key={`${pv.nodeId}-${pv.portId}`} position={pv.position}>
             {/* Larger invisible hit area keeps selection easy even with small premium icons */}
@@ -590,9 +590,9 @@ const SnapSystem: React.FC = () => {
             {/* Visible premium icon */}
             <mesh>
               {pv.type === 'input' ? (
-                <sphereGeometry args={[portSize * 0.92, 12, 10]} />
+                <sphereGeometry args={[portSize * 0.72, 12, 10]} />
               ) : (
-                <octahedronGeometry args={[portSize * 0.95, 0]} />
+                <octahedronGeometry args={[portSize * 0.78, 0]} />
               )}
               <meshStandardMaterial
                 color={selected ? '#ffffff' : stateColor}
@@ -605,11 +605,11 @@ const SnapSystem: React.FC = () => {
             {/* Outer ring indicator */}
             {!pv.connected && (
               <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[portSize + 0.012, portSize + 0.038, 16]} />
+                <ringGeometry args={[portSize + 0.005, portSize + 0.016, 16]} />
                 <meshBasicMaterial
                   color={selected ? '#06b6d4' : stateColor}
                   transparent
-                  opacity={selected ? 0.85 : pv.state === 'preview' ? 0.75 : pv.state === 'invalid' ? 0.8 : pv.state === 'success' ? 0.78 : hovered ? 0.72 : 0.42}
+                  opacity={selected ? 0.72 : pv.state === 'preview' ? 0.62 : pv.state === 'invalid' ? 0.66 : pv.state === 'success' ? 0.64 : hovered ? 0.58 : 0.34}
                   side={THREE.DoubleSide}
                 />
               </mesh>

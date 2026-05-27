@@ -195,16 +195,10 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
           />
         </Suspense>
         {isSelected && (
-          <>
-            <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[1.5, 1.7, 32]} />
-              <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
-            </mesh>
-            <FlowDirectionArrow 
-              length={(node.parameters.length || 3000) / 1000} 
-              height={(node.parameters.height || 800) / 1000} 
-            />
-          </>
+          <FlowDirectionArrow
+            length={(node.parameters.length || 3000) / 1000}
+            height={(node.parameters.height || 800) / 1000}
+          />
         )}
         {node.parameters.supportType === 'ceiling-hanger' && (
           <CeilingHangerModel
@@ -240,12 +234,6 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
             <SpiralConveyorModel parameters={node.parameters} isSelected={isSelected} />
           </Suspense>
         </Model3DErrorBoundary>
-        {isSelected && (
-          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[1.5, 1.7, 32]} />
-            <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
-          </mesh>
-        )}
       </group>
     );
   }
@@ -267,12 +255,6 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
           width={(node.parameters.beltWidth || 600) / 1000}
           isEngaged={node.parameters.engaged ?? true}
         />
-        {isSelected && (
-          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[0.4, 0.5, 32]} />
-            <meshBasicMaterial color="#ef4444" transparent opacity={0.5} side={THREE.DoubleSide} />
-          </mesh>
-        )}
       </group>
     );
   }
@@ -290,12 +272,6 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         onPointerOut={() => { document.body.style.cursor = 'auto'; }}
       >
         <PusherModel parameters={node.parameters} isSelected={isSelected} />
-        {isSelected && (
-          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[0.5, 0.6, 32]} />
-            <meshBasicMaterial color="#ee8833" transparent opacity={0.5} side={THREE.DoubleSide} />
-          </mesh>
-        )}
       </group>
     );
   }
@@ -317,12 +293,6 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
           range={0.3}
           height={(node.parameters.mountHeight || 800) / 1000}
         />
-        {isSelected && (
-          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[0.3, 0.4, 32]} />
-            <meshBasicMaterial color="#22aa44" transparent opacity={0.5} side={THREE.DoubleSide} />
-          </mesh>
-        )}
       </group>
     );
   }
@@ -347,12 +317,6 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
         }>
           <BendConveyorModel parameters={node.parameters} isSelected={isSelected} />
         </Suspense>
-        {isSelected && (
-          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[1.5, 1.7, 32]} />
-            <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
-          </mesh>
-        )}
       </group>
     );
   }
@@ -513,13 +477,6 @@ const ProcessNodeComponent: React.FC<ProcessNodeComponentProps> = ({ node, isSel
     >
       {renderModel()}
       
-      {/* Selection highlight ring */}
-      {isSelected && (
-        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[1.5, 1.7, 32]} />
-          <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
-        </mesh>
-      )}
     </group>
   );
 };

@@ -116,12 +116,6 @@ const CustomModelObject: React.FC<{
           <Suspense fallback={<FallbackBox />}>
             <CustomGLB url={model.glbUrl} isSelected={isSelected} />
           </Suspense>
-          {isSelected && (
-            <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[1.2, 1.4, 32]} />
-              <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
-            </mesh>
-          )}
         </group>
       )}
     </group>

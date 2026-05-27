@@ -103,12 +103,6 @@ const EnvironmentAssetComponent: React.FC<EnvironmentAssetComponentProps> = ({ a
         }>
           <GLBModel url={glb.url} targetSize={glb.targetSize} isSelected={isSelected} />
         </Suspense>
-        {isSelected && (
-          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[0.8, 1.0, 32]} />
-            <meshBasicMaterial color="#06b6d4" transparent opacity={0.5} side={THREE.DoubleSide} />
-          </mesh>
-        )}
       </group>
     );
   }
