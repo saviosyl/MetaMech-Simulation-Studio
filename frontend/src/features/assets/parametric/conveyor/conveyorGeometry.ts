@@ -14,7 +14,8 @@ import {
   matChrome as matRoller,
   matModularBelt as matModular,
   matDarkSteel as matDrive,
-  buildSEWMotor,
+  matIndustrialBlue,
+  matAluminum,
   matCleatRubber as matCleat,
   matSidewall,
 } from '../premiumMaterials';
@@ -217,6 +218,68 @@ function buildCleatedSurface(lengthM: number, widthM: number, heightM: number, p
 }
 
 /** Build drive assembly (end or center) */
+function buildCompactGearMotor(scale = 1.0): THREE.Group {
+  const g = new THREE.Group();
+  g.name = 'compact-gearmotor';
+  const s = scale;
+
+  // Main motor can
+  const motorBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.044 * s, 0.044 * s, 0.105 * s, 20),
+    matIndustrialBlue,
+  );
+  motorBody.rotation.z = Math.PI / 2;
+  motorBody.castShadow = true;
+  g.add(motorBody);
+
+  // End cap + fan cover
+  const rearCap = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.046 * s, 0.046 * s, 0.018 * s, 18),
+    matDrive,
+  );
+  rearCap.rotation.z = Math.PI / 2;
+  rearCap.position.set(-0.06 * s, 0, 0);
+  g.add(rearCap);
+
+  // Compact gearbox housing
+  const gearbox = new THREE.Mesh(
+    new THREE.BoxGeometry(0.058 * s, 0.075 * s, 0.078 * s),
+    matAluminum,
+  );
+  gearbox.position.set(0.073 * s, -0.003 * s, 0);
+  gearbox.castShadow = true;
+  g.add(gearbox);
+
+  // Output flange
+  const flange = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.028 * s, 0.028 * s, 0.008 * s, 16),
+    matDrive,
+  );
+  flange.rotation.z = Math.PI / 2;
+  flange.position.set(0.104 * s, -0.003 * s, 0);
+  g.add(flange);
+
+  // Output shaft (local +X)
+  const outputShaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.011 * s, 0.011 * s, 0.032 * s, 14),
+    matRoller,
+  );
+  outputShaft.rotation.z = Math.PI / 2;
+  outputShaft.position.set(0.124 * s, -0.003 * s, 0);
+  outputShaft.castShadow = true;
+  g.add(outputShaft);
+
+  // Terminal box
+  const terminal = new THREE.Mesh(
+    new THREE.BoxGeometry(0.036 * s, 0.02 * s, 0.03 * s),
+    matIndustrialBlue,
+  );
+  terminal.position.set(-0.008 * s, 0.045 * s, 0);
+  g.add(terminal);
+
+  return g;
+}
+
 function buildDriveAssembly(params: ConveyorParams): THREE.Group {
   const group = new THREE.Group();
   group.name = 'drive';
@@ -242,15 +305,18 @@ function buildDriveAssembly(params: ConveyorParams): THREE.Group {
   roller.castShadow = true;
   group.add(roller);
 
-  // SEW-style geared motor
-  const sewMotor = buildSEWMotor(1.0);
+  // Compact geared motor package (cleaner and less "spring-like" silhouette)
+  const motorScale = 0.9;
+  const motorOutputOffset = 0.124 * motorScale; // local +X offset to output shaft center
+  const motorOutputYOffset = -0.003 * motorScale;
+  const sewMotor = buildCompactGearMotor(motorScale);
   const motorSideSign = params.motorSide === 'right' ? 1 : -1;
   const rollerShaftEndZ = motorSideSign * (driveRollerFaceW / 2 + 0.005);
   const motorOutputShaftCenterZ = motorSideSign * (driveRollerFaceW / 2 + 0.038);
-  // buildSEWMotor output shaft is at local +X, so place origin further outboard.
-  const motorSideZ = motorOutputShaftCenterZ + motorSideSign * 0.145;
+  // Compact motor output shaft is at local +X, so place origin further outboard by output offset.
+  const motorSideZ = motorOutputShaftCenterZ + motorSideSign * motorOutputOffset;
   // Align gearbox output centerline with the drive roller axis for a proper end-drive look.
-  sewMotor.position.set(driveX, heightM + 0.005, motorSideZ);
+  sewMotor.position.set(driveX, heightM - motorOutputYOffset, motorSideZ);
   const shaftDir = new THREE.Vector3(0, 0, -motorSideSign);
   const motorQ = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), shaftDir);
   sewMotor.setRotationFromQuaternion(motorQ);
@@ -267,6 +333,14 @@ function buildDriveAssembly(params: ConveyorParams): THREE.Group {
     coupling.position.set(driveX, heightM, (couplingStartZ + couplingEndZ) / 2);
     coupling.castShadow = true;
     group.add(coupling);
+
+    // Protective coupling guard
+    const guardGeo = new THREE.CylinderGeometry(0.018, 0.018, couplingLen + 0.01, 14);
+    guardGeo.rotateX(Math.PI / 2);
+    const couplingGuard = new THREE.Mesh(guardGeo, matDrive);
+    couplingGuard.position.set(driveX, heightM, (couplingStartZ + couplingEndZ) / 2);
+    couplingGuard.castShadow = true;
+    group.add(couplingGuard);
   }
 
   // Motor mount plate and gusset to integrate drive package with frame rail.
@@ -283,6 +357,13 @@ function buildDriveAssembly(params: ConveyorParams): THREE.Group {
   group.add(gusset);
   gussetCap.castShadow = true;
   group.add(gussetCap);
+
+  // Short torque arm between motor mount zone and frame rail
+  const torqueArm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.012, 0.012), matFrame);
+  torqueArm.position.set(driveX - 0.015, heightM - 0.035, motorSideSign * (driveRollerFaceW / 2 + 0.064));
+  torqueArm.rotation.y = motorSideSign * 0.18;
+  torqueArm.castShadow = true;
+  group.add(torqueArm);
 
   const addEndRefinement = (x: number, endRollerR: number, rollerFaceW: number) => {
     // End plate with bearing blocks to avoid placeholder-looking conveyor ends.
