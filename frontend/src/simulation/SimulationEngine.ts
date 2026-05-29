@@ -55,17 +55,17 @@ export class SimulationEngine {
   private colorIndex = 0;
 
   private getEffectiveProductLength(product: Product): number {
-    // Product meshes are oriented with conveyor motion along local Z.
-    // For the current product renderers, this corresponds to size[1] (pW).
-    const forwardExtent = Array.isArray(product.size) ? Number(product.size[1]) : NaN;
-    if (Number.isFinite(forwardExtent) && forwardExtent > 0) {
-      return Math.max(0.01, forwardExtent);
-    }
+    // Prefer explicit per-product forward length metadata, then current renderer axes.
+    // Box/tote/pallet products are aligned with local X as conveyor-forward.
     const fromPath = Number(product.productLength);
     if (Number.isFinite(fromPath) && fromPath > 0) {
       return Math.max(0.01, fromPath);
     }
-    const fallback = Array.isArray(product.size) ? Number(product.size[0]) : NaN;
+    const forwardExtent = Array.isArray(product.size) ? Number(product.size[0]) : NaN;
+    if (Number.isFinite(forwardExtent) && forwardExtent > 0) {
+      return Math.max(0.01, forwardExtent);
+    }
+    const fallback = Array.isArray(product.size) ? Number(product.size[1]) : NaN;
     return Math.max(0.01, Number.isFinite(fallback) && fallback > 0 ? fallback : 0.2);
   }
 
@@ -1648,6 +1648,7 @@ export class SimulationEngine {
   // ─── Helpers ─────────────────────────────────────────────────
   private createProduct(node: ProcessNode): Product {
     const productColor = node.parameters.productColor || 'brown';
+    const productType = node.parameters.productType || 'box';
     let color: string;
     if (productColor === 'random') {
       color = RANDOM_COLORS[this.colorIndex % RANDOM_COLORS.length];
@@ -1659,10 +1660,11 @@ export class SimulationEngine {
     const pL = (node.parameters.productLength || 300) / 1000;
     const pW = (node.parameters.productWidth || 200) / 1000;
     const pH = (node.parameters.productHeight || 150) / 1000;
+    const forwardLength = (productType === 'cylinder' || productType === 'bottle') ? pW : pL;
 
     return {
       id: uuidv4(),
-      type: node.parameters.productType || 'box',
+      type: productType,
       color,
       size: [pL, pW, pH],
       currentPosition: [...node.position] as [number, number, number],
@@ -1679,7 +1681,7 @@ export class SimulationEngine {
       blockedSince: null,
       stoppedBy: null,
       pathPosition: 0,
-      productLength: pW,
+      productLength: forwardLength,
       textureUrl: node.parameters.productTextureUrl || undefined,
       label: node.parameters.productLabel || undefined,
       labelColor: node.parameters.labelColor || '#ffffff',

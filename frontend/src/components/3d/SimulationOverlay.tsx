@@ -198,7 +198,7 @@ const ProductMesh: React.FC<{ product: Product }> = ({ product }) => {
           </mesh>
           {!texture && (
             <mesh position={[0, pH * 0.5 + 0.001, 0]} rotation={[0, Math.PI / 2, 0]}>
-              <boxGeometry args={[pL * 0.15, 0.002, pW * 1.01]} />
+              <boxGeometry args={[pW * 0.2, 0.002, pL * 0.62]} />
               <meshStandardMaterial color="#d4a574" />
             </mesh>
           )}
