@@ -14,7 +14,8 @@ import {
   matChrome as matRoller,
   matModularBelt as matModular,
   matDarkSteel as matDrive,
-  buildSEWMotor,
+  matIndustrialBlue,
+  matAluminum,
   matCleatRubber as matCleat,
   matSidewall,
 } from '../premiumMaterials';
@@ -217,6 +218,68 @@ function buildCleatedSurface(lengthM: number, widthM: number, heightM: number, p
 }
 
 /** Build drive assembly (end or center) */
+function buildCompactGearMotor(scale = 1.0): THREE.Group {
+  const g = new THREE.Group();
+  g.name = 'compact-gearmotor';
+  const s = scale;
+
+  // Main motor can
+  const motorBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.044 * s, 0.044 * s, 0.105 * s, 20),
+    matIndustrialBlue,
+  );
+  motorBody.rotation.z = Math.PI / 2;
+  motorBody.castShadow = true;
+  g.add(motorBody);
+
+  // End cap + fan cover
+  const rearCap = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.046 * s, 0.046 * s, 0.018 * s, 18),
+    matDrive,
+  );
+  rearCap.rotation.z = Math.PI / 2;
+  rearCap.position.set(-0.06 * s, 0, 0);
+  g.add(rearCap);
+
+  // Compact gearbox housing
+  const gearbox = new THREE.Mesh(
+    new THREE.BoxGeometry(0.058 * s, 0.075 * s, 0.078 * s),
+    matAluminum,
+  );
+  gearbox.position.set(0.073 * s, -0.003 * s, 0);
+  gearbox.castShadow = true;
+  g.add(gearbox);
+
+  // Output flange
+  const flange = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.028 * s, 0.028 * s, 0.008 * s, 16),
+    matDrive,
+  );
+  flange.rotation.z = Math.PI / 2;
+  flange.position.set(0.104 * s, -0.003 * s, 0);
+  g.add(flange);
+
+  // Output shaft (local +X)
+  const outputShaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.011 * s, 0.011 * s, 0.032 * s, 14),
+    matRoller,
+  );
+  outputShaft.rotation.z = Math.PI / 2;
+  outputShaft.position.set(0.124 * s, -0.003 * s, 0);
+  outputShaft.castShadow = true;
+  g.add(outputShaft);
+
+  // Terminal box
+  const terminal = new THREE.Mesh(
+    new THREE.BoxGeometry(0.036 * s, 0.02 * s, 0.03 * s),
+    matIndustrialBlue,
+  );
+  terminal.position.set(-0.008 * s, 0.045 * s, 0);
+  g.add(terminal);
+
+  return g;
+}
+
 function buildDriveAssembly(params: ConveyorParams): THREE.Group {
   const group = new THREE.Group();
   group.name = 'drive';
@@ -227,35 +290,115 @@ function buildDriveAssembly(params: ConveyorParams): THREE.Group {
 
   // Drive roller
   const rollerR = 0.03;
-  const rollerGeo = new THREE.CylinderGeometry(rollerR, rollerR, widthM + 0.02, 16);
+  const driveRollerFaceW = Math.max(0.16, widthM - 0.03); // keep roller inside belt side profile
+  const tailRollerFaceW = Math.max(0.14, widthM - 0.04);
+  const rollerGeo = new THREE.CylinderGeometry(rollerR, rollerR, driveRollerFaceW, 16);
   rollerGeo.rotateX(Math.PI / 2);
   const roller = new THREE.Mesh(rollerGeo, matDrive);
 
   // Position based on drive type
+  const endInset = 0.04;
   const driveX = params.driveType === 'end'
-    ? lengthM / 2 - 0.02  // at output end
+    ? lengthM / 2 - endInset  // slightly recessed for realistic belt-end wrap
     : 0;                    // center
   roller.position.set(driveX, heightM, 0);
   roller.castShadow = true;
   group.add(roller);
 
-  // SEW-style geared motor
-  const sewMotor = buildSEWMotor(1.0);
-  const motorSideZ = params.motorSide === 'right'
-    ? widthM / 2 + 0.06
-    : -(widthM / 2 + 0.06);
-  sewMotor.position.set(driveX, heightM - 0.05, motorSideZ);
-  sewMotor.rotation.set(0, params.motorSide === 'right' ? -Math.PI / 2 : Math.PI / 2, 0);
+  // Compact geared motor package (cleaner and less "spring-like" silhouette)
+  const motorScale = 0.9;
+  const motorOutputOffset = 0.124 * motorScale; // local +X offset to output shaft center
+  const motorOutputYOffset = -0.003 * motorScale;
+  const sewMotor = buildCompactGearMotor(motorScale);
+  const motorSideSign = params.motorSide === 'right' ? 1 : -1;
+  const rollerShaftEndZ = motorSideSign * (driveRollerFaceW / 2 + 0.005);
+  const motorOutputShaftCenterZ = motorSideSign * (driveRollerFaceW / 2 + 0.038);
+  // Compact motor output shaft is at local +X, so place origin further outboard by output offset.
+  const motorSideZ = motorOutputShaftCenterZ + motorSideSign * motorOutputOffset;
+  // Align gearbox output centerline with the drive roller axis for a proper end-drive look.
+  sewMotor.position.set(driveX, heightM - motorOutputYOffset, motorSideZ);
+  const shaftDir = new THREE.Vector3(0, 0, -motorSideSign);
+  const motorQ = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), shaftDir);
+  sewMotor.setRotationFromQuaternion(motorQ);
   group.add(sewMotor);
 
+  // Short coupling between gearbox output and drive roller shaft.
+  const couplingStartZ = rollerShaftEndZ;
+  const couplingEndZ = motorOutputShaftCenterZ;
+  const couplingLen = Math.abs(couplingEndZ - couplingStartZ);
+  if (couplingLen > 0.001) {
+    const couplingGeo = new THREE.CylinderGeometry(0.011, 0.011, couplingLen, 14);
+    couplingGeo.rotateX(Math.PI / 2);
+    const coupling = new THREE.Mesh(couplingGeo, matRoller);
+    coupling.position.set(driveX, heightM, (couplingStartZ + couplingEndZ) / 2);
+    coupling.castShadow = true;
+    group.add(coupling);
+
+    // Protective coupling guard
+    const guardGeo = new THREE.CylinderGeometry(0.018, 0.018, couplingLen + 0.01, 14);
+    guardGeo.rotateX(Math.PI / 2);
+    const couplingGuard = new THREE.Mesh(guardGeo, matDrive);
+    couplingGuard.position.set(driveX, heightM, (couplingStartZ + couplingEndZ) / 2);
+    couplingGuard.castShadow = true;
+    group.add(couplingGuard);
+  }
+
+  // Motor mount plate and gusset to integrate drive package with frame rail.
+  // Keep this compact so the drive-end silhouette stays clean and premium.
+  const mountPlate = new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.012, 0.07), matFrame);
+  mountPlate.position.set(driveX, heightM - 0.06, motorSideSign * (driveRollerFaceW / 2 + 0.102));
+  mountPlate.castShadow = true;
+  group.add(mountPlate);
+  const gusset = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.032, 0.012), matFrame);
+  gusset.position.set(driveX, heightM - 0.04, motorSideSign * (driveRollerFaceW / 2 + 0.078));
+  const gussetCap = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.018), matFrame);
+  gussetCap.position.set(driveX, heightM - 0.022, motorSideSign * (driveRollerFaceW / 2 + 0.086));
+  gusset.castShadow = true;
+  group.add(gusset);
+  gussetCap.castShadow = true;
+  group.add(gussetCap);
+
+  // Short torque arm between motor mount zone and frame rail
+  const torqueArm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.012, 0.012), matFrame);
+  torqueArm.position.set(driveX - 0.015, heightM - 0.035, motorSideSign * (driveRollerFaceW / 2 + 0.064));
+  torqueArm.rotation.y = motorSideSign * 0.18;
+  torqueArm.castShadow = true;
+  group.add(torqueArm);
+
+  const addEndRefinement = (x: number, endRollerR: number, rollerFaceW: number) => {
+    // End plate with bearing blocks to avoid placeholder-looking conveyor ends.
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.075, rollerFaceW + 0.04), matDrive);
+    plate.position.set(x, heightM - 0.028, 0);
+    plate.castShadow = true;
+    group.add(plate);
+
+    // Rounded nose cap around each roller to keep the family look clean and engineered.
+    const noseGeo = new THREE.CylinderGeometry(endRollerR + 0.012, endRollerR + 0.012, rollerFaceW + 0.025, 20, 1, true);
+    noseGeo.rotateX(Math.PI / 2);
+    const nose = new THREE.Mesh(noseGeo, matFrame);
+    nose.position.set(x, heightM, 0);
+    nose.castShadow = true;
+    group.add(nose);
+
+    for (const side of [-1, 1]) {
+      const bearingBlock = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.032, 0.04), matDrive);
+      bearingBlock.position.set(x, heightM - 0.004, side * (rollerFaceW / 2 + 0.012));
+      bearingBlock.castShadow = true;
+      group.add(bearingBlock);
+    }
+  };
+
+  addEndRefinement(driveX, rollerR, driveRollerFaceW);
   // Tail/deflection roller (only for end drive)
   if (params.driveType === 'end') {
-    const tailGeo = new THREE.CylinderGeometry(rollerR * 0.8, rollerR * 0.8, widthM + 0.02, 16);
+    const tailGeo = new THREE.CylinderGeometry(rollerR * 0.8, rollerR * 0.8, tailRollerFaceW, 16);
     tailGeo.rotateX(Math.PI / 2);
     const tail = new THREE.Mesh(tailGeo, matDrive);
-    tail.position.set(-lengthM / 2 + 0.02, heightM, 0);
+    const tailX = -lengthM / 2 + endInset;
+    tail.position.set(tailX, heightM, 0);
     tail.castShadow = true;
     group.add(tail);
+    addEndRefinement(tailX, rollerR * 0.8, tailRollerFaceW);
   }
 
   return group;
