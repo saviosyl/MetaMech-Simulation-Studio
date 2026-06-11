@@ -30,6 +30,18 @@ export interface LayoutInput {
   beltWidthMm: number;
   /** Belt speed in m/min */
   beltSpeedMpm: number;
+  /** Optimization goal for auto-layout heuristics */
+  optimizeFor: 'balanced' | 'throughput' | 'compact' | 'cost';
+  /** Include accumulation/buffer zone */
+  includeBufferZone: boolean;
+}
+
+export interface LayoutKpis {
+  estimatedThroughputTpm: number;
+  estimatedCycleTimeSec: number;
+  estimatedFootprintM2: number;
+  estimatedConveyorLengthM: number;
+  capexBand: 'Low' | 'Medium' | 'High';
 }
 
 export interface LayoutOutput {
@@ -39,6 +51,8 @@ export interface LayoutOutput {
   warnings: string[];
   /** Summary of what was generated */
   description: string;
+  /** Estimated layout KPIs (first-pass heuristic) */
+  kpis: LayoutKpis;
 }
 
 function n(type: string, pos: [number, number, number], params: any, name: string, rot?: [number, number, number]) {
@@ -69,16 +83,34 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
 
   const convHeight = 800;
   const convWidth = input.beltWidthMm || 600;
-  const speed = input.beltSpeedMpm || 20;
+  const baseSpeed = input.beltSpeedMpm || 20;
   const totalM = input.totalLengthMm / 1000;
   
   // Calculate belt speed needed for target TPM
   const productSpacing = (input.productSizeMm[0] / 1000) * 1.5; // 1.5x product length spacing
   const requiredSpeed = (input.targetTPM / 60) * productSpacing; // m/s
   const requiredSpeedMpm = requiredSpeed * 60;
-  if (requiredSpeedMpm > speed * 1.2) {
+  let speed = baseSpeed;
+  if (input.optimizeFor === 'throughput') {
+    speed = Math.max(baseSpeed, Math.ceil(requiredSpeedMpm * 1.15));
+  } else if (input.optimizeFor === 'cost') {
+    speed = Math.max(8, Math.min(baseSpeed, Math.ceil(Math.max(requiredSpeedMpm * 1.03, baseSpeed * 0.8))));
+  } else if (input.optimizeFor === 'compact') {
+    speed = Math.max(baseSpeed, Math.ceil(requiredSpeedMpm * 1.05));
+  }
+  if (requiredSpeedMpm > speed * 1.12) {
     warnings.push(`Belt speed ${speed} m/min may be too slow for ${input.targetTPM} TPM. Recommended: ${Math.ceil(requiredSpeedMpm)} m/min.`);
   }
+  if (input.optimizeFor === 'compact' && totalM > 20) {
+    warnings.push('Compact mode selected on a long line. Review maintenance access clearances after generation.');
+  }
+
+  const lengthFactor = input.optimizeFor === 'compact'
+    ? 0.78
+    : input.optimizeFor === 'throughput'
+      ? 1.1
+      : 1.0;
+  const scaledLen = (mm: number, minMm = 1200) => Math.max(minMm, Math.round(mm * lengthFactor));
 
   let cursorX = 0; // current X position in meters
   let cursorZ = 0;
@@ -96,7 +128,7 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
   cursorX += 1.5;
 
   // ── Infeed conveyor ──
-  const infeedLen = Math.min(3000, input.totalLengthMm * 0.2);
+  const infeedLen = scaledLen(Math.min(3000, input.totalLengthMm * 0.2), 1000);
   const infeed = n('belt-conveyor', [cursorX + infeedLen / 2000, 0, cursorZ], {
     length: infeedLen, width: convWidth, height: convHeight, beltSpeed: speed,
   }, 'Infeed Conveyor');
@@ -104,6 +136,21 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
   edges.push(edge(source.id, infeed.id));
   cursorX += infeedLen / 1000 + 0.5;
   let lastNodeId = infeed.id;
+
+  // ── Buffer / accumulation zone (optional) ──
+  if (input.includeBufferZone) {
+    const bufferLen = scaledLen(1800, 1400);
+    const bufferConv = n('belt-conveyor', [cursorX + bufferLen / 2000, 0, cursorZ], {
+      length: bufferLen,
+      width: convWidth,
+      height: convHeight,
+      beltSpeed: Math.max(10, speed * 0.92),
+    }, 'Accumulation Buffer');
+    nodes.push(bufferConv);
+    edges.push(edge(lastNodeId, bufferConv.id));
+    cursorX += bufferLen / 1000 + 0.4;
+    lastNodeId = bufferConv.id;
+  }
 
   // ── Sensor + Stopper section ──
   if (input.includeSensorLogic) {
@@ -133,7 +180,7 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
 
   // ── Inspection section ──
   if (input.includeInspection) {
-    const mainConvLen = Math.min(3000, input.totalLengthMm * 0.25);
+    const mainConvLen = scaledLen(Math.min(3000, input.totalLengthMm * 0.25), 1500);
     const mainConv = n('belt-conveyor', [cursorX + mainConvLen / 2000, 0, cursorZ], {
       length: mainConvLen, width: convWidth, height: convHeight, beltSpeed: speed,
     }, 'Inspection Conveyor');
@@ -151,7 +198,7 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
     lastNodeId = checkweigher.id;
 
     const labelConv = n('belt-conveyor', [cursorX + 1, 0, cursorZ], {
-      length: 2000, width: convWidth, height: convHeight, beltSpeed: speed,
+      length: scaledLen(2000, 1300), width: convWidth, height: convHeight, beltSpeed: speed,
     }, 'Label Conveyor');
     nodes.push(labelConv);
     edges.push(edge(lastNodeId, labelConv.id));
@@ -170,7 +217,7 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
   // ── L-shape or U-shape bend ──
   if (input.lineType === 'l-shape' || input.lineType === 'u-shape') {
     const bendConv = n('belt-conveyor', [cursorX + 1, 0, cursorZ], {
-      length: 2000, width: convWidth, height: convHeight, beltSpeed: speed,
+      length: scaledLen(2000, 1300), width: convWidth, height: convHeight, beltSpeed: speed,
     }, 'Pre-Bend');
     nodes.push(bendConv);
     edges.push(edge(lastNodeId, bendConv.id));
@@ -180,7 +227,7 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
     // Bend 90°
     cursorZ += 2;
     const afterBend = n('belt-conveyor', [cursorX, 0, cursorZ + 1], {
-      length: 2000, width: convWidth, height: convHeight, beltSpeed: speed,
+      length: scaledLen(2000, 1300), width: convWidth, height: convHeight, beltSpeed: speed,
     }, 'After Bend');
     afterBend.rotation = [0, Math.PI / 2, 0];
     nodes.push(afterBend);
@@ -192,7 +239,7 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
       // Second bend back
       cursorX -= 3;
       const afterBend2 = n('belt-conveyor', [cursorX, 0, cursorZ], {
-        length: 2000, width: convWidth, height: convHeight, beltSpeed: speed,
+        length: scaledLen(2000, 1300), width: convWidth, height: convHeight, beltSpeed: speed,
       }, 'Return Conveyor');
       afterBend2.rotation = [0, Math.PI, 0];
       nodes.push(afterBend2);
@@ -203,7 +250,7 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
   }
 
   // ── Outfeed conveyor ──
-  const outfeedLen = Math.min(3000, input.totalLengthMm * 0.15);
+  const outfeedLen = scaledLen(Math.min(3000, input.totalLengthMm * 0.15), 900);
   const rot = input.lineType === 'u-shape' ? [0, Math.PI, 0] as [number, number, number] : [0, 0, 0] as [number, number, number];
   const outfeed = n('belt-conveyor', [cursorX + (input.lineType === 'u-shape' ? -outfeedLen / 2000 : outfeedLen / 2000), 0, cursorZ], {
     length: outfeedLen, width: convWidth, height: convHeight, beltSpeed: speed,
@@ -250,15 +297,46 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
     warnings.push('Complex layout — review connection alignment before simulating.');
   }
 
+  const conveyorNodes = nodes.filter((nd) => String(nd.type).includes('conveyor'));
+  const estConveyorLengthM = conveyorNodes.reduce((sum, nd) => sum + (Number(nd.parameters?.length || 0) / 1000), 0);
+  const extentX = nodes.map((nd) => Number(nd.position?.[0] || 0));
+  const extentZ = nodes.map((nd) => Number(nd.position?.[2] || 0));
+  const widthX = Math.max(3, (Math.max(...extentX, 0) - Math.min(...extentX, 0)) + 3.2);
+  const depthZ = Math.max(2.5, (Math.max(...extentZ, 0) - Math.min(...extentZ, 0)) + 2.2);
+  const footprint = widthX * depthZ;
+  const throughputBySpeed = Math.max(1, Math.floor((speed / Math.max(productSpacing, 0.2))));
+  const estimatedThroughputTpm = Math.min(input.targetTPM, throughputBySpeed);
+  const estimatedCycleTimeSec = Number((60 / Math.max(estimatedThroughputTpm, 1)).toFixed(2));
+  const capexScore =
+    nodes.length
+    + (input.includeRobotPalletizing ? 4 : 0)
+    + (input.includeInspection ? 2 : 0)
+    + (input.includeBufferZone ? 1 : 0);
+  const capexBand: LayoutKpis['capexBand'] = capexScore >= 16 ? 'High' : capexScore >= 10 ? 'Medium' : 'Low';
+
   const description = [
     `Generated ${input.lineType} layout with ${nodes.length} nodes.`,
     `Line length: ${totalM.toFixed(1)}m, Target: ${input.targetTPM} TPM.`,
+    `Optimization: ${input.optimizeFor}.`,
     input.includeSensorLogic ? 'Includes sensor-stopper logic.' : '',
     input.includeInspection ? 'Includes checkweigher + labeler.' : '',
     input.includeRobotPalletizing ? 'Includes robot palletizing cell.' : '',
+    input.includeBufferZone ? 'Includes accumulation buffer zone.' : '',
   ].filter(Boolean).join(' ');
 
-  return { nodes, edges, warnings, description };
+  return {
+    nodes,
+    edges,
+    warnings,
+    description,
+    kpis: {
+      estimatedThroughputTpm,
+      estimatedCycleTimeSec,
+      estimatedFootprintM2: Number(footprint.toFixed(1)),
+      estimatedConveyorLengthM: Number(estConveyorLengthM.toFixed(1)),
+      capexBand,
+    },
+  };
 }
 
 /** Default input for quick demo */
@@ -274,4 +352,6 @@ export const DEFAULT_LAYOUT_INPUT: LayoutInput = {
   includeInspection: true,
   beltWidthMm: 600,
   beltSpeedMpm: 20,
+  optimizeFor: 'balanced',
+  includeBufferZone: true,
 };
