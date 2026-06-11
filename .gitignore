@@ -1,27 +1,27 @@
-# Build output
-frontend/dist/
+doxygen_output
+_site
+packages
+/C#/API/log.txt
+/C#/API/api/*.yml
+/C#/API/api/.manifest
+*.bak
+Python/unit_tests/report.html
 
-# Dependencies
-node_modules/
+**/__pycache__/**
+**/bin/**
+**/obj/**
+*.user
+**/.vs/**
+**/x64/**
+**/x86/**
+**/build/**
+**/install/**
+**/.cache/**
+**/build-**
 
-# Environment files
-.env
-.env.local
-.env.production
-
-# Large binary assets (store in R2, not GitHub)
-# Keep a few small sample GLBs for dev, but exclude large ones
-*.fbx
-*.blend
-*.max
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
+# JetBrains IDE
 .idea/
-
-# Cloudflare Wrangler
-.wrangler/
+cmake-build-*/
+CMakeUserPresets.json
+CMakePresets.json
+.claude/**
