@@ -1,56 +1,145 @@
 # MetaMech Simulation Studio
 
-This repository contains a **work‐in‐progress skeleton** for the MetaMech Simulation Studio web application.  The aim of the project is to build a premium industrial simulation and animation platform, as described in the accompanying design document.
+MetaMech Simulation Studio is a web-based 3D industrial layout and simulation tool.
+It includes a drag-and-drop editor, process modules, snapping/mating, product flow
+simulation, OEM/parametric assets, and scenario loading for demo and validation.
 
-This codebase is divided into two top‑level packages:
+## Repository overview
 
-- **`backend/`** – a Node.js + TypeScript Express server that will provide authentication and project APIs.  The current implementation contains only minimal scaffolding to illustrate structure; endpoints are stubbed and need to be implemented.
-- **`frontend/`** – a React + TypeScript client (using Vite) that will provide the login page, project dashboard and 3D editor.  The current implementation renders a placeholder component and should be extended in future milestones.
+This monorepo currently contains:
 
-## Getting Started
+- `frontend/` - React + TypeScript + Vite app (Three.js via React Three Fiber)
+- `backend/` - Node.js + Express + PostgreSQL API (local/server deployment path)
+- `cloudflare-worker/` - Cloudflare Worker API + D1 migrations (edge deployment path)
+- `scenarios/` - JSON scenario files used by the editor/simulation
+- `scripts/` - helper scripts such as parts generation
 
-Install dependencies for both front‑end and back‑end:
+## Core capabilities (current app)
+
+- 3D simulation editor with process/environment/actor modules
+- Conveyor/product flow simulation and accumulation behavior
+- Node/port mating with visual snap feedback
+- Parametric and static asset support
+- OEM admin workflows and custom model support
+- Scenario import/load from repository paths
+- Simulation overlays and runtime statistics
+
+## Prerequisites
+
+- Node.js 20+ recommended
+- npm 10+ recommended
+- Docker (optional, for local PostgreSQL via `docker-compose.yml`)
+- Cloudflare account + Wrangler (optional, for Worker deployment)
+
+## Quick start (frontend only)
+
+Run the editor UI without local API:
 
 ```bash
-npm install --workspaces
+cd frontend
+npm install
+npm run dev
 ```
 
-To start the development servers:
+Open `http://localhost:5173`.
+
+By default, frontend API calls use:
+
+- `VITE_API_URL` if set
+- otherwise `http://localhost:3000` in dev
+
+## Full local stack (frontend + backend + PostgreSQL)
+
+### 1) Start PostgreSQL
 
 ```bash
-# Start the API server on http://localhost:3000
-npm run --workspace backend dev
-
-# In a separate terminal, start the client on http://localhost:5173
-npm run --workspace frontend dev
+docker compose up -d postgres
 ```
 
-The front‑end proxy is configured to forward API requests to the back‑end.
+### 2) Configure backend environment
 
-## Project Structure
+Create `backend/.env` (minimum example):
 
-```
-metamech-simulation-studio/
-├── backend/              # Express API server
-│   ├── src/
-│   │   ├── app.ts        # Create the Express application
-│   │   └── server.ts     # Entry point that boots the server
-│   └── package.json
-├── frontend/             # React client (Vite)
-│   ├── src/
-│   │   ├── App.tsx       # Root component with placeholder content
-│   │   └── main.tsx      # Vite entry point
-│   ├── index.html        # HTML template used by Vite
-│   └── package.json
-└── docs/
-    └── design.md         # High‑level design overview
+```bash
+NODE_ENV=development
+PORT=3000
+JWT_SECRET=change-this-secret
+
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_NAME=metamech_studio
 ```
 
-## Next Steps
+### 3) Install and run backend
 
-1. Implement authentication endpoints (`/auth/register`, `/auth/login`, etc.) in the back‑end and connect to PostgreSQL.
-2. Build the Projects dashboard page in the front‑end and wire it to the API.
-3. Implement the 3D editor shell and PBR rendering pipeline using Three.js.
-4. Flesh out the process simulation engine and module library according to the specification.
+```bash
+cd backend
+npm install
+npm run migrate
+npm run dev
+```
 
-For a full description of requirements and milestones, see [`docs/design.md`](docs/design.md).
+### 4) Run frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Cloudflare Worker / D1 path
+
+Root `package.json` includes Wrangler scripts:
+
+```bash
+# from repo root
+npm install
+npm run cf:d1:migrate:local
+npm run cf:d1:migrate:remote
+npm run cf:deploy
+```
+
+Worker entrypoint is configured in `wrangler.toml`:
+
+- `main = "cloudflare-worker/src/index.ts"`
+- D1 migrations dir: `cloudflare-worker/migrations`
+
+## Scenario configuration
+
+The frontend scenario loader can be configured with:
+
+- `VITE_SCENARIO_GITHUB_OWNER`
+- `VITE_SCENARIO_GITHUB_REPO`
+- `VITE_SCENARIO_GITHUB_BRANCH`
+- `VITE_SCENARIO_GITHUB_PATH`
+
+Defaults target this repository's `scenarios/` path.
+
+## Useful commands
+
+### Frontend (`frontend/`)
+
+- `npm run dev` - start Vite dev server
+- `npm run build` - production build
+- `npm run preview` - preview built app
+- `npm run lint` - ESLint checks
+
+### Backend (`backend/`)
+
+- `npm run dev` - start API in watch mode
+- `npm run migrate` - run SQL migrations
+- `npm run seed:test-admin` - seed test admin user
+- `npm run build` / `npm run start` - compile and run dist server
+
+### Root (`/`)
+
+- `npm run generate-parts` - generate conveyor parts data
+- `npm run cf:*` - Cloudflare Worker and D1 tasks
+
+## Notes
+
+- Both backend and worker paths exist in this repo; environments may use one or both
+  depending on deployment target.
+- If local auth/API features fail, first verify DB is running and `backend/.env` is set.
