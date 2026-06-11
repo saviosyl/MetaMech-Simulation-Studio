@@ -34,6 +34,8 @@ export interface LayoutInput {
   optimizeFor: 'balanced' | 'throughput' | 'compact' | 'cost';
   /** Include accumulation/buffer zone */
   includeBufferZone: boolean;
+  /** Run auto-route and auto-space post processing */
+  autoRouteAndSpace: boolean;
 }
 
 export interface LayoutKpis {
@@ -70,6 +72,122 @@ function n(type: string, pos: [number, number, number], params: any, name: strin
 
 function edge(from: string, to: string) {
   return { id: uuidv4(), from, to, fromPort: 'output', toPort: 'input' };
+}
+
+function snapToGrid(v: number, grid = 0.1): number {
+  return Math.round(v / grid) * grid;
+}
+
+function normalizedYaw(node: any): number {
+  const y = Number(node?.rotation?.[1] || 0);
+  const twoPi = Math.PI * 2;
+  let out = y % twoPi;
+  if (out < 0) out += twoPi;
+  return out;
+}
+
+function getNodeFootprint(node: any, fallbackBeltWidthMm: number): { len: number; wid: number } {
+  const t = String(node?.type || '');
+  const p = node?.parameters || {};
+  if (t.includes('conveyor')) {
+    const len = Math.max(0.7, Number(p.length || 2000) / 1000);
+    const wid = Math.max(0.35, Number(p.width || fallbackBeltWidthMm || 600) / 1000);
+    return { len, wid };
+  }
+  if (t === 'source' || t === 'sink') return { len: 0.55, wid: 0.55 };
+  if (t === 'sensor' || t === 'stopper') return { len: 0.45, wid: Math.max(0.35, Number(p.width || fallbackBeltWidthMm || 600) / 1000) };
+  if (t === 'checkweigher' || t === 'labeler') return { len: 1.2, wid: 0.9 };
+  if (t === 'robot-6axis') return { len: 2.2, wid: 2.2 };
+  if (t.includes('pallet')) return { len: 1.4, wid: 1.2 };
+  return { len: 0.9, wid: 0.8 };
+}
+
+function getAxisAlignedHalfExtents(node: any, fallbackBeltWidthMm: number): { halfX: number; halfZ: number } {
+  const { len, wid } = getNodeFootprint(node, fallbackBeltWidthMm);
+  const yaw = normalizedYaw(node);
+  const c = Math.abs(Math.cos(yaw));
+  const s = Math.abs(Math.sin(yaw));
+  const worldX = c * len + s * wid;
+  const worldZ = c * wid + s * len;
+  return { halfX: worldX / 2, halfZ: worldZ / 2 };
+}
+
+function isMovableForSpacing(node: any): boolean {
+  const t = String(node?.type || '');
+  if (t === 'source') return false;
+  if (t === 'sensor' || t === 'stopper') return false;
+  return true;
+}
+
+function autoRouteAndSpaceLayout(nodes: any[], edges: any[], input: LayoutInput, warnings: string[]): void {
+  if (!input.autoRouteAndSpace || nodes.length < 2) return;
+
+  const byId = new Map<string, any>(nodes.map((n) => [n.id, n]));
+  let routeAdjustments = 0;
+  let spacingAdjustments = 0;
+
+  // 1) Route tidy pass: reduce diagonal jumps on connected conveyors/machines.
+  for (const e of edges) {
+    const from = byId.get(e.from);
+    const to = byId.get(e.to);
+    if (!from || !to || !isMovableForSpacing(to)) continue;
+    const dx = Number(to.position?.[0] || 0) - Number(from.position?.[0] || 0);
+    const dz = Number(to.position?.[2] || 0) - Number(from.position?.[2] || 0);
+    if (Math.abs(dx) < 0.6 || Math.abs(dz) < 0.6) continue;
+
+    const yaw = normalizedYaw(from);
+    const alongX = Math.abs(Math.cos(yaw)) >= Math.abs(Math.sin(yaw));
+    if (alongX) {
+      to.position[2] = from.position[2];
+      routeAdjustments++;
+    } else {
+      to.position[0] = from.position[0];
+      routeAdjustments++;
+    }
+  }
+
+  // 2) Collision/clearance pass: push overlapping modules apart.
+  const clearance = input.optimizeFor === 'compact' ? 0.2 : 0.35;
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    if (!isMovableForSpacing(node)) continue;
+    node.position[0] = snapToGrid(Number(node.position?.[0] || 0), 0.05);
+    node.position[2] = snapToGrid(Number(node.position?.[2] || 0), 0.05);
+
+    for (let guard = 0; guard < 80; guard++) {
+      let moved = false;
+      for (let j = 0; j < i; j++) {
+        const other = nodes[j];
+        const a = getAxisAlignedHalfExtents(node, input.beltWidthMm);
+        const b = getAxisAlignedHalfExtents(other, input.beltWidthMm);
+        const dx = Number(node.position?.[0] || 0) - Number(other.position?.[0] || 0);
+        const dz = Number(node.position?.[2] || 0) - Number(other.position?.[2] || 0);
+        const overlapX = a.halfX + b.halfX + clearance - Math.abs(dx);
+        const overlapZ = a.halfZ + b.halfZ + clearance - Math.abs(dz);
+        if (overlapX <= 0 || overlapZ <= 0) continue;
+
+        if (overlapX < overlapZ) {
+          const dir = dx >= 0 ? 1 : -1;
+          node.position[0] = Number(node.position?.[0] || 0) + dir * (overlapX + 0.05);
+        } else {
+          const dir = dz >= 0 ? 1 : -1;
+          node.position[2] = Number(node.position?.[2] || 0) + dir * (overlapZ + 0.05);
+        }
+        spacingAdjustments++;
+        moved = true;
+      }
+      if (!moved) break;
+    }
+    node.position[0] = snapToGrid(Number(node.position?.[0] || 0), 0.1);
+    node.position[2] = snapToGrid(Number(node.position?.[2] || 0), 0.1);
+  }
+
+  if (routeAdjustments > 0) {
+    warnings.push(`Auto-route tidy applied (${routeAdjustments} connection alignment adjustments).`);
+  }
+  if (spacingAdjustments > 0) {
+    warnings.push(`Auto-spacing applied (${spacingAdjustments} overlap/clearance adjustments).`);
+  }
 }
 
 /**
@@ -286,6 +404,9 @@ export function generateLayout(input: LayoutInput): LayoutOutput {
   nodes.push(sink);
   edges.push(edge(lastNodeId, sink.id));
 
+  // ── Auto-route + auto-space pass ──
+  autoRouteAndSpaceLayout(nodes, edges, input, warnings);
+
   // ── Validation warnings ──
   if (input.productWeightKg > 50) {
     warnings.push('Heavy products (>50kg) — consider reinforced conveyor frames and slower belt speed.');
@@ -354,4 +475,5 @@ export const DEFAULT_LAYOUT_INPUT: LayoutInput = {
   beltSpeedMpm: 20,
   optimizeFor: 'balanced',
   includeBufferZone: true,
+  autoRouteAndSpace: true,
 };

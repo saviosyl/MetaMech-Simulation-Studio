@@ -27,6 +27,7 @@ const LAYOUT_PRESETS: { id: string; name: string; apply: Partial<LayoutInput> }[
       includeRobotPalletizing: true,
       includeBufferZone: true,
       optimizeFor: 'balanced',
+      autoRouteAndSpace: true,
     },
   },
   {
@@ -42,6 +43,7 @@ const LAYOUT_PRESETS: { id: string; name: string; apply: Partial<LayoutInput> }[
       includeRobotPalletizing: false,
       includeBufferZone: true,
       optimizeFor: 'compact',
+      autoRouteAndSpace: true,
     },
   },
   {
@@ -57,6 +59,7 @@ const LAYOUT_PRESETS: { id: string; name: string; apply: Partial<LayoutInput> }[
       includeRobotPalletizing: true,
       includeBufferZone: true,
       optimizeFor: 'throughput',
+      autoRouteAndSpace: true,
     },
   },
 ];
@@ -276,6 +279,7 @@ const AILayoutBuilder: React.FC<AILayoutBuilderProps> = ({ onClose }) => {
               { key: 'includeInspection', label: 'Inspection (Checkweigher + Labeler)' },
               { key: 'includeRobotPalletizing', label: 'Robot Palletizing Cell' },
               { key: 'includeBufferZone', label: 'Accumulation Buffer Zone' },
+              { key: 'autoRouteAndSpace', label: 'Auto-route + Auto-space pass' },
             ].map(({ key, label }) => (
               <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--mm-text-secondary)' }}>
                 <input type="checkbox" checked={(input as any)[key]} onChange={e => set(key as any, e.target.checked)} />
