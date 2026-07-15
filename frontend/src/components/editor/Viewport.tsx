@@ -193,7 +193,8 @@ const DraggableObject: React.FC<{
               const snap = checkSnap(
                 { ...node, position: currentSnapTarget.position },
                 processNodes.filter(n => n.id !== id),
-                edges
+                edges,
+                { snapThreshold: activeTool === 'snap-move' ? 0.42 : 0.3 }
               );
 
               const nextPosition = snap?.snapPosition ?? currentSnapTarget.position;
@@ -212,7 +213,7 @@ const DraggableObject: React.FC<{
               }
 
               // Create edge - figure out direction
-              const dragPorts = getConnectionPorts(node.type, nextParameters);
+              const dragPorts = getConnectionPorts(node.type, nextParameters, node.assetId);
               // Use the stored snap info to create connection
               if (snap) {
                 const dragPort = dragPorts.find(p => p.id === snap.dragPortId);
@@ -237,7 +238,7 @@ const DraggableObject: React.FC<{
     return () => {
       controls.removeEventListener('dragging-changed', onDraggingChanged);
     };
-  }, [isSelected, id, objectType, processNodes, edges]);
+  }, [isSelected, id, objectType, processNodes, edges, activeTool]);
 
   const handleObjectChange = useCallback(() => {
     if (!groupRef.current) return;
@@ -291,14 +292,47 @@ const DraggableObject: React.FC<{
     if (objectType === 'process') {
       const node = useEditorStore.getState().processNodes.find(n => n.id === id);
       if (node) {
-        const updatedNode = { ...node, position: [pos.x, pos.y, pos.z] as [number, number, number] };
+        const updatedNode = {
+          ...node,
+          position: [px, 0, pz] as [number, number, number],
+          rotation: [rot.x, rot.y, rot.z] as [number, number, number],
+        };
+        const snapSearchDist = activeTool === 'snap-move' ? 0.42 : 0.3;
+        const magnetDist = activeTool === 'snap-move' ? 0.28 : 0.19;
         const snap = checkSnap(
           updatedNode,
           useEditorStore.getState().processNodes.filter(n => n.id !== id),
-          useEditorStore.getState().edges
+          useEditorStore.getState().edges,
+          { snapThreshold: snapSearchDist },
         );
         if (snap) {
-          setSnapTarget({ nodeId: snap.targetNodeId, portId: snap.targetPortId, position: snap.snapPosition });
+          const shouldMagnet = snap.distance <= magnetDist;
+          if (shouldMagnet) {
+            const nextPos = snap.snapPosition;
+            const nextRot = snap.snapRotation || ([rot.x, rot.y, rot.z] as [number, number, number]);
+            if (groupRef.current) {
+              groupRef.current.position.set(...nextPos);
+              groupRef.current.rotation.set(...nextRot);
+            }
+            const updates: Record<string, any> = {
+              position: nextPos,
+              rotation: nextRot,
+              scale: [scl.x, scl.y, scl.z] as [number, number, number],
+            };
+            if (snap.snapParameters) {
+              updates.parameters = { ...node.parameters, ...snap.snapParameters };
+            }
+            updateObject(id, objectType, updates);
+          }
+          setSnapTarget({
+            nodeId: snap.targetNodeId,
+            portId: snap.targetPortId,
+            position: snap.snapPosition,
+            dragPortPosition: snap.dragPortWorld,
+            targetPortPosition: snap.targetPortWorld,
+            distance: snap.distance,
+            status: shouldMagnet ? 'ready' : 'preview',
+          });
         } else {
           setSnapTarget(null);
         }
@@ -611,10 +645,51 @@ const SceneContent: React.FC<{
 
       {/* Snap target highlight */}
       {!overlaysHidden && snapTarget && (
-        <mesh position={snapTarget.position}>
-          <sphereGeometry args={[0.2, 16, 16]} />
-          <meshBasicMaterial color="#06b6d4" transparent opacity={0.6} />
-        </mesh>
+        <group>
+          <mesh position={snapTarget.position}>
+            <sphereGeometry args={[snapTarget.status === 'ready' ? 0.11 : 0.08, 18, 18]} />
+            <meshBasicMaterial
+              color={snapTarget.status === 'ready' ? '#22c55e' : '#06b6d4'}
+              transparent
+              opacity={0.72}
+            />
+          </mesh>
+          <mesh position={snapTarget.position} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.12, 0.18, 32]} />
+            <meshBasicMaterial
+              color={snapTarget.status === 'ready' ? '#22c55e' : '#06b6d4'}
+              transparent
+              opacity={0.52}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          {snapTarget.dragPortPosition && snapTarget.targetPortPosition && (() => {
+            const start = snapTarget.dragPortPosition!;
+            const end = snapTarget.targetPortPosition!;
+            const dx = end[0] - start[0];
+            const dy = end[1] - start[1];
+            const dz = end[2] - start[2];
+            const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (len < 1e-4) return null;
+            const mid: [number, number, number] = [
+              (start[0] + end[0]) / 2,
+              (start[1] + end[1]) / 2,
+              (start[2] + end[2]) / 2,
+            ];
+            const dir = new THREE.Vector3(dx / len, dy / len, dz / len);
+            const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+            return (
+              <mesh position={mid} quaternion={quat}>
+                <cylinderGeometry args={[0.01, 0.01, len, 12]} />
+                <meshBasicMaterial
+                  color={snapTarget.status === 'ready' ? '#22c55e' : '#06b6d4'}
+                  transparent
+                  opacity={0.45}
+                />
+              </mesh>
+            );
+          })()}
+        </group>
       )}
 
       {/* Connection Lines between connected objects (hidden in clean view) */}

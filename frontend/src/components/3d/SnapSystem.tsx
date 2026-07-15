@@ -1,10 +1,11 @@
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useEditorStore, getConnectionPorts, ProcessNode, EnvironmentAsset, ConnectionPort } from '../../store/editorStore';
 import { getPortWorldPosition, alignNodeToPort, solveMateTransform, localDirToWorld } from '../../lib/nodeTransform';
 import { findNearestConveyorSnap, isAccessoryType, isConveyorType, applyAccessorySnap } from '../../lib/accessorySnap';
 
-const SNAP_THRESHOLD = 0.5;
+const SNAP_THRESHOLD = 0.34;
+const SNAP_MOVE_THRESHOLD = 0.44;
 
 /** Types that should auto-match conveyor belt top height */
 const MACHINE_TYPES = new Set([
@@ -109,6 +110,16 @@ function nodeCategory(id: string, processNodesList: ProcessNode[], _environmentA
 const SnapSystem: React.FC = () => {
   const { processNodes, environmentAssets, edges, selectedObjectId, isDragging, mateMode, activeTool, setMateSelectedPort, addEdge, updateObject } = useEditorStore();
   const wasDragging = useRef(false);
+  const [hoveredPortKey, setHoveredPortKey] = useState<string | null>(null);
+  const [invalidPortKey, setInvalidPortKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!mateMode.active) {
+      setHoveredPortKey(null);
+      setInvalidPortKey(null);
+      document.body.style.cursor = 'auto';
+    }
+  }, [mateMode.active]);
 
   // Merged list of all nodes that can have ports (process + environment)
   const allNodes: AnyNode[] = useMemo(
@@ -140,7 +151,7 @@ const SnapSystem: React.FC = () => {
       // Auto-mate: snap to nearest compatible port when close enough
       // Works for both process nodes AND environment assets (wall-to-wall, fence-to-fence, etc.)
       {
-        const SNAP_DIST = activeTool === 'snap-move' ? 0.15 : 0.1;
+        const SNAP_DIST = activeTool === 'snap-move' ? 0.22 : 0.16;
         const myPorts = getConnectionPorts(node.type, node.parameters, (node as any).assetId);
         let bestDist = SNAP_DIST;
         let bestMatch: { myPort: ConnectionPort; targetNode: AnyNode; targetPort: ConnectionPort; targetWorldPos: [number, number, number]; targetWorldDir: [number, number, number] } | null = null;
@@ -233,7 +244,7 @@ const SnapSystem: React.FC = () => {
       }
     }
     wasDragging.current = isDragging;
-  }, [isDragging]);
+  }, [isDragging, selectedObjectId, allNodes, processNodes, environmentAssets, activeTool, edges, updateObject, addEdge]);
 
   // Show ports for all nodes when something is selected, being dragged, or mate mode
   const showPorts = selectedObjectId !== null || isDragging || mateMode.active;
@@ -268,6 +279,23 @@ const SnapSystem: React.FC = () => {
     return visuals;
   }, [processNodes, environmentAssets, edges, showPorts]);
 
+  const matePreview = useMemo(() => {
+    if (!mateMode.active || !mateMode.selectedPort) return null;
+    const selected = mateMode.selectedPort;
+    let best: { pv: typeof portVisuals[number]; distance: number } | null = null;
+    for (const pv of portVisuals) {
+      if (pv.nodeId === selected.nodeId) continue;
+      if (pv.type === selected.type) continue;
+      const dx = pv.position[0] - selected.worldPosition[0];
+      const dy = pv.position[1] - selected.worldPosition[1];
+      const dz = pv.position[2] - selected.worldPosition[2];
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d > 0.5) continue;
+      if (!best || d < best.distance) best = { pv, distance: d };
+    }
+    return best;
+  }, [mateMode.active, mateMode.selectedPort, portVisuals]);
+
   if (!showPorts) return null;
 
   const handlePortClick = (pv: typeof portVisuals[0]) => {
@@ -283,15 +311,13 @@ const SnapSystem: React.FC = () => {
         worldPosition: pv.position,
       });
     } else {
-      // Second click - connect if compatible (output->input or input->output)
-      if (selectedPort.type === pv.type) {
-        // Same type, just re-select
-        setMateSelectedPort({
-          nodeId: pv.nodeId,
-          portId: pv.portId,
-          type: pv.type,
-          worldPosition: pv.position,
-        });
+      // Hard validation: only output<->input across different nodes.
+      if (selectedPort.nodeId === pv.nodeId || selectedPort.type === pv.type) {
+        const key = `${pv.nodeId}-${pv.portId}`;
+        setInvalidPortKey(key);
+        window.setTimeout(() => {
+          setInvalidPortKey((curr) => (curr === key ? null : curr));
+        }, 350);
         return;
       }
       // Full 3D mate: move AND rotate the second object so ports align face-to-face
@@ -382,44 +408,87 @@ const SnapSystem: React.FC = () => {
     <group>
       {portVisuals.map((pv) => {
         const selected = isMateSelected(pv.nodeId, pv.portId);
-        const portSize = mateMode.active ? 0.15 : 0.08;
+        const key = `${pv.nodeId}-${pv.portId}`;
+        const hovered = hoveredPortKey === key;
+        const invalidPulse = invalidPortKey === key;
+        const selectedPort = mateMode.selectedPort;
+        const compatiblePreview = Boolean(
+          mateMode.active
+          && selectedPort
+          && selectedPort.nodeId !== pv.nodeId
+          && selectedPort.type !== pv.type
+        );
+        const incompatiblePreview = Boolean(
+          mateMode.active
+          && selectedPort
+          && selectedPort.nodeId !== pv.nodeId
+          && selectedPort.type === pv.type
+        );
+        const nearMatePreview = Boolean(matePreview && matePreview.pv.nodeId === pv.nodeId && matePreview.pv.portId === pv.portId);
+        const portSize = mateMode.active ? 0.058 : 0.042;
+        const hitSize = mateMode.active ? 0.13 : 0.085;
+        const baseColor = invalidPulse
+          ? '#ef4444'
+          : selected
+            ? '#ffffff'
+            : nearMatePreview
+              ? '#22c55e'
+              : compatiblePreview
+                ? '#14b8a6'
+                : incompatiblePreview
+                  ? '#f97316'
+                  : pv.connected
+                    ? '#6b7280'
+                    : pv.category === 'environment'
+                      ? '#f59e0b'
+                      : pv.type === 'input'
+                        ? '#3b82f6'
+                        : '#10b981';
         return (
           <group key={`${pv.nodeId}-${pv.portId}`} position={pv.position}>
-            {/* Port sphere */}
-            <mesh
-              onClick={(e) => {
-                if (mateMode.active) {
-                  e.stopPropagation();
-                  handlePortClick(pv);
-                }
-              }}
-              onPointerOver={(e) => {
-                if (mateMode.active) {
-                  e.stopPropagation();
-                  document.body.style.cursor = 'pointer';
-                }
-              }}
-              onPointerOut={() => {
-                if (mateMode.active) document.body.style.cursor = 'auto';
-              }}
-            >
-              <sphereGeometry args={[portSize, 12, 8]} />
+            {/* Visible port icon */}
+            <mesh>
+              <sphereGeometry args={[portSize, 14, 10]} />
               <meshStandardMaterial
-                color={selected ? '#ffffff' : pv.connected ? '#6b7280' : pv.category === 'environment' ? '#f59e0b' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
-                emissive={selected ? '#06b6d4' : pv.connected ? '#333333' : pv.category === 'environment' ? '#f59e0b' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
-                emissiveIntensity={selected ? 1.0 : pv.connected ? 0.1 : 0.5}
+                color={baseColor}
+                emissive={baseColor}
+                emissiveIntensity={selected ? 1.0 : nearMatePreview ? 0.9 : hovered ? 0.75 : compatiblePreview ? 0.65 : pv.connected ? 0.15 : 0.45}
                 transparent
-                opacity={pv.connected ? 0.4 : 0.9}
+                opacity={pv.connected ? 0.5 : 0.92}
               />
             </mesh>
+
+            {/* Invisible hit area for easy user-friendly selection */}
+            <mesh
+              onPointerDown={(e) => {
+                if (!mateMode.active) return;
+                e.stopPropagation();
+                handlePortClick(pv);
+              }}
+              onPointerOver={(e) => {
+                if (!mateMode.active) return;
+                e.stopPropagation();
+                setHoveredPortKey(key);
+                document.body.style.cursor = 'pointer';
+              }}
+              onPointerOut={() => {
+                if (!mateMode.active) return;
+                setHoveredPortKey((curr) => (curr === key ? null : curr));
+                document.body.style.cursor = 'auto';
+              }}
+            >
+              <sphereGeometry args={[hitSize, 10, 8]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+
             {/* Outer ring indicator */}
             {!pv.connected && (
               <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[portSize + 0.02, portSize + 0.07, 16]} />
+                <ringGeometry args={[portSize + 0.014, portSize + (selected || nearMatePreview ? 0.06 : 0.045), 24]} />
                 <meshBasicMaterial
-                  color={selected ? '#06b6d4' : pv.category === 'environment' ? '#f59e0b' : pv.type === 'input' ? '#3b82f6' : '#10b981'}
+                  color={invalidPulse ? '#ef4444' : selected ? '#06b6d4' : nearMatePreview ? '#22c55e' : baseColor}
                   transparent
-                  opacity={selected ? 0.8 : 0.4}
+                  opacity={selected ? 0.85 : nearMatePreview ? 0.8 : hovered ? 0.68 : compatiblePreview ? 0.58 : 0.36}
                   side={THREE.DoubleSide}
                 />
               </mesh>
@@ -427,6 +496,30 @@ const SnapSystem: React.FC = () => {
           </group>
         );
       })}
+
+      {/* Visual attach preview: shows likely pair to be mated */}
+      {mateMode.active && mateMode.selectedPort && matePreview && (() => {
+        const start = mateMode.selectedPort.worldPosition;
+        const end = matePreview.pv.position;
+        const dx = end[0] - start[0];
+        const dy = end[1] - start[1];
+        const dz = end[2] - start[2];
+        const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1e-4) return null;
+        const mid: [number, number, number] = [
+          (start[0] + end[0]) / 2,
+          (start[1] + end[1]) / 2,
+          (start[2] + end[2]) / 2,
+        ];
+        const dir = new THREE.Vector3(dx / len, dy / len, dz / len);
+        const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+        return (
+          <mesh position={mid} quaternion={quat}>
+            <cylinderGeometry args={[0.012, 0.012, len, 12]} />
+            <meshBasicMaterial color="#22c55e" transparent opacity={0.52} />
+          </mesh>
+        );
+      })()}
     </group>
   );
 };
@@ -435,7 +528,8 @@ const SnapSystem: React.FC = () => {
 export function checkSnap(
   draggedNode: ProcessNode,
   allNodes: ProcessNode[],
-  edges: { from: string; to: string; fromPort: string; toPort: string }[]
+  edges: { from: string; to: string; fromPort: string; toPort: string }[],
+  options?: { snapThreshold?: number }
 ): {
   targetNodeId: string;
   targetPortId: string;
@@ -443,12 +537,28 @@ export function checkSnap(
   snapPosition: [number, number, number];
   snapRotation?: [number, number, number];
   snapParameters?: Record<string, any>;
+  distance: number;
+  dragPortWorld: [number, number, number];
+  targetPortWorld: [number, number, number];
 } | null {
+  const threshold = options?.snapThreshold ?? SNAP_THRESHOLD;
+  let bestMatch: {
+    targetNodeId: string;
+    targetPortId: string;
+    dragPortId: string;
+    snapPosition: [number, number, number];
+    snapRotation?: [number, number, number];
+    snapParameters?: Record<string, any>;
+    distance: number;
+    dragPortWorld: [number, number, number];
+    targetPortWorld: [number, number, number];
+  } | null = null;
+
   for (const otherNode of allNodes) {
     if (otherNode.id === draggedNode.id) continue;
-    const otherPorts = getConnectionPorts(otherNode.type, otherNode.parameters);
+    const otherPorts = getConnectionPorts(otherNode.type, otherNode.parameters, (otherNode as any).assetId);
 
-    for (const dp of getConnectionPorts(draggedNode.type, draggedNode.parameters)) {
+    for (const dp of getConnectionPorts(draggedNode.type, draggedNode.parameters, (draggedNode as any).assetId)) {
       const dpWorld = getPortWorldPosition(dp.localPosition, draggedNode);
 
       for (const op of otherPorts) {
@@ -480,7 +590,7 @@ export function checkSnap(
           (isHeightAdjustableForSpiralMate(draggedNode.type) || isHeightAdjustableForSpiralMate(otherNode.type));
         const effectiveDist = usePlanarDist ? dist : fullDist;
 
-        if (effectiveDist < SNAP_THRESHOLD) {
+        if (effectiveDist < threshold && (!bestMatch || effectiveDist < bestMatch.distance)) {
           const spiralConnection =
             draggedNode.type === 'spiral-conveyor' || otherNode.type === 'spiral-conveyor';
 
@@ -510,31 +620,38 @@ export function checkSnap(
               adjustedDp.direction,
               draggedNode.scale,
             );
-            return {
+            bestMatch = {
               targetNodeId: otherNode.id,
               targetPortId: op.id,
               dragPortId: dp.id,
               snapPosition: mate.position,
               snapRotation: mate.rotation,
               snapParameters,
+              distance: effectiveDist,
+              dragPortWorld: dpWorld,
+              targetPortWorld: opWorld,
             };
+            continue;
           }
 
           // Non-spiral behavior stays unchanged (position-only snap).
           const snapPos = alignNodeToPort(dp.localPosition, opWorld, draggedNode.rotation, draggedNode.scale);
 
-          return {
+          bestMatch = {
             targetNodeId: otherNode.id,
             targetPortId: op.id,
             dragPortId: dp.id,
             snapPosition: snapPos,
+            distance: effectiveDist,
+            dragPortWorld: dpWorld,
+            targetPortWorld: opWorld,
           };
         }
       }
     }
   }
 
-  return null;
+  return bestMatch;
 }
 
 export default SnapSystem;

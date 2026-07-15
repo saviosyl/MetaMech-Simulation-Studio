@@ -691,7 +691,15 @@ interface EditorState {
   // Snap state
   isDragging: boolean;
   dragNodeId: string | null;
-  snapTarget: { nodeId: string; portId: string; position: [number, number, number] } | null;
+  snapTarget: {
+    nodeId: string;
+    portId: string;
+    position: [number, number, number];
+    dragPortPosition?: [number, number, number];
+    targetPortPosition?: [number, number, number];
+    distance?: number;
+    status?: 'preview' | 'ready';
+  } | null;
   
   // Actions
   addProcessNode: (type: ProcessNode['type'], position: [number, number, number]) => void;
@@ -740,7 +748,15 @@ interface EditorState {
   // Snap actions
   setIsDragging: (dragging: boolean) => void;
   setDragNodeId: (id: string | null) => void;
-  setSnapTarget: (target: { nodeId: string; portId: string; position: [number, number, number] } | null) => void;
+  setSnapTarget: (target: {
+    nodeId: string;
+    portId: string;
+    position: [number, number, number];
+    dragPortPosition?: [number, number, number];
+    targetPortPosition?: [number, number, number];
+    distance?: number;
+    status?: 'preview' | 'ready';
+  } | null) => void;
   
   // Simulation controls
   play: () => void;
@@ -1204,15 +1220,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   // Edge actions
   addEdge: (from, fromPort, to, toPort) => {
-    const edge: ProcessEdge = {
-      id: uuidv4(),
-      from,
-      to,
-      fromPort,
-      toPort,
-      parameters: {},
-    };
-    set(state => ({ edges: [...state.edges, edge] }));
+    set(state => {
+      const duplicate = state.edges.some((e) =>
+        (e.from === from && e.fromPort === fromPort && e.to === to && e.toPort === toPort)
+        || (e.from === to && e.fromPort === toPort && e.to === from && e.toPort === fromPort)
+      );
+      if (duplicate || from === to) return state;
+      const edge: ProcessEdge = {
+        id: uuidv4(),
+        from,
+        to,
+        fromPort,
+        toPort,
+        parameters: {},
+      };
+      return { edges: [...state.edges, edge] };
+    });
   },
   
   removeEdge: (id) => {
