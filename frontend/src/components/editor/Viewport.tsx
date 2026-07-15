@@ -171,6 +171,66 @@ const DraggableObject: React.FC<{
     setSnapTarget,
     addEdge,
   } = useEditorStore();
+  const directDragPointerIdRef = useRef<number | null>(null);
+  const dragOffsetXZRef = useRef<[number, number]>([0, 0]);
+  const dragGroundPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+
+  const finalizeProcessSnapDrop = useCallback((node: (typeof processNodes)[number]): boolean => {
+    const currentSnapTarget = useEditorStore.getState().snapTarget;
+    if (!currentSnapTarget) return false;
+
+    // Re-evaluate snap at drop so final placement uses latest port/param state.
+    const snap = checkSnap(
+      { ...node, position: currentSnapTarget.position },
+      processNodes.filter(n => n.id !== id),
+      edges,
+      { snapThreshold: activeTool === 'snap-move' ? 0.42 : 0.3 }
+    );
+
+    const nextPosition = snap?.snapPosition ?? currentSnapTarget.position;
+    const nextRotation = snap?.snapRotation ?? node.rotation;
+    const nextParameters = snap?.snapParameters
+      ? { ...node.parameters, ...snap.snapParameters }
+      : node.parameters;
+
+    updateObject(id, 'process', {
+      position: nextPosition,
+      rotation: nextRotation,
+      parameters: nextParameters,
+    });
+    if (groupRef.current) {
+      groupRef.current.position.set(...nextPosition);
+      groupRef.current.rotation.set(...nextRotation);
+    }
+
+    if (!snap) return false;
+
+    // Create edge based on drag port direction (output -> input).
+    const dragPorts = getConnectionPorts(node.type, nextParameters, (node as any).assetId);
+    const dragPort = dragPorts.find(p => p.id === snap.dragPortId);
+    if (!dragPort) return false;
+    if (dragPort.type === 'output') {
+      addEdge(id, snap.dragPortId, snap.targetNodeId, snap.targetPortId);
+    } else {
+      addEdge(snap.targetNodeId, snap.targetPortId, id, snap.dragPortId);
+    }
+
+    setSnapTarget({
+      nodeId: snap.targetNodeId,
+      portId: snap.targetPortId,
+      position: snap.snapPosition,
+      dragPortPosition: snap.dragPortWorld,
+      targetPortPosition: snap.targetPortWorld,
+      status: 'success',
+    });
+    setTimeout(() => {
+      const activeSnap = useEditorStore.getState().snapTarget;
+      if (activeSnap?.status === 'success') {
+        useEditorStore.getState().setSnapTarget(null);
+      }
+    }, 850);
+    return true;
+  }, [activeTool, addEdge, edges, id, processNodes, setSnapTarget, updateObject]);
 
   useEffect(() => {
     if (!isSelected || !transformRef.current) return;
@@ -187,63 +247,11 @@ const DraggableObject: React.FC<{
         setDragNodeId(id);
       } else {
         let showSuccessSnap = false;
-        // Stopped dragging - check snap
+        // Stopped dragging - finalize snap/edge if eligible
         if (objectType === 'process') {
           const node = processNodes.find(n => n.id === id);
           if (node) {
-            const currentSnapTarget = useEditorStore.getState().snapTarget;
-            if (currentSnapTarget) {
-              // Re-evaluate snap at drop using the snapped position so we can
-              // apply spiral inline orientation and then create the edge.
-              const snap = checkSnap(
-                { ...node, position: currentSnapTarget.position },
-                processNodes.filter(n => n.id !== id),
-                edges,
-                { snapThreshold: activeTool === 'snap-move' ? 0.42 : 0.3 }
-              );
-
-              const nextPosition = snap?.snapPosition ?? currentSnapTarget.position;
-              const nextRotation = snap?.snapRotation ?? node.rotation;
-              const nextParameters = snap?.snapParameters
-                ? { ...node.parameters, ...snap.snapParameters }
-                : node.parameters;
-              updateObject(id, objectType, {
-                position: nextPosition,
-                rotation: nextRotation,
-                parameters: nextParameters,
-              });
-              if (groupRef.current) {
-                groupRef.current.position.set(...nextPosition);
-                groupRef.current.rotation.set(...nextRotation);
-              }
-
-              // Create edge - figure out direction
-              const dragPorts = getConnectionPorts(node.type, nextParameters, (node as any).assetId);
-              // Use the stored snap info to create connection
-              if (snap) {
-                const dragPort = dragPorts.find(p => p.id === snap.dragPortId);
-                if (dragPort) {
-                  if (dragPort.type === 'output') {
-                    addEdge(id, snap.dragPortId, snap.targetNodeId, snap.targetPortId);
-                  } else {
-                    addEdge(snap.targetNodeId, snap.targetPortId, id, snap.dragPortId);
-                  }
-                  setSnapTarget({
-                    nodeId: snap.targetNodeId,
-                    portId: snap.targetPortId,
-                    position: snap.snapPosition,
-                    status: 'success',
-                  });
-                  showSuccessSnap = true;
-                  setTimeout(() => {
-                    const activeSnap = useEditorStore.getState().snapTarget;
-                    if (activeSnap?.status === 'success') {
-                      useEditorStore.getState().setSnapTarget(null);
-                    }
-                  }, 850);
-                }
-              }
-            }
+            showSuccessSnap = finalizeProcessSnapDrop(node);
           }
         }
         setIsDragging(false);
@@ -256,7 +264,7 @@ const DraggableObject: React.FC<{
     return () => {
       controls.removeEventListener('dragging-changed', onDraggingChanged);
     };
-  }, [isSelected, id, objectType, processNodes, edges, activeTool]);
+  }, [isSelected, id, objectType, processNodes, setIsDragging, setDragNodeId, setSnapTarget, finalizeProcessSnapDrop, orbitRef]);
 
   const handleObjectChange = useCallback(() => {
     if (!groupRef.current) return;
@@ -356,6 +364,67 @@ const DraggableObject: React.FC<{
     }
   }, [id, objectType, updateObject, setSnapTarget, activeTool]);
 
+  const beginDirectSnapDrag = useCallback((e: any) => {
+    if (activeTool !== 'snap-move' || !isSelected || !groupRef.current) return;
+    if (typeof e.button === 'number' && e.button !== 0) return;
+    const groundPoint = new THREE.Vector3();
+    const hitGround = e.ray?.intersectPlane(dragGroundPlaneRef.current, groundPoint);
+    if (!hitGround) return;
+
+    directDragPointerIdRef.current = e.pointerId;
+    dragOffsetXZRef.current = [
+      groupRef.current.position.x - groundPoint.x,
+      groupRef.current.position.z - groundPoint.z,
+    ];
+    if (orbitRef.current) orbitRef.current.enabled = false;
+    setSnapTarget(null);
+    setIsDragging(true);
+    setDragNodeId(id);
+    document.body.style.cursor = 'grabbing';
+    e.stopPropagation();
+    if (e.target?.setPointerCapture) {
+      e.target.setPointerCapture(e.pointerId);
+    }
+  }, [activeTool, id, isSelected, orbitRef, setDragNodeId, setIsDragging, setSnapTarget]);
+
+  const moveDirectSnapDrag = useCallback((e: any) => {
+    if (activeTool !== 'snap-move' || directDragPointerIdRef.current !== e.pointerId || !groupRef.current) return;
+    const groundPoint = new THREE.Vector3();
+    const hitGround = e.ray?.intersectPlane(dragGroundPlaneRef.current, groundPoint);
+    if (!hitGround) return;
+
+    const [offsetX, offsetZ] = dragOffsetXZRef.current;
+    groupRef.current.position.set(groundPoint.x + offsetX, 0, groundPoint.z + offsetZ);
+    handleObjectChange();
+    e.stopPropagation();
+  }, [activeTool, handleObjectChange]);
+
+  const endDirectSnapDrag = useCallback((e: any) => {
+    if (activeTool !== 'snap-move' || directDragPointerIdRef.current !== e.pointerId) return;
+    directDragPointerIdRef.current = null;
+    if (orbitRef.current) orbitRef.current.enabled = true;
+    if (e.target?.releasePointerCapture) {
+      e.target.releasePointerCapture(e.pointerId);
+    }
+    e.stopPropagation();
+
+    let showSuccessSnap = false;
+    if (objectType === 'process') {
+      const node = useEditorStore.getState().processNodes.find(n => n.id === id);
+      if (node) showSuccessSnap = finalizeProcessSnapDrop(node);
+    }
+
+    setIsDragging(false);
+    setDragNodeId(null);
+    if (!showSuccessSnap) setSnapTarget(null);
+    document.body.style.cursor = 'auto';
+  }, [activeTool, finalizeProcessSnapDrop, id, objectType, orbitRef, setDragNodeId, setIsDragging, setSnapTarget]);
+
+  useEffect(() => () => {
+    directDragPointerIdRef.current = null;
+    document.body.style.cursor = 'auto';
+  }, []);
+
   return (
     <>
       <group
@@ -364,10 +433,14 @@ const DraggableObject: React.FC<{
         rotation={rotation}
         scale={scale}
         userData={{ editorObjectId: id, editorObjectType: objectType }}
+        onPointerDownCapture={beginDirectSnapDrag}
+        onPointerMoveCapture={moveDirectSnapDrag}
+        onPointerUpCapture={endDirectSnapDrag}
+        onPointerCancelCapture={endDirectSnapDrag}
       >
         {children}
       </group>
-      {isSelected && (activeTool === 'move' || activeTool === 'rotate' || activeTool === 'scale' || activeTool === 'snap-move') && (
+      {isSelected && (activeTool === 'move' || activeTool === 'rotate' || activeTool === 'scale') && (
         <TransformControls
           ref={transformRef}
           object={groupRef.current || undefined}

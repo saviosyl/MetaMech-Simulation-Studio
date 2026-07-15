@@ -21,7 +21,7 @@ const tools: ToolButton[] = [
   { id: 'rotate', tooltip: 'Rotate objects (E)', icon: <RotateCcw size={16} /> },
   { id: 'scale', tooltip: 'Scale objects (R)', icon: <Maximize2 size={16} /> },
   { id: 'mate', tooltip: 'Create/inspect node connections (M)', icon: <Link2 size={16} /> },
-  { id: 'snap-move', tooltip: 'Drag with auto-snap assist (N)', icon: <Magnet size={16} /> },
+  { id: 'snap-move', tooltip: 'Auto Snap Drag mode (N) — drag the part directly', icon: <Magnet size={16} /> },
   { id: 'measure', tooltip: 'Measure distances in viewport', icon: <Ruler size={16} /> },
 ];
 
