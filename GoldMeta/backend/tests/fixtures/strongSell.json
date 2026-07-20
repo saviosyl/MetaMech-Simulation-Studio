@@ -10,31 +10,31 @@
   "isConfirmedBar": true,
   "indicatorName": "GoldMetaBridge",
   "ohlcv": {
-    "open": 2405,
-    "high": 2408,
-    "low": 2398,
-    "close": 2400,
+    "open": 2395,
+    "high": 2398,
+    "low": 2378,
+    "close": 2382,
     "volume": 1000
   },
   "levels": {
-    "pocAll": 2390,
+    "pocAll": 2395,
     "vahAll": 2410,
-    "valAll": 2380,
-    "pocNonBroken": [{ "price": 2390, "relation": "BELOW" }],
-    "vahNonBroken": [{ "price": 2410, "relation": "ABOVE" }],
-    "valNonBroken": [{ "price": 2380, "relation": "BELOW" }]
+    "valAll": 2390,
+    "pocNonBroken": [{ "price": 2395, "relation": "BELOW" }],
+    "vahNonBroken": [{ "price": 2410, "relation": "BELOW" }],
+    "valNonBroken": [{ "price": 2390, "relation": "INTERACTING" }]
   },
   "sessionVolumeProfile": {
     "session": "NEWYORK",
-    "poc": 2390,
+    "poc": 2395,
     "vah": 2410,
-    "val": 2380,
+    "val": 2390,
     "hvn": [],
     "lvn": [],
     "acceptanceState": "ACCEPTANCE"
   },
   "marketProfile": {
-    "tpoPoc": 2390,
+    "tpoPoc": 2395,
     "initialBalanceHigh": 2409,
     "initialBalanceLow": 2385,
     "singlePrints": [],
@@ -54,10 +54,10 @@
     "confirmed": true,
     "direction": "BEARISH",
     "classification": "BREAKOUT",
-    "open": 2405,
-    "high": 2408,
-    "low": 2398,
-    "close": 2400,
+    "open": 2395,
+    "high": 2398,
+    "low": 2378,
+    "close": 2382,
     "isClosed": true
   },
   "metadata": {

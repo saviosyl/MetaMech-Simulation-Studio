@@ -20,7 +20,7 @@ export const buildWebhooksRouter = (
   router.post(
     "/webhooks/tradingview/:webhookId",
     createRateLimit("tradingview-webhook"),
-    async (req, res) => {
+    (req, res) => {
       try {
         const webhookId = firstParam(req.params.webhookId) ?? "";
         const validated = validateWebhookPayload(webhookId, req.body);
@@ -34,19 +34,27 @@ export const buildWebhooksRouter = (
           return;
         }
 
-        const decision = await processDecisionPipeline(
+        // Acknowledge immediately. Decision + AI run asynchronously so TradingView
+        // is never blocked waiting on OpenAI or the full scoring pipeline.
+        store.enqueueAcceptedEvent(validated.payload, validated.stableEventId);
+
+        void processDecisionPipeline(
           validated.payload,
           validated.stableEventId,
           store,
           aiExplainer
-        );
+        ).catch((error: unknown) => {
+          logger.error("Background webhook processing failed", {
+            eventId: validated.stableEventId,
+            error: error instanceof Error ? error.message : "unknown"
+          });
+        });
 
         res.status(202).json({
           accepted: true,
           duplicate: false,
           eventId: validated.stableEventId,
-          decisionId: decision.decisionId,
-          decision: decision.decision
+          status: "QUEUED"
         });
       } catch (error: unknown) {
         if (error instanceof WebhookValidationError) {

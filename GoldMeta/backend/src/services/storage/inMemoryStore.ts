@@ -34,6 +34,11 @@ export class InMemoryStore {
     return record;
   }
 
+  /** Fast-path persist used by the webhook before background decision processing. */
+  enqueueAcceptedEvent(payload: TradingViewPayload, stableEventId: string): RawEventRecord {
+    return this.saveRawEvent(payload, stableEventId);
+  }
+
   getRawEvent(eventId: string): RawEventRecord | undefined {
     return this.rawEvents.get(eventId);
   }

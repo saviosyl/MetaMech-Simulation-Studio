@@ -10,25 +10,25 @@
   "isConfirmedBar": true,
   "indicatorName": "GoldMetaBridge",
   "ohlcv": {
-    "open": 2395,
-    "high": 2402,
-    "low": 2392,
-    "close": 2400,
+    "open": 2412,
+    "high": 2425,
+    "low": 2408,
+    "close": 2422,
     "volume": 1000
   },
   "levels": {
     "pocAll": 2410,
-    "vahAll": 2420,
-    "valAll": 2390,
+    "vahAll": 2418,
+    "valAll": 2395,
     "pocNonBroken": [{ "price": 2410, "relation": "ABOVE" }],
-    "vahNonBroken": [{ "price": 2420, "relation": "ABOVE" }],
-    "valNonBroken": [{ "price": 2390, "relation": "BELOW" }]
+    "vahNonBroken": [{ "price": 2418, "relation": "INTERACTING" }],
+    "valNonBroken": [{ "price": 2395, "relation": "BELOW" }]
   },
   "sessionVolumeProfile": {
     "session": "LONDON",
     "poc": 2410,
-    "vah": 2420,
-    "val": 2390,
+    "vah": 2418,
+    "val": 2395,
     "hvn": [],
     "lvn": [],
     "acceptanceState": "ACCEPTANCE"
@@ -54,10 +54,10 @@
     "confirmed": true,
     "direction": "BULLISH",
     "classification": "BREAKOUT",
-    "open": 2395,
-    "high": 2402,
-    "low": 2392,
-    "close": 2400,
+    "open": 2412,
+    "high": 2425,
+    "low": 2408,
+    "close": 2422,
     "isClosed": true
   },
   "metadata": {

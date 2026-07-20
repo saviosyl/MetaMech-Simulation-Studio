@@ -13,8 +13,12 @@ export const calculateConfidence = (
   }
 
   confidence += Math.min(30, Math.abs(score.score) * 0.3);
+  confidence += Math.min(15, (score.confirmations ?? 0) * 5);
   confidence -= dataQuality.missingInputs.length * 8;
   confidence -= dataQuality.warnings.length * 6;
+  if (dataQuality.quality === "PARTIAL") {
+    confidence = Math.min(confidence, 70);
+  }
 
   const clamped = Math.max(0, Math.min(100, Math.round(confidence)));
   const confidenceLabel =

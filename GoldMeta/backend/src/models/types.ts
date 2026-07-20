@@ -203,6 +203,7 @@ export interface ScoreResult {
   bearishEvidence: string[];
   reasonCodes: string[];
   marketRegime: "TRENDING_UP" | "TRENDING_DOWN" | "RANGING" | "TRANSITION" | "UNKNOWN";
+  confirmations?: number;
 }
 
 export interface GuardResult {

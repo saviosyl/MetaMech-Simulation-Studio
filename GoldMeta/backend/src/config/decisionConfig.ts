@@ -10,11 +10,18 @@ export const decisionConfig = {
     staleAfterMs: 5 * 60 * 1000
   },
   scoringWeights: {
-    trendDirection: 45,
-    trendStrength: 20,
-    confirmationCandle: 20,
-    valueMigration: 10,
-    acceptance: 5
+    trendDirection: 28,
+    trendComponent: 18,
+    confirmationCandle: 14,
+    rejectionConfirmation: 8,
+    breakoutRetest: 8,
+    pocPosition: 10,
+    valueAreaPosition: 8,
+    levelInteraction: 6,
+    valueMigration: 8,
+    acceptance: 6,
+    multiTimeframeAgreement: 10,
+    conflictingEvidence: 12
   },
   guards: {
     provisionalAllowed: false,
