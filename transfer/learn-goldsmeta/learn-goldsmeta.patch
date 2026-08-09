@@ -1,0 +1,2551 @@
+From 4c4c8012b3704653f13b8f83434d342850e4d0bd Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Sun, 9 Aug 2026 18:01:57 +0000
+Subject: [PATCH] feat(web): Learn GoldMeta education hub with audio guide
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Add /learn with 21 beginner lessons in simple English, read-along
+text, browser TTS play/pause/resume/restart, educational diagrams,
+and More/Account nav entry. Education only — no trading logic changes.
+---
+ web/src/App.tsx                               |  19 +
+ web/src/components/layout/AppShell.tsx        |   3 +
+ web/src/components/learn/LearnDiagrams.tsx    | 229 ++++++
+ .../components/learn/LessonAudioPlayer.tsx    | 175 ++++
+ web/src/lib/learn/lessons.ts                  | 758 ++++++++++++++++++
+ web/src/lib/learn/speechController.ts         | 365 +++++++++
+ web/src/lib/learn/types.ts                    |  45 ++
+ web/src/main.tsx                              |   1 +
+ web/src/pages/HelpPage.tsx                    |   7 +
+ web/src/pages/LearnPage.test.tsx              | 140 ++++
+ web/src/pages/LearnPage.tsx                   | 193 +++++
+ web/src/pages/RouteInventory.test.tsx         |   2 +
+ web/src/pages/UiReviewApp.tsx                 |   3 +
+ web/src/styles/learn.css                      | 430 ++++++++++
+ 14 files changed, 2370 insertions(+)
+ create mode 100644 web/src/components/learn/LearnDiagrams.tsx
+ create mode 100644 web/src/components/learn/LessonAudioPlayer.tsx
+ create mode 100644 web/src/lib/learn/lessons.ts
+ create mode 100644 web/src/lib/learn/speechController.ts
+ create mode 100644 web/src/lib/learn/types.ts
+ create mode 100644 web/src/pages/LearnPage.test.tsx
+ create mode 100644 web/src/pages/LearnPage.tsx
+ create mode 100644 web/src/styles/learn.css
+
+diff --git a/web/src/App.tsx b/web/src/App.tsx
+index 869c34a..5cf4788 100644
+--- a/web/src/App.tsx
++++ b/web/src/App.tsx
+@@ -48,6 +48,9 @@ const SettingsPage = lazy(() =>
+ const HelpPage = lazy(() =>
+   import("./pages/HelpPage").then((m) => ({ default: m.HelpPage }))
+ );
++const LearnPage = lazy(() =>
++  import("./pages/LearnPage").then((m) => ({ default: m.LearnPage }))
++);
+ const InsightsPage = lazy(() =>
+   import("./pages/InsightsPage").then((m) => ({ default: m.InsightsPage }))
+ );
+@@ -327,6 +330,22 @@ function ProtectedApp() {
+               </LazyRoute>
+             }
+           />
++          <Route
++            path="/learn"
++            element={
++              <LazyRoute label="Learn">
++                <LearnPage />
++              </LazyRoute>
++            }
++          />
++          <Route
++            path="/learn/:lessonId"
++            element={
++              <LazyRoute label="Learn">
++                <LearnPage />
++              </LazyRoute>
++            }
++          />
+           <Route
+             path="*"
+             element={
+diff --git a/web/src/components/layout/AppShell.tsx b/web/src/components/layout/AppShell.tsx
+index b705966..990dbbb 100644
+--- a/web/src/components/layout/AppShell.tsx
++++ b/web/src/components/layout/AppShell.tsx
+@@ -9,6 +9,7 @@ import {
+   ChevronRight,
+   Gauge,
+   Globe2,
++  GraduationCap,
+   HelpCircle,
+   History,
+   Home,
+@@ -58,6 +59,7 @@ const DESKTOP_GROUPS: Array<{ heading: string; items: NavItem[] }> = [
+     heading: "Account",
+     items: [
+       { to: "/settings", label: "Settings", icon: Settings },
++      { to: "/learn", label: "Learn", icon: GraduationCap },
+       { to: "/help", label: "Help", icon: HelpCircle },
+       { to: "/alerts", label: "Alerts", icon: Bell }
+     ]
+@@ -114,6 +116,7 @@ const MOBILE_MORE_GROUPS: MoreGroup[] = [
+     items: [
+       { to: "/alerts", label: "Alerts", icon: Bell },
+       { to: "/settings", label: "Settings", icon: Settings },
++      { to: "/learn", label: "Learn", icon: GraduationCap },
+       { to: "/help", label: "Help", icon: HelpCircle }
+     ]
+   },
+diff --git a/web/src/components/learn/LearnDiagrams.tsx b/web/src/components/learn/LearnDiagrams.tsx
+new file mode 100644
+index 0000000..2107617
+--- /dev/null
++++ b/web/src/components/learn/LearnDiagrams.tsx
+@@ -0,0 +1,229 @@
++import type { ReactNode } from "react";
++import type { LessonDiagramId } from "../../lib/learn/types";
++
++/** Small educational SVGs in GoldMeta navy/gold — decorative, info is also in text. */
++export function LearnDiagram({ id }: { id: LessonDiagramId }) {
++  if (!id) return null;
++  switch (id) {
++    case "candle":
++      return <CandleDiagram />;
++    case "support-resistance":
++      return <SupportResistanceDiagram />;
++    case "market-structure":
++      return <MarketStructureDiagram />;
++    case "value-area":
++      return <ValueAreaDiagram />;
++    case "risk-reward":
++      return <RiskRewardDiagram />;
++    case "buy-sell-wait":
++      return <BuySellWaitDiagram />;
++    case "sessions":
++      return <SessionsDiagram />;
++    case "score":
++      return <ScoreDiagram />;
++    default:
++      return null;
++  }
++}
++
++function Frame({
++  title,
++  children
++}: {
++  title: string;
++  children: ReactNode;
++}) {
++  return (
++    <figure className="gm-learn-diagram" data-testid="learn-diagram" aria-label={title}>
++      <figcaption className="gm-learn-diagram-caption">{title}</figcaption>
++      {children}
++    </figure>
++  );
++}
++
++function CandleDiagram() {
++  return (
++    <Frame title="Green candle and red candle">
++      <svg viewBox="0 0 280 140" className="gm-learn-svg" role="img">
++        <text x="70" y="18" className="gm-learn-svg-label">
++          Green
++        </text>
++        <line x1="70" y1="28" x2="70" y2="120" stroke="#20a85b" strokeWidth="2" />
++        <rect x="58" y="45" width="24" height="50" rx="3" fill="#20a85b" />
++        <text x="58" y="138" className="gm-learn-svg-tiny">
++          open→close up
++        </text>
++
++        <text x="200" y="18" className="gm-learn-svg-label">
++          Red
++        </text>
++        <line x1="200" y1="28" x2="200" y2="120" stroke="#e43d3d" strokeWidth="2" />
++        <rect x="188" y="45" width="24" height="50" rx="3" fill="#e43d3d" />
++        <text x="178" y="138" className="gm-learn-svg-tiny">
++          open→close down
++        </text>
++      </svg>
++    </Frame>
++  );
++}
++
++function SupportResistanceDiagram() {
++  return (
++    <Frame title="Support floor and resistance ceiling">
++      <svg viewBox="0 0 280 140" className="gm-learn-svg" role="img">
++        <line x1="24" y1="36" x2="256" y2="36" stroke="#c98700" strokeWidth="3" strokeDasharray="6 4" />
++        <text x="24" y="28" className="gm-learn-svg-label">
++          Resistance (ceiling)
++        </text>
++        <path
++          d="M40 100 C80 40, 120 110, 160 55 S240 90, 250 70"
++          fill="none"
++          stroke="#0a2345"
++          strokeWidth="2.5"
++        />
++        <line x1="24" y1="118" x2="256" y2="118" stroke="#0a2345" strokeWidth="3" strokeDasharray="6 4" />
++        <text x="24" y="136" className="gm-learn-svg-label">
++          Support (floor)
++        </text>
++      </svg>
++    </Frame>
++  );
++}
++
++function MarketStructureDiagram() {
++  return (
++    <Frame title="Up stairs, down stairs, sideways">
++      <svg viewBox="0 0 280 120" className="gm-learn-svg" role="img">
++        <polyline
++          points="10,90 35,70 50,78 75,50 90,58 115,30"
++          fill="none"
++          stroke="#20a85b"
++          strokeWidth="2.5"
++        />
++        <text x="10" y="110" className="gm-learn-svg-tiny">
++          Higher highs
++        </text>
++        <polyline
++          points="140,30 165,50 180,42 205,70 220,62 255,95"
++          fill="none"
++          stroke="#e43d3d"
++          strokeWidth="2.5"
++        />
++        <text x="150" y="110" className="gm-learn-svg-tiny">
++          Lower highs
++        </text>
++      </svg>
++    </Frame>
++  );
++}
++
++function ValueAreaDiagram() {
++  return (
++    <Frame title="Busy value area (VAL · POC · VAH)">
++      <svg viewBox="0 0 280 140" className="gm-learn-svg" role="img">
++        <rect x="80" y="28" width="120" height="84" rx="8" fill="#fff7e6" stroke="#e2a400" strokeWidth="2" />
++        <line x1="80" y1="70" x2="200" y2="70" stroke="#0a2345" strokeWidth="2" />
++        <text x="210" y="34" className="gm-learn-svg-label">
++          VAH
++        </text>
++        <text x="210" y="74" className="gm-learn-svg-label">
++          POC
++        </text>
++        <text x="210" y="112" className="gm-learn-svg-label">
++          VAL
++        </text>
++        <text x="100" y="78" className="gm-learn-svg-tiny">
++          busiest zone
++        </text>
++      </svg>
++    </Frame>
++  );
++}
++
++function RiskRewardDiagram() {
++  return (
++    <Frame title="Risk versus reward">
++      <svg viewBox="0 0 280 140" className="gm-learn-svg" role="img">
++        <line x1="40" y1="70" x2="240" y2="70" stroke="#cfd8e6" strokeWidth="2" />
++        <circle cx="100" cy="70" r="7" fill="#0a2345" />
++        <text x="88" y="58" className="gm-learn-svg-tiny">
++          Entry
++        </text>
++        <circle cx="60" cy="70" r="6" fill="#e43d3d" />
++        <text x="42" y="92" className="gm-learn-svg-tiny">
++          Stop
++        </text>
++        <circle cx="180" cy="70" r="6" fill="#20a85b" />
++        <text x="168" y="58" className="gm-learn-svg-tiny">
++          TP1
++        </text>
++        <circle cx="230" cy="70" r="6" fill="#20a85b" />
++        <text x="218" y="92" className="gm-learn-svg-tiny">
++          TP2
++        </text>
++        <text x="70" y="120" className="gm-learn-svg-label">
++          Risk 1 → aim for 2+
++        </text>
++      </svg>
++    </Frame>
++  );
++}
++
++function BuySellWaitDiagram() {
++  return (
++    <Frame title="BUY · SELL · WAIT">
++      <div className="gm-learn-bsw" role="group" aria-label="BUY SELL WAIT cards">
++        <div className="gm-learn-bsw-card gm-learn-bsw-buy">
++          <strong>BUY</strong>
++          <span>Up conditions</span>
++        </div>
++        <div className="gm-learn-bsw-card gm-learn-bsw-sell">
++          <strong>SELL</strong>
++          <span>Down conditions</span>
++        </div>
++        <div className="gm-learn-bsw-card gm-learn-bsw-wait">
++          <strong>WAIT</strong>
++          <span>Not ready yet</span>
++        </div>
++      </div>
++    </Frame>
++  );
++}
++
++function SessionsDiagram() {
++  return (
++    <Frame title="World sessions">
++      <div className="gm-learn-sessions" role="list">
++        <div className="gm-learn-session" role="listitem">
++          <strong>Asia</strong>
++          <span>Earlier hours</span>
++        </div>
++        <div className="gm-learn-session" role="listitem">
++          <strong>London</strong>
++          <span>Europe active</span>
++        </div>
++        <div className="gm-learn-session" role="listitem">
++          <strong>New York</strong>
++          <span>America active</span>
++        </div>
++      </div>
++    </Frame>
++  );
++}
++
++function ScoreDiagram() {
++  return (
++    <Frame title="Score is quality — not win chance">
++      <div className="gm-learn-score-callout" data-testid="learn-score-warning">
++        <div className="gm-learn-score-ring" aria-hidden>
++          80
++        </div>
++        <p>
++          <strong>80 / 100 does NOT mean 80% chance of profit.</strong>
++          <br />
++          It only describes setup quality.
++        </p>
++      </div>
++    </Frame>
++  );
++}
+diff --git a/web/src/components/learn/LessonAudioPlayer.tsx b/web/src/components/learn/LessonAudioPlayer.tsx
+new file mode 100644
+index 0000000..227ca57
+--- /dev/null
++++ b/web/src/components/learn/LessonAudioPlayer.tsx
+@@ -0,0 +1,175 @@
++import { useEffect, useState } from "react";
++import { Pause, Play, RotateCcw } from "lucide-react";
++import {
++  learnSpeech,
++  type SpeechStatus
++} from "../../lib/learn/speechController";
++
++type Props = {
++  lessonId: string;
++  lessonTitle: string;
++  script: string;
++};
++
++function formatTime(sec: number | null): string {
++  if (sec == null || !Number.isFinite(sec)) return "0:00";
++  const s = Math.max(0, Math.round(sec));
++  const m = Math.floor(s / 60);
++  const r = s % 60;
++  return `${m}:${r.toString().padStart(2, "0")}`;
++}
++
++function estimateDurationSec(text: string): number {
++  const words = text.trim().split(/\s+/).filter(Boolean).length;
++  // Match speechController WPM/rate estimate (~145 wpm at 0.92)
++  return Math.max(8, Math.round((words / 145) * 60 / 0.92));
++}
++
++/** Play / Pause / Resume / Restart with progress for one lesson. */
++export function LessonAudioPlayer({ lessonId, lessonTitle, script }: Props) {
++  const [status, setStatus] = useState<SpeechStatus>(() => learnSpeech.getStatus());
++
++  useEffect(() => {
++    learnSpeech.refreshVoices();
++    return learnSpeech.subscribe(setStatus);
++  }, []);
++
++  useEffect(() => {
++    return () => {
++      learnSpeech.stopIfLesson(lessonId);
++    };
++  }, [lessonId]);
++
++  const isThis =
++    status.lessonId === lessonId && (status.speaking || status.paused);
++  const progress = isThis ? status.progress : 0;
++  const estimated = estimateDurationSec(script);
++  const duration = isThis ? status.durationSec ?? estimated : estimated;
++  const elapsed = isThis ? status.elapsedSec : 0;
++
++  const onPlayPause = () => {
++    if (!status.supported) return;
++    if (isThis && status.speaking && !status.paused) {
++      learnSpeech.pause();
++      return;
++    }
++    if (isThis && status.paused) {
++      learnSpeech.resume();
++      return;
++    }
++    learnSpeech.play(lessonId, script, 0);
++  };
++
++  const onRestart = () => {
++    if (!status.supported) return;
++    if (isThis) {
++      learnSpeech.restart();
++    } else {
++      learnSpeech.play(lessonId, script, 0);
++    }
++  };
++
++  return (
++    <div className="gm-learn-audio" data-testid="learn-audio-player">
++      <div className="gm-learn-audio-top">
++        <span className="gm-label">Audio guide</span>
++        {isThis && status.speaking && !status.paused ? (
++          <span className="gm-learn-audio-live" data-testid="learn-audio-playing">
++            Playing: {lessonTitle}
++          </span>
++        ) : isThis && status.paused ? (
++          <span className="gm-meta" data-testid="learn-audio-paused">
++            Paused
++          </span>
++        ) : (
++          <span className="gm-meta">Listen in simple English</span>
++        )}
++      </div>
++
++      {!status.supported ? (
++        <p className="gm-meta" data-testid="learn-audio-unsupported">
++          Speech is not available in this browser. You can still read the full lesson
++          below — audio and text always match.
++        </p>
++      ) : (
++        <>
++          <div className="gm-learn-audio-controls">
++            <button
++              type="button"
++              className="gm-btn gm-btn-primary gm-learn-audio-btn"
++              onClick={onPlayPause}
++              data-testid="learn-audio-play-pause"
++              aria-label={
++                isThis && status.speaking && !status.paused ? "Pause" : "Play"
++              }
++            >
++              {isThis && status.speaking && !status.paused ? (
++                <>
++                  <Pause size={18} aria-hidden /> Pause
++                </>
++              ) : (
++                <>
++                  <Play size={18} aria-hidden />{" "}
++                  {isThis && status.paused ? "Resume" : "Play"}
++                </>
++              )}
++            </button>
++            <button
++              type="button"
++              className="gm-btn gm-btn-secondary gm-learn-audio-btn"
++              onClick={onRestart}
++              data-testid="learn-audio-restart"
++              aria-label="Restart"
++            >
++              <RotateCcw size={18} aria-hidden /> Restart
++            </button>
++          </div>
++
++          <div className="gm-learn-audio-progress-wrap">
++            <div
++              className="gm-learn-audio-progress"
++              role="progressbar"
++              aria-valuemin={0}
++              aria-valuemax={100}
++              aria-valuenow={Math.round(progress * 100)}
++              data-testid="learn-audio-progress"
++            >
++              <div
++                className="gm-learn-audio-progress-bar"
++                style={{ width: `${Math.round(progress * 100)}%` }}
++              />
++            </div>
++            <div className="gm-learn-audio-times gm-meta">
++              <span data-testid="learn-audio-elapsed">{formatTime(elapsed)}</span>
++              <span data-testid="learn-audio-duration">{formatTime(duration)}</span>
++            </div>
++          </div>
++
++          {status.voices.length > 0 ? (
++            <label className="gm-learn-voice" htmlFor={`learn-voice-${lessonId}`}>
++              <span className="gm-label">English voice</span>
++              <select
++                id={`learn-voice-${lessonId}`}
++                value={status.selectedVoiceURI ?? ""}
++                onChange={(e) => learnSpeech.setVoice(e.target.value)}
++                data-testid="learn-voice-select"
++              >
++                {status.voices.map((v) => (
++                  <option key={v.voiceURI} value={v.voiceURI}>
++                    {v.name} ({v.lang})
++                  </option>
++                ))}
++              </select>
++            </label>
++          ) : null}
++
++          {status.error ? (
++            <p className="gm-learn-audio-error" data-testid="learn-audio-error">
++              {status.error}
++            </p>
++          ) : null}
++        </>
++      )}
++    </div>
++  );
++}
+diff --git a/web/src/lib/learn/lessons.ts b/web/src/lib/learn/lessons.ts
+new file mode 100644
+index 0000000..ca2de6a
+--- /dev/null
++++ b/web/src/lib/learn/lessons.ts
+@@ -0,0 +1,758 @@
++import type { LearnLesson } from "./types";
++
++/**
++ * Learn GoldMeta — 21 beginner lessons.
++ * Language: extremely simple English. Education only. No profit promises.
++ */
++export const LEARN_LESSONS: LearnLesson[] = [
++  {
++    id: "what-is-trading",
++    number: 1,
++    title: "What is Trading?",
++    description: "Buy low, sell high — and why prices can also go the wrong way.",
++    listenMinutes: 2,
++    diagram: null,
++    body: `Imagine you have a toy.
++You buy it for 10 euros.
++Later, someone buys it from you for 12 euros.
++You made 2 euros.
++
++Markets work in a similar way.
++People buy and sell things like gold.
++The price can go up.
++The price can also go down.
++
++If the price moves the way you hoped, you can make money.
++If the price moves the other way, you can lose money.
++
++Trading can make money OR lose money.
++That is normal.
++Nothing is guaranteed.
++
++GoldMeta helps you understand market conditions.
++GoldMeta does not know the future.
++GoldMeta does not promise profit.`,
++    example:
++      "You buy gold near 4,300. Later the price is 4,310. That move helped. But if price falls to 4,290 instead, that move hurt. Both outcomes are possible.",
++    remember: [
++      "Trading means buying and selling with risk.",
++      "Prices can move up or down.",
++      "You can make money or lose money.",
++      "GoldMeta helps analysis. It does not predict the future."
++    ]
++  },
++  {
++    id: "what-is-a-stock",
++    number: 2,
++    title: "What is a Stock?",
++    description: "A tiny ownership piece of a company — and what GoldMeta focuses on.",
++    listenMinutes: 2,
++    diagram: null,
++    body: `A stock is a small ownership piece of a company.
++
++Think of a big pizza.
++The company is the whole pizza.
++A stock is one slice.
++
++Example:
++Apple stock means a tiny piece of Apple.
++
++People trade stocks hoping the price will rise.
++But stock prices can also fall.
++
++Important for GoldMeta:
++GoldMeta is mainly designed for GOLD.
++GOLD is shown as XAUUSD.
++GoldMeta is not mainly built for ordinary company stocks.`,
++    example:
++      "Owning one share of a company is like owning one tiny brick of a huge building. GoldMeta’s main focus is gold priced in US dollars, not company shares.",
++    remember: [
++      "A stock is a small piece of a company.",
++      "Stock prices can rise or fall.",
++      "GoldMeta is mainly for gold (XAUUSD).",
++      "This app is not a stock-picking tool."
++    ]
++  },
++  {
++    id: "what-is-gold-xauusd",
++    number: 3,
++    title: "What is Gold / XAUUSD?",
++    description: "XAU means gold. USD means US dollars.",
++    listenMinutes: 2,
++    diagram: null,
++    body: `XAU means gold.
++USD means the US dollar.
++
++So XAUUSD shows the price of gold in US dollars.
++
++If XAUUSD is 4,340, one unit of gold costs about 4,340 US dollars.
++
++GoldMeta watches this gold price.
++It studies conditions around that price.
++It still cannot know what happens next.`,
++    example:
++      "When you see 4,340 on GoldMeta, that is gold’s price in dollars — like a big price tag for gold.",
++    remember: [
++      "XAU = gold.",
++      "USD = US dollar.",
++      "XAUUSD = gold priced in dollars.",
++      "GoldMeta focuses on this gold market."
++    ]
++  },
++  {
++    id: "buy-sell-wait",
++    number: 4,
++    title: "BUY, SELL and WAIT",
++    description: "Three decisions — and why WAIT is a real answer.",
++    listenMinutes: 3,
++    diagram: "buy-sell-wait",
++    body: `GoldMeta can show three main decisions.
++
++BUY means:
++GoldMeta sees conditions that support upward movement.
++That does not guarantee price will rise.
++
++SELL means:
++GoldMeta sees conditions that support downward movement.
++That does not guarantee price will fall.
++
++WAIT means:
++There is not enough confirmation yet.
++The picture is incomplete.
++
++WAIT is a valid decision.
++WAIT does NOT mean the application is broken.
++Sometimes the smartest action is to wait.
++
++Always remember:
++These are analysis labels.
++They are not promises of profit.`,
++    example:
++      "Gold is at 4,340. The bigger picture looks okay, but the short confirmation is missing. GoldMeta says WAIT. That is helpful — not a bug.",
++    remember: [
++      "BUY = conditions support upward movement.",
++      "SELL = conditions support downward movement.",
++      "WAIT = not enough confirmation yet.",
++      "WAIT is normal and useful.",
++      "No decision guarantees profit."
++    ]
++  },
++  {
++    id: "candlesticks",
++    number: 5,
++    title: "Candlesticks",
++    description: "Tiny pictures that show how price moved.",
++    listenMinutes: 3,
++    diagram: "candle",
++    body: `A candlestick is a tiny picture of price movement.
++
++It shows four numbers:
++Open — where price started.
++Close — where price finished.
++High — the highest price in that time.
++Low — the lowest price in that time.
++
++A green candle usually means the close was above the open.
++Price finished higher than it started.
++
++A red candle usually means the close was below the open.
++Price finished lower than it started.
++
++The thin lines are called wicks.
++Wicks show the high and low extremes.
++
++Candles help you see movement.
++They do not promise the next move.`,
++    example:
++      "In 15 minutes, gold opens at 4,340, goes as high as 4,345, as low as 4,338, and closes at 4,343. That can draw a green candle with a small wick on top and bottom.",
++    remember: [
++      "Candles show open, close, high, and low.",
++      "Green often means finished higher.",
++      "Red often means finished lower.",
++      "Wicks show extremes.",
++      "Candles describe the past, not guaranteed futures."
++    ]
++  },
++  {
++    id: "timeframes",
++    number: 6,
++    title: "Timeframes",
++    description: "5M, 15M, and 1H — zoom levels for the same market.",
++    listenMinutes: 2,
++    diagram: null,
++    body: `A timeframe is how much time each candle covers.
++
++5M means each candle is 5 minutes.
++15M means each candle is 15 minutes.
++1H means each candle is 1 hour.
++
++Analogy:
++5M is looking closely, like standing next to a painting.
++1H is stepping back to see the bigger picture.
++
++GoldMeta often uses more than one timeframe together.
++A short timeframe can be noisy.
++A longer timeframe can show the wider story.`,
++    example:
++      "On 5M, price may wiggle up and down. On 1H, those wiggles may still look like one clear upward path.",
++    remember: [
++      "Timeframes are zoom levels.",
++      "5M = close look.",
++      "15M = medium look.",
++      "1H = bigger picture.",
++      "Different zooms can tell different parts of the story."
++    ]
++  },
++  {
++    id: "support-resistance",
++    number: 7,
++    title: "Support and Resistance",
++    description: "Floor and ceiling ideas — not magic walls.",
++    listenMinutes: 3,
++    diagram: "support-resistance",
++    body: `Support is like a floor.
++
++Imagine dropping a ball.
++The floor can stop the ball from falling.
++
++In trading, support is a price area where buyers may become stronger.
++
++Resistance is like a ceiling.
++Price may struggle to push through it.
++Sellers may become stronger near that area.
++
++Important:
++Support and resistance are not magic walls.
++Price can still break through them.
++
++GoldMeta uses these areas as context.
++They help describe conditions.
++They do not guarantee a bounce or a reversal.`,
++    example:
++      "If gold keeps bouncing near 4,320, that area may act like support. If price later smashes through 4,320, the old floor failed — that can happen.",
++    remember: [
++      "Support ≈ floor.",
++      "Resistance ≈ ceiling.",
++      "They are areas, not guarantees.",
++      "Price can break through.",
++      "GoldMeta uses them as context."
++    ]
++  },
++  {
++    id: "trend-structure",
++    number: 8,
++    title: "Trend and Market Structure",
++    description: "Rising steps, falling steps, or sideways.",
++    listenMinutes: 3,
++    diagram: "market-structure",
++    body: `Market structure is the shape of price movement.
++
++Bullish structure often shows higher highs and higher lows.
++Like climbing stairs upward.
++
++Bearish structure often shows lower highs and lower lows.
++Like walking downstairs.
++
++Sideways or range means price moves left and right in a box.
++Neither side is clearly winning.
++
++Structure helps describe the path price has been taking.
++It does not lock in the next step.`,
++    example:
++      "Gold makes a high at 4,340, a higher high at 4,350, and the pullbacks stay above earlier lows. That looks more like upward stairs.",
++    remember: [
++      "Higher highs and higher lows can mean upward structure.",
++      "Lower highs and lower lows can mean downward structure.",
++      "Sideways means a range.",
++      "Structure describes the path so far.",
++      "Structure is not a promise."
++    ]
++  },
++  {
++    id: "poc-vah-val",
++    number: 9,
++    title: "POC, VAH and VAL",
++    description: "The busy shopping area of price.",
++    listenMinutes: 3,
++    diagram: "value-area",
++    body: `Think of a shopping centre.
++
++POC means Point of Control.
++It is like the busiest shop area — where the most trading activity happened.
++
++VAH means Value Area High.
++It is near the top of the main busy zone.
++
++VAL means Value Area Low.
++It is near the bottom of the main busy zone.
++
++GoldMeta looks at where price sits around these levels.
++Above, inside, or below the busy zone can change the story.
++
++These levels are maps of past activity.
++They are not crystal balls.`,
++    example:
++      "If POC is 4,335 and price is holding above it, GoldMeta may treat that as stronger location context than price stuck far below the busy area.",
++    remember: [
++      "POC ≈ busiest area.",
++      "VAH ≈ top of main value area.",
++      "VAL ≈ bottom of main value area.",
++      "Location around these levels matters.",
++      "They describe past activity, not guaranteed future moves."
++    ]
++  },
++  {
++    id: "volume-atr",
++    number: 10,
++    title: "Volume and ATR / Volatility",
++    description: "Quiet markets versus moving markets.",
++    listenMinutes: 2,
++    diagram: null,
++    body: `Some days the market is quiet.
++Price moves slowly.
++Waves are small.
++
++Some days the market is active.
++Price moves farther and faster.
++
++Volatility means how much price is moving.
++
++ATR helps measure that movement.
++You do not need the math.
++Just remember: ATR is a movement size helper.
++
++High movement can mean bigger chances and bigger risks.
++Quiet markets can mean smaller moves.
++
++GoldMeta uses volatility as context.
++It does not mean easy profit.`,
++    example:
++      "On a quiet day, gold may move a few dollars. On a busy day, it may swing much more. ATR helps describe that difference simply.",
++    remember: [
++      "Quiet market = smaller moves.",
++      "Active market = larger moves.",
++      "ATR helps measure movement size.",
++      "More movement can also mean more risk.",
++      "Volatility is context, not a signal by itself."
++    ]
++  },
++  {
++    id: "goldmeta-score",
++    number: 11,
++    title: "GoldMeta Score",
++    description: "A setup quality score — not a profit probability.",
++    listenMinutes: 3,
++    diagram: "score",
++    body: `GoldMeta Score is a setup quality score.
++
++GoldMeta checks several pieces of evidence.
++When more pieces agree, the score can be stronger.
++When pieces disagree, the score can be weaker.
++
++CRITICAL:
++A score of 80 out of 100 does NOT mean an 80 percent chance of profit.
++
++It does not mean “almost sure.”
++It does not mean “safe trade.”
++
++It only describes how complete and aligned the current setup looks.
++
++Trading can still lose at any score.`,
++    example:
++      "Score 82 may mean many checklist items agree. Score 45 may mean the picture is mixed. Neither number promises money.",
++    remember: [
++      "GoldMeta Score = setup quality.",
++      "More agreement can raise the score.",
++      "80/100 is NOT an 80% chance of profit.",
++      "Any score can still lose.",
++      "Use the score as context, not a guarantee."
++    ]
++  },
++  {
++    id: "entry-stop-targets",
++    number: 12,
++    title: "Entry, Stop Loss and Targets",
++    description: "Where a plan starts, where it protects, and where it aims.",
++    listenMinutes: 3,
++    diagram: "risk-reward",
++    body: `Entry is where the plan begins.
++It is the area GoldMeta is watching for a possible start.
++
++Stop Loss is the protection point.
++Think of it as an emergency exit.
++If price reaches the stop, the plan idea failed for now.
++
++TP means Take Profit.
++TP1, TP2, and TP3 are profit targets.
++They are goals, not promises.
++
++A plan can show:
++Entry,
++Stop Loss,
++TP1,
++TP2,
++TP3.
++
++Price may reach a target.
++Price may hit the stop instead.
++Both can happen.`,
++    example:
++      "BUY plan: entry near 4,340, stop at 4,330, TP1 at 4,350, TP2 at 4,360. You risk about 10 dollars to aim for larger targets. Targets are not guaranteed.",
++    remember: [
++      "Entry = plan start area.",
++      "Stop Loss = emergency exit.",
++      "TP1 / TP2 / TP3 = targets, not promises.",
++      "Price can hit targets or the stop.",
++      "Always know your risk before acting."
++    ]
++  },
++  {
++    id: "risk-reward",
++    number: 13,
++    title: "Risk / Reward",
++    description: "How much you risk compared with how much you aim for.",
++    listenMinutes: 2,
++    diagram: "risk-reward",
++    body: `Risk is what you may lose if the stop is hit.
++Reward is what you hope to gain if a target is reached.
++
++If you risk 1 euro to try for 2 euros, that is about 1 to 2.
++People write this as 1:2.
++
++A nicer ratio does not make a trade safe.
++A weak ratio does not always make a trade bad.
++It is one educational measuring stick.
++
++GoldMeta can show risk and reward numbers to help you compare size.
++It still cannot promise the reward will arrive.`,
++    example:
++      "Stop is 10 dollars away. TP1 is 20 dollars away. That is roughly risking 1 to try for 2. Educational only — outcomes vary.",
++    remember: [
++      "Risk = possible loss to the stop.",
++      "Reward = possible gain to a target.",
++      "1:2 means risk 1 to aim for 2.",
++      "Ratio is a measuring stick, not safety.",
++      "Reward is never guaranteed."
++    ]
++  },
++  {
++    id: "reading-the-plan",
++    number: 14,
++    title: "Reading the GoldMeta Plan",
++    description: "A calm tour of the Plan page.",
++    listenMinutes: 4,
++    diagram: null,
++    body: `The Plan page is your main day-trading screen.
++
++Here is a simple walkthrough.
++
++Decision:
++Shows BUY, SELL, or WAIT.
++
++Score:
++Shows setup quality. Not a profit percent.
++
++Current Price:
++The latest gold price GoldMeta is using.
++
++Market Story:
++A plain explanation of what is happening.
++
++Market Structure:
++Higher highs, lower lows, or range context.
++
++Why Waiting:
++If the decision is WAIT, this explains what is still missing.
++
++Trade Plan:
++Entry, stop, and targets when a complete plan exists.
++
++Next Action:
++What to watch for next.
++
++Phone alerts:
++Can notify you about important plan events.
++
++Read the Plan slowly.
++If something is missing, WAIT can be the correct answer.`,
++    example:
++      "You open Plan. Decision says WAIT. Why Waiting says 5-minute confirmation is missing. That tells you the structure is incomplete — stay patient.",
++    remember: [
++      "Plan is the main day screen.",
++      "Decision, Score, Price, Story, Structure matter.",
++      "Why Waiting explains incomplete setups.",
++      "Trade Plan shows entry, stop, targets when ready.",
++      "WAIT on Plan is information, not a crash."
++    ]
++  },
++  {
++    id: "reading-market-report",
++    number: 15,
++    title: "Reading the Market Report",
++    description: "The approved single-page report, section by section.",
++    listenMinutes: 4,
++    diagram: null,
++    body: `The Market Report is one clear page.
++It summarises the market in a fixed order.
++
++Read it like this:
++
++Market Decision — BUY, SELL, or WAIT.
++GoldMeta Score — setup quality, not profit chance.
++Current Price — where gold is now.
++Price Action 15M — recent 15-minute movement.
++Price Structure — the shape of the path.
++Market Story — the simple narrative.
++Why Wait, Why Buy, or Why Sell — the reason in plain words.
++Plan Readiness / Trade Plan — whether levels are ready.
++Multi-Timeframe — whether bigger and smaller views agree.
++Volatility — quiet or active.
++Session — which world session is active.
++Key Levels — important price areas.
++Scenario Map — possible paths, not promises.
++
++Use the report to understand conditions.
++Do not treat it as a fortune teller.`,
++    example:
++      "Report says WAIT, score mid-range, 15M mixed, and plan readiness incomplete. That combination teaches patience better than forcing a trade.",
++    remember: [
++      "The report follows a fixed simple order.",
++      "Score is quality, not win probability.",
++      "Why Wait / Buy / Sell explains the reason.",
++      "Multi-timeframe and volatility add context.",
++      "Scenario Map shows possibilities, not guarantees."
++    ]
++  },
++  {
++    id: "multi-timeframe",
++    number: 16,
++    title: "Multi-Timeframe Analysis",
++    description: "Check the close view and the far view together.",
++    listenMinutes: 2,
++    diagram: null,
++    body: `Multi-timeframe means looking at more than one zoom level.
++
++Example:
++1H may show the bigger direction.
++15M may show the medium plan.
++5M may show short confirmation.
++
++When they agree, the story can feel clearer.
++When they disagree, WAIT is often wiser.
++
++Agreement still does not guarantee profit.
++Disagreement does not mean the app is wrong.`,
++    example:
++      "1H looks upward, 15M looks upward, but 5M has no confirmation yet. GoldMeta may stay on WAIT until the short piece arrives.",
++    remember: [
++      "Use more than one timeframe.",
++      "Bigger picture plus close picture.",
++      "Agreement can strengthen confidence in the story.",
++      "Disagreement often means WAIT.",
++      "Agreement is still not a guarantee."
++    ]
++  },
++  {
++    id: "market-sessions",
++    number: 17,
++    title: "Market Sessions",
++    description: "Asia, London, and New York — different active hours.",
++    listenMinutes: 2,
++    diagram: "sessions",
++    body: `The gold market is open across the world.
++Different parts of the world become active at different times.
++
++Asia session:
++Often calmer for some periods.
++
++London session:
++Often busier as Europe becomes active.
++
++New York session:
++Often busy as America becomes active.
++
++Overlap periods can be especially active.
++
++Session alone does not predict direction.
++It only tells you when more people may be awake and trading.`,
++    example:
++      "During London–New York overlap, gold may move more. That means more activity — not a promised up or down move.",
++    remember: [
++      "Asia, London, and New York are main sessions.",
++      "Different hours can feel different.",
++      "Overlap can be more active.",
++      "Session ≠ direction signal.",
++      "Session is timing context only."
++    ]
++  },
++  {
++    id: "autotrade-explained",
++    number: 18,
++    title: "AutoTrade Explained",
++    description: "Like learning to drive — practice first, Live later.",
++    listenMinutes: 3,
++    diagram: null,
++    body: `Think of AutoTrade like learning to drive.
++
++First you learn the rules.
++Then you practise.
++Then you take safety checks.
++Only later could Live become possible.
++
++AutoTrade follows predefined GoldMeta rules automatically.
++It is NOT a money button.
++It does not print profit.
++
++Trades can still lose in Demo.
++Trades can still lose if Live is ever enabled later.
++
++Live trading must never start automatically.
++Live stays locked until separate activation.
++
++Always stay in control of risk settings.`,
++    example:
++      "You qualify on Demo with practice money. AutoTrade may place practice trades only after you enable Demo Auto. Live remains locked.",
++    remember: [
++      "AutoTrade is not a money button.",
++      "It follows rules automatically.",
++      "Practice and Demo come first.",
++      "Trades can still lose.",
++      "Live must never auto-start."
++    ]
++  },
++  {
++    id: "qualification-demo",
++    number: 19,
++    title: "Qualification and Demo Trading",
++    description: "Preview, practice trades, observation, safety checks.",
++    listenMinutes: 3,
++    diagram: null,
++    body: `Qualification is the safe learning path.
++
++Step one: Preview.
++You review setups without forcing Live money.
++
++Step two: Controlled Demo trades.
++Demo uses practice money.
++It feels real, but it is not your live cash.
++
++Step three: Observation.
++You watch results and behaviour.
++
++Step four: Safety checks.
++Limits, risk settings, and controls are reviewed.
++
++Demo Max Trades per Day can be set up to 6.
++That limit helps prevent overtrading in practice.
++
++Live remains LOCKED until separate activation.
++Qualification does not unlock Live by itself.`,
++    example:
++      "You complete preview and a few Demo trades under the daily practice limit. You observe outcomes. Live still shows locked — that is correct.",
++    remember: [
++      "Qualification = preview → Demo → observation → checks.",
++      "Demo uses practice money.",
++      "Demo Max Trades/Day can be up to 6.",
++      "Live stays locked.",
++      "Practice is for learning, not guaranteed profit."
++    ]
++  },
++  {
++    id: "phone-alerts",
++    number: 20,
++    title: "Phone Alerts",
++    description: "Get notified about important Plan events.",
++    listenMinutes: 2,
++    diagram: null,
++    body: `GoldMeta can send phone notifications for important Plan events.
++
++Examples:
++A new valid plan appears.
++Price approaches entry.
++Price reaches entry.
++Confirmation arrives.
++A plan is invalidated.
++A target is reached.
++
++Alerts help you pay attention.
++Alerts do not guarantee a trade should be taken.
++Alerts do not guarantee profit.
++
++You still decide how to respond.
++You still manage risk.`,
++    example:
++      "Your phone says “entry approaching.” You open Plan, re-check the story and risk, then decide. The alert was a reminder — not an order.",
++    remember: [
++      "Alerts notify. They do not decide for you.",
++      "Common events include plan, entry, confirmation, invalidation, targets.",
++      "An alert is not a trade guarantee.",
++      "Always re-check Plan and risk.",
++      "You stay in control."
++    ]
++  },
++  {
++    id: "complete-example",
++    number: 21,
++    title: "Complete GoldMeta Example",
++    description: "One full story from WAIT to a BUY plan — both outcomes possible.",
++    listenMinutes: 4,
++    diagram: "buy-sell-wait",
++    body: `Let’s walk through one calm example.
++
++Gold is at 4,340.
++
++1H looks bullish.
++15M looks bullish.
++Price is above POC.
++But 5M confirmation is missing.
++
++GoldMeta says WAIT.
++That is correct.
++The short confirmation piece is not ready yet.
++
++Later, confirmation arrives.
++GoldMeta creates a BUY plan.
++
++Example levels:
++Entry near 4,340.
++Stop Loss near 4,330.
++TP1 near 4,350.
++TP2 near 4,360.
++TP3 near 4,370.
++Risk to reward toward TP1 is about 1 to 1, and farther targets are larger.
++
++Now two outcomes are possible.
++
++Outcome A:
++Price moves toward the targets.
++
++Outcome B:
++Price falls to the Stop Loss.
++
++No outcome is guaranteed.
++A clear plan still involves risk.
++
++GoldMeta helped describe conditions and levels.
++GoldMeta did not know the future.`,
++    example:
++      "WAIT while 5M confirmation is missing → confirmation arrives → BUY plan with entry, stop, and targets → price may hit TP or stop. Both remain possible.",
++    remember: [
++      "Incomplete confirmation → WAIT can be right.",
++      "A BUY plan still needs entry, stop, and targets.",
++      "Targets and stops are both possible endings.",
++      "Nothing is guaranteed.",
++      "Education first. Risk always exists."
++    ]
++  }
++];
++
++export function getLessonById(id: string | undefined | null): LearnLesson | null {
++  if (!id) return null;
++  return LEARN_LESSONS.find((l) => l.id === id) ?? null;
++}
++
++export function getLessonByNumber(n: number): LearnLesson | null {
++  return LEARN_LESSONS.find((l) => l.number === n) ?? null;
++}
++
++export const LEARN_LESSON_COUNT = LEARN_LESSONS.length;
+diff --git a/web/src/lib/learn/speechController.ts b/web/src/lib/learn/speechController.ts
+new file mode 100644
+index 0000000..fe65bd9
+--- /dev/null
++++ b/web/src/lib/learn/speechController.ts
+@@ -0,0 +1,365 @@
++/**
++ * Singleton Web Speech controller for Learn GoldMeta.
++ * - One utterance stream at a time across the app
++ * - Natural English voice preference
++ * - Rate ~0.92, normal pitch
++ */
++
++export type SpeechVoiceOption = {
++  voiceURI: string;
++  name: string;
++  lang: string;
++  localService: boolean;
++};
++
++export type SpeechStatus = {
++  supported: boolean;
++  speaking: boolean;
++  paused: boolean;
++  lessonId: string | null;
++  /** 0–1 progress through the current script */
++  progress: number;
++  /** Estimated duration in seconds for current script */
++  durationSec: number | null;
++  /** Elapsed seconds estimate */
++  elapsedSec: number;
++  voices: SpeechVoiceOption[];
++  selectedVoiceURI: string | null;
++  error: string | null;
++};
++
++type Listener = (status: SpeechStatus) => void;
++
++const STORAGE_VOICE = "gm-learn-voice-uri";
++const DEFAULT_RATE = 0.92;
++const DEFAULT_PITCH = 1;
++
++/** Rough words-per-minute for duration estimates at rate 0.92. */
++const WPM = 145;
++
++function estimateDurationSec(text: string, rate: number): number {
++  const words = text.trim().split(/\s+/).filter(Boolean).length;
++  return Math.max(8, Math.round((words / WPM) * 60 / rate));
++}
++
++function scoreEnglishVoice(v: SpeechSynthesisVoice): number {
++  let score = 0;
++  const lang = (v.lang || "").toLowerCase();
++  const name = (v.name || "").toLowerCase();
++  if (lang.startsWith("en")) score += 50;
++  if (lang === "en-gb" || lang === "en-us" || lang === "en-au" || lang === "en-ie") score += 20;
++  if (v.localService) score += 10;
++  // Prefer natural / premium sounding names when present
++  if (/natural|neural|premium|enhanced|samantha|karen|daniel|moira|serena|google|microsoft/i.test(name)) {
++    score += 25;
++  }
++  if (/compact|eloquence|robot|novelty/i.test(name)) score -= 30;
++  return score;
++}
++
++class LearnSpeechController {
++  private listeners = new Set<Listener>();
++  private chunks: string[] = [];
++  private chunkIndex = 0;
++  private lessonId: string | null = null;
++  private fullText = "";
++  private speaking = false;
++  private paused = false;
++  private progress = 0;
++  private durationSec: number | null = null;
++  private startedAtMs: number | null = null;
++  private pausedAccumMs = 0;
++  private pauseStartedMs: number | null = null;
++  private selectedVoiceURI: string | null = null;
++  private voices: SpeechVoiceOption[] = [];
++  private error: string | null = null;
++  private tickTimer: number | null = null;
++
++  constructor() {
++    if (typeof window !== "undefined") {
++      try {
++        this.selectedVoiceURI = localStorage.getItem(STORAGE_VOICE);
++      } catch {
++        this.selectedVoiceURI = null;
++      }
++      this.refreshVoices();
++      if (typeof window.speechSynthesis !== "undefined") {
++        window.speechSynthesis.onvoiceschanged = () => this.refreshVoices();
++      }
++    }
++  }
++
++  isSupported(): boolean {
++    return typeof window !== "undefined" && typeof window.speechSynthesis !== "undefined";
++  }
++
++  getStatus(): SpeechStatus {
++    return {
++      supported: this.isSupported(),
++      speaking: this.speaking,
++      paused: this.paused,
++      lessonId: this.lessonId,
++      progress: this.progress,
++      durationSec: this.durationSec,
++      elapsedSec: this.elapsedSec(),
++      voices: this.voices,
++      selectedVoiceURI: this.selectedVoiceURI,
++      error: this.error
++    };
++  }
++
++  subscribe(listener: Listener): () => void {
++    this.listeners.add(listener);
++    listener(this.getStatus());
++    return () => this.listeners.delete(listener);
++  }
++
++  private emit() {
++    const status = this.getStatus();
++    for (const l of this.listeners) l(status);
++  }
++
++  refreshVoices(): SpeechVoiceOption[] {
++    if (!this.isSupported()) {
++      this.voices = [];
++      this.emit();
++      return this.voices;
++    }
++    const raw = window.speechSynthesis.getVoices();
++    const english = raw
++      .filter((v) => (v.lang || "").toLowerCase().startsWith("en"))
++      .sort((a, b) => scoreEnglishVoice(b) - scoreEnglishVoice(a));
++    this.voices = english.map((v) => ({
++      voiceURI: v.voiceURI,
++      name: v.name,
++      lang: v.lang,
++      localService: v.localService
++    }));
++    if (
++      this.selectedVoiceURI &&
++      !this.voices.some((v) => v.voiceURI === this.selectedVoiceURI)
++    ) {
++      this.selectedVoiceURI = this.voices[0]?.voiceURI ?? null;
++    }
++    if (!this.selectedVoiceURI && this.voices[0]) {
++      this.selectedVoiceURI = this.voices[0].voiceURI;
++    }
++    this.emit();
++    return this.voices;
++  }
++
++  setVoice(voiceURI: string) {
++    this.selectedVoiceURI = voiceURI;
++    try {
++      localStorage.setItem(STORAGE_VOICE, voiceURI);
++    } catch {
++      /* ignore */
++    }
++    this.emit();
++    if (this.speaking && !this.paused && this.lessonId) {
++      // Restart current chunk with new voice for consistency
++      const id = this.lessonId;
++      const text = this.fullText;
++      const prog = this.progress;
++      this.stopInternal(false);
++      this.play(id, text, prog);
++    }
++  }
++
++  play(lessonId: string, text: string, resumeProgress = 0) {
++    if (!this.isSupported()) {
++      this.error = "Speech is not available on this device or browser.";
++      this.emit();
++      return;
++    }
++    this.error = null;
++    // Stop any other lesson
++    this.stopInternal(false);
++
++    this.lessonId = lessonId;
++    this.fullText = text;
++    this.chunks = splitIntoChunks(text);
++    this.durationSec = estimateDurationSec(text, DEFAULT_RATE);
++    this.progress = Math.min(0.99, Math.max(0, resumeProgress));
++    this.chunkIndex = Math.min(
++      this.chunks.length - 1,
++      Math.floor(this.progress * this.chunks.length)
++    );
++    this.pausedAccumMs = Math.round((this.progress * (this.durationSec ?? 0)) * 1000);
++    this.pauseStartedMs = null;
++    this.startedAtMs = Date.now();
++    this.speaking = true;
++    this.paused = false;
++    this.startTick();
++    this.speakFromChunk();
++    this.emit();
++  }
++
++  pause() {
++    if (!this.isSupported() || !this.speaking || this.paused) return;
++    window.speechSynthesis.pause();
++    this.paused = true;
++    this.pauseStartedMs = Date.now();
++    this.emit();
++  }
++
++  resume() {
++    if (!this.isSupported() || !this.speaking || !this.paused) return;
++    if (this.pauseStartedMs != null) {
++      this.pausedAccumMs += Date.now() - this.pauseStartedMs;
++      this.pauseStartedMs = null;
++    }
++    window.speechSynthesis.resume();
++    // Some browsers (iOS) drop resume — restart from current chunk if not speaking
++    window.setTimeout(() => {
++      if (this.speaking && this.paused === false && !window.speechSynthesis.speaking) {
++        this.speakFromChunk();
++      }
++    }, 120);
++    this.paused = false;
++    this.emit();
++  }
++
++  restart() {
++    if (!this.lessonId || !this.fullText) return;
++    const id = this.lessonId;
++    const text = this.fullText;
++    this.stopInternal(false);
++    this.play(id, text, 0);
++  }
++
++  stop() {
++    this.stopInternal(true);
++  }
++
++  /** Call when leaving a lesson page. */
++  stopIfLesson(lessonId: string) {
++    if (this.lessonId === lessonId) this.stop();
++  }
++
++  private stopInternal(emit: boolean) {
++    if (this.isSupported()) {
++      window.speechSynthesis.cancel();
++    }
++    this.speaking = false;
++    this.paused = false;
++    this.lessonId = null;
++    this.chunks = [];
++    this.chunkIndex = 0;
++    this.fullText = "";
++    this.progress = 0;
++    this.durationSec = null;
++    this.startedAtMs = null;
++    this.pausedAccumMs = 0;
++    this.pauseStartedMs = null;
++    this.stopTick();
++    if (emit) this.emit();
++  }
++
++  private elapsedSec(): number {
++    if (this.startedAtMs == null || this.durationSec == null) return 0;
++    let pausedExtra = this.pausedAccumMs;
++    if (this.paused && this.pauseStartedMs != null) {
++      pausedExtra += Date.now() - this.pauseStartedMs;
++    }
++    const raw = (Date.now() - this.startedAtMs - pausedExtra) / 1000;
++    return Math.max(0, Math.min(this.durationSec, raw));
++  }
++
++  private startTick() {
++    this.stopTick();
++    this.tickTimer = window.setInterval(() => {
++      if (!this.speaking || this.paused) {
++        this.emit();
++        return;
++      }
++      if (this.durationSec && this.durationSec > 0) {
++        this.progress = Math.min(0.99, this.elapsedSec() / this.durationSec);
++      }
++      this.emit();
++    }, 250);
++  }
++
++  private stopTick() {
++    if (this.tickTimer != null) {
++      window.clearInterval(this.tickTimer);
++      this.tickTimer = null;
++    }
++  }
++
++  private resolveVoice(): SpeechSynthesisVoice | null {
++    if (!this.isSupported()) return null;
++    const all = window.speechSynthesis.getVoices();
++    if (this.selectedVoiceURI) {
++      const match = all.find((v) => v.voiceURI === this.selectedVoiceURI);
++      if (match) return match;
++    }
++    const english = all
++      .filter((v) => (v.lang || "").toLowerCase().startsWith("en"))
++      .sort((a, b) => scoreEnglishVoice(b) - scoreEnglishVoice(a));
++    return english[0] ?? all[0] ?? null;
++  }
++
++  private speakFromChunk() {
++    if (!this.isSupported() || !this.speaking) return;
++    if (this.chunkIndex >= this.chunks.length) {
++      this.progress = 1;
++      this.speaking = false;
++      this.paused = false;
++      this.stopTick();
++      this.emit();
++      return;
++    }
++
++    const chunk = this.chunks[this.chunkIndex]!;
++    const u = new SpeechSynthesisUtterance(chunk);
++    u.rate = DEFAULT_RATE;
++    u.pitch = DEFAULT_PITCH;
++    u.volume = 1;
++    const voice = this.resolveVoice();
++    if (voice) {
++      u.voice = voice;
++      u.lang = voice.lang || "en-US";
++    } else {
++      u.lang = "en-US";
++    }
++
++    u.onend = () => {
++      if (!this.speaking || this.paused) return;
++      this.chunkIndex += 1;
++      this.progress = Math.min(1, this.chunkIndex / Math.max(1, this.chunks.length));
++      this.speakFromChunk();
++      this.emit();
++    };
++    u.onerror = (ev) => {
++      // interrupted by cancel/restart is normal
++      if (ev.error === "interrupted" || ev.error === "canceled") return;
++      this.error = "Audio stopped unexpectedly. Tap Play to try again.";
++      this.speaking = false;
++      this.paused = false;
++      this.stopTick();
++      this.emit();
++    };
++
++    window.speechSynthesis.speak(u);
++  }
++}
++
++function splitIntoChunks(text: string): string[] {
++  const parts = text
++    .split(/\n+/)
++    .map((p) => p.trim())
++    .filter(Boolean);
++  const chunks: string[] = [];
++  for (const part of parts) {
++    // Split long paragraphs on sentence boundaries for smoother iOS playback
++    const sentences = part.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [part];
++    for (const s of sentences) {
++      const t = s.trim();
++      if (t) chunks.push(t);
++    }
++  }
++  return chunks.length ? chunks : [text];
++}
++
++export const learnSpeech = new LearnSpeechController();
+diff --git a/web/src/lib/learn/types.ts b/web/src/lib/learn/types.ts
+new file mode 100644
+index 0000000..3d5c770
+--- /dev/null
++++ b/web/src/lib/learn/types.ts
+@@ -0,0 +1,45 @@
++/** Learn GoldMeta — education-only types (no trading logic). */
++
++export type LessonDiagramId =
++  | "candle"
++  | "support-resistance"
++  | "market-structure"
++  | "value-area"
++  | "risk-reward"
++  | "buy-sell-wait"
++  | "sessions"
++  | "score"
++  | null;
++
++export type LearnLesson = {
++  id: string;
++  number: number;
++  title: string;
++  description: string;
++  /** Estimated listening time in minutes (spoken text). */
++  listenMinutes: number;
++  /** Full lesson text — identical for read-along and audio. */
++  body: string;
++  /** One easy example, also spoken. */
++  example: string;
++  /** 3–5 key takeaways. */
++  remember: string[];
++  diagram: LessonDiagramId;
++  /**
++   * Optional future pre-generated audio path (MP3/M4A).
++   * Unused in v1 — browser speech synthesis is the player.
++   */
++  audioSrc?: string | null;
++};
++
++/** Concatenate the exact spoken / read-along script for a lesson. */
++export function lessonScript(lesson: LearnLesson): string {
++  const rememberBlock = lesson.remember.map((r, i) => `${i + 1}. ${r}`).join("\n");
++  return [
++    lesson.title,
++    lesson.body,
++    `Easy example. ${lesson.example}`,
++    `Key things to remember.`,
++    rememberBlock
++  ].join("\n\n");
++}
+diff --git a/web/src/main.tsx b/web/src/main.tsx
+index 1a18e77..6f9f222 100644
+--- a/web/src/main.tsx
++++ b/web/src/main.tsx
+@@ -11,6 +11,7 @@ import "./styles/redesign.css";
+ import "./styles/premium-dashboard.css";
+ import "./styles/gm-v2.css";
+ import "./styles/premium-broker-autotrade.css";
++import "./styles/learn.css";
+ 
+ export { GOLD_META_BUILD_STAMP, GOLD_META_COMMIT_SHA };
+ 
+diff --git a/web/src/pages/HelpPage.tsx b/web/src/pages/HelpPage.tsx
+index 5139a33..506db1b 100644
+--- a/web/src/pages/HelpPage.tsx
++++ b/web/src/pages/HelpPage.tsx
+@@ -146,6 +146,13 @@ export function HelpPage() {
+       </label>
+ 
+       <SectionCard title="Quick start">
++        <p className="gm-meta" style={{ marginTop: 0 }}>
++          New to trading? Start with{" "}
++          <Link to="/learn" data-testid="help-to-learn">
++            Learn GoldMeta
++          </Link>{" "}
++          — simple lessons with audio.
++        </p>
+         <ol className="gm-help-steps" data-testid="first-use-guide">
+           <li>
+             Open <Link to="/">Plan</Link> and read the decision.
+diff --git a/web/src/pages/LearnPage.test.tsx b/web/src/pages/LearnPage.test.tsx
+new file mode 100644
+index 0000000..0f8791c
+--- /dev/null
++++ b/web/src/pages/LearnPage.test.tsx
+@@ -0,0 +1,140 @@
++import { describe, expect, it, vi, beforeEach } from "vitest";
++import { render, screen, within } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { MemoryRouter, Route, Routes } from "react-router-dom";
++import { LearnPage } from "./LearnPage";
++import { LEARN_LESSONS } from "../lib/learn/lessons";
++import { lessonScript } from "../lib/learn/types";
++
++function renderLearn(path = "/learn") {
++  return render(
++    <MemoryRouter initialEntries={[path]}>
++      <Routes>
++        <Route path="/learn" element={<LearnPage />} />
++        <Route path="/learn/:lessonId" element={<LearnPage />} />
++      </Routes>
++    </MemoryRouter>
++  );
++}
++
++describe("Learn GoldMeta", () => {
++  beforeEach(() => {
++    vi.restoreAllMocks();
++  });
++
++  it("renders home with 21 lesson cards and education disclaimer", () => {
++    renderLearn("/learn");
++    expect(screen.getByTestId("learn-page")).toBeInTheDocument();
++    expect(screen.getByText("Learn GoldMeta")).toBeInTheDocument();
++    expect(screen.getByText(/Trading explained in simple English/i)).toBeInTheDocument();
++    expect(screen.getByTestId("learn-lesson-grid").querySelectorAll("a")).toHaveLength(21);
++    expect(screen.getByText(/does not know the future/i)).toBeInTheDocument();
++    expect(screen.getByText(/Trading can lose money/i)).toBeInTheDocument();
++  });
++
++  it("opens GoldMeta Score lesson with critical score warning", async () => {
++    const user = userEvent.setup();
++    renderLearn("/learn");
++    await user.click(screen.getByTestId("learn-card-goldmeta-score"));
++    expect(screen.getByTestId("learn-lesson-page")).toHaveAttribute(
++      "data-lesson",
++      "goldmeta-score"
++    );
++    expect(screen.getByTestId("learn-score-warning")).toHaveTextContent(
++      /does NOT mean 80% chance of profit/i
++    );
++    expect(screen.getByTestId("learn-readalong")).toHaveTextContent(
++      /does NOT mean an 80 percent chance of profit/i
++    );
++  });
++
++  it("shows Market Report lesson sections in order language", () => {
++    renderLearn("/learn/reading-market-report");
++    expect(screen.getByTestId("learn-readalong")).toHaveTextContent(/Market Decision/i);
++    expect(screen.getByTestId("learn-readalong")).toHaveTextContent(/Scenario Map/i);
++  });
++
++  it("shows AutoTrade lesson safety language", () => {
++    renderLearn("/learn/autotrade-explained");
++    expect(screen.getByTestId("learn-readalong")).toHaveTextContent(/NOT a money button/i);
++    expect(screen.getByTestId("learn-readalong")).toHaveTextContent(
++      /must never start automatically/i
++    );
++  });
++
++  it("keeps audio script identical to read-along content", () => {
++    for (const lesson of LEARN_LESSONS) {
++      const script = lessonScript(lesson);
++      expect(script).toContain(lesson.title);
++      expect(script).toContain(lesson.example);
++      for (const tip of lesson.remember) {
++        expect(script).toContain(tip);
++      }
++      expect(script).not.toMatch(/GoldMeta knows where price will go/i);
++      expect(script).not.toMatch(/will make you rich/i);
++      expect(script).not.toMatch(/easy money|get rich|guaranteed returns/i);
++    }
++  });
++
++  it("exposes play pause restart controls when speech is available", async () => {
++    const speak = vi.fn((u: SpeechSynthesisUtterance) => {
++      window.setTimeout(() => u.onend?.(new Event("end") as SpeechSynthesisEvent), 0);
++    });
++    const cancel = vi.fn();
++    const pause = vi.fn();
++    const resume = vi.fn();
++
++    class MockUtterance {
++      text: string;
++      rate = 1;
++      pitch = 1;
++      volume = 1;
++      lang = "en-US";
++      voice: SpeechSynthesisVoice | null = null;
++      onend: ((ev: SpeechSynthesisEvent) => void) | null = null;
++      onerror: ((ev: SpeechSynthesisErrorEvent) => void) | null = null;
++      constructor(text: string) {
++        this.text = text;
++      }
++    }
++    vi.stubGlobal("SpeechSynthesisUtterance", MockUtterance);
++
++    Object.defineProperty(window, "speechSynthesis", {
++      configurable: true,
++      value: {
++        speak,
++        cancel,
++        pause,
++        resume,
++        speaking: false,
++        paused: false,
++        getVoices: () => [
++          {
++            voiceURI: "test-en",
++            name: "Test English",
++            lang: "en-US",
++            localService: true,
++            default: true
++          }
++        ],
++        onvoiceschanged: null
++      }
++    });
++
++    // Re-import controller path uses window at call time — play through UI.
++    const user = userEvent.setup();
++    renderLearn("/learn/what-is-trading");
++    const player = screen.getByTestId("learn-audio-player");
++    expect(within(player).getByTestId("learn-audio-play-pause")).toBeInTheDocument();
++    expect(within(player).getByTestId("learn-audio-restart")).toBeInTheDocument();
++    await user.click(within(player).getByTestId("learn-audio-play-pause"));
++    expect(speak).toHaveBeenCalled();
++  });
++
++  it("qualification lesson states Demo max trades and Live locked", () => {
++    renderLearn("/learn/qualification-demo");
++    const body = screen.getByTestId("learn-readalong");
++    expect(body).toHaveTextContent(/Demo Max Trades per Day can be set up to 6/i);
++    expect(body).toHaveTextContent(/Live remains LOCKED/i);
++  });
++});
+diff --git a/web/src/pages/LearnPage.tsx b/web/src/pages/LearnPage.tsx
+new file mode 100644
+index 0000000..a3b07ec
+--- /dev/null
++++ b/web/src/pages/LearnPage.tsx
+@@ -0,0 +1,193 @@
++import { Link, useLocation, useParams } from "react-router-dom";
++import { ChevronLeft, ChevronRight, GraduationCap } from "lucide-react";
++import { PageHeader, SectionCard } from "../components/ui/primitives";
++import { LearnDiagram } from "../components/learn/LearnDiagrams";
++import { LessonAudioPlayer } from "../components/learn/LessonAudioPlayer";
++import { LEARN_LESSONS, getLessonById } from "../lib/learn/lessons";
++import { lessonScript } from "../lib/learn/types";
++
++/** Support production `/learn` and UI-review `/ui-review/learn`. */
++function useLearnBase(): string {
++  const { pathname } = useLocation();
++  return pathname.startsWith("/ui-review") ? "/ui-review" : "";
++}
++
++/** Learn GoldMeta — beginner education with read-along audio. */
++export function LearnPage() {
++  const { lessonId } = useParams<{ lessonId?: string }>();
++  if (lessonId) {
++    return <LessonDetail lessonId={lessonId} />;
++  }
++  return <LearnHome />;
++}
++
++function LearnHome() {
++  const base = useLearnBase();
++  return (
++    <div className="gm-learn-page" data-testid="learn-page">
++      <div className="gm-page-hero-navy gm-learn-hero">
++        <div className="gm-learn-hero-icon" aria-hidden>
++          <GraduationCap size={28} strokeWidth={2} />
++        </div>
++        <PageHeader
++          title="Learn GoldMeta"
++          freshness="Trading explained in simple English."
++        />
++        <p className="gm-learn-hero-note">
++          Education only. GoldMeta helps you understand market conditions. It does not know
++          the future. Trading can lose money.
++        </p>
++      </div>
++
++      <SectionCard title="How to use Learn">
++        <ol className="gm-help-steps" data-testid="learn-how-to">
++          <li>Pick a lesson card below.</li>
++          <li>Tap Play to hear the guide, or read along.</li>
++          <li>Audio and text always say the same thing.</li>
++          <li>
++            For day-to-day “how do I use this screen?”, also see{" "}
++            <Link to={`${base}/help`}>Help</Link>.
++          </li>
++        </ol>
++      </SectionCard>
++
++      <div className="gm-learn-grid" data-testid="learn-lesson-grid">
++        {LEARN_LESSONS.map((lesson) => (
++          <Link
++            key={lesson.id}
++            to={`${base}/learn/${lesson.id}`}
++            className="gm-learn-card"
++            data-testid={`learn-card-${lesson.id}`}
++          >
++            <span className="gm-learn-card-num">
++              {String(lesson.number).padStart(2, "0")}
++            </span>
++            <span className="gm-learn-card-body">
++              <strong className="gm-learn-card-title">{lesson.title}</strong>
++              <span className="gm-meta">{lesson.description}</span>
++              <span className="gm-learn-card-meta">
++                About {lesson.listenMinutes} min listen
++              </span>
++            </span>
++            <ChevronRight className="gm-learn-card-chevron" size={18} aria-hidden />
++          </Link>
++        ))}
++      </div>
++    </div>
++  );
++}
++
++function LessonDetail({ lessonId }: { lessonId: string }) {
++  const base = useLearnBase();
++  const lesson = getLessonById(lessonId);
++  if (!lesson) {
++    return (
++      <div className="gm-learn-page" data-testid="learn-lesson-missing">
++        <PageHeader title="Lesson not found" freshness="Pick another lesson." />
++        <Link to={`${base}/learn`} className="gm-btn gm-btn-secondary">
++          Back to Learn
++        </Link>
++      </div>
++    );
++  }
++
++  const script = lessonScript(lesson);
++  const prev = LEARN_LESSONS.find((l) => l.number === lesson.number - 1) ?? null;
++  const next = LEARN_LESSONS.find((l) => l.number === lesson.number + 1) ?? null;
++  const paragraphs = lesson.body.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
++
++  return (
++    <div
++      className="gm-learn-page gm-learn-lesson"
++      data-testid="learn-lesson-page"
++      data-lesson={lesson.id}
++    >
++      <Link to={`${base}/learn`} className="gm-learn-back" data-testid="learn-back">
++        <ChevronLeft size={16} aria-hidden /> All lessons
++      </Link>
++
++      <header className="gm-learn-lesson-header">
++        <span className="gm-learn-card-num">
++          {String(lesson.number).padStart(2, "0")}
++        </span>
++        <PageHeader
++          title={lesson.title}
++          freshness={`${lesson.description} · About ${lesson.listenMinutes} min`}
++        />
++      </header>
++
++      <LessonAudioPlayer
++        lessonId={lesson.id}
++        lessonTitle={lesson.title}
++        script={script}
++      />
++
++      <LearnDiagram id={lesson.diagram} />
++
++      <SectionCard title="Read along">
++        <div className="gm-learn-readalong" data-testid="learn-readalong">
++          {paragraphs.map((p, i) => (
++            <p key={i} className="gm-learn-para">
++              {p.split("\n").map((line, j) => (
++                <span key={j}>
++                  {j > 0 ? <br /> : null}
++                  {line}
++                </span>
++              ))}
++            </p>
++          ))}
++
++          <div className="gm-learn-example" data-testid="learn-example">
++            <h3 className="gm-learn-example-title">Easy example</h3>
++            <p>{lesson.example}</p>
++          </div>
++
++          <div className="gm-learn-remember" data-testid="learn-remember">
++            <h3 className="gm-learn-example-title">Key things to remember</h3>
++            <ul>
++              {lesson.remember.map((r) => (
++                <li key={r}>{r}</li>
++              ))}
++            </ul>
++          </div>
++        </div>
++      </SectionCard>
++
++      <p className="gm-meta gm-learn-disclaimer" data-testid="learn-disclaimer">
++        Education only. GoldMeta helps understand market conditions. It does not know the
++        future. Trading can lose money.
++      </p>
++
++      <nav className="gm-learn-pager" aria-label="Lesson navigation">
++        {prev ? (
++          <Link
++            to={`${base}/learn/${prev.id}`}
++            className="gm-btn gm-btn-secondary"
++            data-testid="learn-prev"
++          >
++            <ChevronLeft size={16} aria-hidden /> {prev.title}
++          </Link>
++        ) : (
++          <span />
++        )}
++        {next ? (
++          <Link
++            to={`${base}/learn/${next.id}`}
++            className="gm-btn gm-btn-primary"
++            data-testid="learn-next"
++          >
++            {next.title} <ChevronRight size={16} aria-hidden />
++          </Link>
++        ) : (
++          <Link
++            to={`${base}/learn`}
++            className="gm-btn gm-btn-primary"
++            data-testid="learn-finish"
++          >
++            Back to all lessons
++          </Link>
++        )}
++      </nav>
++    </div>
++  );
++}
+diff --git a/web/src/pages/RouteInventory.test.tsx b/web/src/pages/RouteInventory.test.tsx
+index 482301c..a1bafb1 100644
+--- a/web/src/pages/RouteInventory.test.tsx
++++ b/web/src/pages/RouteInventory.test.tsx
+@@ -43,6 +43,8 @@ const REQUIRED_PATHS = [
+   "/admin/tradingview-template",
+   "/settings",
+   "/help",
++  "/learn",
++  "/learn/:lessonId",
+   "/insights",
+   "/insights/:tab",
+   "/history-replay",
+diff --git a/web/src/pages/UiReviewApp.tsx b/web/src/pages/UiReviewApp.tsx
+index 87420a3..6df34d4 100644
+--- a/web/src/pages/UiReviewApp.tsx
++++ b/web/src/pages/UiReviewApp.tsx
+@@ -17,6 +17,7 @@ import { SignalPerformancePage } from "./SignalPerformancePage";
+ import { AutoTradePage } from "./AutoTradePage";
+ import { BrokerControlCentrePage } from "./broker/BrokerControlCentrePage";
+ import { HelpPage } from "./HelpPage";
++import { LearnPage } from "./LearnPage";
+ import { AdminUsersPage } from "./admin/AdminUsersPage";
+ import { TradingViewSetupPage } from "./TradingViewSetupPage";
+ import { TradingViewTemplateAdminPage } from "./admin/TradingViewTemplateAdminPage";
+@@ -1570,6 +1571,8 @@ export default function UiReviewApp() {
+             <Route path="brokers" element={<BrokerControlCentrePage />} />
+             <Route path="tradingview" element={<TradingViewSetupPage />} />
+             <Route path="help" element={<HelpPage />} />
++            <Route path="learn" element={<LearnPage />} />
++            <Route path="learn/:lessonId" element={<LearnPage />} />
+             <Route path="admin/users" element={<AdminUsersPage />} />
+             <Route path="admin/tradingview-template" element={<TradingViewTemplateAdminPage />} />
+             <Route path="brand" element={<BrandConceptsPage />} />
+diff --git a/web/src/styles/learn.css b/web/src/styles/learn.css
+new file mode 100644
+index 0000000..090d88f
+--- /dev/null
++++ b/web/src/styles/learn.css
+@@ -0,0 +1,430 @@
++/* Learn GoldMeta — education UI matching premium navy/gold system */
++
++.gm-learn-page {
++  display: flex;
++  flex-direction: column;
++  gap: 1rem;
++  max-width: 720px;
++  width: 100%;
++  min-width: 0;
++}
++
++.gm-learn-hero {
++  border-radius: var(--radius-lg, 16px);
++  padding: 1.25rem 1.25rem 1rem;
++  margin-bottom: 0.25rem;
++  flex-direction: column;
++  align-items: flex-start;
++  justify-content: flex-start;
++}
++
++.gm-learn-hero .gm-page-header {
++  margin-bottom: 0.5rem;
++  width: 100%;
++}
++
++.gm-learn-hero .gm-page-title {
++  color: #fff;
++}
++
++.gm-learn-hero .gm-meta {
++  color: rgba(255, 255, 255, 0.78);
++}
++
++.gm-learn-hero-icon {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  width: 44px;
++  height: 44px;
++  border-radius: 12px;
++  background: rgba(226, 164, 0, 0.18);
++  color: var(--gold-500);
++  margin-bottom: 0.75rem;
++}
++
++.gm-learn-hero-note {
++  margin: 0;
++  color: rgba(255, 255, 255, 0.85);
++  font-size: 0.95rem;
++  line-height: 1.45;
++  max-width: 40rem;
++}
++
++.gm-learn-grid {
++  display: flex;
++  flex-direction: column;
++  gap: 0.65rem;
++}
++
++.gm-learn-card {
++  display: grid;
++  grid-template-columns: auto 1fr auto;
++  gap: 0.75rem;
++  align-items: start;
++  padding: 0.9rem 1rem;
++  border-radius: var(--radius-md, 12px);
++  background: var(--surface-card);
++  border: 1px solid var(--border-soft);
++  text-decoration: none;
++  color: inherit;
++  min-height: 72px;
++  transition: border-color 0.15s ease, box-shadow 0.15s ease;
++}
++
++.gm-learn-card:hover,
++.gm-learn-card:focus-visible {
++  border-color: var(--gold-500);
++  box-shadow: 0 0 0 1px rgba(226, 164, 0, 0.25);
++  outline: none;
++}
++
++.gm-learn-card-num {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  min-width: 2.25rem;
++  height: 2.25rem;
++  padding: 0 0.35rem;
++  border-radius: 8px;
++  background: var(--navy-900);
++  color: var(--gold-500);
++  font-weight: 700;
++  font-size: 0.85rem;
++  letter-spacing: 0.02em;
++}
++
++.gm-learn-card-body {
++  display: flex;
++  flex-direction: column;
++  gap: 0.2rem;
++  min-width: 0;
++}
++
++.gm-learn-card-title {
++  font-size: 1.05rem;
++  color: var(--navy-900);
++  line-height: 1.25;
++}
++
++.gm-learn-card-meta {
++  font-size: 0.8rem;
++  color: var(--muted);
++  margin-top: 0.15rem;
++}
++
++.gm-learn-card-chevron {
++  color: var(--muted);
++  margin-top: 0.35rem;
++  flex-shrink: 0;
++}
++
++.gm-learn-back {
++  display: inline-flex;
++  align-items: center;
++  gap: 0.25rem;
++  color: var(--navy-800);
++  font-weight: 600;
++  text-decoration: none;
++  font-size: 0.95rem;
++  min-height: 44px;
++}
++
++.gm-learn-lesson-header {
++  display: flex;
++  flex-direction: column;
++  gap: 0.5rem;
++}
++
++.gm-learn-audio {
++  background: var(--surface-card);
++  border: 1px solid var(--border-soft);
++  border-radius: var(--radius-md, 12px);
++  padding: 1rem;
++  display: flex;
++  flex-direction: column;
++  gap: 0.75rem;
++}
++
++.gm-learn-audio-top {
++  display: flex;
++  flex-wrap: wrap;
++  justify-content: space-between;
++  gap: 0.35rem 0.75rem;
++  align-items: baseline;
++}
++
++.gm-learn-audio-live {
++  color: var(--navy-900);
++  font-weight: 600;
++  font-size: 0.9rem;
++}
++
++.gm-learn-audio-controls {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 0.5rem;
++}
++
++.gm-learn-audio-btn {
++  min-height: 48px;
++  min-width: 7.5rem;
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  gap: 0.4rem;
++  font-weight: 600;
++}
++
++.gm-learn-audio-progress-wrap {
++  display: flex;
++  flex-direction: column;
++  gap: 0.35rem;
++}
++
++.gm-learn-audio-progress {
++  height: 8px;
++  border-radius: 999px;
++  background: var(--navy-soft);
++  overflow: hidden;
++}
++
++.gm-learn-audio-progress-bar {
++  height: 100%;
++  background: linear-gradient(90deg, var(--navy-900), var(--gold-500));
++  border-radius: inherit;
++  transition: width 0.2s linear;
++}
++
++.gm-learn-audio-times {
++  display: flex;
++  justify-content: space-between;
++  font-variant-numeric: tabular-nums;
++}
++
++.gm-learn-voice {
++  display: flex;
++  flex-direction: column;
++  gap: 0.35rem;
++}
++
++.gm-learn-voice select {
++  min-height: 44px;
++  border-radius: 10px;
++  border: 1px solid var(--border-soft);
++  background: var(--surface-soft);
++  padding: 0.5rem 0.75rem;
++  color: var(--navy-900);
++  font: inherit;
++  max-width: 100%;
++}
++
++.gm-learn-audio-error {
++  margin: 0;
++  color: var(--danger);
++  font-size: 0.9rem;
++}
++
++.gm-learn-diagram {
++  margin: 0;
++  background: var(--surface-card);
++  border: 1px solid var(--border-soft);
++  border-radius: var(--radius-md, 12px);
++  padding: 0.85rem 1rem 1rem;
++}
++
++.gm-learn-diagram-caption {
++  font-size: 0.85rem;
++  font-weight: 600;
++  color: var(--navy-800);
++  margin-bottom: 0.5rem;
++}
++
++.gm-learn-svg {
++  width: 100%;
++  max-width: 360px;
++  height: auto;
++  display: block;
++}
++
++.gm-learn-svg-label {
++  fill: var(--navy-900);
++  font-size: 11px;
++  font-weight: 600;
++  font-family: var(--font-sans, system-ui, sans-serif);
++}
++
++.gm-learn-svg-tiny {
++  fill: var(--neutral);
++  font-size: 9px;
++  font-family: var(--font-sans, system-ui, sans-serif);
++}
++
++.gm-learn-bsw {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 0.5rem;
++}
++
++.gm-learn-bsw-card {
++  border-radius: 10px;
++  padding: 0.65rem 0.5rem;
++  display: flex;
++  flex-direction: column;
++  gap: 0.15rem;
++  text-align: center;
++  font-size: 0.8rem;
++  border: 1px solid var(--border-soft);
++}
++
++.gm-learn-bsw-card strong {
++  font-size: 0.95rem;
++}
++
++.gm-learn-bsw-buy {
++  background: var(--success-soft);
++  color: #146c3a;
++}
++
++.gm-learn-bsw-sell {
++  background: var(--danger-soft);
++  color: #9f2424;
++}
++
++.gm-learn-bsw-wait {
++  background: var(--warning-soft);
++  color: #7a5a00;
++}
++
++.gm-learn-sessions {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 0.5rem;
++}
++
++.gm-learn-session {
++  background: var(--navy-soft);
++  border-radius: 10px;
++  padding: 0.65rem;
++  display: flex;
++  flex-direction: column;
++  gap: 0.15rem;
++  font-size: 0.8rem;
++}
++
++.gm-learn-session strong {
++  color: var(--navy-900);
++}
++
++.gm-learn-score-callout {
++  display: flex;
++  gap: 0.85rem;
++  align-items: center;
++}
++
++.gm-learn-score-ring {
++  flex-shrink: 0;
++  width: 56px;
++  height: 56px;
++  border-radius: 50%;
++  border: 3px solid var(--gold-500);
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  font-weight: 800;
++  color: var(--navy-900);
++  background: var(--gold-soft);
++}
++
++.gm-learn-score-callout p {
++  margin: 0;
++  font-size: 0.95rem;
++  line-height: 1.4;
++  color: var(--navy-900);
++}
++
++.gm-learn-readalong {
++  display: flex;
++  flex-direction: column;
++  gap: 0.85rem;
++}
++
++.gm-learn-para {
++  margin: 0;
++  font-size: 1.05rem;
++  line-height: 1.55;
++  color: var(--navy-900);
++}
++
++.gm-learn-example,
++.gm-learn-remember {
++  background: var(--gold-soft);
++  border-radius: 12px;
++  padding: 0.85rem 1rem;
++  border: 1px solid var(--gold-200);
++}
++
++.gm-learn-example-title {
++  margin: 0 0 0.4rem;
++  font-size: 0.95rem;
++  color: var(--navy-900);
++}
++
++.gm-learn-example p,
++.gm-learn-remember ul {
++  margin: 0;
++  font-size: 0.98rem;
++  line-height: 1.5;
++  color: var(--navy-800);
++}
++
++.gm-learn-remember ul {
++  padding-left: 1.15rem;
++}
++
++.gm-learn-remember li + li {
++  margin-top: 0.35rem;
++}
++
++.gm-learn-disclaimer {
++  margin: 0;
++}
++
++.gm-learn-pager {
++  display: flex;
++  flex-wrap: wrap;
++  justify-content: space-between;
++  gap: 0.65rem;
++  padding-bottom: 0.5rem;
++}
++
++.gm-learn-pager .gm-btn {
++  min-height: 48px;
++  max-width: 100%;
++}
++
++@media (max-width: 430px) {
++  .gm-learn-bsw,
++  .gm-learn-sessions {
++    grid-template-columns: 1fr;
++  }
++
++  .gm-learn-card-title {
++    font-size: 1rem;
++  }
++
++  .gm-learn-para {
++    font-size: 1rem;
++  }
++
++  .gm-learn-score-callout {
++    flex-direction: column;
++    align-items: flex-start;
++  }
++}
++
++@media (max-width: 360px) {
++  .gm-learn-audio-btn {
++    flex: 1 1 100%;
++  }
++}
+-- 
+2.43.0
+
