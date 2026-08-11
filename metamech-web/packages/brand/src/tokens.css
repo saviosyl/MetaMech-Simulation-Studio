@@ -1,0 +1,46 @@
+:root {
+  /* Base */
+  --mm-bg: #f7f9fc;
+  --mm-surface: #ffffff;
+  --mm-text: #10263a;
+  --mm-text-secondary: #5f6b78;
+  --mm-border: #dce4ec;
+
+  /* Accents */
+  --mm-blue: #3f7cff;
+  --mm-teal: #20c7c9;
+  --mm-cyan: #43d7ff;
+  --mm-green: #35c98b;
+  --mm-warm: #ffb84a;
+
+  /* Semantic product accents */
+  --mm-accent-mdat: #3f7cff;
+  --mm-accent-simulation: #20c7c9;
+  --mm-accent-goldmeta: #10263a;
+  --mm-accent-software: #3f7cff;
+  --mm-accent-ai: #20c7c9;
+  --mm-accent-engineering: #3f7cff;
+  --mm-accent-3d: #43d7ff;
+  --mm-accent-web: #35c98b;
+
+  /* Layout */
+  --mm-radius-sm: 8px;
+  --mm-radius-md: 14px;
+  --mm-radius-lg: 22px;
+  --mm-shadow-soft: 0 18px 50px rgba(16, 38, 58, 0.08);
+  --mm-shadow-panel: 0 10px 40px rgba(63, 124, 255, 0.12);
+
+  /* Typography */
+  --mm-font-sans: "Manrope", "Segoe UI", sans-serif;
+  --mm-font-display: "Manrope", "Segoe UI", sans-serif;
+
+  /* Motion */
+  --mm-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --mm-duration: 420ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --mm-duration: 1ms;
+  }
+}
