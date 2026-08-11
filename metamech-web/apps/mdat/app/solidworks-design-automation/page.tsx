@@ -396,7 +396,7 @@ export default function SolidWorksDesignAutomationPage() {
               <p className="text-gray-300 text-sm leading-relaxed mb-2">
                 <strong className="text-white">Why it matters:</strong> Manually building a BOM from a 500-part assembly is tedious and error-prone. MetaMech&apos;s <strong className="text-white">SolidWorks automation</strong> extracts it in seconds with zero copy-paste errors.
               </p>
-              <Link href="/features#bom" className="text-teal-400 hover:text-teal-300 text-sm font-medium">→ Learn more about BOM generation</Link>
+              <Link href="/tools/bom" className="text-teal-400 hover:text-teal-300 text-sm font-medium">→ Learn more about BOM generation</Link>
             </div>
 
             {/* PDF Merge & Index */}
@@ -418,7 +418,7 @@ export default function SolidWorksDesignAutomationPage() {
               <p className="text-gray-300 text-sm leading-relaxed mb-2">
                 <strong className="text-white">Why it matters:</strong> Clients and manufacturing partners expect a single, indexed PDF package — not 50 individual files. This design automation tool delivers that in one operation.
               </p>
-              <Link href="/features#pdf" className="text-teal-400 hover:text-teal-300 text-sm font-medium">→ Learn more about PDF merge</Link>
+              <Link href="/tools/pdf-merge" className="text-teal-400 hover:text-teal-300 text-sm font-medium">→ Learn more about PDF merge</Link>
             </div>
 
             {/* STEP & DXF Batch Export */}
@@ -440,7 +440,7 @@ export default function SolidWorksDesignAutomationPage() {
               <p className="text-gray-300 text-sm leading-relaxed mb-2">
                 <strong className="text-white">Why it matters:</strong> Manufacturing needs STEP files for machining and DXF files for cutting. Exporting them one by one is the definition of wasted engineering time. MetaMech&apos;s <strong className="text-white">SolidWorks design automation</strong> handles entire assemblies at once.
               </p>
-              <Link href="/features#export" className="text-teal-400 hover:text-teal-300 text-sm font-medium">→ Learn more about batch export</Link>
+              <Link href="/tools/file-export" className="text-teal-400 hover:text-teal-300 text-sm font-medium">→ Learn more about batch export</Link>
             </div>
 
             {/* Drawing Renumbering */}
@@ -462,7 +462,7 @@ export default function SolidWorksDesignAutomationPage() {
               <p className="text-gray-300 text-sm leading-relaxed mb-2">
                 <strong className="text-white">Why it matters:</strong> After an ECO, renumbering drawings manually is slow and dangerous — one missed reference means a manufacturing error. This is one of the hardest tasks to automate with macros, and one of the easiest with MetaMech.
               </p>
-              <Link href="/features#renumber" className="text-teal-400 hover:text-teal-300 text-sm font-medium">→ Learn more about drawing renumbering</Link>
+              <Link href="/tools" className="text-teal-400 hover:text-teal-300 text-sm font-medium">→ Learn more about drawing renumbering</Link>
             </div>
 
             {/* Template & Properties Sync */}
@@ -484,7 +484,7 @@ export default function SolidWorksDesignAutomationPage() {
               <p className="text-gray-300 text-sm leading-relaxed mb-2">
                 <strong className="text-white">Why it matters:</strong> Inconsistent properties cause downstream problems — wrong part numbers on BOMs, missing descriptions in PDM, incorrect title blocks on drawings. SolidWorks automation through MetaMech keeps everything aligned.
               </p>
-              <Link href="/features#properties" className="text-teal-400 hover:text-teal-300 text-sm font-medium">→ Learn more about property sync</Link>
+              <Link href="/tools" className="text-teal-400 hover:text-teal-300 text-sm font-medium">→ Learn more about property sync</Link>
             </div>
           </div>
 
@@ -695,7 +695,7 @@ export default function SolidWorksDesignAutomationPage() {
               </Link>
             </div>
             <div className="flex flex-wrap justify-center gap-4 text-sm">
-              <Link href="/features" className="text-teal-400 hover:text-teal-300 underline">See all features →</Link>
+              <Link href="/tools" className="text-teal-400 hover:text-teal-300 underline">See all features →</Link>
               <span className="text-gray-600">·</span>
               <Link href="/solidworks-macros" className="text-teal-400 hover:text-teal-300 underline">Read about SolidWorks macros →</Link>
               <span className="text-gray-600">·</span>

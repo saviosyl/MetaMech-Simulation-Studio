@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import {
   useCallback,
   useEffect,
@@ -9,44 +8,15 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
-import { heroServices, type HeroService } from './services';
+import HeroVisual from './HeroVisuals';
+import { heroServices } from './services';
 
 const AUTO_MS = 7000;
-
-function HeroVisual({ service }: { service: HeroService }) {
-  if (service.image) {
-    return (
-      <div className="hero-visual" aria-hidden="true">
-        <div className="hero-visual__art">
-          <Image
-            src={service.image}
-            alt=""
-            width={960}
-            height={720}
-            priority={service.id === 'interactive3d'}
-            sizes="(max-width: 900px) 90vw, 560px"
-          />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="hero-visual" aria-hidden="true">
-      <div className="hero-visual__art" data-visual={service.visual}>
-        <div className="hero-visual__nodes">
-          <span />
-          <span />
-          <span />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function ServiceHero() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [contentKey, setContentKey] = useState(0);
   const listId = useId();
   const timerRef = useRef<number | null>(null);
   const active = heroServices[activeIndex];
@@ -71,30 +41,33 @@ export default function ServiceHero() {
     if (reducedMotion) return;
     timerRef.current = window.setInterval(() => {
       setActiveIndex((i) => (i + 1) % heroServices.length);
+      setContentKey((k) => k + 1);
     }, AUTO_MS);
     return clearTimer;
   }, [activeIndex, reducedMotion, clearTimer]);
 
   const select = (index: number) => {
+    if (index === activeIndex) return;
     setActiveIndex(index);
+    setContentKey((k) => k + 1);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
       event.preventDefault();
-      setActiveIndex((i) => (i + 1) % heroServices.length);
+      select((activeIndex + 1) % heroServices.length);
     }
     if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
       event.preventDefault();
-      setActiveIndex((i) => (i - 1 + heroServices.length) % heroServices.length);
+      select((activeIndex - 1 + heroServices.length) % heroServices.length);
     }
     if (event.key === 'Home') {
       event.preventDefault();
-      setActiveIndex(0);
+      select(0);
     }
     if (event.key === 'End') {
       event.preventDefault();
-      setActiveIndex(heroServices.length - 1);
+      select(heroServices.length - 1);
     }
   };
 
@@ -106,8 +79,10 @@ export default function ServiceHero() {
           style={{ ['--hero-accent' as string]: active.accent }}
           aria-live="polite"
         >
-          <HeroVisual service={active} />
-          <div className="hero-panel__content">
+          <div className="hero-panel__visual-slot" key={`visual-${active.id}`}>
+            <HeroVisual service={active} />
+          </div>
+          <div className="hero-panel__content" key={`copy-${contentKey}`}>
             <p className="hero-brand">MetaMech Solutions</p>
             <p className="hero-panel__label" id={`${listId}-heading`}>
               {active.label}
@@ -124,10 +99,7 @@ export default function ServiceHero() {
             </div>
             <div className="hero-progress" aria-hidden="true">
               {heroServices.map((service, index) => (
-                <i
-                  key={service.id}
-                  className={index === activeIndex ? 'active' : undefined}
-                />
+                <i key={service.id} className={index === activeIndex ? 'active' : undefined} />
               ))}
             </div>
           </div>
@@ -145,13 +117,12 @@ export default function ServiceHero() {
               key={service.id}
               type="button"
               role="tab"
+              id={`${listId}-tab-${service.id}`}
+              aria-controls={`${listId}-heading`}
               aria-selected={index === activeIndex}
               tabIndex={index === activeIndex ? 0 : -1}
-              className={`hero-selector${index === activeIndex ? ' is-active-mobile' : ''}`}
-              style={{
-                ['--selector-accent' as string]: service.accent,
-                display: undefined,
-              }}
+              className="hero-selector"
+              style={{ ['--selector-accent' as string]: service.accent }}
               data-active={index === activeIndex ? 'true' : 'false'}
               onClick={() => select(index)}
             >

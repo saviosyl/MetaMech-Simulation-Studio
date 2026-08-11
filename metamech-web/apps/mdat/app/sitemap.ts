@@ -1,34 +1,60 @@
 import type { MetadataRoute } from 'next';
 
-const BASE_URL = 'https://metamechsolutions.com';
+/**
+ * Current production canonical host remains metamechsolutions.com until
+ * an approved domain migration moves MDAT to mdat.metamechsolutions.com.
+ * Override with NEXT_PUBLIC_SITE_URL only for isolated preview experiments —
+ * do not attach production DNS from this workspace.
+ */
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://metamechsolutions.com';
+
+const staticRoutes = [
+  '',
+  '/tools',
+  '/tools/bom',
+  '/tools/pdf-merge',
+  '/tools/file-export',
+  '/services',
+  '/industries',
+  '/pricing',
+  '/contact',
+  '/download',
+  '/about',
+  '/solidworks-macros',
+  '/solidworks-design-automation',
+  '/privacy-policy',
+  '/terms',
+  '/blog',
+  '/blog/solidworks-bom-automation-guide',
+  '/blog/merge-solidworks-drawings-pdf',
+  '/blog/batch-export-step-dxf-solidworks',
+  '/blog/solidworks-automation-tools-comparison',
+  '/blog/reduce-engineering-errors-solidworks',
+  '/blog/solidworks-macros-guide',
+  '/blog/mechanical-design-consultant-ireland',
+  '/blog/solidworks-add-ins-productivity',
+  '/blog/cad-automation-engineering-teams',
+  '/blog/solidworks-drawing-management-tips',
+  // Previously missing from sitemap (pages exist)
+  '/blog/best-solidworks-macros-2026',
+  '/blog/mechanical-design-ireland-2026',
+  '/blog/solidworks-automation-guide-2026',
+  '/blog/solidworks-macro-vs-automation-tool',
+] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [
-    { url: BASE_URL, lastModified: new Date(), changeFrequency: 'weekly', priority: 1 },
-    { url: `${BASE_URL}/tools`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.9 },
-    { url: `${BASE_URL}/tools/bom`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${BASE_URL}/tools/pdf-merge`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${BASE_URL}/tools/file-export`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${BASE_URL}/services`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${BASE_URL}/industries`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/pricing`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.9 },
-    { url: `${BASE_URL}/contact`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/download`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${BASE_URL}/blog`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
-    { url: `${BASE_URL}/blog/solidworks-bom-automation-guide`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/blog/merge-solidworks-drawings-pdf`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/blog/batch-export-step-dxf-solidworks`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/blog/solidworks-automation-tools-comparison`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/blog/reduce-engineering-errors-solidworks`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/blog/solidworks-macros-guide`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/blog/mechanical-design-consultant-ireland`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/blog/solidworks-add-ins-productivity`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/blog/cad-automation-engineering-teams`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/blog/solidworks-drawing-management-tips`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/solidworks-macros`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${BASE_URL}/about`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${BASE_URL}/solidworks-design-automation`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${BASE_URL}/privacy-policy`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${BASE_URL}/terms`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-  ];
+  const now = new Date();
+  return staticRoutes.map((route) => ({
+    url: `${BASE_URL}${route}`,
+    lastModified: now,
+    changeFrequency: route.startsWith('/blog') ? 'monthly' : route === '' || route === '/pricing' ? 'weekly' : 'monthly',
+    priority:
+      route === ''
+        ? 1
+        : route === '/pricing' || route === '/tools' || route === '/download'
+          ? 0.9
+          : route.startsWith('/blog/')
+            ? 0.7
+            : 0.8,
+  }));
 }

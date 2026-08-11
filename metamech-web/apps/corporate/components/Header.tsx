@@ -20,7 +20,7 @@ export default function Header() {
     <header className="site-header">
       <div className="mm-container site-header__inner">
         <Link href="/" className="brand-lockup" aria-label="MetaMech Solutions home">
-          <Image src="/metamech-logo.png" alt="" width={42} height={42} priority />
+          <Image src="/metamech-logo.png" alt="" width={34} height={34} priority />
           <span>
             <strong>MetaMech Solutions</strong>
             <span>Technology & Product Development</span>
@@ -42,9 +42,10 @@ export default function Header() {
             background: 'linear-gradient(135deg, #3F7CFF, #20C7C9)',
             color: '#fff',
             border: 'none',
-            padding: '0.75rem 1.15rem',
-            borderRadius: 12,
+            padding: '0.62rem 0.95rem',
+            borderRadius: 11,
             fontWeight: 700,
+            fontSize: '0.9rem',
             textDecoration: 'none',
           }}
         >

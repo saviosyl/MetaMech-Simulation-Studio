@@ -287,7 +287,7 @@ export default function SolidWorksMacrosPage() {
             </div>
 
             <div className="mt-6">
-              <Link href="/features" className="inline-flex items-center gap-2 text-teal-400 hover:text-teal-300 font-medium transition-colors">
+              <Link href="/tools" className="inline-flex items-center gap-2 text-teal-400 hover:text-teal-300 font-medium transition-colors">
                 See all MetaMech features <ArrowRight size={16} />
               </Link>
             </div>
@@ -391,7 +391,7 @@ export default function SolidWorksMacrosPage() {
                 Download the Free Trial
               </Link>
               <Link
-                href="/features"
+                href="/tools"
                 className="inline-flex items-center gap-2 border border-teal-400/50 text-teal-400 hover:bg-teal-400 hover:text-[#0a1628] font-bold py-3 px-6 rounded-xl transition-all duration-300"
               >
                 See How MetaMech Compares <ArrowRight size={16} />

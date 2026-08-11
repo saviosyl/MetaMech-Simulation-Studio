@@ -117,27 +117,27 @@ export default function AboutPage() {
             <ul className="space-y-3 mb-6">
               <li className="flex items-start gap-2 text-gray-300">
                 <span className="text-teal-400 mt-1 flex-shrink-0">✅</span>
-                <span><Link href="/features#bom" className="text-teal-400 hover:text-teal-300 underline font-bold">BOM Generation</Link> — Extract complete bills of materials from assemblies and export them to formatted Excel files.</span>
+                <span><Link href="/tools/bom" className="text-teal-400 hover:text-teal-300 underline font-bold">BOM Generation</Link> — Extract complete bills of materials from assemblies and export them to formatted Excel files.</span>
               </li>
               <li className="flex items-start gap-2 text-gray-300">
                 <span className="text-teal-400 mt-1 flex-shrink-0">✅</span>
-                <span><Link href="/features#pdf" className="text-teal-400 hover:text-teal-300 underline font-bold">PDF Merge &amp; Index</Link> — Batch-export drawings to PDF, merge them into a single document, and generate a clickable index.</span>
+                <span><Link href="/tools/pdf-merge" className="text-teal-400 hover:text-teal-300 underline font-bold">PDF Merge &amp; Index</Link> — Batch-export drawings to PDF, merge them into a single document, and generate a clickable index.</span>
               </li>
               <li className="flex items-start gap-2 text-gray-300">
                 <span className="text-teal-400 mt-1 flex-shrink-0">✅</span>
-                <span><Link href="/features#export" className="text-teal-400 hover:text-teal-300 underline font-bold">STEP &amp; DXF Batch Export</Link> — Convert entire assemblies to STEP and DXF with automated file naming and folder organisation.</span>
+                <span><Link href="/tools/file-export" className="text-teal-400 hover:text-teal-300 underline font-bold">STEP &amp; DXF Batch Export</Link> — Convert entire assemblies to STEP and DXF with automated file naming and folder organisation.</span>
               </li>
               <li className="flex items-start gap-2 text-gray-300">
                 <span className="text-teal-400 mt-1 flex-shrink-0">✅</span>
-                <span><Link href="/features#renumber" className="text-teal-400 hover:text-teal-300 underline font-bold">Drawing Renumbering</Link> — Renumber drawing sheets and views in bulk with automatic reference updates.</span>
+                <span><Link href="/tools" className="text-teal-400 hover:text-teal-300 underline font-bold">Drawing Renumbering</Link> — Renumber drawing sheets and views in bulk with automatic reference updates.</span>
               </li>
               <li className="flex items-start gap-2 text-gray-300">
                 <span className="text-teal-400 mt-1 flex-shrink-0">✅</span>
-                <span><Link href="/features#properties" className="text-teal-400 hover:text-teal-300 underline font-bold">Template &amp; Properties Sync</Link> — Push property templates across files to keep part numbers, descriptions, and revision fields consistent.</span>
+                <span><Link href="/tools" className="text-teal-400 hover:text-teal-300 underline font-bold">Template &amp; Properties Sync</Link> — Push property templates across files to keep part numbers, descriptions, and revision fields consistent.</span>
               </li>
             </ul>
             <p className="text-gray-300 mb-0 leading-relaxed">
-              Every feature is designed for speed, reliability, and zero coding. <Link href="/features" className="text-teal-400 hover:text-teal-300 underline">Explore all features →</Link>
+              Every feature is designed for speed, reliability, and zero coding. <Link href="/tools" className="text-teal-400 hover:text-teal-300 underline">Explore all features →</Link>
             </p>
           </div>
 
@@ -235,7 +235,7 @@ export default function AboutPage() {
                 Download the Free Trial
               </Link>
               <Link
-                href="/features"
+                href="/tools"
                 className="inline-flex items-center gap-2 border border-teal-400/50 text-teal-400 hover:bg-teal-400 hover:text-[#0a1628] font-bold py-3 px-6 rounded-xl transition-all duration-300"
               >
                 See All Features <ArrowRight size={16} />

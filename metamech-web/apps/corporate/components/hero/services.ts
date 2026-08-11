@@ -9,6 +9,7 @@ export type HeroService = {
   accent: string;
   visual: 'software' | 'ai' | 'engineering' | 'interactive3d' | 'web';
   image?: string;
+  imageAlt?: string;
 };
 
 export const heroServices: HeroService[] = [
@@ -47,6 +48,8 @@ export const heroServices: HeroService[] = [
     secondaryCta: { label: 'Start a Project', href: '/contact/' },
     accent: '#3F7CFF',
     visual: 'engineering',
+    image: '/hero-mdat.jpg',
+    imageAlt: 'MetaMech MDAT engineering automation interface',
   },
   {
     id: 'interactive3d',
@@ -59,7 +62,8 @@ export const heroServices: HeroService[] = [
     secondaryCta: { label: 'Start a Project', href: '/contact/' },
     accent: '#43D7FF',
     visual: 'interactive3d',
-    image: '/sim-hero-main-light-v01.png',
+    image: '/hero-simulation.jpg',
+    imageAlt: 'MetaMech Simulation Studio industrial layout visualisation',
   },
   {
     id: 'web',

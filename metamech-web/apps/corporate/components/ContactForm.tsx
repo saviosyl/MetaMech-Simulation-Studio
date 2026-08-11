@@ -5,12 +5,31 @@ import { contact, projectEnquiryOptions } from '@metamech/shared';
 
 export default function ContactForm() {
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setStatus('submitting');
     const form = event.currentTarget;
     const data = new FormData(form);
+    const nextErrors: Record<string, string> = {};
+
+    const name = String(data.get('name') || '').trim();
+    const email = String(data.get('email') || '').trim();
+    const projectType = String(data.get('project_type') || '').trim();
+    const message = String(data.get('message') || '').trim();
+
+    if (!name) nextErrors.name = 'Please enter your name.';
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) nextErrors.email = 'Enter a valid email.';
+    if (!projectType) nextErrors.project_type = 'Select a project type.';
+    if (!message || message.length < 10) nextErrors.message = 'Add a short project description.';
+
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
+      setStatus('idle');
+      return;
+    }
+
+    setStatus('submitting');
 
     try {
       const response = await fetch(contact.formspree, {
@@ -31,11 +50,13 @@ export default function ContactForm() {
       <div className="form-grid two">
         <label>
           Name
-          <input name="name" required autoComplete="name" />
+          <input name="name" required autoComplete="name" aria-invalid={Boolean(errors.name)} />
+          {errors.name ? <span className="form-error">{errors.name}</span> : null}
         </label>
         <label>
           Email
-          <input name="email" type="email" required autoComplete="email" />
+          <input name="email" type="email" required autoComplete="email" aria-invalid={Boolean(errors.email)} />
+          {errors.email ? <span className="form-error">{errors.email}</span> : null}
         </label>
       </div>
       <div className="form-grid two" style={{ marginTop: '0.9rem' }}>
@@ -45,7 +66,7 @@ export default function ContactForm() {
         </label>
         <label>
           Project type
-          <select name="project_type" required defaultValue="">
+          <select name="project_type" required defaultValue="" aria-invalid={Boolean(errors.project_type)}>
             <option value="" disabled>
               Select an option
             </option>
@@ -55,12 +76,19 @@ export default function ContactForm() {
               </option>
             ))}
           </select>
+          {errors.project_type ? <span className="form-error">{errors.project_type}</span> : null}
         </label>
       </div>
       <div className="form-grid" style={{ marginTop: '0.9rem' }}>
         <label>
           Project details
-          <textarea name="message" required placeholder="What are you looking to build?" />
+          <textarea
+            name="message"
+            required
+            placeholder="What are you looking to build?"
+            aria-invalid={Boolean(errors.message)}
+          />
+          {errors.message ? <span className="form-error">{errors.message}</span> : null}
         </label>
       </div>
       <input type="hidden" name="_subject" value="MetaMech Solutions — Project enquiry" />
@@ -77,6 +105,7 @@ export default function ContactForm() {
             borderRadius: 12,
             fontWeight: 700,
             cursor: 'pointer',
+            minHeight: 44,
           }}
         >
           {status === 'submitting' ? 'Sending…' : 'Send enquiry'}
@@ -89,6 +118,9 @@ export default function ContactForm() {
       {status === 'error' ? (
         <p className="form-status">Something went wrong. Please email {contact.email} directly.</p>
       ) : null}
+      <p className="form-status" style={{ marginTop: '0.85rem' }}>
+        Preview builds use the existing Formspree endpoint. Do not send production test spam.
+      </p>
     </form>
   );
 }

@@ -1,6 +1,6 @@
 import Image from 'next/image';
 
-const goldmetaUrl = process.env.NEXT_PUBLIC_GOLDMETA_URL || 'https://goldmeta.app';
+const goldmetaUrl = process.env.NEXT_PUBLIC_GOLDMETA_URL || '';
 const corporateUrl = process.env.NEXT_PUBLIC_CORPORATE_URL || 'http://localhost:3001';
 
 export default function Page() {
@@ -16,16 +16,22 @@ export default function Page() {
           keeps its own product identity while being developed by MetaMech Solutions.
         </p>
         <div className="actions">
-          <a className="btn btn-primary" href={goldmetaUrl} rel="noopener noreferrer">
-            Visit GoldMeta
+          {goldmetaUrl ? (
+            <a className="btn btn-primary" href={goldmetaUrl} rel="noopener noreferrer">
+              Visit GoldMeta
+            </a>
+          ) : null}
+          <a className="btn btn-secondary" href={`${corporateUrl}/products/goldmeta/`}>
+            View on MetaMech Solutions
           </a>
           <a className="btn btn-secondary" href={corporateUrl}>
             MetaMech Solutions
           </a>
         </div>
         <p className="disclaimer">
-          This page does not promise investment returns, guaranteed profits or trading performance. Product
-          application code remains in the GOLDSMETA repository.
+          This page does not promise investment returns, guaranteed profits or trading performance. Public
+          product destination is configurable via `NEXT_PUBLIC_GOLDMETA_URL` and requires owner confirmation
+          before launch. Application code remains in the GOLDSMETA repository.
         </p>
       </div>
     </div>

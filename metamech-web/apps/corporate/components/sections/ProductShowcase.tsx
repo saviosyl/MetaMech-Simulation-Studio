@@ -1,20 +1,15 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { products } from '@metamech/shared';
 
 const mdatUrl = process.env.NEXT_PUBLIC_MDAT_URL || 'http://localhost:3000';
 const simulationUrl = process.env.NEXT_PUBLIC_SIMULATION_URL || 'http://localhost:3002';
-const goldmetaUrl = process.env.NEXT_PUBLIC_GOLDMETA_URL || 'https://goldmeta.app';
+const goldmetaExternal = process.env.NEXT_PUBLIC_GOLDMETA_URL || '';
 
-const hrefById: Record<string, string> = {
-  mdat: '/products/mdat/',
-  simulation: '/products/simulation-studio/',
-  goldmeta: '/products/goldmeta/',
-};
-
-const externalById: Record<string, string> = {
-  mdat: mdatUrl,
-  simulation: simulationUrl,
-  goldmeta: goldmetaUrl,
+const visuals: Record<string, { src: string; alt: string; contain?: boolean }> = {
+  mdat: { src: '/hero-mdat.jpg', alt: 'MetaMech MDAT interface', contain: false },
+  simulation: { src: '/hero-simulation.jpg', alt: 'MetaMech Simulation Studio', contain: false },
+  goldmeta: { src: '/goldmeta-mark-512.png', alt: 'GoldMeta mark', contain: true },
 };
 
 export default function ProductShowcase() {
@@ -30,24 +25,54 @@ export default function ProductShowcase() {
         </div>
 
         <div className="product-grid" style={{ marginTop: '2rem' }}>
-          {products.map((product) => (
-            <article
-              key={product.id}
-              className={`product-card${product.id === 'goldmeta' ? ' goldmeta' : ''}`}
-              style={{ ['--card-accent' as string]: product.accent }}
-            >
-              <p className="category">{product.category}</p>
-              <h3>{product.name}</h3>
-              <p className="label">{product.label}</p>
-              <p>{product.description}</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
-                <Link href={hrefById[product.id]}>{product.cta}</Link>
-                <a href={externalById[product.id]} rel="noopener noreferrer">
-                  Open destination →
-                </a>
-              </div>
-            </article>
-          ))}
+          {products.map((product) => {
+            const visual = visuals[product.id];
+            const internalHref =
+              product.id === 'mdat'
+                ? '/products/mdat/'
+                : product.id === 'simulation'
+                  ? '/products/simulation-studio/'
+                  : '/products/goldmeta/';
+            const external =
+              product.id === 'mdat'
+                ? mdatUrl
+                : product.id === 'simulation'
+                  ? simulationUrl
+                  : goldmetaExternal;
+
+            return (
+              <article
+                key={product.id}
+                className={`product-card${product.id === 'goldmeta' ? ' goldmeta' : ''}`}
+                style={{ ['--card-accent' as string]: product.accent }}
+              >
+                {visual ? (
+                  <div className={`product-card__media${visual.contain ? ' is-contain' : ''}`}>
+                    <Image
+                      src={visual.src}
+                      alt={visual.alt}
+                      width={720}
+                      height={420}
+                      loading="lazy"
+                      sizes="(max-width: 900px) 100vw, 360px"
+                    />
+                  </div>
+                ) : null}
+                <p className="category">{product.category}</p>
+                <h3>{product.name}</h3>
+                <p className="label">{product.label}</p>
+                <p>{product.description}</p>
+                <div className="product-card__actions">
+                  <Link href={internalHref}>{product.cta}</Link>
+                  {external ? (
+                    <a href={external} rel="noopener noreferrer">
+                      Open destination →
+                    </a>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>

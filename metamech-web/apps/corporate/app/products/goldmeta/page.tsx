@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     'GoldMeta — AI Market Intelligence. A MetaMech Solutions Product for market structure analysis and decision support.',
 };
 
-const goldmetaUrl = process.env.NEXT_PUBLIC_GOLDMETA_URL || 'https://goldmeta.app';
+const goldmetaUrl = process.env.NEXT_PUBLIC_GOLDMETA_URL || '';
 
 export default function GoldmetaProductPage() {
   return (
@@ -36,26 +36,32 @@ export default function GoldmetaProductPage() {
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1.25rem', flexWrap: 'wrap' }}>
             <Image
-              src="/goldmeta-mark.png"
+              src="/goldmeta-mark-512.png"
               alt="GoldMeta mark"
               width={88}
               height={88}
               style={{ borderRadius: 18, background: '#fff' }}
             />
-            <a
-              href={goldmetaUrl}
-              rel="noopener noreferrer"
-              style={{
-                background: '#FFB84A',
-                color: '#10263A',
-                padding: '0.85rem 1.35rem',
-                borderRadius: 12,
-                fontWeight: 700,
-                textDecoration: 'none',
-              }}
-            >
-              Visit GoldMeta
-            </a>
+            {goldmetaUrl ? (
+              <a
+                href={goldmetaUrl}
+                rel="noopener noreferrer"
+                style={{
+                  background: '#FFB84A',
+                  color: '#10263A',
+                  padding: '0.85rem 1.35rem',
+                  borderRadius: 12,
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                }}
+              >
+                Visit GoldMeta
+              </a>
+            ) : (
+              <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.92rem' }}>
+                Public product URL pending owner confirmation (`NEXT_PUBLIC_GOLDMETA_URL`).
+              </span>
+            )}
             <Link href="/contact/" style={{ color: '#fff', fontWeight: 600 }}>
               Talk to MetaMech →
             </Link>

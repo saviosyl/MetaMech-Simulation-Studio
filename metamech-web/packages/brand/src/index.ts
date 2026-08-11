@@ -22,6 +22,10 @@ export const productAccents = {
   web: brandColors.green,
 } as const;
 
+/**
+ * Future domain intent. GoldMeta public host is left blank until owner
+ * confirms a verified destination via NEXT_PUBLIC_GOLDMETA_URL.
+ */
 export const brand = {
   name: 'MetaMech Solutions',
   tagline: 'Technology & Product Development',
@@ -31,6 +35,6 @@ export const brand = {
     mdatFuture: 'https://mdat.metamechsolutions.com',
     simulationFuture: 'https://simulation.metamechsolutions.com',
     simulationApp: 'https://metamech-studio.pages.dev',
-    goldmeta: 'https://goldmeta.app',
+    goldmeta: '',
   },
 } as const;
