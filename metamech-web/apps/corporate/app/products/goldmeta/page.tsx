@@ -65,11 +65,7 @@ export default function GoldmetaProductPage() {
               >
                 Visit GoldMeta
               </a>
-            ) : (
-              <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.92rem' }}>
-                Public product URL pending owner confirmation (`NEXT_PUBLIC_GOLDMETA_URL`).
-              </span>
-            )}
+            ) : null}
             <Link href="/contact/" style={{ color: '#fff', fontWeight: 600 }}>
               Talk to MetaMech →
             </Link>

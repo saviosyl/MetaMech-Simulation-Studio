@@ -14,7 +14,7 @@ export default function WorkPage() {
         <div className="mm-container">
           <p className="mm-eyebrow">Work</p>
           <h1>Selected work</h1>
-          <p>Real MetaMech products as proof — no invented client portfolios.</p>
+          <p>Selected MetaMech products that demonstrate what we design and ship.</p>
         </div>
       </section>
       <SelectedWork />

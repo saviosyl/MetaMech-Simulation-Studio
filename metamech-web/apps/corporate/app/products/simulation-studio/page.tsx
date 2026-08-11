@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     'Browser-based interactive 3D engineering environment for industrial equipment, layouts and demonstrations.',
 };
 
-const simulationUrl = process.env.NEXT_PUBLIC_SIMULATION_URL || 'http://localhost:3002';
+const simulationUrl = process.env.NEXT_PUBLIC_SIMULATION_URL || '';
 const appUrl = process.env.NEXT_PUBLIC_SIMULATION_APP_URL || 'https://metamech-studio.pages.dev';
 
 export default function SimulationProductPage() {
@@ -40,21 +40,23 @@ export default function SimulationProductPage() {
           />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.5rem' }}>
-          <a
-            href={simulationUrl}
-            className="mm-btn mm-btn-primary"
-            style={{
-              background: 'linear-gradient(135deg, #20C7C9, #43D7FF)',
-              color: '#fff',
-              border: 'none',
-              padding: '0.85rem 1.35rem',
-              borderRadius: 12,
-              fontWeight: 700,
-              textDecoration: 'none',
-            }}
-          >
-            Explore Simulation marketing
-          </a>
+          {simulationUrl ? (
+            <a
+              href={simulationUrl}
+              className="mm-btn mm-btn-primary"
+              style={{
+                background: 'linear-gradient(135deg, #20C7C9, #43D7FF)',
+                color: '#fff',
+                border: 'none',
+                padding: '0.85rem 1.35rem',
+                borderRadius: 12,
+                fontWeight: 700,
+                textDecoration: 'none',
+              }}
+            >
+              Explore Simulation Studio
+            </a>
+          ) : null}
           <a href={appUrl} className="mm-btn mm-btn-secondary" rel="noopener noreferrer">
             Open application
           </a>

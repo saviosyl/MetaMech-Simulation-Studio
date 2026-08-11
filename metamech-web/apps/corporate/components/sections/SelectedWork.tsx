@@ -42,7 +42,7 @@ export default function SelectedWork() {
           <p className="mm-eyebrow">Selected work</p>
           <h2 id="work-heading">Proof through products we ship</h2>
           <p className="mm-section-desc">
-            Featured work is drawn from MetaMech’s own products — not fabricated client logos or claims.
+            Featured work is drawn from MetaMech’s own products — the technology we design, build and ship.
           </p>
         </div>
 

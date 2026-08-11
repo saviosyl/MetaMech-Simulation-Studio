@@ -118,9 +118,6 @@ export default function ContactForm() {
       {status === 'error' ? (
         <p className="form-status">Something went wrong. Please email {contact.email} directly.</p>
       ) : null}
-      <p className="form-status" style={{ marginTop: '0.85rem' }}>
-        Preview builds use the existing Formspree endpoint. Do not send production test spam.
-      </p>
     </form>
   );
 }

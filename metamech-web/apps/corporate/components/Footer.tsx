@@ -40,7 +40,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="mm-container" style={{ marginTop: '2rem', color: 'var(--mm-text-secondary)', fontSize: '0.85rem' }}>
-        © {new Date().getFullYear()} MetaMech Solutions. All rights reserved. Preview build — not production root.
+        © {new Date().getFullYear()} MetaMech Solutions. All rights reserved.
       </div>
     </footer>
   );

@@ -15,7 +15,7 @@ export default function AboutPage() {
         <div className="mm-container">
           <p className="mm-eyebrow">About</p>
           <h1>MetaMech Solutions</h1>
-          <p>Ambitious, accurate, product-led — not a fabricated multinational story.</p>
+          <p>We combine engineering thinking with modern software, automation and digital product development.</p>
         </div>
       </section>
       <AboutPositioning />

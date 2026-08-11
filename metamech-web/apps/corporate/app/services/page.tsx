@@ -15,7 +15,7 @@ export default function ServicesPage() {
         <div className="mm-container">
           <p className="mm-eyebrow">Services</p>
           <h1>What MetaMech can build</h1>
-          <p>Realistic capabilities grounded in products and delivery experience — not inflated claims.</p>
+          <p>Capabilities grounded in the products we build and the projects we deliver.</p>
         </div>
       </section>
       <Capabilities variant="full" />

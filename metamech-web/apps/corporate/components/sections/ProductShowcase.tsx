@@ -2,8 +2,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { products } from '@metamech/shared';
 
-const mdatUrl = process.env.NEXT_PUBLIC_MDAT_URL || 'http://localhost:3000';
-const simulationUrl = process.env.NEXT_PUBLIC_SIMULATION_URL || 'http://localhost:3002';
+const mdatUrl = process.env.NEXT_PUBLIC_MDAT_URL || '';
+const simulationUrl = process.env.NEXT_PUBLIC_SIMULATION_URL || '';
 const goldmetaExternal = process.env.NEXT_PUBLIC_GOLDMETA_URL || '';
 
 const visuals: Record<string, { src: string; alt: string; contain?: boolean }> = {
