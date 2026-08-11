@@ -160,24 +160,19 @@ function EngineeringComposition({ image, imageAlt }: { image?: string; imageAlt?
 
 function Interactive3dComposition({ image, imageAlt }: { image?: string; imageAlt?: string }) {
   return (
-    <div className="hero-comp hero-comp--3d" aria-hidden="true">
+    <div className="hero-comp hero-comp--interactive3d" aria-hidden="true">
       <div className="sim-stage">
         {image ? (
           <Image
             src={image}
             alt={imageAlt || ''}
             width={1600}
-            height={1000}
+            height={800}
             priority
-            sizes="(max-width: 900px) 94vw, 720px"
+            sizes="(max-width: 900px) 94vw, 760px"
           />
         ) : null}
         <div className="sim-fade" />
-        <div className="sim-ui sim-ui--top">
-          <span>Layout</span>
-          <span>Connect</span>
-          <span>Simulate</span>
-        </div>
         <div className="sim-ui sim-ui--badge">Simulation Studio</div>
       </div>
     </div>

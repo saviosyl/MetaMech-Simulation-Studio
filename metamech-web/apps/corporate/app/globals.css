@@ -395,6 +395,11 @@ button:focus-visible,
   inset: 0;
 }
 
+.hero-comp--interactive3d,
+.hero-comp--engineering {
+  inset: 0;
+}
+
 /* Software composition */
 .soft-stage {
   position: absolute;
@@ -1226,7 +1231,7 @@ button:focus-visible,
 
 @media (min-width: 900px) {
   .service-hero__grid {
-    grid-template-columns: minmax(0, 1fr) 118px;
+    grid-template-columns: minmax(0, 1fr) 96px;
     min-height: 540px;
     align-items: stretch;
   }
@@ -1236,20 +1241,21 @@ button:focus-visible,
   }
 
   .hero-panel__content {
-    max-width: min(34rem, 44%);
-    padding-right: 0.75rem;
+    max-width: min(33rem, 40%);
+    padding-right: 0.5rem;
     justify-content: center;
   }
 
   .hero-visual__art {
-    width: min(54%, 560px);
-    height: 78%;
+    width: min(58%, 640px);
+    height: 84%;
+    margin: auto 1rem 1rem auto;
   }
 
   .hero-visual__art--interactive3d,
   .hero-visual__art--engineering {
-    width: min(56%, 600px);
-    height: 82%;
+    width: min(60%, 680px);
+    height: 88%;
   }
 
   .hero-selectors {
@@ -1258,19 +1264,25 @@ button:focus-visible,
     grid-template-rows: repeat(4, minmax(0, 1fr));
     overflow: visible;
     height: 100%;
-    gap: 0.5rem;
+    gap: 0.45rem;
   }
 
   .hero-selector {
     min-height: 0;
     min-width: 0;
-    padding: 0.75rem 0.65rem;
+    padding: 0.7rem 0.5rem;
     border-radius: 14px;
     writing-mode: horizontal-tb;
   }
 
+  .hero-selector__icon {
+    width: 1.65rem;
+    height: 1.65rem;
+  }
+
   .hero-selector__title {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
+    line-height: 1.2;
   }
 
   /* Desktop: active service lives in the large panel; hide its thin selector */
@@ -1281,26 +1293,37 @@ button:focus-visible,
 
 @media (min-width: 1100px) {
   .service-hero__grid {
-    grid-template-columns: minmax(0, 1.08fr) 112px;
+    grid-template-columns: minmax(0, 1.1fr) 100px;
   }
 
   .hero-selector {
-    padding: 0.8rem 0.6rem;
+    padding: 0.75rem 0.55rem;
   }
 
   .hero-selector__title {
-    font-size: 0.8rem;
+    font-size: 0.74rem;
   }
 }
 
 @media (min-width: 1280px) {
   .service-hero__grid {
-    grid-template-columns: minmax(0, 1.12fr) 120px;
+    grid-template-columns: minmax(0, 1.14fr) 104px;
     min-height: 560px;
   }
 
   .hero-panel {
     min-height: 560px;
+  }
+
+  .hero-visual__art {
+    width: min(60%, 700px);
+    height: 86%;
+  }
+
+  .hero-visual__art--interactive3d,
+  .hero-visual__art--engineering {
+    width: min(62%, 740px);
+    height: 90%;
   }
 }
 

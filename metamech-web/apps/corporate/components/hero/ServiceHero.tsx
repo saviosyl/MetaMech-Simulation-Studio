@@ -114,6 +114,7 @@ export default function ServiceHero() {
         <div
           className="hero-selectors"
           role="tablist"
+          tabIndex={0}
           aria-label="MetaMech services"
           aria-orientation="vertical"
           onKeyDown={onKeyDown}
@@ -128,7 +129,7 @@ export default function ServiceHero() {
                 id={`${listId}-tab-${service.id}`}
                 aria-controls={`${listId}-heading`}
                 aria-selected={index === activeIndex}
-                tabIndex={index === activeIndex ? 0 : -1}
+                tabIndex={-1}
                 className="hero-selector"
                 style={{ ['--selector-accent' as string]: service.accent }}
                 data-active={index === activeIndex ? 'true' : 'false'}

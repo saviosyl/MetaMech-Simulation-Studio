@@ -76,8 +76,8 @@ export const heroServices: HeroService[] = [
     accent: '#43D7FF',
     visual: 'interactive3d',
     icon: Box,
-    image: '/hero-sim-environment.webp',
-    imageAlt: 'MetaMech Simulation Studio industrial layout visualisation',
+    image: '/hero-sim-factory.webp',
+    imageAlt: 'MetaMech Simulation Studio industrial factory layout with conveyors and equipment',
   },
   {
     id: 'web',
