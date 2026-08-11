@@ -17,7 +17,7 @@ Conceptual production source (read-only): `saviosyl/MetaMech_2026`
 
 ## 3. Current HEAD SHA
 
-See `git rev-parse HEAD` on the branch after final push.
+`38e202e960a74e71de9a4cb0a5e190dc093e2117`
 
 ## 4. Build status
 
