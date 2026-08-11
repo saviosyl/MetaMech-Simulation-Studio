@@ -27,15 +27,14 @@ Conceptual production source (read-only): `saviosyl/MetaMech_2026`
 
 ## 3. Current HEAD SHA
 
-Always verify with:
-
 ```bash
-git checkout cursor/metamech-corporate-site-v1-46e2
 git rev-parse HEAD
 ```
 
-QA implementation commit (hero/links/destinations): `98df4aab2fe871c205d4a808f4e7a6cd1624c261`  
-Branch tip after this documentation sync will be recorded in git history; do not rely on a stale hardcoded tip SHA.
+Branch: `cursor/metamech-corporate-site-v1-46e2`  
+QA implementation commit: `98df4aab2fe871c205d4a808f4e7a6cd1624c261`
+
+This `metamech-web/` workspace is temporarily hosted inside `saviosyl/MetaMech-Simulation-Studio` only because the agent lacked permission to create the future dedicated website repository. Intended final repository: `saviosyl/METAMECH-WEB`.
 
 ## 4. Build status
 
