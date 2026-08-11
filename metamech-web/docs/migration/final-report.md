@@ -27,9 +27,15 @@ Conceptual production source (read-only): `saviosyl/MetaMech_2026`
 
 ## 3. Current HEAD SHA
 
+Always verify with:
 
+```bash
+git checkout cursor/metamech-corporate-site-v1-46e2
+git rev-parse HEAD
+```
 
-Verified with `git rev-parse HEAD` on `cursor/metamech-corporate-site-v1-46e2` after this QA push.
+QA implementation commit (hero/links/destinations): `98df4aab2fe871c205d4a808f4e7a6cd1624c261`  
+Branch tip after this documentation sync will be recorded in git history; do not rely on a stale hardcoded tip SHA.
 
 ## 4. Build status
 
