@@ -31,6 +31,7 @@ Conceptual production source (read-only): `saviosyl/MetaMech_2026`
 git rev-parse HEAD
 ```
 
+Current tip at docs stamp: `7c8a181991c4fcc7fd8c4d2b5b0c7b4900b5e24c`  
 Branch: `cursor/metamech-corporate-site-v1-46e2`  
 QA implementation commit: `98df4aab2fe871c205d4a808f4e7a6cd1624c261`
 
