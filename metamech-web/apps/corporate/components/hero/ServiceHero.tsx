@@ -108,6 +108,7 @@ export default function ServiceHero() {
         >
           <HeroVisual service={active} />
           <div className="hero-panel__content">
+            <p className="hero-brand">MetaMech Solutions</p>
             <p className="hero-panel__label" id={`${listId}-heading`}>
               {active.label}
             </p>
@@ -145,7 +146,6 @@ export default function ServiceHero() {
               type="button"
               role="tab"
               aria-selected={index === activeIndex}
-              aria-pressed={index === activeIndex}
               tabIndex={index === activeIndex ? 0 : -1}
               className={`hero-selector${index === activeIndex ? ' is-active-mobile' : ''}`}
               style={{

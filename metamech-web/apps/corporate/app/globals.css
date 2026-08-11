@@ -227,6 +227,14 @@ button:focus-visible,
   max-width: 36rem;
 }
 
+.hero-brand {
+  margin: 0;
+  font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--mm-text);
+}
+
 .hero-panel__label {
   font-size: 0.75rem;
   font-weight: 800;
@@ -237,9 +245,9 @@ button:focus-visible,
 
 .hero-panel h1 {
   margin: 0;
-  font-size: clamp(2rem, 4.5vw, 3.4rem);
-  line-height: 1.05;
-  letter-spacing: -0.035em;
+  font-size: clamp(1.75rem, 3.8vw, 2.85rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
   color: var(--mm-text);
 }
 
@@ -433,7 +441,8 @@ button:focus-visible,
   border-color: color-mix(in srgb, var(--selector-accent, #3f7cff) 45%, var(--mm-border));
 }
 
-.hero-selector[aria-pressed="true"] {
+.hero-selector[data-active='true'],
+.hero-selector[aria-selected='true'] {
   border-color: color-mix(in srgb, var(--selector-accent, #3f7cff) 55%, var(--mm-border));
   box-shadow: 0 12px 28px color-mix(in srgb, var(--selector-accent, #3f7cff) 18%, transparent);
   background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--selector-accent, #3f7cff) 8%, #fff));

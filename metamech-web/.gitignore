@@ -18,3 +18,5 @@ coverage/
 .wrangler/
 
 apps/mdat/public/models/
+
+**/next-env.d.ts
