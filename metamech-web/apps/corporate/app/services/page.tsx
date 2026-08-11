@@ -18,7 +18,7 @@ export default function ServicesPage() {
           <p>Realistic capabilities grounded in products and delivery experience — not inflated claims.</p>
         </div>
       </section>
-      <Capabilities />
+      <Capabilities variant="full" />
       <FinalCta />
     </>
   );

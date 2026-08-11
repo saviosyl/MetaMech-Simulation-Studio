@@ -7,9 +7,9 @@ const simulationUrl = process.env.NEXT_PUBLIC_SIMULATION_URL || 'http://localhos
 const goldmetaExternal = process.env.NEXT_PUBLIC_GOLDMETA_URL || '';
 
 const visuals: Record<string, { src: string; alt: string; contain?: boolean }> = {
-  mdat: { src: '/hero-mdat.webp', alt: 'MetaMech MDAT interface', contain: false },
-  simulation: { src: '/hero-sim-factory.webp', alt: 'MetaMech Simulation Studio industrial layout', contain: false },
-  goldmeta: { src: '/goldmeta-mark-512.png', alt: 'GoldMeta mark', contain: true },
+  mdat: { src: '/hero-mdat-workspace.webp', alt: 'MetaMech MDAT Mechanical Design Automation workspace', contain: false },
+  simulation: { src: '/hero-sim-factory-crop.webp', alt: 'MetaMech Simulation Studio industrial layout', contain: false },
+  goldmeta: { src: '/goldmeta-surface.webp', alt: 'GoldMeta market structure workspace', contain: false },
 };
 
 export default function ProductShowcase() {

@@ -34,13 +34,21 @@ export default function GoldmetaProductPage() {
           <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.9rem' }}>
             No investment returns, profits or trading performance are promised.
           </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1.25rem', flexWrap: 'wrap' }}>
+          <div style={{ marginTop: '1.25rem', marginBottom: '1.25rem' }}>
             <Image
-              src="/goldmeta-mark-512.png"
+              src="/goldmeta-surface.webp"
+              alt="GoldMeta market structure workspace"
+              width={960}
+              height={560}
+              style={{ width: 'min(100%, 520px)', height: 'auto', borderRadius: 16, border: '1px solid rgba(255,255,255,0.12)' }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+            <Image
+              src="/goldmeta-mark-transparent.png"
               alt="GoldMeta mark"
-              width={88}
-              height={88}
-              style={{ borderRadius: 18, background: '#fff' }}
+              width={72}
+              height={72}
             />
             {goldmetaUrl ? (
               <a

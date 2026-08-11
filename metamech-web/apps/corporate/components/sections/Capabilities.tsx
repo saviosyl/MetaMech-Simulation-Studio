@@ -1,18 +1,15 @@
-const groups = [
+const homeGroups = [
   {
     id: 'software-apps',
     title: 'Software & Apps',
     accent: '#3F7CFF',
     items: [
-      'Custom software',
-      'Web applications',
-      'Mobile/cross-platform applications',
-      'SaaS platforms',
-      'Internal business tools',
-      'Dashboards',
-      'Customer portals',
-      'API integrations',
-      'Database-driven applications',
+      'Custom Software',
+      'Web Applications',
+      'Mobile / Cross-platform Apps',
+      'SaaS Platforms',
+      'Internal Business Tools',
+      'Dashboards & Portals',
     ],
   },
   {
@@ -20,14 +17,12 @@ const groups = [
     title: 'AI & Automation',
     accent: '#20C7C9',
     items: [
-      'AI integrations',
-      'AI assistants',
-      'Workflow automation',
-      'Document processing',
-      'Intelligent search',
-      'Decision-support systems',
-      'Reporting automation',
-      'Business-process automation',
+      'AI Integrations',
+      'AI Assistants',
+      'Workflow Automation',
+      'Document Processing',
+      'Intelligent Search',
+      'Decision-Support Systems',
     ],
   },
   {
@@ -35,15 +30,12 @@ const groups = [
     title: 'Engineering & 3D',
     accent: '#43D7FF',
     items: [
-      'CAD automation',
-      'SolidWorks automation',
-      'DraftSight automation',
-      'Engineering utilities',
-      'Custom engineering applications',
+      'CAD / SolidWorks Automation',
+      'Engineering Applications',
+      'Engineering Utilities',
       'Interactive 3D',
-      'Industrial visualisation',
-      'Product configurators',
-      'Technical simulation',
+      'Industrial Visualisation',
+      'Product Configurators',
     ],
   },
   {
@@ -51,20 +43,82 @@ const groups = [
     title: 'Web & Creative',
     accent: '#35C98B',
     items: [
-      'Premium websites',
-      'Product websites',
-      'Landing pages',
-      'UI/UX implementation',
-      'Digital product launches',
-      'AI-assisted product videos',
-      'Technical explainer videos',
-      'Social media creative',
-      'Product visualisation',
+      'Premium Websites',
+      'Product Websites',
+      'Digital Product Launches',
+      'AI-assisted Product Videos',
+      'Technical Explainers',
+      'Product Visualisation',
     ],
   },
 ];
 
-export default function Capabilities() {
+const fullGroups = [
+  {
+    id: 'software-apps',
+    title: 'Software & Apps',
+    accent: '#3F7CFF',
+    items: [
+      'Custom Software',
+      'Web Applications',
+      'Mobile / Cross-platform Apps',
+      'SaaS Platforms',
+      'Internal Business Tools',
+      'Dashboards & Portals',
+      'API Integrations',
+      'Database-driven Applications',
+    ],
+  },
+  {
+    id: 'ai-automation',
+    title: 'AI & Automation',
+    accent: '#20C7C9',
+    items: [
+      'AI Integrations',
+      'AI Assistants',
+      'Workflow Automation',
+      'Document Processing',
+      'Intelligent Search',
+      'Decision-Support Systems',
+      'Reporting Automation',
+      'Practical AI Product Features',
+    ],
+  },
+  {
+    id: 'engineering-3d',
+    title: 'Engineering & 3D',
+    accent: '#43D7FF',
+    items: [
+      'CAD / SolidWorks Automation',
+      'Engineering Applications',
+      'Engineering Utilities',
+      'Interactive 3D',
+      'Industrial Visualisation',
+      'Product Configurators',
+      'Technical Simulation Interfaces',
+      'Browser-based Engineering Tools',
+    ],
+  },
+  {
+    id: 'web-creative',
+    title: 'Web & Creative',
+    accent: '#35C98B',
+    items: [
+      'Premium Websites',
+      'Product Websites',
+      'Digital Product Launches',
+      'AI-assisted Product Videos',
+      'Technical Explainers',
+      'Product Visualisation',
+      'UI / UX Implementation',
+      'Launch Landing Experiences',
+    ],
+  },
+];
+
+export default function Capabilities({ variant = 'home' }: { variant?: 'home' | 'full' }) {
+  const groups = variant === 'full' ? fullGroups : homeGroups;
+
   return (
     <section className="mm-section" id="capabilities" aria-labelledby="capabilities-heading">
       <div className="mm-container">

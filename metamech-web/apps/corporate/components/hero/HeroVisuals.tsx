@@ -132,26 +132,24 @@ function EngineeringComposition({ image, imageAlt }: { image?: string; imageAlt?
       <div className="eng-stage">
         <div className="eng-main">
           {image ? (
-            <Image src={image} alt={imageAlt || ''} width={1400} height={900} priority sizes="(max-width: 900px) 92vw, 640px" />
+            <Image
+              src={image}
+              alt={imageAlt || ''}
+              width={1400}
+              height={900}
+              priority
+              sizes="(max-width: 900px) 92vw, 680px"
+            />
           ) : null}
           <div className="eng-overlay" />
-        </div>
-        <div className="eng-ui">
-          <Image
-            src="/hero-mdat-ui.webp"
-            alt=""
-            width={900}
-            height={680}
-            sizes="280px"
-          />
         </div>
         <div className="eng-chip eng-chip--a">BOM</div>
         <div className="eng-chip eng-chip--b">PDF</div>
         <div className="eng-chip eng-chip--c">STEP</div>
         <div className="eng-chip eng-chip--d">DXF</div>
         <div className="eng-note">
-          <small>Engineering Output</small>
-          <strong>Automated package ready</strong>
+          <small>MetaMech MDAT</small>
+          <strong>Mechanical Design Automation</strong>
         </div>
       </div>
     </div>
@@ -186,26 +184,65 @@ function WebComposition() {
         <div className="web-desktop">
           <div className="web-desktop__bar">
             <i /><i /><i />
-            <span>product.metamech</span>
+            <span>studio.metamech</span>
           </div>
           <div className="web-desktop__body">
-            <div className="web-desktop__hero" />
+            <div className="web-desktop__nav">
+              <strong>MetaMech</strong>
+              <span>Platform</span>
+              <span>Products</span>
+              <span>Launch</span>
+              <em>Start Project</em>
+            </div>
+            <div className="web-desktop__hero">
+              <small>DIGITAL PRODUCT EXPERIENCE</small>
+              <b>Engineered for clarity.</b>
+              <p>Premium websites, product launches and technical storytelling.</p>
+              <div className="web-desktop__cta-row">
+                <span>Explore Platform</span>
+                <span className="ghost">View Work</span>
+              </div>
+            </div>
             <div className="web-desktop__cols">
-              <span />
-              <span />
-              <span />
+              <article>
+                <small>Website</small>
+                <strong>Brand Surface</strong>
+                <p>Structured narrative and product hierarchy.</p>
+              </article>
+              <article>
+                <small>Product</small>
+                <strong>Interactive Demo</strong>
+                <p>Guided walks through core workflows.</p>
+              </article>
+              <article>
+                <small>Content</small>
+                <strong>Explainer Series</strong>
+                <p>Technical video and launch assets.</p>
+              </article>
             </div>
           </div>
         </div>
+
         <div className="web-mobile">
           <div className="web-mobile__screen">
-            <b />
-            <em />
-            <em />
-            <em />
+            <div className="web-mobile__hero">
+              <small>MetaMech</small>
+              <strong>Launch ready.</strong>
+            </div>
+            <div className="web-mobile__card">
+              <em>Product site</em>
+              <span>Responsive experience</span>
+            </div>
+            <div className="web-mobile__card">
+              <em>Explainer</em>
+              <span>Technical narrative</span>
+            </div>
+            <div className="web-mobile__bar" />
           </div>
         </div>
+
         <div className="web-media">
+          <div className="web-media__frame" />
           <span>Product Video</span>
           <strong>Technical Explainer</strong>
         </div>

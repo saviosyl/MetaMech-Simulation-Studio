@@ -61,8 +61,8 @@ export const heroServices: HeroService[] = [
     accent: '#3F7CFF',
     visual: 'engineering',
     icon: Cog,
-    image: '/hero-mdat.webp',
-    imageAlt: 'MetaMech MDAT engineering automation interface',
+    image: '/hero-mdat-workspace.webp',
+    imageAlt: 'MetaMech MDAT Mechanical Design Automation workspace with Design Tools and Engineering Tools',
   },
   {
     id: 'interactive3d',
@@ -76,7 +76,7 @@ export const heroServices: HeroService[] = [
     accent: '#43D7FF',
     visual: 'interactive3d',
     icon: Box,
-    image: '/hero-sim-factory.webp',
+    image: '/hero-sim-factory-crop.webp',
     imageAlt: 'MetaMech Simulation Studio industrial factory layout with conveyors and equipment',
   },
   {
