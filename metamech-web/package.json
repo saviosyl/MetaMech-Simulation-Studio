@@ -1,0 +1,24 @@
+{
+  "name": "metamech-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Canonical MetaMech Solutions website monorepo workspace",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:corporate": "npm run dev -w @metamech/corporate",
+    "dev:mdat": "npm run dev -w @metamech/mdat",
+    "dev:simulation": "npm run dev -w @metamech/simulation-marketing",
+    "dev:goldmeta": "npm run dev -w @metamech/goldmeta-marketing",
+    "build": "npm run build -w @metamech/brand && npm run build -w @metamech/shared && npm run build -w @metamech/ui && npm run build -w @metamech/corporate && npm run build -w @metamech/mdat && npm run build -w @metamech/simulation-marketing && npm run build -w @metamech/goldmeta-marketing",
+    "build:corporate": "npm run build -w @metamech/corporate",
+    "build:mdat": "npm run build -w @metamech/mdat",
+    "lint": "npm run lint -w @metamech/corporate --if-present && npm run lint -w @metamech/mdat --if-present",
+    "typecheck": "npm run typecheck -w @metamech/corporate --if-present && npm run typecheck -w @metamech/mdat --if-present"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

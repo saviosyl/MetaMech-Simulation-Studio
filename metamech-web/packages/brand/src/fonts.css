@@ -1,0 +1,8 @@
+/* Font face loading is handled per-app (next/font or link). Tokens define the stack. */
+html {
+  font-family: var(--mm-font-sans);
+  color: var(--mm-text);
+  background: var(--mm-bg);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}

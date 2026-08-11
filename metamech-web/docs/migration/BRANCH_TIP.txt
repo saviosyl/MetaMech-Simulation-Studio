@@ -1,0 +1,3 @@
+branch=cursor/metamech-corporate-site-v1-46e2
+qa_implementation=98df4aab2fe871c205d4a808f4e7a6cd1624c261
+verify=git rev-parse HEAD
