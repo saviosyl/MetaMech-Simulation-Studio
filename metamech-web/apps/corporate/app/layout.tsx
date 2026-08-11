@@ -20,6 +20,9 @@ export const metadata: Metadata = {
     default: 'MetaMech Solutions — Technology & Product Development',
     template: '%s | MetaMech Solutions',
   },
+  icons: {
+    icon: [{ url: '/favicon.ico' }, { url: '/metamech-logo.png', type: 'image/png' }],
+  },
   description:
     'MetaMech Solutions designs and develops intelligent software, engineering automation, interactive 3D and digital products — including MetaMech MDAT, Simulation Studio and GoldMeta.',
   openGraph: {

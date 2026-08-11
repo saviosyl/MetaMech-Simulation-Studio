@@ -780,7 +780,7 @@ button:focus-visible,
 
 .eng-main img {
   object-fit: cover;
-  object-position: center 35%;
+  object-position: center center;
 }
 
 .eng-overlay {
