@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap');
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Manrope, Segoe UI, sans-serif;
+  color: #f7f9fc;
+  background: linear-gradient(160deg, #10263a 0%, #1a3a55 55%, #0d1c2b 100%);
+}
+.wrap { width: min(880px, calc(100% - 2rem)); margin: 0 auto; padding: 4rem 0; }
+.card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 24px;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+}
+.mark {
+  width: 96px; height: 96px; border-radius: 22px; background: #fff; object-fit: cover;
+  margin-bottom: 1.25rem;
+}
+.eyebrow { color: #ffb84a; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.75rem; }
+h1 { margin: 0.5rem 0; font-size: clamp(2.2rem, 5vw, 3.2rem); letter-spacing: -0.03em; }
+.sub { color: rgba(247,249,252,0.72); margin: 0 0 1rem; }
+p { color: rgba(247,249,252,0.78); line-height: 1.65; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
+.btn {
+  display: inline-flex; padding: 0.85rem 1.2rem; border-radius: 12px; font-weight: 700; text-decoration: none;
+}
+.btn-primary { background: #ffb84a; color: #10263a; }
+.btn-secondary { border: 1px solid rgba(255,255,255,0.25); color: #fff; }
+.disclaimer { margin-top: 1.5rem; font-size: 0.85rem; color: rgba(247,249,252,0.5); }
