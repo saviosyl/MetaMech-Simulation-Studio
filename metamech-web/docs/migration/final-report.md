@@ -27,7 +27,7 @@ Conceptual production source (read-only): `saviosyl/MetaMech_2026`
 
 ## 3. Current HEAD SHA
 
-`98df4aab2fe871c205d4a808f4e7a6cd1624c261`
+
 
 Verified with `git rev-parse HEAD` on `cursor/metamech-corporate-site-v1-46e2` after this QA push.
 
