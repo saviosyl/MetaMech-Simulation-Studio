@@ -33,6 +33,22 @@ fi
 echo "== Applying backend migrations =="
 npm --prefix backend run migrate
 
+# The repository commits node_modules, but the frontend's node_modules/.bin
+# symlinks are not tracked (unlike the backend's). On each boot the workspace is
+# reset to the committed git state, which strips those untracked symlinks, so
+# `vite` disappears even though install created it. Repair it here (post-checkout)
+# with a clean install whenever the vite bin is missing. This is idempotent and
+# only does work when the symlinks are actually absent.
+echo "== Ensuring frontend dev binaries are present =="
+if [ ! -x frontend/node_modules/.bin/vite ]; then
+  echo "frontend/node_modules/.bin/vite missing; restoring with npm ci"
+  npm --prefix frontend ci --no-audit --no-fund
+fi
+if [ ! -x backend/node_modules/.bin/tsx ]; then
+  echo "backend/node_modules/.bin/tsx missing; restoring with npm ci"
+  npm --prefix backend ci --no-audit --no-fund
+fi
+
 echo "== Starting backend (port 3000) and frontend (port 5173) dev servers =="
 export VITE_API_URL="${VITE_API_URL:-http://localhost:3000}"
 
