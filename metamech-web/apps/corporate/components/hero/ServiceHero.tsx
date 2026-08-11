@@ -12,6 +12,7 @@ import HeroVisual from './HeroVisuals';
 import { heroServices } from './services';
 
 const AUTO_MS = 7000;
+const MANUAL_PAUSE_MS = 12000;
 
 export default function ServiceHero() {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -19,6 +20,7 @@ export default function ServiceHero() {
   const [contentKey, setContentKey] = useState(0);
   const listId = useId();
   const timerRef = useRef<number | null>(null);
+  const pauseUntilRef = useRef(0);
   const active = heroServices[activeIndex];
 
   useEffect(() => {
@@ -40,14 +42,16 @@ export default function ServiceHero() {
     clearTimer();
     if (reducedMotion) return;
     timerRef.current = window.setInterval(() => {
+      if (Date.now() < pauseUntilRef.current) return;
       setActiveIndex((i) => (i + 1) % heroServices.length);
       setContentKey((k) => k + 1);
     }, AUTO_MS);
     return clearTimer;
   }, [activeIndex, reducedMotion, clearTimer]);
 
-  const select = (index: number) => {
+  const select = (index: number, manual = false) => {
     if (index === activeIndex) return;
+    if (manual) pauseUntilRef.current = Date.now() + MANUAL_PAUSE_MS;
     setActiveIndex(index);
     setContentKey((k) => k + 1);
   };
@@ -55,19 +59,19 @@ export default function ServiceHero() {
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
       event.preventDefault();
-      select((activeIndex + 1) % heroServices.length);
+      select((activeIndex + 1) % heroServices.length, true);
     }
     if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
       event.preventDefault();
-      select((activeIndex - 1 + heroServices.length) % heroServices.length);
+      select((activeIndex - 1 + heroServices.length) % heroServices.length, true);
     }
     if (event.key === 'Home') {
       event.preventDefault();
-      select(0);
+      select(0, true);
     }
     if (event.key === 'End') {
       event.preventDefault();
-      select(heroServices.length - 1);
+      select(heroServices.length - 1, true);
     }
   };
 
@@ -79,6 +83,8 @@ export default function ServiceHero() {
           style={{ ['--hero-accent' as string]: active.accent }}
           aria-live="polite"
         >
+          <div className="hero-panel__glow" aria-hidden="true" />
+          <div className="hero-panel__grid" aria-hidden="true" />
           <div className="hero-panel__visual-slot" key={`visual-${active.id}`}>
             <HeroVisual service={active} />
           </div>
@@ -88,7 +94,7 @@ export default function ServiceHero() {
               {active.label}
             </p>
             <h1>{active.title}</h1>
-            <p>{active.description}</p>
+            <p className="hero-panel__desc">{active.description}</p>
             <div className="hero-actions">
               <a className="mm-btn mm-btn-primary hero-primary" href={active.primaryCta.href}>
                 {active.primaryCta.label}
@@ -112,24 +118,30 @@ export default function ServiceHero() {
           aria-orientation="vertical"
           onKeyDown={onKeyDown}
         >
-          {heroServices.map((service, index) => (
-            <button
-              key={service.id}
-              type="button"
-              role="tab"
-              id={`${listId}-tab-${service.id}`}
-              aria-controls={`${listId}-heading`}
-              aria-selected={index === activeIndex}
-              tabIndex={index === activeIndex ? 0 : -1}
-              className="hero-selector"
-              style={{ ['--selector-accent' as string]: service.accent }}
-              data-active={index === activeIndex ? 'true' : 'false'}
-              onClick={() => select(index)}
-            >
-              <span className="hero-selector__index">{service.index}</span>
-              <span className="hero-selector__title">{service.label}</span>
-            </button>
-          ))}
+          {heroServices.map((service, index) => {
+            const Icon = service.icon;
+            return (
+              <button
+                key={service.id}
+                type="button"
+                role="tab"
+                id={`${listId}-tab-${service.id}`}
+                aria-controls={`${listId}-heading`}
+                aria-selected={index === activeIndex}
+                tabIndex={index === activeIndex ? 0 : -1}
+                className="hero-selector"
+                style={{ ['--selector-accent' as string]: service.accent }}
+                data-active={index === activeIndex ? 'true' : 'false'}
+                onClick={() => select(index, true)}
+              >
+                <span className="hero-selector__icon" aria-hidden="true">
+                  <Icon size={18} strokeWidth={1.75} />
+                </span>
+                <span className="hero-selector__index">{service.index}</span>
+                <span className="hero-selector__title">{service.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </section>

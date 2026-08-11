@@ -20,7 +20,7 @@ export default function Header() {
     <header className="site-header">
       <div className="mm-container site-header__inner">
         <Link href="/" className="brand-lockup" aria-label="MetaMech Solutions home">
-          <Image src="/metamech-logo.png" alt="" width={34} height={34} priority />
+          <Image src="/metamech-logo.png" alt="" width={46} height={46} priority />
           <span>
             <strong>MetaMech Solutions</strong>
             <span>Technology & Product Development</span>

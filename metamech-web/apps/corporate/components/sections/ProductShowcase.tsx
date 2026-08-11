@@ -7,8 +7,8 @@ const simulationUrl = process.env.NEXT_PUBLIC_SIMULATION_URL || 'http://localhos
 const goldmetaExternal = process.env.NEXT_PUBLIC_GOLDMETA_URL || '';
 
 const visuals: Record<string, { src: string; alt: string; contain?: boolean }> = {
-  mdat: { src: '/hero-mdat.jpg', alt: 'MetaMech MDAT interface', contain: false },
-  simulation: { src: '/hero-simulation.jpg', alt: 'MetaMech Simulation Studio', contain: false },
+  mdat: { src: '/hero-mdat.webp', alt: 'MetaMech MDAT interface', contain: false },
+  simulation: { src: '/hero-sim-environment.webp', alt: 'MetaMech Simulation Studio', contain: false },
   goldmeta: { src: '/goldmeta-mark-512.png', alt: 'GoldMeta mark', contain: true },
 };
 

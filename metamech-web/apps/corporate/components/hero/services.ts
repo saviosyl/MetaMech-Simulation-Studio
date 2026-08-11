@@ -1,3 +1,12 @@
+import type { LucideIcon } from 'lucide-react';
+import {
+  AppWindow,
+  Box,
+  CircuitBoard,
+  Cog,
+  PenTool,
+} from 'lucide-react';
+
 export type HeroService = {
   id: string;
   index: string;
@@ -8,6 +17,7 @@ export type HeroService = {
   secondaryCta: { label: string; href: string };
   accent: string;
   visual: 'software' | 'ai' | 'engineering' | 'interactive3d' | 'web';
+  icon: LucideIcon;
   image?: string;
   imageAlt?: string;
 };
@@ -24,6 +34,7 @@ export const heroServices: HeroService[] = [
     secondaryCta: { label: 'Start a Project', href: '/contact/' },
     accent: '#3F7CFF',
     visual: 'software',
+    icon: AppWindow,
   },
   {
     id: 'ai',
@@ -36,6 +47,7 @@ export const heroServices: HeroService[] = [
     secondaryCta: { label: 'Start a Project', href: '/contact/' },
     accent: '#20C7C9',
     visual: 'ai',
+    icon: CircuitBoard,
   },
   {
     id: 'engineering',
@@ -48,7 +60,8 @@ export const heroServices: HeroService[] = [
     secondaryCta: { label: 'Start a Project', href: '/contact/' },
     accent: '#3F7CFF',
     visual: 'engineering',
-    image: '/hero-mdat.jpg',
+    icon: Cog,
+    image: '/hero-mdat.webp',
     imageAlt: 'MetaMech MDAT engineering automation interface',
   },
   {
@@ -62,7 +75,8 @@ export const heroServices: HeroService[] = [
     secondaryCta: { label: 'Start a Project', href: '/contact/' },
     accent: '#43D7FF',
     visual: 'interactive3d',
-    image: '/hero-simulation.jpg',
+    icon: Box,
+    image: '/hero-sim-environment.webp',
     imageAlt: 'MetaMech Simulation Studio industrial layout visualisation',
   },
   {
@@ -76,5 +90,6 @@ export const heroServices: HeroService[] = [
     secondaryCta: { label: 'Start a Project', href: '/contact/' },
     accent: '#35C98B',
     visual: 'web',
+    icon: PenTool,
   },
 ];
